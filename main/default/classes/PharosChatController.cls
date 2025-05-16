@@ -22,15 +22,22 @@ public with sharing class PharosChatController {
             OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(OPEN_AI_SECRET);
             String secretKey = mdtSettings.Token__c;
 
-            if (String.isBlank(openAiKey) || String.isBlank(secretKey) || !OpenAI.validateToken(openAiKey)) {
-                errorMessages.add(ERROR_OPENAI_NOT_READY);
-            }
-            if (!GitHubUtils.validateGitHubConnection()) {
-                errorMessages.add(ERROR_GIT_NOT_INTEGRATED);
-            }
-            if (!isCodeIndexed(orgId)) {
-                errorMessages.add(ERROR_CODE_NOT_INDEXED);
-            }
+            errorMessages.add(ConfigUtil.GIT_API_SETTINGS.Reponame__c);
+//            if (String.isBlank(openAiKey) || String.isBlank(secretKey) || !OpenAI.validateToken(openAiKey)) {
+//                errorMessages.add(ERROR_OPENAI_NOT_READY);
+//            }
+//
+//            try {
+//                if (!GitHubUtils.validateGitHubConnection()) {
+//                    errorMessages.add(ERROR_GIT_NOT_INTEGRATED);
+//                }
+//            } catch (Exception e) {
+//                errorMessages.add(ERROR_GIT_NOT_INTEGRATED);
+//            }
+//
+//            if (!isCodeIndexed(orgId)) {
+//                errorMessages.add(ERROR_CODE_NOT_INDEXED);
+//            }
 
             if (errorMessages.size() > 0) {
                 return new InitChatResponse(errorMessages);
@@ -56,7 +63,7 @@ public with sharing class PharosChatController {
             return new InitChatResponse(orgId);
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'initChat');
-            errorMessages.add(e.getMessage());
+            errorMessages.add(e.getStackTraceString());
             return new InitChatResponse(errorMessages);
         }
     }
@@ -68,8 +75,8 @@ public with sharing class PharosChatController {
                     HttpUtils.getHeadersContentTypeJSON(),
                     200
             );
-            Map<String, Object> body = (Map<String, Object>)JSON.deserializeUntyped(response);
-            return (Boolean)body.get('empty') == false;
+            CodeIndexResponse body = (CodeIndexResponse)JSON.deserialize(response, CodeIndexResponse.class);
+            return !body.empty;
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'isCodeIndexed');
             return false;
@@ -90,5 +97,9 @@ public with sharing class PharosChatController {
             this.success = true;
             this.sessionId = sessionId;
         }
+    }
+
+    public class CodeIndexResponse {
+        public Boolean empty;
     }
 }
