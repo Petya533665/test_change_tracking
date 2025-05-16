@@ -7,13 +7,14 @@ public with sharing class PharosChatController {
 
     public static final String OPEN_AI_SECRET = 'OpenAISecret';
 
-    private static final String ERROR_OPENAI_NOT_READY = 'OpenAI integration is not configured. Please set up OpenAI integration first.';
+    private static final String ERROR_OPENAI_NOT_READY = 'OpenAI token is not configured or is invalid. Please set up OpenAI integration first.';
     private static final String ERROR_GIT_NOT_INTEGRATED = 'Git integration is not configured. Please set up Git integration first.';
     private static final String ERROR_CODE_NOT_INDEXED = 'Codebase is not indexed. Please wait for indexing to complete.';
-    private static final String ERROR_INIT_FAILED = 'Chat initialization failed';
+    private static final String ERROR_INIT_FAILED = 'Chat initialization failed.';
 
     @AuraEnabled
     public static InitChatResponse initChat() {
+        List<String> errorMessages = new List<String>();
         try {
             Connected_Org__c org = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId());
             String orgId = org.Id;
@@ -21,17 +22,15 @@ public with sharing class PharosChatController {
             OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(OPEN_AI_SECRET);
             String secretKey = mdtSettings.Token__c;
 
-            List<String> errorMessages = new List<String>();
-//            if (!(openAiKey && secretKey)) {
-            if (true) {
+            if (String.isBlank(openAiKey) || String.isBlank(secretKey) || !OpenAI.validateToken(openAiKey)) {
                 errorMessages.add(ERROR_OPENAI_NOT_READY);
             }
-            if (!isGitIntegrated()) {
+            if (!GitHubUtils.validateGitHubConnection()) {
                 errorMessages.add(ERROR_GIT_NOT_INTEGRATED);
             }
-//            if (!isCodeIndexed(orgId)) {
-//                errorMessages.add(ERROR_CODE_NOT_INDEXED)
-//            }
+            if (!isCodeIndexed(orgId)) {
+                errorMessages.add(ERROR_CODE_NOT_INDEXED);
+            }
 
             if (errorMessages.size() > 0) {
                 return new InitChatResponse(errorMessages);
@@ -57,22 +56,20 @@ public with sharing class PharosChatController {
             return new InitChatResponse(orgId);
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'initChat');
-            return new InitChatResponse(ERROR_INIT_FAILED);
+            errorMessages.add(e.getMessage());
+            return new InitChatResponse(errorMessages);
         }
-    }
-
-    public static boolean isGitIntegrated() {
-        return false;
     }
 
     public static boolean isCodeIndexed(String logOrgId) {
         try {
-            HttpUtils.get(
+            String response = HttpUtils.get(
                     CHECK_CODE_INDEXED_ENDPOINT + '?namespace=' + logOrgId,
                     HttpUtils.getHeadersContentTypeJSON(),
                     200
             );
-            return true;
+            Map<String, Object> body = (Map<String, Object>)JSON.deserializeUntyped(response);
+            return (Boolean)body.get('empty') == false;
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'isCodeIndexed');
             return false;
