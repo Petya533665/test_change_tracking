@@ -10,7 +10,7 @@ public with sharing class PharosChatController {
     private static final String ERROR_OPENAI_NOT_READY = 'OpenAI token is not configured or is invalid. Please set up OpenAI integration first.';
     private static final String ERROR_GIT_NOT_INTEGRATED = 'Git integration is not configured. Please set up Git integration first.';
     private static final String ERROR_CODE_NOT_INDEXED = 'Codebase is not indexed. Please wait for indexing to complete.';
-    private static final String ERROR_INIT_FAILED = 'Chat initialization failed.';
+    private static final String ERROR_INIT_FAILED = 'Chat initialization has failed.';
 
     @AuraEnabled
     public static InitChatResponse initChat() {
