@@ -80,9 +80,9 @@ public with sharing class PharosChatController {
     }
 
     public class InitChatResponse {
-        public Boolean success;
-        public List<String> errorMessages;
-        public String sessionId;
+        @AuraEnabled public Boolean success;
+        @AuraEnabled public List<String> errorMessages;
+        @AuraEnabled public String sessionId;
 
         public InitChatResponse(List<String> errorMessages) {
             this.success = false;
