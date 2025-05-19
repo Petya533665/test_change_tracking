@@ -1,0 +1,347 @@
+<apex:page showHeader="false" sidebar="false" controller="LoggerSettingsController"  lightningStyleSheets="false">
+
+    <apex:slds />
+
+    <style>
+        .c-hidden {
+            display: none;
+        }
+        #c-message-box {
+            width: 700px;
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            margin-left: -350px;
+            text-align: center;
+            background-color: red;
+            color: white;
+            font-size: 14px
+        }
+        .spinner {
+            display: flex; 
+            height: 100vh;
+            align-items: center;
+            justify-content: center; 
+        }
+        .spinner__logo {
+            width: 376px;
+            height: 68px;
+            animation: pulse 2s linear infinite;
+        }
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(.8);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+    </style>
+    <div class="spinner">
+        <apex:image value="{!$Resource.pharos_logo}" styleClass="spinner__logo"/>
+    </div>
+
+    <div id="c-message-box" class="c-hidden">
+        <span style="padding: 5px 40px;">XXXXX</span>
+        <div style="background-color: #fff;"><a href="javascript:void(0);" onclick="window.close();">Return back to Pharos Admin</a></div>
+    </div>
+
+
+    <div style="visibility: hidden;">
+        <div class="slds-scope">
+            <apex:form >
+                <h1 style="font-size: 24px;">Logger Settings</h1>
+                <br />
+
+                <apex:pageMessages />
+
+                <apex:outputPanel layout="block" rendered="{!isCode}">
+                    Processing ...
+                </apex:outputPanel>
+
+            </apex:form>
+        </div>
+
+    </div>
+
+    <script>
+
+        const currentUrl = window.location.protocol+'//'+window.location.hostname+window.location.pathname;
+        window.onload = function() {
+
+            if (window.location.search) {
+                const oAuthResponse = parseOAuthResponse(window.location.search);
+                if (oAuthResponse.code) {
+                    try {
+                        const a = decodeURIComponent(oAuthResponse.state);
+                        const state = JSON.parse(atob(a));
+                        if(state.isJira) {
+                            generateTokenForJira(oAuthResponse.code, state);
+                        }
+                        else if(state.isSlack) {
+                            generateTokenForSlack(oAuthResponse.code, state);
+                        }
+                        else if(state.isGraphDelegated) {
+                            generateTokenForGraph(oAuthResponse.code, state);
+                        }
+                        else if(state.isGitAPI) {
+                            generateTokenForGitHub(oAuthResponse.code, state);
+                        }
+                        else if(state.isAzureDevOps) {
+                            generateTokenForAzureDevOps(oAuthResponse.code, state);
+                        }
+                        else {
+                            generateTokenForConnectedOrg(oAuthResponse.code, state);
+                        }
+                        return;
+                    } catch (e) {}
+                    console.error('Invalid OAuth Handshake format');
+                }
+                else{
+                    window.close();
+                }
+            } else {
+                window.close();
+            }
+        };
+
+        function parseOAuthResponse(query) {
+            query = query.substring(1);
+            return JSON.parse('{"' + decodeURI(query).replace(/"/g, '\\"').replace(/&/g, '","').replace(/(?<!\=)\=(?!\=|$)/g,'":"') + '"}');
+        }
+
+        function showMessage(m) {
+            const messageBox = document.getElementById('c-message-box');
+            messageBox.getElementsByTagName('span')[0].innerText = m;
+            messageBox.classList.remove('c-hidden');
+        }
+
+        function generateTokenForConnectedOrg(code, state) {
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.LoggerSettingsController.generateTokenForConnectedOrg}',
+                JSON.stringify({ code: code, redirectUrl: state.callBackUrl, state: state }),
+                function(result, event){
+
+                    let m = 'Internal Error. Please contact administrator';
+                    if (event.status) {
+                        result = JSON.parse(result);
+                        if (result.status === 'ok') {
+                            if (window.opener) {
+                                window.close();
+                                return;
+                            } else {
+                                window.location.href = currentUrl;
+                                return;
+                            }
+                        } else if (result.status === 'error' && result.message) {
+                            m = result.message;
+                        } else {
+                            m = result;
+                        }
+                    }
+
+                    showMessage(m);
+
+                    if (window.opener) {
+                        setTimeout(function(){
+                            window.close();
+                        }, 30000)
+                    }
+
+                },
+                { escape: false }
+            );
+        }
+
+        function generateTokenForJira(code, state) {
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.LoggerSettingsController.generateTokenForJira}',
+                JSON.stringify({ code: code, return_url: '{!PHAROS_OUATH_CALLBACK_PROXY}', state: state }),
+                function(result, event){
+
+                    let m = 'Unable to complete authentication. Please double check your Jira settings and try again.';
+                    if (event.status) {
+                        result = JSON.parse(result);
+                        if (result.status === 'ok') {
+                            if (window.opener) {
+                                window.close();
+                                return;
+                            } else {
+                                window.location.href = currentUrl;
+                                return;
+                            }
+                        } else if (result.status === 'error' && result.message) {
+                            m = result.message;
+                        } else {
+                            m = result;
+                        }
+                    }
+
+                    showMessage(m);
+
+                    if (window.opener) {
+                        setTimeout(function(){
+                            window.close();
+                        }, 30000)
+                    }
+
+                },
+                { escape: false }
+            );
+        }
+
+        function generateTokenForSlack(code, state) {
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.LoggerSettingsController.generateTokenForSlack}',
+                JSON.stringify({ code: code, return_url: '{!PHAROS_OUATH_CALLBACK_PROXY}', state: state }),
+                function(result, event){
+
+                    let m = 'Unable to complete authentication. Please double check your Slack settings and try again.';
+                    if (event.status) {
+                        result = JSON.parse(result);
+                        if (result.status === 'ok') {
+                            if (window.opener) {
+                                window.close();
+                                return;
+                            } else {
+                                window.location.href = currentUrl;
+                                return;
+                            }
+                        } else if (result.status === 'error' && result.message) {
+                            m = result.message;
+                        } else {
+                            m = result;
+                        }
+                    }
+
+                    showMessage(m);
+
+                    if (window.opener) {
+                        setTimeout(function(){
+                            window.close();
+                        }, 30000)
+                    }
+
+                },
+                { escape: false }
+            );
+        }
+
+        function generateTokenForGraph(code, state) {
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.LoggerSettingsController.generateTokenForGraph}',
+                JSON.stringify({ code: code, return_url: '{!PHAROS_OUATH_CALLBACK_PROXY}', state: state }),
+                function(result, event){
+
+                    let m = 'Unable to complete authentication. Please double check your Teams settings and try again.';
+                    if (event.status) {
+                        result = JSON.parse(result);
+                        if (result.status === 'ok') {
+                            if (window.opener) {
+                                window.close();
+                                return;
+                            } else {
+                                window.location.href = currentUrl;
+                                return;
+                            }
+                        } else if (result.status === 'error' && result.message) {
+                            m = result.message;
+                        } else {
+                            m = result;
+                        }
+                    }
+
+                    showMessage(m);
+
+                    if (window.opener) {
+                        setTimeout(function(){
+                            window.close();
+                        }, 30000)
+                    }
+
+                },
+                { escape: false }
+            );
+        }
+
+        function generateTokenForAzureDevOps(code, state) {
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.LoggerSettingsController.generateTokenForAzureDevOps}',
+                JSON.stringify({ code: code, return_url: '{!PHAROS_OUATH_CALLBACK_PROXY}', state: state }),
+                function(result, event){
+
+                    let m = 'Unable to complete authentication. Please double check your Azure Dev Ops settings and try again.';
+                    if (event.status) {
+                        result = JSON.parse(result);
+                        if (result.status === 'ok') {
+                            if (window.opener) {
+                                window.close();
+                                return;
+                            } else {
+                                window.location.href = currentUrl;
+                                return;
+                            }
+                        } else if (result.status === 'error' && result.message) {
+                            m = result.message;
+                        } else {
+                            m = result;
+                        }
+                    }
+
+                    showMessage(m);
+
+                    if (window.opener) {
+                        setTimeout(function(){
+                            window.close();
+                        }, 30000)
+                    }
+
+                },
+                { escape: false }
+            );
+        }
+
+        function generateTokenForGitHub(code, state) {
+            Visualforce.remoting.Manager.invokeAction(
+                '{!$RemoteAction.LoggerSettingsController.generateTokenForGitHub}',
+                JSON.stringify({ code: code, return_url: '{!PHAROS_OUATH_CALLBACK_PROXY}', state: state }),
+                function(result, event){
+
+                    let m = 'Unable to complete authentication. Please double check your GitHub settings and try again.';
+                    if (event.status) {
+                        result = JSON.parse(result);
+                        if (result.status === 'ok') {
+                            if (window.opener) {
+                                window.close();
+                                return;
+                            } else {
+                                window.location.href = currentUrl;
+                                return;
+                            }
+                        } else if (result.status === 'error' && result.message) {
+                            m = result.message;
+                        } else {
+                            m = result;
+                        }
+                    }
+
+                    showMessage(m);
+
+                    if (window.opener) {
+                        setTimeout(function(){
+                            window.close();
+                        }, 30000)
+                    }
+
+                },
+                { escape: false }
+            );
+        }
+
+    </script>
+
+
+</apex:page>

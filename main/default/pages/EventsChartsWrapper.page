@@ -1,0 +1,77 @@
+<apex:page showHeader="true" sidebar="false" standardController="Event__c" extensions="EventsChartsWrapperController" lightningStyleSheets="true">
+    <base href="/apex/EventCharts" />
+    <apex:slds />
+    <style>
+        html,
+        body {
+            height: 100%;
+        }
+    </style>
+    <script>
+        let currentEvent = {
+            Id: '{!currentEvent.Id}',
+            CreatedDate: '{!currentEvent.CreatedDate}',
+            RuleId: '{!currentEvent.Rule__c}',
+        };
+        let currentRule = {
+            Id: '{!currentRule.Id}',
+            Name: '{!JSENCODE(currentRule.Name)}',
+            Threshold__c: '{!currentRule.Threshold__c}',
+            EventTimeInterval__c: '{!currentRule.EventTimeInterval__c}',
+            Subtype__c: '{!JSENCODE(currentRule.Subtype__c)}',
+            Type__c: '{!JSENCODE(currentRule.Type__c)}'
+        };
+        window.APP_CONFIG = {
+            assetsPath: "{!URLFOR($Resource.eventschartsapp, 'assets')}",
+            remoteActionHandlerName: '{!$RemoteAction.EventsChartsWrapperController.remoteActionHandler}',
+            packageNamespace: JSON.stringify('{!JSENCODE(packageNamespace)}'),
+            currentRule: JSON.stringify(currentRule),
+            currentEvent: JSON.stringify(currentEvent),
+            userTimezoneOffset: '{!userTimezoneOffset}',
+        };
+        function sendHeight() {
+            const height = document.body.scrollHeight;
+            window.parent.postMessage(
+                {
+                    type: 'height',
+                    page: 'EventsChartsWrapper',
+                    value: height
+                },
+                '*'
+            );
+        }
+        window.onload = function() {
+            sendHeight();
+        };
+        window.onresize = function () {
+            sendHeight();
+        }
+    </script>
+    <div class="slds grs">
+        <grs-root></grs-root>
+        <apex:outputPanel layout="none" rendered="{!isDev}">
+            <script>
+                console.log('************************************');
+                console.log('************************************');
+                console.log('PHAROS ADMIN APP IN DEVELOPMENT MODE');
+                console.log('************************************');
+                console.log('************************************');
+
+                // window.APP_CONFIG.assetsPath = 'https://localhost:4200/assets';
+
+            </script>
+            <div style="position: fixed; top: 0; right: 0; background-color: #ef4646; color: #fff; padding: 0 7px; z-index: 99999;">http://localhost:4200</div>
+            <script type="text/javascript" src="https://localhost:4200/runtime.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/polyfills.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/styles.css"></script>
+            <script type="text/javascript" src="https://localhost:4200/vendor.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/main.js"></script>
+        </apex:outputPanel>
+        <apex:outputPanel layout="none" rendered="{!NOT(isDev)}">
+            <apex:stylesheet value="{!URLFOR($Resource.eventschartsapp, 'styles.css')}" />
+            <script src="{!URLFOR($Resource.eventschartsapp, 'runtime.js')}" />
+            <script src="{!URLFOR($Resource.eventschartsapp, 'polyfills.js')}" />
+            <script src="{!URLFOR($Resource.eventschartsapp, 'main.js')}" />
+        </apex:outputPanel>
+    </div>
+</apex:page>

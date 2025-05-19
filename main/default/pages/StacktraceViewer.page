@@ -1,0 +1,123 @@
+<apex:page showHeader="true" sidebar="false" standardController="Log__c" extensions="StacktraceViewerController"
+           lightningStyleSheets="true">
+    <base href="/apex/StacktraceViewer"/>
+    <apex:slds />
+    <style>
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+        .slds-scope:not(html), .slds-scope body {
+            background-color: #fff;
+        }
+
+        .local-host-label {
+            position: fixed;
+            top: 0;
+            right: 0;
+            background-color: #ef4646;
+            color: #fff;
+            padding: 0 7px;
+            z-index: 99999;
+        }
+    </style>
+    <script>
+        const logId = '{!JSENCODE(log.Id)}';
+        const logType = '{!JSENCODE(log.Type__c)}';
+        const logName = '{!JSENCODE(log.Name)}';
+        const logCategory = '{!JSENCODE(log.Category__c)}';
+        const stackTraceParseResult = '{!JSENCODE(log.Stacktrace_Parse_Result__c)}';
+        const stackTraceParseResultAvailable = '{!log.Stack_trace_parse_result_available__c}';
+        const Summary__c = '{!JSENCODE(log.Summary__c)}';
+        const Organization_Url__c = '{!JSENCODE(log.Organization_Url__c)}';
+        const Stacktrace__c = '{!JSENCODE(log.Stacktrace__c)}';
+        const Async_Job_Id__c = '{!JSENCODE(log.Async_Job_Id__c)}';
+        const Flow_Link__c = '{!JSENCODE(log.Flow_Link__c)}';
+        const isBlurMode = '{!isBlurMode}';
+        const blurModeUrlParameter = '{!blurModeUrlParameter}';
+
+        const stacktraceCvId = '{!JSENCODE(stacktraceCvId)}';
+        const stacktraceParseResultCvId = '{!JSENCODE(stacktraceParseResultCvId)}';
+
+        function sendHeight() {
+            let height = document.body.scrollHeight;
+            if (!stackTraceParseResultAvailable) {
+                height = 20;
+            } else {
+                switch (logCategory) {
+                    case 'Bulk API':
+                        height = 600;
+                        break;
+                    case 'Flow':
+                    case 'Process Builder':
+                    case 'Integration':
+                        height = 610;
+                        break;
+                    default:
+                        try {
+                            height = JSON.parse(stackTraceParseResult).length * 310;
+                        } catch (e) {}
+                        break;
+                }
+            }
+            window.parent.postMessage(
+                {
+                    type: 'height',
+                    page: 'StacktraceViewer',
+                    value: height
+                },
+                '*'
+            );
+        }
+        window.onload = function () {
+            document.body.classList.remove('sfdcBody');
+            sendHeight();
+        }
+        window.onresize = function () {
+            sendHeight();
+        }
+
+        window.APP_CONFIG = {
+            sldsIconsPath: "/apexpages/slds/latest/assets/icons",
+            remoteActionHandlerName: '{!$RemoteAction.StacktraceViewerController.remoteActionHandler}',
+            assetsPath: "{!URLFOR($Resource.adminapp, 'assets')}",
+            projectAssetsPath: "{!URLFOR($Resource.processbuilderapp, 'assets')}",
+            logId: logId,
+            logType: logType,
+            logName: logName,
+            stackTraceParseResult: stackTraceParseResult,
+            Summary__c: Summary__c,
+            Stacktrace__c: Stacktrace__c,
+            logCategory: logCategory,
+            Organization_Url__c: Organization_Url__c,
+            Async_Job_Id__c: Async_Job_Id__c,
+            Flow_Link__c: Flow_Link__c,
+            baseUrl: "{!baseUrl}",
+            apiSessionId: "{!$Api.Session_ID}",
+            packageNamespace: JSON.stringify('{!packageNamespace}'),
+            isBlurMode: isBlurMode,
+            blurModeUrlParameter: `/fp-04?q=${blurModeUrlParameter}`,
+            stacktraceCvId: stacktraceCvId,
+            stacktraceParseResultCvId: stacktraceParseResultCvId
+        }
+    </script>
+    <div class="slds slds-scope slds-is-relative grs">
+        <grs-root></grs-root>
+        <apex:outputPanel layout="none" rendered="{!isDev}">
+            <div class="local-host-label">http://localhost:4200</div>
+            <link href="https://localhost:4200/styles.css" rel="stylesheet" type="text/css"/>
+            <script type="text/javascript" src="https://localhost:4200/runtime.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/polyfills.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/styles.css"></script>
+            <script type="text/javascript" src="https://localhost:4200/vendor.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/main.js"></script>
+        </apex:outputPanel>
+        <apex:outputPanel layout="none" rendered="{!NOT(isDev)}">
+            <apex:stylesheet value="{!URLFOR($Resource.processbuilderapp, 'styles.css')}"/>
+            <script src="{!URLFOR($Resource.processbuilderapp, 'runtime.js')}"/>
+            <script src="{!URLFOR($Resource.processbuilderapp, 'polyfills.js')}"/>
+            <script src="{!URLFOR($Resource.processbuilderapp, 'main.js')}"/>
+        </apex:outputPanel>
+    </div>
+</apex:page>

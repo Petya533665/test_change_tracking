@@ -1,0 +1,216 @@
+<apex:page showHeader="true" sidebar="false" standardController="Log__c" extensions="JiraDetailsController"
+           lightningStyleSheets="true" action="{!init}">
+
+    <script src="{!URLFOR($Resource.libs, '/libs/moment.2.22.2.min.js')}"/>
+    <script src="{!URLFOR($Resource.libs, '/libs/handlebars.4.0.11.js')}"/>
+    <style>
+        html,
+        body {
+            height: 100%;
+        }
+    </style>
+    <script>
+        Handlebars.registerHelper('equal', function(lvalue, rvalue, options) {
+            if (arguments.length < 3)
+                throw new Error("Handlebars Helper equal needs 2 parameters");
+            if( lvalue!=rvalue ) {
+                return options.inverse(this);
+            } else {
+                return options.fn(this);
+            }
+        });
+        
+        Handlebars.registerHelper('compare', function(lvalue, rvalue, options) {
+
+            if (arguments.length < 3)
+                throw new Error("Handlerbars Helper 'compare' needs 2 parameters");
+
+            var operator = options.hash.operator || "==";
+
+            var operators = {
+                '==':       function(l,r) { return l == r; },
+                '===':      function(l,r) { return l === r; },
+                '!=':       function(l,r) { return l != r; },
+                '<':        function(l,r) { return l < r; },
+                '>':        function(l,r) { return l > r; },
+                '<=':       function(l,r) { return l <= r; },
+                '>=':       function(l,r) { return l >= r; },
+                'typeof':   function(l,r) { return typeof l == r; }
+            }
+
+            if (!operators[operator])
+                throw new Error("Handlerbars Helper 'compare' doesn't know the operator "+operator);
+
+            var result = operators[operator](lvalue,rvalue);
+
+            if( result ) {
+                return options.fn(this);
+            } else {
+                return options.inverse(this);
+            }
+
+        });
+
+        Handlebars.registerHelper('toJSON', function(object){
+            return new Handlebars.SafeString(JSON.stringify(object));
+        });
+
+        function sendHeight() {
+            const height = document.body.scrollHeight;
+            window.parent.postMessage(
+                {
+                    type: 'height',
+                    page: 'JiraDetails',
+                    value: height
+                },
+                '*'
+            );
+        }
+        window.onload = function() {
+            sendHeight();
+        };
+        window.onresize = function () {
+            sendHeight();
+        }
+    </script>
+    
+    <div class="c-container"></div>
+
+    <c:ticketTemplate isAzure="{!isAzure}" jiraTaskUrl="{!jiraTaskUrl}"/>
+
+    <apex:outputPanel rendered="{!isAzure}">
+        <script>
+            Handlebars.registerHelper('equal', function (v1, v2, options) {
+                if (v1 === v2) {
+                    return options.fn(this);
+                } else {
+                    return options.inverse(this);
+                }
+            });
+            const workItem = '{!JSENCODE(workItem)}';
+            const workItemComments = '{!JSENCODE(workItemComments)}';
+
+            if (checkValidJson(workItem)) {
+                const itemTemplate = Handlebars.compile(document.getElementById("azure-ticket-details-template").innerHTML);
+                const container = document.querySelector('.c-container');
+
+                const wi = JSON.parse(workItem);
+                let wic;
+
+                wi.fields.Tags = wi.fields.Tags ? wi.fields.Tags.split('; ') : '';
+                wi.fields.StartDate = wi.fields.StartDate ? moment.utc(wi.fields.StartDate).format('DD.MM.YYYY HH:mm') : '';
+                wi.fields.TargetDate = wi.fields.TargetDate ? moment.utc(wi.fields.TargetDate).format('DD.MM.YYYY HH:mm'): '';
+                wi.fields.ChangedDate = wi.fields.ChangedDate ? moment.utc(wi.fields.ChangedDate).format('DD.MM.YYYY HH:mm'): '';
+
+                if (checkValidJson(workItemComments)) {
+                    wic = JSON.parse(workItemComments);
+                }
+                const htmlPart = itemTemplate({workItem: wi, workItemComments: wic});
+                container.innerHTML = htmlPart;
+
+                const stateIndicator = document.getElementById('state-indicator');
+                switch(wi.fields.State) {
+                    case 'To Do': {
+                        stateIndicator.classList.add('state-indicator__to-do');
+                        break;
+                    }
+                    case 'Doing': {
+                        stateIndicator.classList.add('state-indicator__doing');
+                        break;
+                    }
+                    case 'Done': {
+                        stateIndicator.classList.add('state-indicator__done');
+                        break;
+                    }
+                }
+            }
+
+
+            function checkValidJson(str) {
+                try {
+                    JSON.parse(str);
+                } catch (e) {
+                    return false;
+                }
+                return true;
+            }
+
+        </script>
+    </apex:outputPanel>
+
+    <apex:outputPanel rendered="{!NOT(isAzure)}">
+        <script>
+            var itemTemplate = Handlebars.compile(document.getElementById("jira-ticket-details-template").innerHTML);
+            var setupJiraTicketDetailsJson = '{!JSENCODE(jiraTask)}';
+            const container = document.querySelector('.c-container');
+            function checkValidJson(str) {
+                try {
+                    JSON.parse(str);
+                } catch (e) {
+                    return false;
+                }
+                return true;
+            }
+            const isValidJson = checkValidJson(setupJiraTicketDetailsJson);
+            if (isValidJson) {
+                let records = JSON.parse(setupJiraTicketDetailsJson);
+                Object.keys(records.fields).forEach((key)=> {
+                    if ((records.fields[key]) && (records.fields[key]).toString().includes('service.sprint')) {
+                        spriteString = records.fields[key].toString();
+                        spriteName = spriteString.substring(spriteString.lastIndexOf("name=") + 5, spriteString.lastIndexOf(",goal="));
+    
+                        records.fields.sprint = spriteName;
+                    }
+                });
+    
+                function updateType(object) {
+                    Object.keys(object).forEach(function (k) {
+                        if (object[k]) {
+                            if (k == 'type') {
+                                object['type'+object[k]] = true;
+                            }
+                            if (k == 'content') {
+                                for (let content of object.content) {
+                                    updateType(content);
+                                }
+                            }
+                        }
+                    });
+                }
+    
+                for (var comment of records.fields.comment.comments) {
+                    updateType(comment.body);
+                }
+    
+                for (var comment of records.fields.comment.comments) {
+                    comment.createdFormatted = moment(comment.created).format('LLL');
+                }
+                records.fields.createdFormatted = moment(records.fields.created).format('LLL');
+                if (records.fields.updated) {
+                    records.fields.updatedFormatted = moment(records.fields.updated).format('LLL');
+                }
+                if (records.fields.resolved) {
+                    records.fields.updatedResolved = moment(records.fields.resolved).format('LLL');
+                }
+    
+                for (var attachment of records.fields.attachment) {
+                    let mimeType = attachment.mimeType.split('/').shift();
+                    if (mimeType == 'video') {
+                        attachment.mimeTypeVideo = 1;
+                    }
+                    if (mimeType == 'image') {
+                        attachment.mimeTypeImage = 1;
+                    }
+                    if (mimeType == 'application') {
+                        attachment.mimeTypeApplication = 1;
+                    }
+                }
+    
+                const htmlPart = itemTemplate({records: records});
+                container.innerHTML = htmlPart;
+            } else {
+                container.innerHTML = 'This view is not available. No Bug tracker link associated.'
+            }
+        </script>
+    </apex:outputPanel>
+</apex:page>

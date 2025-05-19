@@ -1,0 +1,4 @@
+<design:component label="Issue Related List">
+    <design:attribute name="showHeader" label="Show Header" />
+    <design:attribute name="fields" label="Fields" />
+</design:component>

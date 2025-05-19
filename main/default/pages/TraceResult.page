@@ -1,0 +1,40 @@
+<apex:page showHeader="true" sidebar="false" standardController="Trace_Result__c" extensions="TraceResultController">
+
+    <base href="/apex/TraceResult"/>
+    <apex:slds />
+
+    <html>
+    <body>
+    <script>
+        window.onload = function() {
+            document.body.classList.remove('sfdcBody');
+        };
+        window.APP_CONFIG = {
+            remoteActionHandlerName: '{!$RemoteAction.TraceResultController.remoteActionHandler}',
+            packageNamespace: JSON.stringify('{!packageNamespace}'),
+            assetsPath: "{!URLFOR($Resource.adminapp, 'assets')}",
+            apisessionId: "{!$Api.Session_ID}",
+            baseUrl: "{!baseUrl}"
+        };
+    </script>
+    <div class="slds slds-scope grs">
+        <grs-root></grs-root>
+        <apex:outputPanel layout="none" rendered="{!isDev}">
+            <link href="https://localhost:4200/styles.css" rel="stylesheet" type="text/css"/>
+            <script type="text/javascript" src="https://localhost:4200/runtime.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/polyfills.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/styles.css"></script>
+            <script type="text/javascript" src="https://localhost:4200/vendor.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/main.js"></script>
+        </apex:outputPanel>
+        <apex:outputPanel layout="none" rendered="{!NOT(isDev)}">
+            <apex:stylesheet value="{!URLFOR($Resource.traceapp, 'styles.css')}"/>
+            <script src="{!URLFOR($Resource.traceapp, 'runtime.js')}"/>
+            <script src="{!URLFOR($Resource.traceapp, 'polyfills.js')}"/>
+            <script src="{!URLFOR($Resource.traceapp, 'main.js')}"/>
+        </apex:outputPanel>
+    </div>
+    </body>
+    </html>
+
+</apex:page>

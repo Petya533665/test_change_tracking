@@ -1,0 +1,1107 @@
+<apex:component >
+    <apex:attribute name="isAzure" type="Boolean" description="A boolean value"/>
+    <apex:attribute name="jiraTaskUrl" type="String" description="A String value"/>
+
+    <apex:outputPanel rendered="{!isAzure}">
+        <script id="azure-ticket-details-template" type="text/x-handlebars-template">
+            <div class="azure-container">
+                <div class="azure-header">
+                    <div class="azure-header__link-wrap">
+                        <img id="work-item-icon" width="14" height="14" data-workItemType="{{workItem.fields.WorkItemType}}" data-workItemOrg="{{workItem.organizationName}}">
+                        <a class="azure-header__link" href="{{workItem.links.html.href}}" target="_blank">{{workItem.fields.WorkItemType}} {{workItem.id}}</a>
+                    </div>
+                    <div class="azure-header_title">
+                        {{workItem.id}} {{workItem.fields.Title}}
+                    </div>
+                    <div class="azure-header_content">
+                        <div class="azure-header_content-user">
+                            <div class="azure-header_content-user-icon">
+                                <img src="{{workItem.fields.CreatedBy.links.avatar.href}}" width="20" height="20" alt="user-icon">
+                            </div>
+                            <div>{{workItem.fields.CreatedBy.displayName}}</div>
+                        </div>
+                        <div class="azure-header_content-info">
+                            <div class="azure-header_content-info-comment">
+                                {{workItem.fields.CommentCount}} comment{{#equal workItemComments.totalCount 1}}<span></span>{{else}}<span>s</span>{{/equal}}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="azure-header_content-tags-wrap">
+                        {{#each workItem.fields.Tags}}
+                            <div class="azure-header_content-info-tag">{{this}}</div>
+                        {{/each}}
+                    </div>
+                </div>
+              
+                <div class="azure-info">
+                    <div class="azure-info_wrap">
+                        <div class="azure-info_block">
+                            <div class="azure-info_block-group">
+                                <div class="azure-info_title mb-5">State</div>
+                                <div class="azure-info_title">Reason</div>
+                            </div>
+                            <div class="azure-info_block-group">
+                                <div class="mb-5 azure-info_block-group-state">
+                                    <div id="state-indicator" class="azure-info_block-group-state-indicator"></div>
+                                    <div class="ml-5">
+                                        {{workItem.fields.State}}
+                                    </div>
+                                </div>
+                                <div>{{workItem.fields.Reason}}</div>
+                            </div>
+                        </div >
+                        <div class="azure-info_block">
+                            <div class="azure-info_block-group">
+                                <div class="azure-info_title mb-5">Area</div>
+                                <div class="azure-info_title">Iteration</div>
+                            </div>
+                            <div class="azure-info_block-group">
+                                <div class="mb-5">{{workItem.fields.AreaPath}}</div>
+                                <div>{{workItem.fields.IterationPath}}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="azure-info_title">Updated: {{workItem.fields.ChangedDate}}</div>
+                </div>
+              
+                <div class="azure-body">
+                    <div class="azure-body_group">
+                        <div class="azure-body_group-title">Description</div>
+                        <div class="azure-body_group-description">
+                            <div class="azure-body_group-description-list">
+                                {{{workItem.fields.Description}}}
+                            </div>
+                            <div class="azure-body_group-title">Discussion</div>
+                            {{#each workItemComments.comments}}
+                                <div class="azure-body_wrap">
+                                    <div class="azure-header_content-user-icon">
+                                        <img class="azure-header_content-user-icon-img" src="{{this.createdBy.imageUrl}}" alt="user-comment-icon">
+                                    </div>
+                                    <div class="azure-body_group-description-section">
+                                      <div class="azure-body_group-description-section-title">
+                                          <div class="azure-body_group-description-section-user">{{this.createdBy.displayName}}</div>
+                                          <div class="azure-body_group-description-section-status">commented</div>
+                                      </div>
+                                      <div class="azure-body_group-description-section-content">
+                                          {{{this.text}}}
+                                      </div>
+                                    </div>
+                                </div>
+                            {{/each}}
+                        </div>
+                    </div>
+                    <div class="azure-body_group azure-body_group-smaller ml-20">
+                        <div class="azure-body_group-title">Planning</div>
+                        <div class="azure-body_group-planning">
+                            <div class="azure-body_group-planning-title">Priority</div>
+                            <div class="azure-body_group-planning-content">{{workItem.fields.Priority}}</div>
+                            <div class="azure-body_group-planning-title">Start Date</div>
+                            <div class="azure-body_group-planning-content">{{workItem.fields.StartDate}}</div>
+                            <div class="azure-body_group-planning-title">Target Date</div>
+                            <div class="azure-body_group-planning-content">{{workItem.fields.TargetDate}}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const iconElem = document.getElementById('work-item-icon');
+                if (iconElem) {
+                    const workItemType = iconElem.getAttribute('data-workItemType');
+                    const workItemOrg = iconElem.getAttribute('data-workItemOrg');
+                    const { icon, color }  = getIconAndColor(workItemType);
+                    const src = `https://dev.azure.com/${workItemOrg}/_apis/wit/workitemicons/${icon}?color=${color}&v=2&api-version=7.1-preview.1`;
+                    iconElem.setAttribute('src', src);
+                }
+            });
+
+            function getIconAndColor(type) {
+                let icon = 'icon_clipboard_issue';
+                let color = '339947';
+                if (type === 'Task') {
+                    icon = 'icon_check_box';
+                    color = 'a4880a';
+                } else if (type === 'Epic') {
+                    icon = 'icon_crown';
+                    color = 'e06c00';
+                } else if (type === 'Bug') {
+                    icon = 'icon_insect';
+                    color = 'cc293d';
+                } else if (type === 'Test Case') {
+                    icon = 'icon_test_case';
+                    color = '004b50';
+                } else if (type === 'User Story') {
+                    icon = 'icon_book';
+                    color = '0099c7';
+                } else if (type === 'Feature') {
+                    icon = 'icon_trophy';
+                    color = '773b93';
+                } 
+                return { icon, color };
+            }
+
+        </script>
+
+        <style>
+            .azure-header_title {
+                font-size: 18px;
+                padding: 0 2px;
+            }
+            .azure-header__link-wrap {
+                display: flex;
+                font-size: 14px;
+                margin-bottom: 4px;
+                text-transform: uppercase;
+            }
+            .azure-header__link {
+                margin-left: 5px;
+            }
+            .azure-header_content-user {
+                font-size: 14px;
+                display: flex;
+                align-items: center;
+                min-width: 15%;
+                margin-bottom: 7px;
+            }
+            .azure-header_content-user-icon {
+                border-radius: 14px;
+                overflow: hidden;
+                margin-right: 5px;
+            }
+            .azure-header_content-user-icon-img {
+                width: 100%;
+                height: 100%;
+                max-width: 28px;
+            }
+            .azure-header_content {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .azure-header_content-info{
+              display: flex;
+              align-items: center;
+            }
+            .azure-header_content-info-comment{
+              margin-right: 10px;
+              font-size: 14px;
+            }
+            .azure-header_content-tags-wrap{
+              display: flex;
+              align-items: center;
+              flex-wrap: wrap;
+            }
+            .azure-header_content-info-tag{
+              margin: 0 5px 7px 0;
+              background-color: #f0f7fd;
+              font-size: 14px;
+              padding: 1px 4px;
+              max-width: 200px;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              overflow: hidden;
+            }
+            .azure-info {
+              display: flex;
+              justify-content: space-between;
+              background-color: #f8f8f8;
+              padding: 20px 15px;
+            }
+            .azure-info_wrap {
+                display: flex;
+            }
+            .azure-info_block {
+              display: flex;
+            }
+            .azure-info_block-group{
+              display: flex;
+              flex-direction: column;
+              font-size: 14px;
+              margin-right: 14px;
+            }
+            .azure-info_title{
+              color: grey;
+              font-weight: 500;
+            }
+            .azure-body{
+              display: flex;
+              justify-content: space-between;
+              padding: 10px;
+            }
+            .azure-body_group {
+              margin-left: 5px;
+              display: inline-block;
+              width: 100%;
+            }
+            .azure-body_group-title{
+              font-weight: 600;
+              font-size: 16px;
+              border-bottom: 1px solid rgb(212, 212, 212);
+              margin-bottom: 10px; 
+              padding-bottom: 10px; 
+            }
+            .azure-body_wrap {
+                display: flex;
+                align-items: flex-start;
+            }
+            .azure-body_group-description-section {
+              border: 1px solid rgb(221, 221, 221);
+              margin-bottom: 7px;
+              border-radius: 5px;
+              padding: 10px;
+              font-size: 14px;
+              width: 100%;
+            }
+            .azure-body_group-description-list {
+                margin-bottom: 25px;
+                font-size: 14px;
+                padding-left: 5px;
+            }
+            .azure-body_group-description-section-title{
+              display: flex;
+              align-items: end;
+              margin-bottom: 10px;
+            }
+            .azure-body_group-description-section-user{
+              margin-right: 5px;
+              color: gray;
+              font-weight: bold;
+
+            }
+            .azure-body_group-description-section-status{
+              font-size: 12px;
+              color: gray;
+            }
+            .azure-body_group-planning-title{
+              font-size: 12px;
+              color: gray;
+              margin: 2px 0;
+            }
+            .azure-body_group-planning-content {
+                font-size: 14px;
+                margin-bottom: 7px;
+            }
+            .azure-body_group-smaller{
+              width: 60%;
+            }
+            .ml-20 {
+                margin-left: 20px;
+            }
+            .mb-5 {
+                margin-bottom: 5px;
+            }
+            .ml-5 {
+                margin-left: 5px;
+            }
+            .azure-info_block-group-state {
+                display: flex;
+                align-items: baseline;
+            }
+            .azure-info_block-group-state-indicator {
+                height: 11px;
+                width: 11px;
+                border-radius: 50%;
+            }
+            .state-indicator__to-do {
+                background-color: rgb(178, 178, 178);
+            }
+            .state-indicator__doing {
+                background-color: rgb(0, 122, 204);
+            }
+            .state-indicator__done {
+                background-color: rgb(51, 153, 51);
+            }
+        </style>
+    </apex:outputPanel>
+
+
+    <apex:outputPanel rendered="{!NOT(isAzure)}">
+        <script id="jira-ticket-details-template" type="text/x-handlebars-template">
+            <div class="jira-main-container">
+                <div class="jira-ticket-id"><a href="{!jiraTaskUrl}" target="_blank">{{records.key}} <i class="jira-ticket-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><path d="M448 279.196V464c0 26.51-21.49 48-48 48H48c-26.51 0-48-21.49-48-48V112c0-26.51 21.49-48 48-48h248a24 24 0 0 1 16.97 7.029l16 16C344.09 102.149 333.382 128 312 128H64v320h320V295.196c0-6.365 2.529-12.47 7.029-16.971l16-16C422.148 247.106 448 257.814 448 279.196zM576 37.333C576 16.715 559.285 0 538.667 0H380c-15.464 0-28 12.536-28 28v17.885c0 15.766 13.011 28.424 28.772 27.989l67.203-1.906L199.09 319.09c-9.429 9.363-9.457 24.605-.061 34.001l23.879 23.879c9.396 9.396 24.639 9.369 34.001-.06l247.122-248.885-1.906 67.203c-.434 15.76 12.224 28.772 27.99 28.772H548c15.464 0 28-12.536 28-28V37.333z"/></svg></i></a></div>
+                
+                <div class="jira-container">
+                    <div class="jira-main">
+                        
+                        <div class="jira-aside-section">
+                            <div class="jira-regular-title">Status</div>
+                            <div class="jira-ticket-status">{{records.fields.status.name}}</div>
+                        </div>
+                        
+                        <div class="jira-aside-section">
+                            <div class="jira-regular-title">Assignee</div>
+                            <div class="jira-ticket-aside-user">
+                                {{#if records.fields.assignee }}
+                                     <div class="jira-ticket-aside-user-image">
+                                          <img src="{{records.fields.assignee.avatarUrls.48x48}}" alt="{{records.fields.assignee.displayName}}" />
+                                     </div>
+                                     <div class="jira-ticket-aside-user-name">{{records.fields.assignee.displayName}}</div>
+                                {{else}}
+                                     <div class="jira-ticket-aside-user-image">
+                                          <img src="https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/default?size=48&s=48" alt="default" />
+                                     </div>
+                                     <div class="jira-ticket-aside-user-name">Unassigned</div>
+                                {{/if}}
+                            </div>
+                        </div>
+                        
+                        {{#if records.fields.labels}}
+                        <div class="jira-aside-section">
+                            <div class="jira-regular-title">Labels</div>
+                            <ul class="jira-ticket-labels">
+                                {{#each records.fields.labels}}<li><a href="#">{{this}}</a></li>{{/each}}
+                            </ul>
+                        </div>
+                        {{/if}}
+                        
+                        {{#if records.fields.fixVersions}}
+                        <div class="jira-aside-section">
+                            <div class="jira-regular-title">Fix Versions</div>
+                            <ul class="jira-ticket-labels">
+                                {{#each records.fields.fixVersions}}<li><a href="#">{{this.name}}</a></li>{{/each}}
+                            </ul>
+                        </div>
+                        {{/if}}
+                        
+                        {{#if records.fields.sprint}}
+                        <div class="jira-aside-section">
+                            <div class="jira-regular-title">Sprint</div>
+                            <div class="jira-ticket-sprint">{{records.fields.sprint}}</div>
+                        </div>
+                        {{/if}}
+                        
+                        <div class="jira-aside-section">
+                            <div class="jira-regular-title">Reporter</div>
+                            <div class="jira-ticket-aside-user">
+                                <div class="jira-ticket-aside-user-image">
+                                    <img src="{{records.fields.reporter.avatarUrls.48x48}}" alt="{{records.fields.reporter.displayName}}" />
+                                </div>
+                                <div class="jira-ticket-aside-user-name">{{records.fields.reporter.displayName}}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="jira-aside-section">
+                            <div class="jira-ticket-dates">
+                                <div>Created <span>{{records.fields.createdFormatted}}</span></div>
+                                {{#if records.fields.updatedFormatted}}
+                                <div>Updated <span>{{records.fields.updatedFormatted}}</span></div>
+                                {{/if}}
+                                {{#if records.fields.updatedResolved}}
+                                <div>Resolved <span>{{records.fields.updatedResolved}}</span></div>
+                                {{/if}}
+                            </div>
+                        </div>
+                    
+                    </div>
+                    
+                    <div class="jira-aside">
+                        
+                        {{#if records.fields.comment.comments}}
+                        <div class="jira-main-section">
+                            <div class="jira-regular-title">Comments</div>
+                            <div class="jira-comments">
+                                
+                                {{#each records.renderedFields.comment.comments}}
+                                <div class="jira-comment">
+                                    <div class="jira-comment-author-image">
+                                        <img src="{{author.avatarUrls.48x48}}" alt="{{author.displayName}}"/>
+                                    </div>
+                                    <div class="jira-comment-info">
+                                        <div class="jira-comment-author-and-date">
+                                        <span class="jira-comment-author-name">
+                                            {{author.displayName}}
+                                        </span>
+                                            <span class="jira-comment-date">
+                                            {{createdFormatted}}
+                                        </span>
+                                        </div>
+                                        <div class="jira-comment-content">
+                                        {{#if body.content}}
+                                            {{#each body.content}}
+                                                {{#if typetable}}
+                                                    <div class="jira-comment-table">
+                                                        <table>
+                                                            {{#each content}}
+                                                                {{#if typetableRow}}
+    
+                                                                    <tr>
+                                                                        {{#each content}}
+                                                                            {{#if typetableHeader}}
+                                                                                {{#each content}}
+                                                                                    {{#each content}}
+                                                                                        <th>{{text}}</th>
+                                                                                    {{/each}}
+                                                                                {{/each}}
+                                                                            {{/if}}
+                                                                            {{#if typetableCell}}
+                                                                                {{#each content}}
+                                                                                    {{#each content}}
+                                                                                        <td>{{text}}</td>
+                                                                                    {{/each}}
+                                                                                {{/each}}
+                                                                            {{/if}}
+                                                                        {{/each}}
+                                                                    </tr>
+    
+                                                                {{/if}}
+                                                            {{/each}}
+    
+                                                        </table>
+                                                    </div>
+                                                {{/if}}
+
+                                                {{#if typecodeBlock}}
+                                                    {{#each content}}
+                                                        <figure class="jira-comment-code-block">
+                                                            <figcaption>{{attrs.language}}</figcaption>
+                                                            <pre>
+                                                                <code>
+                                                                    {{text}}
+                                                                </code>
+                                                            </pre>
+                                                        </figure>
+                                                    {{/each}}
+                                                {{/if}}
+
+                                                {{#if typeblockquote}}
+                                                    {{#each content}}
+                                                        {{#if typeparagraph}}
+                                                            <p>
+                                                                {{#each content}}
+                                                                    <blockquote>
+                                                                        {{text}}
+                                                                    </blockquote>
+                                                                {{/each}}
+                                                            </p>
+                                                        {{/if}}
+                                                    {{/each}}
+                                                {{/if}}
+
+                                                {{#if typeheading}}
+                                                    {{#equal attrs.level 1}}
+                                                        {{#each content}}
+                                                            <h1>{{text}}</h1>
+                                                        {{/each}}
+                                                    {{/equal}}
+                                                    {{#equal attrs.level 2}}
+                                                        {{#each content}}
+                                                            <h2>{{text}}</h2>
+                                                        {{/each}}
+                                                    {{/equal}}
+                                                    {{#equal attrs.level 3}}
+                                                        {{#each content}}
+                                                            <h3>{{text}}</h3>
+                                                        {{/each}}
+                                                    {{/equal}}
+                                                    {{#equal attrs.level 4}}
+                                                        {{#each content}}
+                                                            <h4>{{text}}</h4>
+                                                        {{/each}}
+                                                    {{/equal}}
+                                                    {{#equal attrs.level 5}}
+                                                        {{#each content}}
+                                                            <h5>{{text}}</h5>
+                                                        {{/each}}
+                                                    {{/equal}}
+                                                    {{#equal attrs.level 6}}
+                                                        {{#each content}}
+                                                            <h6>{{text}}</h6>
+                                                        {{/each}}
+                                                    {{/equal}}
+                                                {{/if}}
+    
+                                                {{#if typebulletList}}
+                                                    <ul>
+                                                        {{#each content}}
+                                                            {{#if typelistItem}}
+                                                                <li>
+                                                                    {{#each content}}
+                                                                    {{#if typeparagraph}}
+                                                                    <p>
+                                                                        {{#each content}}
+                                                                        {{#if marks}}
+                                                                        {{#each marks}}
+                                                                        {{#equal type 'strong'}}
+                                                                        <b>
+                                                                            {{/equal}}
+                                                                            {{#equal type 'em'}}
+                                                                            <em>
+                                                                                {{/equal}}
+                                                                                {{#equal type 'underline'}}
+                                                                                <u>
+                                                                                    {{/equal}}
+                                                                                    {{#equal type 'strike'}}
+                                                                                    <del>
+                                                                                        {{/equal}}
+                                                                                        {{#equal type 'textColor'}}
+                                                                                        <span style="color: {{attrs.color}};">
+                                                                                {{/equal}}
+                                                                            {{/each}}
+    
+                                                                            {{text}}
+    
+                                                                            {{#each marks}}
+                                                                                {{#equal type 'strong'}}
+                                                                                    </b>
+                                                                                    {{/equal}}
+                                                                                    {{#equal type 'em'}}
+                                                                                    </em>
+                                                                                    {{/equal}}
+                                                                                    {{#equal type 'underline'}}
+                                                                                    </u>
+                                                                                    {{/equal}}
+                                                                                    {{#equal type 'strike'}}
+                                                                                    </del>
+                                                                                    {{/equal}}
+                                                                                    {{#equal type 'textColor'}}
+                                                                                    </span>
+                                                                                    {{/equal}}
+                                                                                    {{/each}}
+    
+                                                                                    {{else}}
+                                                                                        <p>{{text}}</p>
+                                                                                    {{/if}}
+                                                                                    {{/each}}
+                                                                    </p>
+                                                                    {{/if}}
+                                                                    {{/each}}
+                                                                </li>
+                                                            {{/if}}
+                                                        {{/each}}
+                                                    </ul>
+                                                {{/if}}
+    
+                                                {{#if typeorderedList}}
+                                                <ol>
+                                                    {{#each content}}
+                                                    {{#if typelistItem}}
+                                                    <li>
+                                                        {{#each content}}
+                                                        {{#if typeparagraph}}
+                                                        <p>
+                                                            {{#each content}}
+                                                            {{#if marks}}
+                                                            {{#each marks}}
+                                                            {{#equal type 'strong'}}
+                                                            <b>
+                                                                {{/equal}}
+                                                                {{#equal type 'em'}}
+                                                                <em>
+                                                                    {{/equal}}
+                                                                    {{#equal type 'underline'}}
+                                                                    <u>
+                                                                        {{/equal}}
+                                                                        {{#equal type 'strike'}}
+                                                                        <del>
+                                                                            {{/equal}}
+                                                                            {{#equal type 'textColor'}}
+                                                                            <span style="color: {{attrs.color}};">
+                                                                                    {{/equal}}
+                                                                                {{/each}}
+    
+                                                                                {{text}}
+    
+                                                                                {{#each marks}}
+                                                                                    {{#equal type 'strong'}}
+                                                            </b>
+                                                            {{/equal}}
+                                                            {{#equal type 'em'}}
+                                                            </em>
+                                                            {{/equal}}
+                                                            {{#equal type 'underline'}}
+                                                            </u>
+                                                            {{/equal}}
+                                                            {{#equal type 'strike'}}
+                                                            </del>
+                                                            {{/equal}}
+                                                            {{#equal type 'textColor'}}
+                                                            </span>
+                                                            {{/equal}}
+                                                            {{/each}}
+    
+                                                            {{else}}
+                                                        <p>{{text}}</p>
+                                                        {{/if}}
+                                                        {{/each}}
+                                                        </p>
+                                                        {{/if}}
+                                                        {{/each}}
+                                                    </li>
+                                                    {{/if}}
+                                                    {{/each}}
+                                                </ol>
+                                                {{/if}}
+    
+                                                {{#if typeparagraph}}
+                                                    <p>
+                                                        {{#each content}}
+                                                            {{#if marks}}
+                                                                {{#each marks}}
+                                                                    {{#equal type 'strong'}}
+                                                                        <b>
+                                                                    {{/equal}}
+                                                                    {{#equal type 'em'}}
+                                                                        <em>
+                                                                    {{/equal}}
+                                                                    {{#equal type 'underline'}}
+                                                                        <u>
+                                                                    {{/equal}}
+                                                                    {{#equal type 'strike'}}
+                                                                        <del>
+                                                                    {{/equal}}
+                                                                    {{#equal type 'textColor'}}
+                                                                        <span style="color: {{attrs.color}};">
+                                                                    {{/equal}}
+                                                                {{/each}}
+    
+                                                                {{text}}
+    
+                                                                {{#each marks}}
+                                                                    {{#equal type 'strong'}}
+                                                                        </b>
+                                                                    {{/equal}}
+                                                                    {{#equal type 'em'}}
+                                                                        </em>
+                                                                    {{/equal}}
+                                                                    {{#equal type 'underline'}}
+                                                                        </u>
+                                                                    {{/equal}}
+                                                                    {{#equal type 'strike'}}
+                                                                        </del>
+                                                                    {{/equal}}
+                                                                    {{#equal type 'textColor'}}
+                                                                        </span>
+                                                                    {{/equal}}
+                                                                {{/each}}
+    
+                                                            {{else}}
+                                                                <p>{{text}}</p>
+                                                            {{/if}}
+                                                        {{/each}}
+                                                    </p>
+                                                {{/if}}
+    
+                                                {{#each content}}
+    
+                                                    {{#if attrs}}
+                                                        {{#equal type 'mention'}}
+                                                            <span class="jira-comment-mention">{{attrs.text}}</span>
+                                                        {{/equal}}
+                                                        {{#equal this.type 'inlineCard'}}
+                                                            <a href="{{this.attrs.url}}" class="jira-inline-card" target="_blank">{{this.attrs.url}}</a>
+                                                        {{/equal}}
+                                                        {{#equal this.type 'media'}}
+                                                            <span class="inline-image">
+                                                                <img src="{{this.attrs.url}}" height="{{this.attrs.height}}" width="{{this.attrs.width}}" alt="-">
+                                                            </span>
+                                                        {{/equal}}
+                                                    {{/if}}
+    
+                                                    {{#if typetext}}
+                                                        <span>
+                                                            <!--{{text}}-->
+                                                        </span>
+                                                    {{/if}}
+    
+                                                    {{#if typeparagraph}}
+                                                        <p>
+                                                            {{text}}
+                                                        </p>
+                                                    {{/if}}
+                                                {{/each}}
+                                            {{/each}}
+                                        {{else}}
+                                            <div>{{{body}}}</div>
+                                        {{/if}}
+                                        </div>
+                                    </div>
+                                </div>
+                                {{/each}}
+                            
+                            </div>
+                        </div>
+                        {{/if}}
+                        
+                        {{#if records.fields.attachment}}
+                        <div class="jira-main-section">
+                            <div class="jira-regular-title">Attachments</div>
+                            <div class="jira-attachments">
+                                {{#each records.fields.attachment}}
+                                <div class="jira-attachment">
+                                    <i class="jira-ticket-attachment-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg">
+                                            <use xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/doctype-sprite/svg/symbols.svg#attachment')}"></use>
+                                        </svg>
+                                    </i>
+                                    <div class="jira-attachment-title">{{filename}}</div>
+                                </div>
+                                {{/each}}
+                            </div>
+                        </div>
+                        {{/if}}
+                    
+                    </div>
+                
+                </div>
+            
+            </div>
+        </script>
+                
+        <style>
+            .jira-container {
+                display: grid;
+                grid-template-columns: 34% 66%;
+            }
+            .jira-ticket-id {
+                font-size: 20px;
+                font-weight: 600;
+                text-decoration: none;
+                margin: 0 0 15px 0;
+            }
+            .jira-ticket-id a {
+                text-decoration: none;
+                color: #172b4d;
+            }
+            .jira-ticket-id a:hover,
+            .jira-ticket-id a:focus {
+                text-decoration: none;
+                color: #0052cc;
+            }
+            .jira-ticket-id a:hover svg,
+            .jira-ticket-id a:focus svg {
+                fill: #0052cc;
+            }
+            
+            .jira-ticket-title {
+                font-size: 24px;
+                font-weight: 600;
+            }
+            .jira-ticket-title a {
+                color: #172b4d;
+                text-decoration: none;
+            }
+            .jira-ticket-title a:focus,
+            .jira-ticket-title a:hover {
+                text-decoration: underline;
+            }
+            .jira-regular-title {
+                color: #172b4d;
+                font-size: 14px;
+                font-weight: 600;
+                margin-bottom: 7px;
+            }
+            .jira-aside .jira-regular-title {
+                color: rgb(94, 108, 132);
+                text-transform: uppercase;
+                font-size: 12px;
+                margin-bottom: 3px;
+            }
+            .jira-main-section {
+                margin-bottom: 15px;
+            }
+            .jira-aside-section {
+                margin-bottom: 15px;
+            }
+            .jira-ticket-status {
+                font-size: 15px;
+                font-weight: 600;
+                background-color: rgb(223, 225, 230);
+                color: rgb(23, 43, 77);
+                padding: 5px 10px;
+                border-radius: 4px;
+                display: inline-block;
+                vertical-align: top;
+            }
+            
+            .jira-ticket-aside-user-image {
+                height: 24px;
+                width: 24px;
+                display: inline-block;
+                vertical-align: middle;
+                border-radius: 50px;
+                overflow: hidden;
+            }
+            .jira-ticket-aside-user-image img {
+                height: 24px;
+                width: 24px;
+                display: block;
+            }
+            .jira-ticket-aside-user-name {
+                display: inline-block;
+                vertical-align: middle;
+                margin-left: 5px;
+                font-size: 14px;
+            }
+            .jira-ticket-sprint {
+                color: #0052cc;
+                font-size: 14px;
+                padding: 2px 5px 2px 0;
+            }
+            .jira-ticket-labels {
+                display: block;
+                list-style: none;
+                margin: 0;
+                padding: 0;
+            }
+            .jira-ticket-labels li {
+                list-style: none;
+                margin: 0 3px 3px 0;
+                padding: 0;
+                display: inline-block;
+                vertical-align: top;
+                
+            }
+            .jira-ticket-labels li a {
+                display: block;
+                color: #0052cc;
+                background-color: #F4F5F7;
+                text-decoration: none;
+                font-size: 14px;
+                padding: 2px 5px;
+                border-radius: 4px;
+            }
+            .jira-ticket-dates {
+                color: rgb(122, 134, 154);
+                font-size: 12px;
+            }
+            
+            .jira-comment {
+                display: grid;
+                grid-template-columns: 32px calc(100% - 32px);
+            }
+            .jira-comment + .jira-comment {
+                margin-top: 20px;
+            }
+            .jira-comment-author-image {
+                height: 32px;
+                width: 32px;
+                border-radius: 50px;
+                overflow: hidden;
+            }
+            .jira-comment-author-image img {
+                height: 32px;
+                width: 32px;
+            }
+            .jira-comment-info {
+                padding-left: 8px;
+                padding-top: 2px;
+            }
+            .jira-comment-author-name {
+                color: rgb(66, 82, 110);
+                font-weight: 600;
+                font-size: 14px;
+            }
+            .jira-comment-date {
+                color: rgb(66, 82, 110);
+                font-weight: 400;
+                font-size: 14px;
+                padding-left: 5px;
+            }
+            .jira-comment-content {
+                color: rgb(23, 43, 77);
+                font-weight: 400;
+                font-size: 14px;
+                padding: 5px 0 0 0;
+                line-height: 1.3;
+                width: 100%;
+            }
+            .jira-attachment {
+                display: inline-block;
+                vertical-align: top;
+                width: 156px;
+                height: 125px;
+                position: relative;
+                border-radius: 8px;
+                overflow: hidden;
+                border: 1px solid rgb(235, 242, 255);
+                margin-right: 3px;
+            }
+            .jira-attachment img {
+                display: block;
+                height: 100%;
+                width: 100%;
+                object-fit: cover;
+                object-position: center;
+            }
+            .jira-attachment .jira-attachment-title {
+                position: relative;
+                left: 0;
+                z-index: 1;
+                color: #fff;
+                background-color: rgba(0,0,0,.5);
+                width: 100%;
+                height: 40px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 13px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                display: -webkit-box;
+                -webkit-line-clamp: 2; /* number of lines to show */
+                line-clamp: 2;
+                -webkit-box-orient: vertical;
+            }
+            .jira-ticket-icon {
+                display: inline-block;
+                vertical-align: top;
+            }
+            .jira-ticket-icon svg {
+                height: 18px;
+                width: auto;
+                display: inline-block;
+                margin-left: 5px;
+                margin-top: 1px;
+                vertical-align: top;
+            }
+            .jira-ticket-attachment-icon {
+                height: 50px;
+                width: auto;
+                position: absolute;
+                left: 50%;
+                top: 55px;
+                transform: translateX(-50%);
+                display: block;
+                z-index: 1;
+            }
+            .jira-ticket-attachment-icon svg {
+                display: block;
+                height: 100%;
+                width: auto;
+                fill: #fff;
+            }
+            .jira-comment-mention {
+                background-color: #0052cc;
+                color: #fff;
+                padding: 2px 8px;
+                border-radius: 20px;
+                display: inline-block;
+                vertical-align: baseline;
+                font-size: 96%;
+            }
+            
+            .jira-comment-table {
+            
+            }
+            .jira-comment-table table {
+                border-collapse: collapse;
+                table-layout: fixed;
+                font-size: 14px;
+                width: 100%;
+                margin: 24px 8px 24px 0px;
+                border-width: 1px;
+                border-style: solid;
+                border-color: rgb(193, 199, 208);
+                border-image: initial;
+            }
+            .jira-comment-table th,
+            .jira-comment-table td {
+                min-width: 48px;
+                font-weight: normal;
+                vertical-align: top;
+                background-clip: padding-box;
+                border-width: 1px 0px 0px 1px;
+                border-style: solid;
+                border-color: rgb(193, 199, 208);
+                border-image: initial;
+                padding: 8px;
+            }
+            .jira-comment-table th {
+                background-color: rgb(244, 245, 247);
+                text-align: left;
+                font-weight: bold;
+            }
+            .jira-inline-card {
+                box-shadow: rgba(9, 30, 66, 0.25) 0px 1px 1px, rgba(9, 30, 66, 0.31) 0px 0px 1px 0px;
+                color: #0052cc;
+                padding: 1px 5px;
+                border-radius: 3px;
+                display: inline-block;
+                font-size: 96%;
+                text-decoration: none;
+            }
+            .jira-inline-card:hover,
+            .jira-inline-card:focus {
+                color: #0052cc;
+                background-color: rgb(244, 245, 247);
+                text-decoration: none;
+            }
+            blockquote {
+                box-sizing: border-box;
+                margin-right: 0px;
+                border-left: 2px solid rgb(223, 225, 230);
+                color: #707070;
+                margin-left: 19px;
+                padding: 10px 20px;
+            }
+            h1,h2,h3,h4,h5,h6 {
+                color: rgb(23, 43, 77);
+                display: block;
+            }
+            h1 {
+                font-size: 24px;
+                line-height: 28px;
+                margin: 5px 0 15px 0;
+                font-weight: 500;
+            }
+            h2 {
+                font-size: 20px;
+                line-height: 24px;
+                margin: 5px 0 15px 0;
+                font-weight: 500;
+            }
+            h3 {
+                font-size: 16px;
+                line-height: 20px;
+                margin: 5px 0 15px 0;
+                font-weight: 600;
+            }
+            h4 {
+                font-size: 14px;
+                line-height: 16px;
+                margin: 5px 0 15px 0;
+                font-weight: 600;
+            }
+            h5 {
+                font-size: 12px;
+                line-height: 16px;
+                margin: 5px 0 15px 0;
+                font-weight: 600;
+            }
+            h6 {
+                font-size: 11px;
+                line-height: 16px;
+                margin: 5px 0 10px 0;
+                font-weight: 700;
+            }
+            .jira-comment-code-block {
+                background-color: rgb(244, 245, 247);
+                font-size: 12px;
+                color: rgb(23, 43, 77);
+                border-radius: 3px;
+                display: block;
+                line-height: 1.66667;
+                overflow-x: auto;
+                white-space: normal;
+                width: calc(100% - 0px);
+                padding: 10px 15px;
+                margin: 0;
+                box-sizing: border-box;
+            }
+            .jira-comment-code-block code {
+                padding: 0;
+            }
+            .jira-comment-code-block pre {
+                padding: 0;
+                margin: 0;
+                text-align: left;
+                white-space: pre;
+                word-spacing: normal;
+                word-break: normal;
+                word-wrap: normal;
+                -moz-tab-size: 4; -o-tab-size: 4; tab-size: 4;
+                -webkit-hyphens: none; -moz-hyphens: none; -ms-hyphens: none; hyphens: none;
+            }
+        </style>
+    </apex:outputPanel>
+</apex:component>

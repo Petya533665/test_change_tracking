@@ -1,0 +1,38 @@
+<apex:page showHeader="true" sidebar="false" standardController="Issue__c" extensions="IssueJiraTaskController" lightningStyleSheets="false">
+
+    <script>
+        window.onload = function () {
+            document.body.classList.remove('sfdcBody');
+        };
+        const blurModeUrlParameter = '{!blurModeUrlParameter}';
+        window.APP_CONFIG = {
+            remoteActionHandlerName: '{!$RemoteAction.IssueJiraTaskController.remoteActionHandler}',
+            packageNamespace: JSON.stringify('{!packageNamespace}'),
+            assetsPath: "{!URLFOR($Resource.ticketapp, 'assets')}",
+            issueId: '{!issue.Id}',
+            isBlurMode: '{!isBlurMode}',
+            blurModeUrlParameter: `/fp-03?q=${blurModeUrlParameter}`,
+        };
+    </script>
+
+    <div class="slds slds-scope grs">
+        <grs-root></grs-root>
+
+        <apex:outputPanel layout="none" rendered="{!isDev}">
+            <link href="https://localhost:4200/styles.css" rel="stylesheet" type="text/css" />
+            <script type="text/javascript" src="https://localhost:4200/runtime.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/polyfills.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/styles.css"></script>
+            <script type="text/javascript" src="https://localhost:4200/vendor.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/main.js"></script>
+        </apex:outputPanel>
+
+        <apex:outputPanel layout="none" rendered="{!NOT(isDev)}">
+            <apex:stylesheet value="{!URLFOR($Resource.ticketapp, 'styles.css')}" />
+            <script src="{!URLFOR($Resource.ticketapp, 'runtime.js')}" />
+            <script src="{!URLFOR($Resource.ticketapp, 'polyfills.js')}" />
+            <script src="{!URLFOR($Resource.ticketapp, 'main.js')}" />
+        </apex:outputPanel>
+    </div>
+
+</apex:page>

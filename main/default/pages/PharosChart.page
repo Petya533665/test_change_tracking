@@ -1,0 +1,449 @@
+<apex:page id="PharosChart"  showHeader="false" sidebar="false" standardStylesheets="false" lightningStylesheets="false" controller="PharosChartController">
+
+    <apex:stylesheet value="{!URLFOR($Resource.syncfusion_chart, '/styles/customized/material.css')}" />
+    <apex:includeScript value="{!URLFOR($Resource.syncfusion_chart, '/scripts/ej2.js')}" />
+
+    <div id="chart-container"></div>
+
+    <script>
+        
+        const LOG_LIMITS_CHART_NAME = 'Log Limits';
+
+        const ORG_LIMITS_CHART_NAME = 'Org Limits';
+        const LICENSES_CHART_NAME = 'Licenses';
+        const RECORD_COUNT_BY_OBJECT_CHART_NAME = 'Record Count By Object';
+        const OBJECT_AUTOMATIONS_CHART_NAME = 'Object Automations';
+        const USERS_INFO_DETAILS_CHART_NAME = 'Users Info Details';
+        const SENSITIVE_PERMISSIONS_CHART_NAME = 'Sensitive Permissions';
+
+        const chartName = '{!chart}';
+
+        window.onload = function() {
+            sendMessageToLWC('isLoaded', true);
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            if (chartName === LOG_LIMITS_CHART_NAME) {
+                _chartData = JSON.parse('{!chartDataJSON}');
+                initializeChart();
+            }
+        });
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'chartData' && event.data.chart === chartName) {
+                chartData = JSON.parse(event.data.data);
+                prepareChartData();
+                initializeChart();
+            }
+        }, false);
+
+        function sendMessageToLWC(type, data) {
+            window.parent.postMessage(
+                {
+                    type: type,
+                    chart: chartName,
+                    data: data
+                },
+                '*'
+            );
+        }
+
+        let chartData = null;
+
+        let _chartData = null;
+
+        const filterField = {
+            [ORG_LIMITS_CHART_NAME]: 'value',
+            [LICENSES_CHART_NAME]: 'value',
+            [RECORD_COUNT_BY_OBJECT_CHART_NAME]: 'recordCount',
+            [OBJECT_AUTOMATIONS_CHART_NAME]: 'name',
+        };
+        const sortField = {
+            [ORG_LIMITS_CHART_NAME]: 'percentage',
+            [LICENSES_CHART_NAME]: 'percentage',
+            [RECORD_COUNT_BY_OBJECT_CHART_NAME]: 'recordCount',
+            [OBJECT_AUTOMATIONS_CHART_NAME]: 'name',
+        };
+
+        function getChartData() {
+            return _chartData;
+        }
+
+        function prepareChartData() {
+            if (chartName === USERS_INFO_DETAILS_CHART_NAME) {
+                _chartData = chartData
+                    .sort((a, b) => {
+                        return a.recordCount - b.recordCount;
+                    });
+            }
+            else if (chartName === SENSITIVE_PERMISSIONS_CHART_NAME) {
+                _chartData = [
+                    {
+                        name: 'modifyAllData',
+                        label: 'Modify All Data',
+                        count: 0,
+                        userIds: [],
+                    },{
+                        name: 'viewAllData',
+                        label: 'View All Data',
+                        count: 0,
+                        userIds: [],
+                    },{
+                        name: 'resetPasswords',
+                        label: 'Reset Passwords',
+                        count: 0,
+                        userIds: [],
+                    },{
+                        name: 'dataExport',
+                        label: 'Data Export',
+                        count: 0,
+                        userIds: [],
+                    },{
+                        name: 'manageSharing',
+                        label: 'Manage Sharing',
+                        count: 0,
+                        userIds: [],
+                    },{
+                        name: 'manageRoles',
+                        label: 'Manage Roles',
+                        count: 0,
+                        userIds: [],
+                    },{
+                        name: 'editReadonlyFields',
+                        label: 'Edit Readonly Fields',
+                        count: 0,
+                        userIds: [],
+                    },
+                ];
+                _chartData.forEach((data) => {
+                    chartData.forEach(item => {
+                        item.stackingCounts.forEach(stackingCount => {
+                            if (stackingCount.subName === data.name && !data.userIds.includes(item.id)) {
+                                data.userIds.push(item.id);
+                                data.count++;
+                            }
+                        });
+                    });
+                });
+                _chartData.sort((a, b) => {
+                    return a.count - b.count;
+                })
+            } else if (chartName === OBJECT_AUTOMATIONS_CHART_NAME) {
+                _chartData = chartData
+                    .filter(item => {
+                        if (!item.automations || !Array.isArray(item.automations)) {
+                            return false;
+                        }
+                        return item.automations.some(automation =>
+                            automation.count > 0
+                        );
+
+                    })
+                    .sort((a, b) => {
+                        const sumA = a.automations.reduce((sum, automation) =>
+                            sum + (automation.count || 0), 0);
+                        const sumB = b.automations.reduce((sum, automation) =>
+                            sum + (automation.count || 0), 0);
+                        return sumA - sumB;
+                    });
+
+            } else {
+                _chartData = chartData
+                    .filter(item => {
+                        return item[filterField[chartName]] && item[filterField[chartName]] !== 0;
+                    })
+                    .sort((a, b) => {
+                        return a[sortField[chartName]] - b[sortField[chartName]];
+                    });
+            }
+        }
+
+        function sendHeight() {
+            let containerElement = document.getElementById('chart-container');
+            if (containerElement) {
+                let height = containerElement.scrollHeight + 20;
+                window.parent.postMessage(
+                    {
+                        type: 'height',
+                        chart: '{!chart}',
+                        value: height
+                    },
+                    '*'
+                );
+            }
+        }
+
+        function initializeChart() {
+            let containerElement = document.getElementById('chart-container');
+            if (containerElement) {
+                ej.base.registerLicense('ORg4AjUWIQA/Gnt2VVhkQlFadVdJXGFWfVJpTGpQdk5xdV9DaVZUTWY/P1ZhSXxQdkZhWX9dc3NQR2hZVUQ=');
+
+                let chart = new ej.charts.Chart({
+                    height: getHeight(),
+                    primaryXAxis: {
+                        valueType: 'Category',
+                        labelFormat: 'y',
+                    },
+                    series: getChartData() ? getSeries() : [],
+                    tooltip: {
+                        enable: true,
+                        format: '${series.name} ${point.x} : ${point.y}',
+                    },
+                    legendSettings: {
+                        visible: true,
+                        toggleVisibility: true,
+                        enableHighlight: true,
+                    },
+                });
+                if (chartName === LOG_LIMITS_CHART_NAME) {
+                    chart.primaryYAxis = {
+                        valueType: 'Double',
+                        labelFormat: '{value}%',
+                        minimum: 0,
+                    }
+                    chart.title = {!modal} ? '' : 'Transactional Limits';
+                    chart.zoomSettings = {
+                        mode: 'X',
+                        showToolbar: true,
+                        enableMouseWheelZooming: false,
+                        enablePinchZooming: true,
+                        enableSelectionZooming: true,
+                        enableScrollbar: true,
+                    };
+                    chart.TooltipRender = function(args) {
+                        try {
+                            if (args.series.properties.dataSource[args.point.index]) {
+                                let record = args.series.properties.dataSource[args.point.index];
+                                let text = args.point.y + '% (' + record.value  + '/' + record.max + ')';
+                                if (record.category) text += '<br/>' + record.category;
+                                if (record.operation) text += '<br/>' + record.operation;
+                                args.text = text;
+                            }
+                        } catch (e) {}
+                    }
+                }
+                if (
+                    chartName === LICENSES_CHART_NAME
+                    || chartName === ORG_LIMITS_CHART_NAME
+                ) {
+                    chart.primaryYAxis = {
+                        valueType: 'Double',
+                        labelFormat: '{value}%',
+                        minimum: 0,
+                        maximum: 100,
+                    }
+                    chart.tooltipRender = function(args) {
+                        try {
+                            if (args.series.properties.dataSource[args.point.index]) {
+                                let record = args.series.properties.dataSource[args.point.index];
+                                let text = args.point.y + '% (' + record.value  + '/' + record.max + ')';
+                                args.text = text;
+                            }
+                        } catch (e) {}
+                    };
+                }
+                if (
+                    chartName === USERS_INFO_DETAILS_CHART_NAME
+                    || chartName === RECORD_COUNT_BY_OBJECT_CHART_NAME
+                ) {
+                    chart.primaryYAxis = {
+                        valueType: 'Double',
+                        labelFormat: '{value}',
+                        minimum: 0,
+                    };
+                }
+                if (
+                    chartName === OBJECT_AUTOMATIONS_CHART_NAME
+                    || chartName === SENSITIVE_PERMISSIONS_CHART_NAME
+                ) {
+                    chart.primaryYAxis = {
+                        valueType: 'Double',
+                        labelFormat: '{value}',
+                        minimum: 0,
+                        interval: 1
+                    };
+                }
+                if (chartName === SENSITIVE_PERMISSIONS_CHART_NAME) {
+                    chart.tooltip.format += ' users';
+                }
+                console.log(chartName);
+                console.log(JSON.stringify(getSeries()));
+                chart.appendTo(containerElement);
+                sendHeight();
+            }
+        }
+
+        function getHeight() {
+            let height = getChartData() && getChartData().length >= 10 ? getChartData().length * 40 : 400;
+            return height + 'px';
+        }
+
+        function getSeries() {
+            if (chartName === LOG_LIMITS_CHART_NAME) {
+                return getChartData().map((limit) => {
+                    return {
+                        name: limit.label,
+                        dataSource: limit.items.map((item) => ({
+                            recordId: item.recordId,
+                            name: item.name,
+                            label: item.name,
+                            value: item.value,
+                            max: item.max,
+                            percentage: item.percentage,
+                            category: item.category,
+                            operation: item.operation,
+                        })),
+                        xName: 'label',
+                        yName: 'percentage',
+                        type: 'Column',
+                        columnWidth: 0.8,
+                        marker: {
+                            dataLabel: {
+                                visible: true
+                            }
+                        }
+                    };
+                });
+            }
+            else if (chartName === LICENSES_CHART_NAME || chartName === ORG_LIMITS_CHART_NAME) {
+                return [{
+                    dataSource: getChartData()
+                        .map(item => ({
+                            name: item.name,
+                            label: item.name,
+                            percentage: item.percentage,
+                            value: item.value,
+                            max: item.max,
+                            color: item.color
+                        })),
+                    type: 'Bar',
+                    xName: 'label',
+                    yName: 'percentage',
+                    pointColorMapping: 'color',
+                    dataLabel: {
+                        visible: false,
+                    },
+                    marker: {
+                        dataLabel: {
+                            visible: true,
+                        }
+                    }
+                }];
+            }
+            else if (chartName === RECORD_COUNT_BY_OBJECT_CHART_NAME) {
+                return [{
+                    dataSource: getChartData()
+                        .map(item => ({
+                            name: item.name,
+                            label: item.label,
+                            count: item.recordCount,
+                        })),
+                    type: 'Bar',
+                    xName: 'label',
+                    yName: 'count',
+                    fill: '#3196ed',
+                    dataLabel: {
+                        visible: false,
+                    },
+                    marker: {
+                        dataLabel: {
+                            visible: true,
+                        }
+                    }
+                }];
+            }
+            else if (chartName === USERS_INFO_DETAILS_CHART_NAME) {
+                return [{
+                    dataSource: getChartData()
+                        .map(item => ({
+                            name: item.name,
+                            label: item.label,
+                            count: item.count,
+                        })),
+                    type: 'Bar',
+                    xName: 'label',
+                    yName: 'count',
+                    fill: '#f9e3b6',
+                    dataLabel: {
+                        visible: false,
+                    },
+                    marker: {
+                        dataLabel: {
+                            visible: true,
+                        }
+                    }
+                }];
+            }
+            else if (chartName === OBJECT_AUTOMATIONS_CHART_NAME) {
+                const stackedData = getChartData().map(object => {
+                        const data = object.automations.reduce((obj, automation) => {
+                            obj[automation.type] = automation.count;
+                            return obj;
+                        }, {});
+                        data.name = object.name;
+                        data.label = object.label;
+                        return data;
+                    });
+
+
+                let series = [
+                    {
+                        type: 'StackingBar', name: 'Trigger',
+                        dataSource: stackedData, xName: 'label', yName: 'Trigger',
+                        fill: '#9d53f2',
+                    }, {
+                        type: 'StackingBar', name: 'Workflow',
+                        dataSource: stackedData, xName: 'label', yName: 'Workflow',
+                        fill: '#c398f5',
+                    }, {
+                        type: 'StackingBar', name: 'Process',
+                        dataSource: stackedData, xName: 'label', yName: 'Process',
+                        fill: '#3196ed',
+                    }, {
+                        type: 'StackingBar', name: 'Flow',
+                        dataSource: stackedData, xName: 'label', yName: 'Flow',
+                        fill: '#76b9f2',
+                    }
+                ];
+
+                return series;
+            }
+            else if (chartName === SENSITIVE_PERMISSIONS_CHART_NAME) {
+                let series = [
+                    {
+                        type: 'Bar',
+                        dataSource: getChartData(), xName: 'label', yName: 'count',
+                        fill: '#3196ed',
+                    }
+                ];
+
+                return series;
+            }
+            else {
+                return chartData.map((limit) => {
+                    return {
+                        name: limit.label,
+                        dataSource: limit.items.map((item) => ({
+                            recordId: item.recordId,
+                            name: item.name,
+                            label: item.name,
+                            value: item.value,
+                            max: item.max,
+                            percentage: item.percentage,
+                            category: item.category,
+                            operation: item.operation,
+                        })),
+                        xName: 'label',
+                        yName: 'percentage',
+                        type: 'Column',
+                        columnWidth: 0.8,
+                        marker: {
+                            dataLabel: {
+                                visible: true
+                            }
+                        }
+                    };
+                });
+            }
+        }
+    </script>
+
+</apex:page>

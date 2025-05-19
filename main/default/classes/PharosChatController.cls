@@ -16,8 +16,7 @@ public with sharing class PharosChatController {
     public static InitChatResponse initChat() {
         List<String> errorMessages = new List<String>();
         try {
-            Connected_Org__c org = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId());
-            String orgId = org.Id;
+            String orgId = UserInfo.getOrganizationId();
             String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
             OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(OPEN_AI_SECRET);
             String secretKey = mdtSettings.Token__c;
@@ -25,7 +24,8 @@ public with sharing class PharosChatController {
             if (String.isBlank(openAiKey) || String.isBlank(secretKey) || !OpenAI.validateToken(openAiKey)) {
                 errorMessages.add(ERROR_OPENAI_NOT_READY);
             }
-            if (!GitHubUtils.validateGitHubConnection()) {
+            Boolean gitConfigPresent = GitHubUtils.GIT_USERNAME != null && GitHubUtils.GIT_REPONAME != null && ConfigUtil.GIT_API_SETTINGS.Branch_Name__c != null;
+            if (!gitConfigPresent || !GitHubUtils.validateGitHubConnection()) {
                 errorMessages.add(ERROR_GIT_NOT_INTEGRATED);
             }
             if (!isCodeIndexed(orgId)) {
@@ -56,7 +56,7 @@ public with sharing class PharosChatController {
             return new InitChatResponse(orgId);
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'initChat');
-            errorMessages.add(e.getStackTraceString());
+            errorMessages.add(ERROR_INIT_FAILED);
             return new InitChatResponse(errorMessages);
         }
     }
@@ -68,8 +68,8 @@ public with sharing class PharosChatController {
                     HttpUtils.getHeadersContentTypeJSON(),
                     200
             );
-            Map<String, Object> body = (Map<String, Object>)JSON.deserializeUntyped(response);
-            return (Boolean)body.get('empty') == false;
+            Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(response);
+            return (Boolean) body.get('empty') == false;
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'isCodeIndexed');
             return false;

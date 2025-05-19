@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Process_Builder_Logs</fullName>
+    <columns>NAME</columns>
+    <columns>Icon__c</columns>
+    <columns>Created_At__c</columns>
+    <columns>Summary__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Category__c</field>
+        <operation>equals</operation>
+        <value>Process Builder</value>
+    </filters>
+    <label>Process Builder Logs</label>
+</ListView>

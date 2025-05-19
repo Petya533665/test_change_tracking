@@ -1,0 +1,191 @@
+<apex:page showHeader="true" sidebar="false" standardController="Log__c" extensions="SetupAuditTrailViewerController">
+
+    <script src="{!URLFOR($Resource.libs, '/libs/moment.2.22.2.min.js')}"/>
+    <script src="{!URLFOR($Resource.libs, '/libs/handlebars.4.0.11.js')}"/>
+
+    <apex:slds />
+
+    <style>
+        .c-setup-audit-trail-table th {
+            cursor: default;
+        }
+        .backdrop-blur-mode {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background: rgb(255 255 255 / 60%);
+            backdrop-filter: blur(3px);
+            z-index: 9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .backdrop-blur-mode__content-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .backdrop-blur-mode__content {
+            font-size: larger;
+            margin-bottom: 1rem;
+        }
+    </style>
+
+    <div class="slds-scope">
+        <apex:outputPanel layout="none" rendered="{!isBlurMode}">
+            <div class="backdrop-blur-mode">
+                <div class="backdrop-blur-mode__content-wrap">
+                    <div class="backdrop-blur-mode__content">This feature is limited in your edition of Pharos.</div>
+                    <button class="slds-button slds-button_brand" onclick="window.open('https://pharos.ai/fp-06?q={!blurModeUrlParameter}', '_blank')">Learn more</button>
+                </div>
+            </div>
+        </apex:outputPanel>
+        <!-- <h1 style="font-size: 24px;">Setup Audit Trail</h1> -->
+
+        <div class="slds-form-element">
+            <label class="slds-form-element__label" style="margin-right: 6px;">Show recent events in the last</label>
+            <div class="slds-form-element__control" style="display: inline-block;">
+                <div class="slds-select_container">
+                    <select class="slds-select" id="c-hours-select" onchange="timeChanged()">
+                        <option value="1">1 hour</option>
+                        <option value="12">12 hours</option>
+                        <option value="24">24 hours</option>
+                        <option value="48">48 hours</option>
+                    </select>
+                </div>
+            </div>
+            <label class="slds-form-element__label">&nbsp;hours</label>
+        </div>
+        <br />
+        <div class="c-container "></div>
+    </div>
+
+    <script id="setup-audit-trail-template" type="text/x-handlebars-template">
+        <table class="slds-table slds-table_bordered slds-table_cell-buffer c-setup-audit-trail-table">
+            <thead>
+                <tr class="slds-text-title_caps">
+                    <th scope="col" title="The full description of changes made in Setup. For example, if the Action field has a value of PermSetCreate, the Display field has a value like “Created permission set MAD: with user license Salesforce.”">
+                        Action
+                    </th>
+                    <th scope="col" title="The section in the Setup menu where the action occurred. For example, Manage Users or Company Profile.">
+                        Section
+                    </th>
+                    <th scope="col" title="The Login-As user who executed the action in Setup. If a Login-As user didn’t perform the action, this field is blank.">
+                        Delegate User
+                    </th>
+                    <th scope="col">
+                        Created By
+                    </th>
+                    <th scope="col">
+                        Created Date
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#if records}}
+                    {{#each records}}
+                    <tr>
+                        <td style="white-space: normal;">
+                            {{{Display_}}}
+                        </td>
+                        <td>
+                            {{Section}}
+                        </td>
+                        <td>
+                            {{DelegateUser}}
+                        </td>
+                        <td>
+                            {{CreatedBy.Name}}
+                        </td>
+                        <td>
+                            {{CreatedDate_}}
+                        </td>
+                    </tr>
+                    {{/each}}
+                {{/if}}
+            </tbody>
+        </table>
+        {{#if records}}
+        {{else}}
+            <br />
+            <p id="no-audit-trail-message">No Audit Trail records available for the past 48 hrs.</p>
+        {{/if}}
+    </script>
+
+    <script>
+
+        const container = document.querySelector('.c-container');
+        const itemTemplate = Handlebars.compile(document.getElementById('setup-audit-trail-template').innerHTML);
+        const setupAuditTrailJson = '{!JSENCODE(data)}';
+        const hours = 12;
+        const logCreated = moment('{!log.Created_At__c}');
+        const userTimezoneOffset = '{!userTimezoneOffset}';
+
+        function timeChanged() {
+            buildTable(parseInt(document.getElementById('c-hours-select').value, 10));
+        }
+
+        function buildTable(hours) {
+            if (setupAuditTrailJson === 'Data not yet available. Please check back in a minute or so.') {
+                container.innerText = setupAuditTrailJson;
+            } else {
+                try {
+                    const records = JSON.parse(setupAuditTrailJson);
+                    const filteredRecords = [];
+                    for (const record of records) {
+                        const d = moment(record.CreatedDate);
+                        const duration = moment.duration(logCreated.diff(d));
+                        if (duration.asHours() <= hours) {
+                            filteredRecords.push(record);
+                        }
+                    }
+
+                    for (const record of filteredRecords) {
+                        record.CreatedDate_ = moment(record.CreatedDate).utcOffset(parseInt(userTimezoneOffset)).format('L LT');
+                        if (record.Field1) {
+                            record.Display_ = record.Display.replace(record.Field1, '<b>'+record.Field1+'</b>');
+                        } else {
+                            record.Display_ = record.Display;
+                        }
+                    }
+                    const htmlPart = itemTemplate({records: filteredRecords});
+                    container.innerHTML = htmlPart;
+                    if (filteredRecords.length === 0) {
+                        updateNoRecordsMessage(hours);
+                    }
+                } catch(err) {
+                    container.innerText = 'Setup Audit Trail information is unavailable.';
+                }
+            }
+        }
+        function updateNoRecordsMessage(hours) {
+            const messageElement = document.getElementById('no-audit-trail-message');
+            messageElement.innerText = `No Audit Trail records available for the past ${hours} hr${hours > 1 ? 's' : ''}.`;
+        }
+
+        function sendHeight() {
+            const height = document.body.scrollHeight;
+            window.parent.postMessage(
+                {
+                    type: 'height',
+                    page: 'SetupAuditTrailViewer',
+                    value: height
+                },
+                '*'
+            );
+        }
+        window.onload = function(){
+            document.getElementById('c-hours-select').value = hours;
+            buildTable(hours);
+            sendHeight();
+        };
+        window.onresize = function () {
+            sendHeight();
+        }
+    </script>
+
+</apex:page>

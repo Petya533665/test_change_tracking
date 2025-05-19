@@ -1,0 +1,33 @@
+global interface IErrorParser {
+    void init(String errorBody, String emailSubject, String emailSentFrom);
+    Boolean canProcess();
+    void process();
+    String getError();
+    String getErrorSummary();
+    String getErrorDetails();
+    String getVisualforcePage();
+    String getRelatedId();
+    String getRelatedObjectType();
+    String getAsyncJobName();
+    String getAsyncJobId();
+    String getErrorType();
+    String getArea();
+    String getUserId();
+    String getOrganizationId();
+    String getStackTrace();
+    String parseStackTrace();
+    String getMethodName();
+    String getHash1();
+    String getHash2();
+    String getHash3();
+    String getPendingJobsInfo();
+    Decimal getTotalActiveSessions();
+    String getAuditTrail();
+    String getInstalledPackagesInfo();
+    String getNamespace();
+    String getDeploymentsInfo();
+    String getFlowVersion();
+    String getSalesforceErrorId();
+    List<ICustomErrorInfo> getCustomInfo();
+    List<Queueable> getAsyncMethods(Id logId);
+}

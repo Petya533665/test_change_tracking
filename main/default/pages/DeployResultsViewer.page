@@ -1,0 +1,150 @@
+<apex:page showHeader="true" sidebar="false" standardController="Log__c" extensions="DeployResultsViewerController">
+
+    <script src="{!URLFOR($Resource.libs, '/libs/moment.2.22.2.min.js')}"/>
+    <script src="{!URLFOR($Resource.libs, '/libs/handlebars.4.0.11.js')}"/>
+
+    <apex:slds />
+
+    <style>
+        html,
+        body {
+            height: 100%;
+        }
+        .c-setup-audit-trail-table th {
+            cursor: default;
+        }
+        .backdrop-blur-mode {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background: rgb(255 255 255 / 60%);
+            backdrop-filter: blur(3px);
+            z-index: 9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .backdrop-blur-mode__content-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .backdrop-blur-mode__content {
+            font-size: larger;
+            margin-bottom: 1rem;
+        }
+    </style>
+
+    <div class="slds-scope">
+        <apex:outputPanel layout="none" rendered="{!isBlurMode}">
+            <div class="backdrop-blur-mode">
+                <div class="backdrop-blur-mode__content-wrap">
+                    <div class="backdrop-blur-mode__content">This feature is limited in your edition of Pharos.</div>
+                    <button class="slds-button slds-button_brand" onclick="window.open('https://pharos.ai/fp-06?q={!blurModeUrlParameter}', '_blank')">Learn more</button>
+                </div>
+            </div>
+        </apex:outputPanel>
+        <div class="c-container "></div>
+    </div>
+
+    <script id="table-template" type="text/x-handlebars-template">
+        <table class="slds-table slds-table_bordered slds-table_cell-buffer c-setup-audit-trail-table">
+            <thead>
+                <tr class="slds-text-title_caps">
+                    <th scope="col">
+                        Name
+                    </th>
+                    <th scope="col">
+                        Status
+                    </th>
+                    <th scope="col">
+                        Completed Date
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#if records}}
+                    {{#each records}}
+                    <tr>
+                        <td style="white-space: normal;">
+                            {{#if instanceUrl_}}
+                                <a href="{{instanceUrl_}}/changemgmt/monitorDeploymentsDetails.apexp?asyncId={{id}}" target="_blank">{{id}}</a>
+                            {{else}}
+                                {{id}}
+                            {{/if}}
+                        </td>
+                        <td>
+                            <img src="/changemgmt/img/checkgreen.png" alt="">
+                            {{#if status_ }}
+                                Deploy: Succeeded
+                            {{else}}
+                                Deploy: Partially Succeeded
+                            {{/if}}
+                        </td>
+                        <td>
+                            {{completedDate_}}
+                        </td>
+                    </tr>
+                    {{/each}}
+                {{/if}}
+            </tbody>
+        </table>
+        {{#if records}}
+        {{else}}
+            <br />
+            <p>No Recent Deployments available</p>
+        {{/if}}
+    </script>
+
+    <script>
+        const container = document.querySelector('.c-container');
+        const itemTemplate = Handlebars.compile(document.getElementById('table-template').innerHTML);
+        const dataJson = '{!JSENCODE(data)}';
+
+
+        function buildTable() {
+            try {
+                const records = JSON.parse(dataJson);
+                for (const record of records) {
+                    const d = moment(record.completedDate);
+                    record.completedDate_ = d.utcOffset({!timeZoneOffset}).format('L LT');
+                    record.status_ = record.status === 'Succeeded';
+                    record.instanceUrl_ = '{!instanceUrl}';
+                }
+                const htmlPart = itemTemplate({records: records});
+                container.innerHTML = htmlPart;
+            } catch(err) {
+                if (!dataJson) {
+                    container.innerText = 'Deploy Results information is unavailable.';
+                } else {
+                    container.innerText = dataJson;
+                }
+            }
+        }
+
+        function sendHeight() {
+            const height = document.body.scrollHeight;
+            window.parent.postMessage(
+                {
+                    type: 'height',
+                    page: 'DeployResultsViewer',
+                    value: height
+                },
+                '*'
+            );
+        }
+        window.onload = function() {
+            buildTable();
+            sendHeight();
+        };
+        window.onresize = function () {
+            sendHeight();
+        }
+
+    </script>
+
+</apex:page>

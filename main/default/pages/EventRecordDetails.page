@@ -1,0 +1,2 @@
+<apex:page showHeader="true" sidebar="false" standardController="Event__c" extensions="EventRecordDetailsController" lightningStyleSheets="true">
+</apex:page>
