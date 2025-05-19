@@ -1,0 +1,60 @@
+<apex:page showHeader="true" sidebar="false" standardController="Issue__c" extensions="DevOpsCenterController">
+
+    <base href="/apex/TraceResult"/>
+    <apex:slds />
+    <style>
+        html,
+        body {
+            height: 100%;
+        }
+    </style>
+    <html>
+    <body>
+    <script>
+        function sendHeight() {
+            const height = document.body.scrollHeight;
+            window.parent.postMessage(
+                {
+                    type: 'height',
+                    page: 'DevOpsCenter',
+                    value: height
+                },
+                '*'
+            );
+        }
+        window.onload = function() {
+            document.body.classList.remove('sfdcBody');
+            sendHeight();
+        };
+        window.onresize = function () {
+            sendHeight();
+        }
+
+        window.APP_CONFIG = {
+            remoteActionHandlerName: '{!$RemoteAction.DevOpsCenterController.remoteActionHandler}',
+            packageNamespace: JSON.stringify('{!packageNamespace}'),
+            assetsPath: "{!URLFOR($Resource.devopscenterapp, 'assets')}",
+            sourceControlMetadata: '{!sourceControlMetadata}'
+        };
+    </script>
+    <div class="slds slds-scope">
+        <grs-root></grs-root>
+        <apex:outputPanel layout="none" rendered="{!isDev}">
+            <link href="https://localhost:4200/styles.css" rel="stylesheet" type="text/css"/>
+            <script type="text/javascript" src="https://localhost:4200/runtime.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/polyfills.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/styles.css"></script>
+            <script type="text/javascript" src="https://localhost:4200/vendor.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/main.js"></script>
+        </apex:outputPanel>
+        <apex:outputPanel layout="none" rendered="{!NOT(isDev)}">
+            <apex:stylesheet value="{!URLFOR($Resource.devopscenterapp, 'styles.css')}"/>
+            <script src="{!URLFOR($Resource.devopscenterapp, 'runtime.js')}"/>
+            <script src="{!URLFOR($Resource.devopscenterapp, 'polyfills.js')}"/>
+            <script src="{!URLFOR($Resource.devopscenterapp, 'main.js')}"/>
+        </apex:outputPanel>
+    </div>
+    </body>
+    </html>
+
+</apex:page>

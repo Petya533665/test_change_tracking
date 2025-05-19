@@ -1,0 +1,67 @@
+<apex:page showHeader="true" sidebar="false" standardController="Log__c" extensions="LogsChartsWrapperController" lightningStyleSheets="true">
+    <base href="/apex/LogsCharts" />
+    <apex:slds />
+    <style>
+        html,
+        body {
+            height: 100%;
+        }
+    </style>
+    <script>
+        let currentLog = {
+            Created_At__c: '{!currentLog.Created_At__c}',
+            Id: '{!currentLog.Id}',
+        };
+        const blurModeUrlParameter = '{!blurModeUrlParameter}';
+        window.APP_CONFIG = {
+            sldsIconsPath: "/apexpages/slds/latest/assets/icons",
+            remoteActionHandlerName: '{!$RemoteAction.LogsChartsWrapperController.remoteActionHandler}',
+            assetsPath: "{!URLFOR($Resource.logschartsapp, 'assets')}",
+            currentLog: JSON.stringify(currentLog),
+            packageNamespace: JSON.stringify('{!packageNamespace}'),
+            isBlurMode: "{!isBlurMode}",
+            blurModeUrlParameter: `/fp-01?q=${blurModeUrlParameter}`,
+        };
+        function sendHeight() {
+            let height = document.body.scrollHeight;
+            window.parent.postMessage(
+                {
+                    type: 'height',
+                    page: 'LogsChartsWrapper',
+                    value: height
+                },
+                '*'
+            );
+        }
+        window.onload = function() {
+            sendHeight();
+        };
+        window.onresize = function () {
+            sendHeight();
+        }
+    </script>
+    <div class="slds slds-is-relative grs">
+        <grs-root></grs-root>
+        <apex:outputPanel layout="none" rendered="{!isDev}">
+            <link href="https://localhost:4200/styles.css" rel="stylesheet" type="text/css" />
+            <script>
+                console.log('************************************');
+                console.log('************************************');
+                console.log('PHAROS ADMIN APP IN DEVELOPMENT MODE');
+                console.log('************************************');
+                console.log('************************************');
+            </script>
+            <div style="position: fixed; top: 0; right: 0; background-color: #ef4646; color: #fff; padding: 0 7px; z-index: 99999;">http://localhost:4200</div>
+            <script type="text/javascript" src="https://localhost:4200/runtime.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/polyfills.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/vendor.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/main.js"></script>
+        </apex:outputPanel>
+        <apex:outputPanel layout="none" rendered="{!NOT(isDev)}">
+            <apex:stylesheet value="{!URLFOR($Resource.logschartsapp, 'styles.css')}" />
+            <script src="{!URLFOR($Resource.logschartsapp, 'runtime.js')}" />
+            <script src="{!URLFOR($Resource.logschartsapp, 'polyfills.js')}" />
+            <script src="{!URLFOR($Resource.logschartsapp, 'main.js')}" />
+        </apex:outputPanel>
+    </div>
+</apex:page>

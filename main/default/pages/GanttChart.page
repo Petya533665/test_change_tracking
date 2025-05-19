@@ -1,0 +1,65 @@
+<apex:page showHeader="true" sidebar="false" standardController="Log__c" extensions="GanttChartController">
+
+    <base href="/apex/GanttChart"/>
+    <apex:slds />
+    <style>
+        html,
+        body {
+            height: 100%;
+        }
+    </style>
+    <html>
+    <body>
+    <script>
+        function sendHeight() {
+            let height = document.body.scrollHeight;
+            const grsRoot = document.querySelector('#grs-app');
+            if (grsRoot) {
+                height = grsRoot.scrollHeight;
+            }
+            window.parent.postMessage(
+                {
+                    type: 'height',
+                    page: 'GanttChart',
+                    value: height
+                },
+                '*'
+            );
+        }
+        window.onload = function() {
+            document.body.classList.remove('sfdcBody');
+            sendHeight();
+        };
+        window.onresize = function () {
+            sendHeight();
+        }
+        window.APP_CONFIG = {
+            remoteActionHandlerName: '{!$RemoteAction.GanttChartController.remoteActionHandler}',
+            packageNamespace: JSON.stringify('{!packageNamespace}'),
+            assetsPath: "{!URLFOR($Resource.adminapp, 'assets')}",
+            apisessionId: "{!$Api.Session_ID}",
+            userTimezoneOffset: '{!userTimezoneOffset}',
+            recordId: '{!recordId}'
+        };
+    </script>
+    <div class="slds slds-scope grs">
+        <grs-root></grs-root>
+        <apex:outputPanel layout="none" rendered="{!isDev}">
+            <link href="https://localhost:4200/styles.css" rel="stylesheet" type="text/css"/>
+            <script type="text/javascript" src="https://localhost:4200/runtime.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/polyfills.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/styles.css"></script>
+            <script type="text/javascript" src="https://localhost:4200/vendor.js"></script>
+            <script type="text/javascript" src="https://localhost:4200/main.js"></script>
+        </apex:outputPanel>
+        <apex:outputPanel layout="none" rendered="{!NOT(isDev)}">
+            <apex:stylesheet value="{!URLFOR($Resource.ganttchartapp, 'styles.css')}"/>
+            <script src="{!URLFOR($Resource.ganttchartapp, 'runtime.js')}"/>
+            <script src="{!URLFOR($Resource.ganttchartapp, 'polyfills.js')}"/>
+            <script src="{!URLFOR($Resource.ganttchartapp, 'main.js')}"/>
+        </apex:outputPanel>
+    </div>
+    </body>
+    </html>
+
+</apex:page>

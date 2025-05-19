@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Flow_Logs</fullName>
+    <columns>NAME</columns>
+    <columns>Icon__c</columns>
+    <columns>Category__c</columns>
+    <columns>Created_At__c</columns>
+    <columns>Flow_Link__c</columns>
+    <columns>Flow_Version__c</columns>
+    <columns>Flow_API_Name__c</columns>
+    <columns>Type__c</columns>
+    <columns>Hash_1__c</columns>
+    <columns>Is_Parent__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Category__c</field>
+        <operation>equals</operation>
+        <value>Flow</value>
+    </filters>
+    <label>Flow Logs</label>
+</ListView>

@@ -1,0 +1,16 @@
+<aura:component implements="flexipage:availableForAllPageTypes,force:hasRecordId" description="IssueRelatedListWrapper" access="global">
+    <aura:attribute name="recordId" type="String" />
+    <aura:attribute name="showHeader" type="Boolean" default="true" access="global"/>
+    <aura:attribute name="fields" type="String" default="Name,Category__c,Status__c,Summary__c" access="global"/>
+    <aura:attribute name="backgroundColor" type="String" default="#FAFFBD"/>
+    <aura:html tag="style">
+        tr[data-row-key-value="{!v.recordId}"] {
+            background-color: {!v.backgroundColor};
+        }
+    </aura:html>
+    <c:issueRelatedList
+            recordId="{!v.recordId}"
+            showHeader="{!v.showHeader}"
+            fields="{!v.fields}">
+    </c:issueRelatedList>
+</aura:component>

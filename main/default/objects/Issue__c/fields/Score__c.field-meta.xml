@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Score__c</fullName>
+    <externalId>false</externalId>
+    <formula>IF(Average_Frequency__c != 0,
+MCEILING(SQRT(Impacted_Objects_Count__c*Impacted_Objects_Count__c + Impacted_Users_Count__c*Impacted_Users_Count__c +  Log_Count__c*Log_Count__c ) / Average_Frequency__c),
+0)</formula>
+    <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
+    <label>Score</label>
+    <precision>18</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>
