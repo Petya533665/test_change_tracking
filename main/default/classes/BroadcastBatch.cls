@@ -87,7 +87,10 @@ public with sharing class BroadcastBatch extends DatabaseUtils.PharosBatchImpl i
 			Log__c log = loggerInstance?.getInternalError(mapExceptionsByCorgName.get(corgName), corgName, BroadcastBatch.class.getName(), 'finish');
 			if (log != null) {
 				log.Related_Objects__c = JSON.serialize(new Map<String, List<String>>{Log__c.SObjectType.getDescribe().getName() => mapLogIdsByCorgName.get(corgName)});
-				loggerInstance?.add(log);
+				System.debug('log: ' + log);
+				System.debug('Related_Objects__c +++++' + log.Related_Objects__c);
+				System.debug('Log__c.SObjectType.getDescribe().getName() +++++' + Log__c.SObjectType.getDescribe().getName());
+				System.debug('mapLogIdsByCorgName +++++' + mapLogIdsByCorgName);
 			}
 			if (mapExceptionsByCorgName.get(corgName).getMessage().contains(EXCEPTION_INVALID_SESSION_ID)) {
 				Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(corgName);
