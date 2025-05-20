@@ -168,6 +168,7 @@ public with sharing class AIAnalysis {
 	private void setResult() {
 		for (AI_Event__e event : events) {
 			analysisServiceByIssueId.get(event.Record_Id__c).setResult(event.Analysis__c, event.Status__c, event.Result__c);
+			String apexName = event.Log_r.Apex_Name__c;
 		}
 	}
 
