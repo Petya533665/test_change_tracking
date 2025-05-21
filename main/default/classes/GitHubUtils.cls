@@ -44,12 +44,7 @@ public with sharing class GitHubUtils {
     public static final String GIT_API_V3_JSON_HEADER = 'application/vnd.github.v3+json';
 
     public static Boolean validateGitHubConnection() {
-        Map<String, Object> data = new Map<String, Object>{
-            'owner' => GIT_USERNAME,
-            'reponame' => GIT_REPONAME,
-            'branchname' => ConfigUtil.GIT_API_SETTINGS.Branch_Name__c
-        };
-        List<GitRepoBranchInfo> branches = getRepoBranchesInfos(data);
+        List<GitRepoBranchInfo> branches = getRepoBranchesInfos(ConfigUtil.GIT_API_SETTINGS.Reponame__c);
         for(GitRepoBranchInfo branch : branches) {
             if(branch.name == ConfigUtil.GIT_API_SETTINGS.Branch_Name__c) {
                 return true;

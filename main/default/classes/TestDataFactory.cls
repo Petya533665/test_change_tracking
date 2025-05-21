@@ -312,7 +312,7 @@ public class TestDataFactory {
     public static void createRuleFilterOnUpdate(Integer index, Rule__c rule, String comparisonOperator, String value, String fieldName, Boolean isOld) {
         String packagePrefix = ConfigUtil.nameSpacePrefix;
         RuleFilter__c rf1 = new RuleFilter__c();
-        rf1.Index__c = 1;
+        rf1.Index__c = index;
         rf1.Rule__c = rule.Id;
         rf1.ComparisonOperator__c = comparisonOperator;
         rf1.FieldName__c = fieldName;

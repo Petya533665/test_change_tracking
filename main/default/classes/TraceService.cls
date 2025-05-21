@@ -884,7 +884,8 @@ public without sharing class TraceService extends DatabaseUtils.PharosBatchImpl 
             this.traceRequests = [
                 SELECT Id,Issue__c,Trace_Schedule__c,Traced_Entity_Id__c,
                     Status__c,Issue__r.Category__c,Issue__r.Log__r.Stacktrace__c,
-                    Issue__r.Log__r.Flow_Version_Id__c,Issue__r.Log__r.Async_Job_Id__c
+                    Issue__r.Log__r.Flow_Version_Id__c,Issue__r.Log__r.Async_Job_Id__c,
+                    Issue__r.Key__c
                 FROM Trace_Request__c
                 // process requests which ended no older than -1 hour from now
                 WHERE End_Date__c >= :DateTime.now().addHours(-1)

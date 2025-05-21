@@ -2636,6 +2636,9 @@ public with sharing class FlowLogServiceTest {
         if(actionCall.outputParameters != null) {
             validateOutputParameters(actionCall.outputParameters);
         }
+
+        // Validate flow transaction model
+        System.assert(actionCall.flowTransactionModel == FlowLogService.FLOW_TRANSACTION_MODEL_CURRENT_TRANSACTION, 'Flow transaction model must be ' + FlowLogService.FLOW_TRANSACTION_MODEL_CURRENT_TRANSACTION);
     }
 
     private static void validateInputParameters(List<MetadataService.FlowActionCallInputParameter> inputParams) {

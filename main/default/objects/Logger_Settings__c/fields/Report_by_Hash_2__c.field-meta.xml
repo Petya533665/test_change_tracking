@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Report_by_Hash_2__c</fullName>
+    <defaultValue>&apos;Summary by Date Filtered 2&apos;</defaultValue>
+    <externalId>false</externalId>
+    <label>Report by Hash 2</label>
+    <length>255</length>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

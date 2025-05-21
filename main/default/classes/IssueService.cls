@@ -54,8 +54,7 @@ public with sharing class IssueService {
 					}
 					issueToReRunTicketing.put(issue.Key__c, issue);
 				}
-			} else if (BlurModeService.AVAILABLE_ISSUES_COUNT == null || BlurModeService.AVAILABLE_ISSUES_COUNT > 0) {
-				if (BlurModeService.AVAILABLE_ISSUES_COUNT != null) BlurModeService.AVAILABLE_ISSUES_COUNT--;
+			} else {
 				Log__c log = mapLogsByHash.get(hash)[0];
 				Issue__c issue = new Issue__c(
 						Description__c = log.Details__c,
@@ -97,9 +96,65 @@ public with sharing class IssueService {
 
 	public static void issueTracker(Map<String, List<Log__c>> mapLogsByHash, Map<String, Issue__c> mapIssuesByHash, Logger logger) {
 		Map<String, Issue__c> successMapIssuesByHash = new Map<String, Issue__c>();
-		if (!mapIssuesByHash.isEmpty()) {
-			List<Issue__c> successIssues = DatabaseUtils.getInstance().performUpsertDML(mapIssuesByHash.values(), Schema.SObjectType.Issue__c)
+		Issue__c issueToCheckAutonumber;
+		List<Issue__c> issuesToUpsert = new List<Issue__c>();
+		List<Issue__c> issuesToInsert = new List<Issue__c>();
+		List<Issue__c> issuesToUpdate = new List<Issue__c>();
+		if (LimitsService.getMaxIssues() != null) {
+			if (ConfigUtil.SETTINGS.Last_Issue_Number__c == null && BlurModeService.AVAILABLE_ISSUES_COUNT > 0) {
+				for (Issue__c issue : mapIssuesByHash.values()) {
+					if (String.isBlank(issue.Id) && issueToCheckAutonumber == null) {
+						issueToCheckAutonumber = issue;
+						break;
+					}
+				}
+				if (issueToCheckAutonumber != null) {
+					List<Issue__c> successIssues = DatabaseUtils.getInstance().performUpsertDML(new List<Issue__c>{issueToCheckAutonumber}, Schema.SObjectType.Issue__c)
+							.handleError(IssueService.class.getName(), '.issueTracker', logger).getSuccessSObjects();
+					List<Issue__c> issues = [SELECT Id, Name FROM Issue__c WHERE Id IN :successIssues];
+					if (!issues.isEmpty()) {
+						ConfigUtil.SETTINGS.Last_Issue_Number__c = getHighestIssueNumber(issues);
+						DatabaseUtils.getInstance().performUpsertDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c)
+								.handleError(ConfigUtil.class.getName(), 'issueTracker', logger);
+						BlurModeService.AVAILABLE_ISSUES_COUNT = null;
+					}
+				}
+			}
+			if (ConfigUtil.SETTINGS.Last_Issue_Number__c != null && BlurModeService.AVAILABLE_ISSUES_COUNT > 0) {
+				for (Issue__c issue : mapIssuesByHash.values()) {
+					if (String.isBlank(issue.Id) && BlurModeService.AVAILABLE_ISSUES_COUNT > 0) {
+						issuesToInsert.add(issue);
+						BlurModeService.AVAILABLE_ISSUES_COUNT--;
+						if (BlurModeService.AVAILABLE_ISSUES_COUNT == 0) break;
+					}
+				}
+			}
+			if (BlurModeService.AVAILABLE_ISSUE_KEYS != null && !BlurModeService.AVAILABLE_ISSUE_KEYS.isEmpty()) {
+				for (Issue__c issue : mapIssuesByHash.values()) {
+					if (String.isNotBlank(issue.Id) && (issueToCheckAutonumber == null || issueToCheckAutonumber.Id != issue.Id) && BlurModeService.AVAILABLE_ISSUE_KEYS.contains(issue.Key__c)) {
+						issuesToUpdate.add(issue);
+					}
+				}
+			}
+			if (!issuesToInsert.isEmpty()) issuesToUpsert.addAll(issuesToInsert);
+			if (!issuesToUpdate.isEmpty()) issuesToUpsert.addAll(issuesToUpdate);
+		} else {
+			issuesToUpsert.addAll(mapIssuesByHash.values());
+		}
+		if (!issuesToUpsert.isEmpty()) {
+			List<Issue__c> successIssues = DatabaseUtils.getInstance().performUpsertDML(issuesToUpsert, Schema.SObjectType.Issue__c)
 					.handleError(IssueService.class.getName(), '.issueTracker', logger).getSuccessSObjects();
+			List<Issue__c> issues = [SELECT Id, Name FROM Issue__c WHERE Id IN :successIssues];
+			if (!issues.isEmpty()) {
+				Integer highestIssueNumber = getHighestIssueNumber(issues);
+				if (highestIssueNumber != null && ConfigUtil.SETTINGS.Last_Issue_Number__c != null && highestIssueNumber > ConfigUtil.SETTINGS.Last_Issue_Number__c) {
+					ConfigUtil.SETTINGS.Last_Issue_Number__c = highestIssueNumber;
+					DatabaseUtils.getInstance().performUpsertDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c)
+							.handleError(ConfigUtil.class.getName(), 'issueTracker', logger);
+					BlurModeService.AVAILABLE_ISSUES_COUNT = null;
+				}
+			}
+			if (issueToCheckAutonumber != null) successMapIssuesByHash.put(issueToCheckAutonumber.Key__c, issueToCheckAutonumber);
 			for (Issue__c issue : successIssues) {
 				successMapIssuesByHash.put(issue.Key__c, issue);
 			}
@@ -133,6 +188,34 @@ public with sharing class IssueService {
 				IssueService.calculateImpactedObjects(issueIds, logger);
 			}
 		}
+	}
+
+	public static Integer getHighestIssueNumber(List<Issue__c> issues) {
+		Integer highestIssueNumber = null;
+		if (issues == null || issues.isEmpty()) {
+			return null;
+		}
+		for (Issue__c issue : issues) {
+			if (issue == null) {
+				continue;
+			}
+			Integer currentIssueNumber = getNumberFromIssueName(issue.Name);
+			if (currentIssueNumber != null && (highestIssueNumber == null || highestIssueNumber < currentIssueNumber)) {
+				highestIssueNumber = currentIssueNumber;
+			}
+		}
+		return highestIssueNumber;
+	}
+
+	public static Integer getNumberFromIssueName(String issueName) {
+		if (String.isBlank(issueName)) {
+			return null;
+		}
+		List<String> parts = issueName.split('-');
+		if (parts.size() == 2) {
+			return Integer.valueOf(parts[1].trim());
+		}
+		return null;
 	}
 
 	public static List<Issue__c> calculateLogsCount(Set<String> hashes) {

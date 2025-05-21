@@ -47,6 +47,7 @@ public class IssueTriggerHandlerTest {
 	@IsTest
 	private static void test_case_3() {
 		TestDataFactory.enableIssueTracking();
+		TestDataFactory.enableMaxIssues(0);
 		insert createPharosLog('hash1_1', 'hash2_1', 'hash3_1');
 		Issue__c issue = [SELECT Id, Status__c FROM Issue__c LIMIT 1];
 		issue.Status__c = 'Completed';
@@ -72,6 +73,7 @@ public class IssueTriggerHandlerTest {
 	@IsTest
 	private static void test_delete_issue() {
 		TestDataFactory.enableIssueTracking();
+		TestDataFactory.enableMaxIssues(0);
 		List<Log__c> logs = new List<Log__c>();
 		logs.add(createPharosLog('hash1_1', 'hash2_1', 'hash3_1'));
 		logs.add(createPharosLog('hash1_2', 'hash2_2', 'hash3_2'));
@@ -189,9 +191,20 @@ public class IssueTriggerHandlerTest {
 		System.assertEquals(1, [SELECT COUNT() FROM Issue__c]);
 	}
 
+	private static void fillTestOffset() {
+		Savepoint sp = Database.setSavepoint();
+		insert createPharosLog('hash1_1', 'hash2_1', 'hash3_1');
+		List<Issue__c> issues = [SELECT Id, Name FROM Issue__c];
+		if (!issues.isEmpty()) {
+			BlurModeService.TEST_OFFSET = IssueService.getHighestIssueNumber(issues);
+		}
+		Database.rollback(sp);
+	}
+
 	@IsTest
 	private static void test_max_issues_2_enabled() {
 		TestDataFactory.enableIssueTracking();
+		fillTestOffset();
 		TestDataFactory.enableMaxIssues(2);
 		List<Log__c> logs = new List<Log__c>();
 		logs.add(createPharosLog('hash1_1', 'hash2_1', 'hash3_1'));
@@ -219,6 +232,8 @@ public class IssueTriggerHandlerTest {
 	@IsTest
 	private static void test_max_issues_disable_to_enable() {
 		TestDataFactory.enableIssueTracking();
+		fillTestOffset();
+		TestDataFactory.enableMaxIssues(0);
 		List<Log__c> logs = new List<Log__c>();
 		logs.add(createPharosLog('hash1_1', 'hash2_1', 'hash3_1'));
 		logs.add(createPharosLog('hash1_2', 'hash2_2', 'hash3_2'));
@@ -233,7 +248,6 @@ public class IssueTriggerHandlerTest {
 		insert logs2;
 		System.assertEquals(3, [SELECT COUNT() FROM Issue__c]);
 		System.assertEquals(2, [SELECT Id, Log_Count__c FROM Issue__c][0].Log_Count__c);
-		TestDataFactory.enableMaxIssues(1);
 		List<Log__c> logs3 = new List<Log__c>();
 		logs3.add(createPharosLog('hash1_1', 'hash2_1', 'hash3_1'));
 		logs3.add(createPharosLog('hash1_2', 'hash2_2', 'hash3_2'));
@@ -241,12 +255,34 @@ public class IssueTriggerHandlerTest {
 		insert logs3;
 		System.assertEquals(3, [SELECT COUNT() FROM Issue__c]);
 		System.assertEquals(3, [SELECT Id, Log_Count__c FROM Issue__c][0].Log_Count__c);
-
+		TestDataFactory.enableMaxIssues(3);
 		List<Log__c> logs4 = new List<Log__c>();
 		logs4.add(createPharosLog('hash1_4', 'hash2_4', 'hash3_4'));
 		insert logs4;
 		System.assertEquals(3, [SELECT COUNT() FROM Issue__c]);
 		System.assertEquals(3, [SELECT Id, Log_Count__c FROM Issue__c][0].Log_Count__c);
+	}
+
+	@IsTest
+	private static void test_max_issues_disable_and_delete_to_enable() {
+		TestDataFactory.enableIssueTracking();
+		TestDataFactory.enableMaxIssues(0);
+		List<Log__c> logs = new List<Log__c>();
+		logs.add(createPharosLog('hash1_1', 'hash2_1', 'hash3_1'));
+		logs.add(createPharosLog('hash1_2', 'hash2_2', 'hash3_2'));
+		logs.add(createPharosLog('hash1_3', 'hash2_3', 'hash3_3'));
+		insert logs;
+		System.assertEquals(3, [SELECT COUNT() FROM Issue__c]);
+		System.assertEquals(1, [SELECT Id, Log_Count__c FROM Issue__c][0].Log_Count__c);
+		TestDataFactory.enableMaxIssues(3);
+		fillTestOffset();
+		delete [SELECT Id FROM Issue__c];
+		List<Log__c> logs2 = new List<Log__c>();
+		logs2.add(createPharosLog('hash1_1', 'hash2_1', 'hash3_1'));
+		logs2.add(createPharosLog('hash1_2', 'hash2_2', 'hash3_2'));
+		logs2.add(createPharosLog('hash1_3', 'hash2_3', 'hash3_3'));
+		insert logs2;
+		System.assertEquals(0, [SELECT COUNT() FROM Issue__c]);
 	}
 
 }

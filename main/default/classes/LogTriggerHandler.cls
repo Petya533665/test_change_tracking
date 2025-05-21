@@ -16,9 +16,19 @@ public with sharing class LogTriggerHandler {
 				logs.add(log);
 			}
 		}
-		Map<String, List<Log__c>> mapLogsByHash = IssueService.getMapLogsByHash(logs);
-		Map<String, Issue__c> mapIssuesByHash = IssueService.getMapIssuesByHash(mapLogsByHash);
-		IssueService.issueTracker(mapLogsByHash, mapIssuesByHash, Logger.getInstance());
+		List<Log__c> logsToTrack = new List<Log__c>();
+		if (LimitsService.getMaxIssues() == null || BlurModeService.AVAILABLE_ISSUES_COUNT > 0) {
+			logsToTrack.addAll(logs);
+		} else if (LimitsService.getMaxIssues() != null && BlurModeService.AVAILABLE_ISSUES_COUNT <= 0 && BlurModeService.AVAILABLE_ISSUE_KEYS != null && !BlurModeService.AVAILABLE_ISSUE_KEYS.isEmpty()) {
+			for (Log__c log : logs) {
+				if (BlurModeService.AVAILABLE_ISSUE_KEYS.contains(log.Hash_1__c)) logsToTrack.add(log);
+			}
+		}
+		if (!logsToTrack.isEmpty()) {
+			Map<String, List<Log__c>> mapLogsByHash = IssueService.getMapLogsByHash(logsToTrack);
+			Map<String, Issue__c> mapIssuesByHash = IssueService.getMapIssuesByHash(mapLogsByHash);
+			IssueService.issueTracker(mapLogsByHash, mapIssuesByHash, Logger.getInstance());
+		}
 	}
 
 	private static Boolean isBroadcastLog(Log__c newLog, Log__c oldLog) {

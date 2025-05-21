@@ -3,6 +3,8 @@ private class IssueTrackerBatchTest {
 
 	@IsTest
 	private static void test_batch_case_1() {
+		TestDataFactory.enableIssueTracking();
+		TestDataFactory.enableMaxIssues(0);
 		Test.startTest();
 		insert createLog('test hash 1', System.now(), IssueService.POST_PROCESSING_STATUS_COMPLETED, null, false);
 		insert createLog('test hash 1', System.now(), IssueService.POST_PROCESSING_STATUS_COMPLETED, null, false);
@@ -14,6 +16,8 @@ private class IssueTrackerBatchTest {
 
 	@IsTest
 	private static void test_batch_case_2() {
+		TestDataFactory.enableIssueTracking();
+		TestDataFactory.enableMaxIssues(0);
 		Test.startTest();
 		insert createLog('test hash 1', System.now(), IssueService.POST_PROCESSING_STATUS_COMPLETED, null, false);
 		insert createLog('test hash 1', System.now(), IssueService.POST_PROCESSING_STATUS_COMPLETED, null, false);
@@ -25,6 +29,8 @@ private class IssueTrackerBatchTest {
 
 	@IsTest
 	private static void test_batch_case_3() {
+		TestDataFactory.enableIssueTracking();
+		TestDataFactory.enableMaxIssues(0);
 		Test.startTest();
 		insert createLog('test hash 1', System.now(), IssueService.POST_PROCESSING_STATUS_COMPLETED, null, false);
 		insert createLog('test hash 1', System.now(), IssueService.POST_PROCESSING_STATUS_COMPLETED, null, false);

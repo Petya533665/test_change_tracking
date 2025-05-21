@@ -609,7 +609,7 @@ public without sharing class PermissionsUtil {
 			if(IssueAnalysisEnabled == null) {
 				IssueAnalysisEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_ISSUE_ANALYSIS_ENABLED));
 			}
-			return true;
+			return IssueAnalysisEnabled;
 		}
 		private set;
 	}
@@ -620,7 +620,7 @@ public without sharing class PermissionsUtil {
 			if(GitHubIntegrationEnabled == null) {
 				GitHubIntegrationEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_GITHUB_INTEGRATION_ENABLED));
 			}
-			return true;
+			return GitHubIntegrationEnabled;
 		}
 		private set;
 	}
@@ -631,7 +631,7 @@ public without sharing class PermissionsUtil {
 			if(ChangeTrackingEnabled == null) {
 				ChangeTrackingEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_CHANGE_TRACKING_ENABLED));
 			}
-			return true;
+			return ChangeTrackingEnabled;
 		}
 		private set;
 	}

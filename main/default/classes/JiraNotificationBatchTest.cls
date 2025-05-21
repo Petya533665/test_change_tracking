@@ -472,7 +472,6 @@ public class JiraNotificationBatchTest {
 
 	private static void createRuleFilterOnUpdate(Rule__c testRule) {
 		TestDataFactory.createRuleFilterOnUpdate(1, testRule, ISSUE_NOTIFICATION_UPDATE_COMPARISON_OPERATOR_NEW_VALUE, ISSUE_NOTIFICATION_UPDATE_NEW_VALUE, ISSUE_NOTIFICATION_FIELD_NAME, false);
-		TestDataFactory.createRuleFilterOnUpdate(2, testRule, ISSUE_NOTIFICATION_UPDATE_COMPARISON_OPERATOR_OLD_VALUE, ISSUE_NOTIFICATION_UPDATE_OLD_VALUE, ISSUE_NOTIFICATION_FIELD_NAME, true);
 	}
 
 	private static void createPharosLog(Boolean isBatch) {

@@ -52,6 +52,7 @@ private class LogServiceBatchTest {
         System.runAs(new User(Id = UserInfo.getUserId())) {
             TestDataFactory.createTestNotificationLog();
         }
+
         Integer metrics3 = FeatureManagement.checkPackageIntegerValue(PermissionsUtil.FEATURE_PARAM_MAP_7_NAME);
 
         Test.startTest();
@@ -502,7 +503,7 @@ private class LogServiceBatchTest {
     }
 
     @IsTest
-    private static void test_put_cache_item_counter_info() {
+    private static void test_put_cache_item_counter_info_with_value_map() {
         Map<String, Integer> mapLogCounter = new Map<String, Integer> {
             '005000000000001' => 1,
             '005000000000002' => 2,
@@ -518,6 +519,7 @@ private class LogServiceBatchTest {
         Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId().left(15));
         CacheUtils cacheUtil = new CacheUtils(corg.Name);
         cacheUtil.putValue(CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING, mapLogCounter);
+
         Integer mapLogCounterSizeBefore = mapLogCounter.size();
 
         Test.startTest();
@@ -552,6 +554,48 @@ private class LogServiceBatchTest {
         System.assertEquals('005000000000007', cachedValueKeys.get(5));
         System.assertEquals('005000000000008', cachedValueKeys.get(6));
         System.assertEquals('005000000000009', cachedValueKeys.get(7));
+    }
+
+    @IsTest
+    private static void test_put_cache_item_counter_info_without_value_map() {
+
+        TestDataFactory.createConnectedOrg();
+        Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId().left(15));
+        CacheUtils cacheUtil = new CacheUtils(corg.Name);
+
+
+        cacheUtil.putValue(
+                CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING,
+                corg?.Name + '005000000000001' + CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING,
+                1
+        );
+
+        cacheUtil.putValue(
+                CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING,
+                corg?.Name + '005000000000002' + CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING,
+                2
+        );
+
+        Test.startTest();
+        // enable emulate cache.ItemSizeLimitExceededException with 2.5% overlimit
+        CacheUtils.THROW_ITEM_SIZE_LIMIT_EXCEEDED_EXCEPTION = true;
+
+        Test.stopTest();
+
+        Integer count = (Integer) CacheUtils.getCacheValue(
+                corg?.Name + '005000000000001' + CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING
+        );
+        System.assertEquals(1, count, 'Should be 1');
+
+        count = (Integer) CacheUtils.getCacheValue(corg?.Name + '005000000000002' + CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING);
+        System.assertEquals(2, count, 'Should be 2');
+
+        count = (Integer) cacheUtil.getValue(CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING, corg?.Name + '005000000000001' + CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING);
+        System.assertEquals(1, count, 'Should be 1');
+
+        count = (Integer) cacheUtil.getValue(CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING, corg?.Name + '005000000000002' + CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING);
+        System.assertEquals(2, count, 'Should be 2');
+
     }
 
     @IsTest

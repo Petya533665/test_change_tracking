@@ -1511,17 +1511,6 @@ public without sharing class AdminService {
         return checkRemoteSiteSettings();
     }
 
-    public static Boolean isLogObjectAccessSetupCompleted() {
-        // Log Object Access
-        Integer availableAssignmentsToPermissionSets = [
-            SELECT COUNT()
-            FROM PermissionSetAssignment
-            WHERE PermissionSet.Name IN (:ConfigUtil.LOG_READ_PERMISSION_SET_NAME, :ConfigUtil.LOG_READ_WRITE_PERMISSION_SET_NAME)
-            LIMIT 1
-        ];
-        return availableAssignmentsToPermissionSets > 0;
-    }
-
     public static Boolean isEmailServiceFunctionSetupCompleted() {
         // Email Service
         List<EmailServicesFunction> availableEmailServices = getPackageEmailServicesFunctions();
@@ -1612,7 +1601,6 @@ public without sharing class AdminService {
             ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG6 => false,
             ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG7 => false,
             ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8 => false,
-            ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG9 => false,
             ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS => 0
         };
 
@@ -1622,17 +1610,13 @@ public without sharing class AdminService {
             data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
 
-        if (isLogObjectAccessSetupCompleted()) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG1, true);
-        }
-
         if (isEmailServiceFunctionSetupCompleted()) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG2, true);
+            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG1, true);
             data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
 
         if (isConnectionOrgsSetupCompleted()) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG3, true);
+            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG2, true);
             data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PASSTHROUGHT_MODE_ENABLED, ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c);
             data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
@@ -1640,44 +1624,44 @@ public without sharing class AdminService {
         // Add percents for Integrations
         Integer integrationsPercentCompleted = getIntegrationsPercentCompleted();
         if (integrationsPercentCompleted > 0) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG4, true);
+            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG3, true);
         }
 
         // Sensitive Data Masking
         Integer availableMasks = SensitiveDataMask__c.getAll().size();
         if (availableMasks > 0 && PermissionsUtil.SensitiveDataMaskingEnabled) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG5, true);
+            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG4, true);
         }
 
         // Monitoring
         if (ConfigUtil.SETTINGS.Monitoring_Enabled__c) {
             if (isMonitoringRulesSetupCompleted()) {
-                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG6, true);
+                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG5, true);
                 data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
             }
         }
         // Log Retention
         if (ConfigUtil.SETTINGS.Archival_Enabled__c) {
             if (isArchivalRulesSetupCompleted()) {
-                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG7, true);
+                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG6, true);
                 data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
             }
         }
 
         if (isPlatformEventConfigSetupCompleted()) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8, true);
+            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG7, true);
             data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
 
         // Notifications section
         if (PermissionsUtil.NotificationIntegrationEnabled) {
             if (isNotificationsSetupCompleted()) {
-                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG9, true);
+                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8, true);
                 data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
             }
         }
 
-        // FLAG0 FLAG2 FLAG3 FLAG4 FLAG6 FLAG7 FLAG8 FLAG9
+        // FLAG0 FLAG1 FLAG2 FLAG3 FLAG4 FLAG6 FLAG7 FLAG8
         Integer flagsQuantity = 8;
         Decimal progress = 100*Decimal.valueOf(String.valueOf(data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)))/flagsQuantity + (Decimal.valueOf(100)/flagsQuantity)*(Decimal.valueOf(integrationsPercentCompleted)/100);
         data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, progress <= 100 ? Integer.valueOf(progress) : 100);
@@ -2498,38 +2482,6 @@ public without sharing class AdminService {
         }
     }
 
-    public static LogAccessData getLogAccessData() {
-        LogAccessData output = new LogAccessData();
-        List<PermissionSet> psList = [
-            SELECT Id, Name, NamespacePrefix, Label
-            FROM PermissionSet
-            WHERE Name = :ConfigUtil.LOG_READ_PERMISSION_SET_NAME AND NamespacePrefix = :ConfigUtil.NS
-        ];
-        if (psList.size() != 1) {
-            throw new AdminServiceException(ConfigUtil.PERMISSIONS_READ_NOT_FOUND_MESSAGE);
-        }
-        output.readPermissionSet = psList[0];
-        psList = [
-            SELECT Id, Name, NamespacePrefix, Label
-            FROM PermissionSet
-            WHERE Name = :ConfigUtil.LOG_READ_WRITE_PERMISSION_SET_NAME AND NamespacePrefix = :ConfigUtil.NS
-        ];
-        if (psList.size() != 1) {
-            throw new AdminServiceException(ConfigUtil.PERMISSIONS_RW_NOT_FOUND_MESSAGE);
-        }
-        output.readWritePermissionSet = psList[0];
-        List<Id> permissionSetIds = new List<Id> {
-            output.readPermissionSet.Id,
-            output.readWritePermissionSet.Id
-        };
-        output.assignments = [
-            SELECT Id, AssigneeId, Assignee.Name, PermissionSetId, PermissionSet.Name
-            FROM PermissionSetAssignment
-            WHERE PermissionSetId IN :permissionSetIds
-        ];
-        return output;
-    }
-
     public static OAuthSettings createConnectedApp(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         Boolean useManagedApp = (Boolean)input.get('useManagedApp');
@@ -2687,10 +2639,6 @@ public without sharing class AdminService {
         return randStr;
     }
 
-    public static List<User> getLogAccessUsers() {
-        return [SELECT Id, Name FROM User WHERE IsActive = true];
-    }
-
     public static List<SensitiveDataMaskWrapper> getMasks() {
         List<SensitiveDataMaskWrapper> masks = new List<SensitiveDataMaskWrapper>();
         Map<String, SensitiveDataMask__c> masksMap = SensitiveDataMask__c.getAll();
@@ -2727,27 +2675,6 @@ public without sharing class AdminService {
         String regex = (String)input.get(ConfigUtil.SENSETIVE_MASK_KEY_REGEX);
         String result = text.replaceAll(regex, ConfigUtil.SENSETIVE_MASK_KEY_MASK);
         return result;
-    }
-
-    public static LogAccessData addPermissionSetToUser(Object data) {
-        Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
-        PermissionSetAssignment newPSA = new PermissionSetAssignment(
-            AssigneeId = (String)input.get(ConfigUtil.PERMISSION_SET_KEY_USER_ID),
-            PermissionSetId = (String)input.get(ConfigUtil.PERMISSION_SET_KEY_PERMISSION_SET_ID)
-        );
-        DatabaseUtils.getInstance().performInsertDML(new List<PermissionSetAssignment>{newPSA}, Schema.SObjectType.PermissionSetAssignment, true);
-        return getLogAccessData();
-    }
-
-    public static LogAccessData removePermissionSetAssignment(Object data) {
-        Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
-        List<PermissionSetAssignment> permissionSetAssignments = [
-                SELECT Id
-                FROM PermissionSetAssignment
-                WHERE Id = :(String)input.get(ConfigUtil.PERMISSION_SET_ASSIGNMENT_KEY_ID) AND PermissionSet.Name IN (:ConfigUtil.LOG_READ_PERMISSION_SET_NAME, :ConfigUtil.LOG_READ_WRITE_PERMISSION_SET_NAME)
-        ];
-        DatabaseUtils.getInstance().performDeleteDML(permissionSetAssignments, Schema.SObjectType.PermissionSetAssignment, true);
-        return getLogAccessData();
     }
 
     public static Map<String, Object> getServicesEnable() {
@@ -3560,12 +3487,6 @@ public without sharing class AdminService {
             regex = mask.Regex__c;
             description = mask.Description__c;
         }
-    }
-
-    public class LogAccessData {
-        public PermissionSet readPermissionSet;
-        public PermissionSet readWritePermissionSet;
-        public List<PermissionSetAssignment> assignments;
     }
 
     public class SlackSettings {
