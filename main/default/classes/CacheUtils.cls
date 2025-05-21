@@ -121,31 +121,41 @@ public with sharing class CacheUtils {
 	private final String orgName;
 	private final Map<String, String> keyMap = new Map<String, String>();
 
+
 	public CacheUtils(String orgName) {
 		this.orgName = orgName;
 	}
 
-	public Object getValue(String keyType) {
-		if(!keyMap.containsKey(keyType)) {
-			String key = buildCacheKey(keyType, this.orgName);
-			keyMap.put(keyType, key);
+	public Object getValue(String cacheKeyPrefix, String keyCache) {
+		keyCache = getKeyByKeyCache(keyCache);
+		if(isCacheAvailableForKey(cacheKeyPrefix, keyCache)) {
+			return getCacheValue(keyCache);
 		}
-		String key = keyMap.get(keyType);
-		if(isCacheAvailableForKey(keyType, key)) {
+		return null;
+	}
+
+	public Object getValue(String keyCache) {
+		String key = getKeyByKeyCache(keyCache);
+		if(isCacheAvailableForKey(keyCache, key)) {
 			return getCacheValue(key);
 		}
 		return null;
 	}
 
-	public void putValue(String keyType, Object toPut) {
-		if(!keyMap.containsKey(keyType)) {
-			String key = buildCacheKey(keyType, this.orgName);
-			keyMap.put(keyType, key);
+	public void putValue(String  cacheKeyPrefix, String keyCache, Object toPut) {
+		keyCache = getKeyByKeyCache(keyCache);
+		if(isCacheAvailableForKey(cacheKeyPrefix, keyCache)) {
+			putCacheValue(keyCache, toPut, getTTLValue(cacheKeyPrefix));
 		}
-		String key = keyMap.get(keyType);
-		if(isCacheAvailableForKey(keyType, key)) {
-			putCacheValue(key, toPut, getTTLValue(keyType.split(':')[0]));
+
+	}
+
+	public void putValue(String keyCache, Object toPut) {
+		String key = getKeyByKeyCache(keyCache);
+		if(isCacheAvailableForKey(keyCache, key)) {
+			putCacheValue(key, toPut, getTTLValue(keyCache.split(':')[0]));
 		}
+
 	}
 
 	public static Boolean isCacheEnabled(String featureName) {
@@ -158,8 +168,8 @@ public with sharing class CacheUtils {
 
 	public static Boolean isCacheAvailableForKey(String featureName, String keyCache) {
 		return (CacheUtils.isCacheEnabled(featureName)
-			&& CacheUtils.isCacheAvailable
-			&& CacheUtils.isCacheKeyValid(keyCache)
+				&& CacheUtils.isCacheAvailable
+				&& CacheUtils.isCacheKeyValid(keyCache)
 		);
 	}
 
@@ -249,19 +259,19 @@ public with sharing class CacheUtils {
 	public static Object reduceCacheValue(Object cacheValue, Decimal percentOverLimit) {
 		Object result = cacheValue;
 		if(percentOverLimit != null) {
-			if(result instanceOf Map<String, LogPostProcessingService.SObjectDescribeInfo> 
-				|| result instanceOf Map<String, String>
-				|| result instanceOf Map<String, LogPostProcessingService.FlowDescribeInfo>
-				|| result instanceOf Map<String, Integer>) {
+			if(result instanceOf Map<String, LogPostProcessingService.SObjectDescribeInfo>
+					|| result instanceOf Map<String, String>
+					|| result instanceOf Map<String, LogPostProcessingService.FlowDescribeInfo>
+					|| result instanceOf Map<String, Integer>) {
 
 				result = reduceFirstElementsOfMap(result, percentOverLimit);
 			}
 			else if(result instanceOf List<LogPostProcessingService.DeployResult>
-				|| result instanceOf List<String>
-				|| result instanceOf List<SetupAuditTrail>
-				|| result instanceOf List<AsyncApexJob>
-				|| result instanceOf List<Publisher>
-				|| result instanceOf Set<String>) {
+					|| result instanceOf List<String>
+					|| result instanceOf List<SetupAuditTrail>
+					|| result instanceOf List<AsyncApexJob>
+					|| result instanceOf List<Publisher>
+					|| result instanceOf Set<String>) {
 
 				result = reduceFirstElementsOfList(result, percentOverLimit);
 			}
@@ -270,7 +280,7 @@ public with sharing class CacheUtils {
 	}
 
 	public static Integer getCountToRemove(Integer size, Decimal percentOverLimit) {
-		Decimal multiplyCoefficientOfObject = 0.15;  
+		Decimal multiplyCoefficientOfObject = 0.15;
 		return Integer.valueOf(((size / 100.0) * percentOverLimit) * multiplyCoefficientOfObject);
 	}
 
@@ -305,5 +315,16 @@ public with sharing class CacheUtils {
 			return orgPartition.get(keyName);
 		}
 		return null;
+	}
+
+	private String getKeyByKeyCache(String keyCache) {
+		if(!this.keyMap.containsKey(keyCache)) {
+			String key = keyCache;
+			if (!keyCache.endsWith(CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING)) {
+				key = buildCacheKey(keyCache, this.orgName);
+			}
+			this.keyMap.put(keyCache, key);
+		}
+		return this.keyMap.get(keyCache);
 	}
 }

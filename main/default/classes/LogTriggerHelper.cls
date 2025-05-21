@@ -53,7 +53,6 @@ public with sharing class LogTriggerHelper {
                         // catch Invalid id
                     }
                 }
-                System.debug('relatedIds +++++' + relatedIds);
                 log.Related_Objects__c = !relatedIds.isEmpty() ? JSON.serialize(relatedIds) : null;
             }
         }

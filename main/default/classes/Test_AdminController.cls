@@ -59,18 +59,6 @@ public class Test_AdminController {
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
-            'method' => 'getLogAccessData',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'getLogAccessUsers',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
             'method' => 'getMasks',
             'data' => ''
         };
@@ -120,18 +108,6 @@ public class Test_AdminController {
 
         payload = new Map<String, Object>{
             'method' => 'createConnectedApp',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'addPermissionSetToUser',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'removePermissionSetAssignment',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));

@@ -2973,6 +2973,8 @@ public class FlowLogService {
                elementName?.endsWith(POST_PRE_LOG_MARKER) ||
                elementName.startsWith(LOG_ELEMENT_HASH_MARKER);
     }
+
+    public static final String FLOW_TRANSACTION_MODEL_CURRENT_TRANSACTION = 'CurrentTransaction';
        
     /**
      * Creates a logging action call for the given flow element
@@ -2991,6 +2993,8 @@ public class FlowLogService {
         actionCall.locationX = logElement.getX();
         actionCall.locationY = logElement.getY();
         actionCall.description = logElement.getDescription();
+        // Keeps the invocable action running in the same transaction.
+        actionCall.flowTransactionModel = FLOW_TRANSACTION_MODEL_CURRENT_TRANSACTION;
         
 
         // Create connector if there's a target

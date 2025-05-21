@@ -3,22 +3,57 @@ public with sharing class BlurModeService {
 	private static final SObjectType LOG_SOBJECT_TYPE = Log__c.SObjectType;
 	private static final SObjectType ISSUE_SOBJECT_TYPE = Issue__c.SObjectType;
 
+	@TestVisible
+	private static Integer TEST_OFFSET;
+
 	public static Integer AVAILABLE_ISSUES_COUNT {
 		get {
 			if (AVAILABLE_ISSUES_COUNT == null) {
 				AVAILABLE_ISSUES_COUNT = LimitsService.getMaxIssues();
+				if (Test.isRunningTest() && TEST_OFFSET != null) AVAILABLE_ISSUES_COUNT += TEST_OFFSET;
 				if (AVAILABLE_ISSUES_COUNT == null) return null;
-				List<Issue__c> issues = [SELECT Id, Name FROM Issue__c WHERE Name != NULL ORDER BY Name DESC LIMIT 1];
-				if (!issues.isEmpty()) {
-					List<String> parts = issues[0].Name.split('-');
-					if (parts.size() == 2) {
-						String numericPart = parts[1].trim();
-						Integer lastIssueNum = Integer.valueOf(numericPart) + 1;
-						AVAILABLE_ISSUES_COUNT -= lastIssueNum;
+				if (ConfigUtil.SETTINGS.Last_Issue_Number__c != null) {
+					AVAILABLE_ISSUES_COUNT -= Integer.valueOf(ConfigUtil.SETTINGS.Last_Issue_Number__c);
+				} else {
+					List<Issue__c> issues = [SELECT Id, Name FROM Issue__c WHERE Name != NULL ORDER BY Name DESC LIMIT 1];
+					if (!issues.isEmpty()) {
+						List<String> parts = issues[0].Name.split('-');
+						if (parts.size() == 2) {
+							Integer highestIssueNumber = Integer.valueOf(parts[1].trim());
+							AVAILABLE_ISSUES_COUNT -= highestIssueNumber;
+						}
 					}
 				}
 			}
 			return AVAILABLE_ISSUES_COUNT;
+		}
+		set;
+	}
+
+	public static List<String> AVAILABLE_ISSUE_KEYS {
+		get {
+			if (AVAILABLE_ISSUE_KEYS == null) {
+				if (LimitsService.getMaxIssues() != null) {
+					AVAILABLE_ISSUE_KEYS = new List<String>();
+					List<String> generatedNames = new List<String>();
+					String prefix = 'ISS-';
+					Integer i = 0;
+					Integer maxIssues = LimitsService.getMaxIssues();
+					if (Test.isRunningTest() && TEST_OFFSET != null) {
+						i += TEST_OFFSET;
+						maxIssues += TEST_OFFSET;
+					}
+					for (; i < maxIssues; i++) {
+						String formattedNumber = String.valueOf(i).leftPad(5, '0');
+						generatedNames.add(prefix + formattedNumber);
+					}
+					List<Issue__c> issues = [SELECT Id, Key__c FROM Issue__c WHERE Name IN :generatedNames];
+					for (Issue__c issue : issues) {
+						AVAILABLE_ISSUE_KEYS.add(issue.Key__c);
+					}
+				}
+			}
+			return AVAILABLE_ISSUE_KEYS;
 		}
 		set;
 	}

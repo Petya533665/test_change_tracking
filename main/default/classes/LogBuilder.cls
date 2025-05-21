@@ -79,8 +79,18 @@ global virtual with sharing class LogBuilder {
 		return this;
 	}
 
+	global LogBuilder tracePoint() {
+		LogService.calculateHashes(this.log);
+		return this;
+	}
+
+	global String getTraceId() {
+		return this.log?.Hash_1__c;
+	}
+
 	global Log__c build() {
 		return log;
 	}
 
+	
 }

@@ -152,8 +152,8 @@ public with sharing class LogPostProcessingService {
 	}
 
 	public class PostProcessingLogCounter extends PostProcessingCounter {
-		public PostProcessingLogCounter(String corgName) {
-			super(corgName, CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING);
+		public PostProcessingLogCounter(String corgName, String cacheKey) {
+			super(corgName, CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING, cacheKey);
 		}
 	}
 
@@ -162,25 +162,48 @@ public with sharing class LogPostProcessingService {
 		private Map<String, Integer> mapCounterByLogId;
 		private CacheUtils cacheUtil;
 		private String cacheKey;
-		
-		public PostProcessingCounter(String corgName, String cacheKey){
+		private Integer counter;
+		private String cacheKeyPrefix;
+
+		public PostProcessingCounter(String corgName, String cacheKeyPrefix, String cacheKey){
 			this.cacheKey = cacheKey;
+			this.cacheKeyPrefix = cacheKeyPrefix;
 			this.mapCounterByLogId = new Map<String, Integer>();
 			this.cacheUtil = new CacheUtils(corgName);
-			Object cacheObject = cacheUtil.getValue(cacheKey);
+			Object counterObj = cacheUtil.getValue(cacheKeyPrefix, cacheKey);
+			if (counterObj != null) {
+				this.counter = (Integer) counterObj;
+			}
+		}
+
+		public PostProcessingCounter(String corgName, String cacheKeyPrefix){
+			this.cacheKey = cacheKeyPrefix;
+			this.mapCounterByLogId = new Map<String, Integer>();
+			this.cacheUtil = new CacheUtils(corgName);
+			Object cacheObject = cacheUtil.getValue(cacheKeyPrefix);
 			if (cacheObject != null) {
 				this.mapCounterByLogId = (Map<String, Integer>)cacheObject;
 			}
 		}
 
+		public PostProcessingCounter incrementCounter() {
+			this.counter = this.counter == null ? 0 : this.counter + 1;
+			this.cacheUtil.putValue(this.cacheKeyPrefix , this.cacheKey, this.counter);
+			return this;
+		}
+
 		public PostProcessingCounter incrementCounter(String logId) {
 			this.mapCounterByLogId.put(logId, getCounter(logId) + 1);
-			this.cacheUtil.putValue(this.cacheKey, this.mapCounterByLogId);
+			this.cacheUtil.putValue(this.cacheKeyPrefix, this.mapCounterByLogId);
 			return this;
 		}
 
 		public Integer getCounter(String logId) {
 			return this.mapCounterByLogId.get(logId) != null ? this.mapCounterByLogId.get(logId) : 0;
+		}
+
+		public Integer getCounter() {
+			return this.counter != null ? this.counter : 0;
 		}
 	}
 

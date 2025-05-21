@@ -73,10 +73,11 @@ public with sharing class LogPostProcessingBatch extends DatabaseUtils.PharosBat
     public void execute(Database.BatchableContext BC, List<Log__c> scope) {
         // Counter (stored in cache) to limit Log processing number to 2 and prevent recursion
         Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(scope[0].Organization_Id__c);
-        LogPostProcessingService.PostProcessingLogCounter logCounter = new LogPostProcessingService.PostProcessingLogCounter(corg?.Name);
-        logCounter.incrementCounter(scope[0].Id);
+        String cacheKey = corg?.Name + scope[0].Id + CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING;
+        LogPostProcessingService.PostProcessingLogCounter logCounter = new LogPostProcessingService.PostProcessingLogCounter(corg?.Name, cacheKey);
+        logCounter.incrementCounter();
 
-        if (corg != null && this.currentMode == BATCH_MODE.REGULAR_POST_PROCESSING && logCounter.getCounter(scope[0].Id) <= 2) {
+        if (corg != null && this.currentMode == BATCH_MODE.REGULAR_POST_PROCESSING && logCounter.getCounter() <= 2) {
             this.logIdsInTransaction.add(scope[0].Id);
             try {
                 LogPostProcessingService.LogPostProcessingResult result = LogPostProcessingService.doLogPostProcessing(scope[0], loggerInstance);

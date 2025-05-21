@@ -399,6 +399,8 @@ public class Test_LogService {
             System.assertEquals(true, log.First_Occurred_On__c != null);
         }
         System.assertEquals(true, findIsNew);
+
+
     }
 
     @IsTest
@@ -656,5 +658,43 @@ public class Test_LogService {
         }
         System.assertEquals(1, countWithEarliestDate, 'Only one log should have the earliest Created_At__c');
         System.assertEquals(2, countOtherLogs, 'Only one log should have the earliest Created_At__c');
+    }
+
+    @IsTest
+    private static void test_logBuilder_tracePoint_methods() {
+        Log__c log;
+
+        Test.startTest();
+
+        try {
+            Integer i = 2/0;
+        }
+        catch(Exception e) {
+            LogBuilder logBuilder = LogBuilder.getInstance()
+                    .category('Some Category')
+                    .summary(e.getMessage())
+                    .area('Some Area')
+                    .type(String.isBlank(e.getTypeName()) ? 'Some Type' : e.getTypeName())
+                    .stackTrace(e.getStackTraceString())
+                    .details(e.getMessage())
+                    .attribute(Schema.SObjectType.Log__c.fields.Organization_Id__c.getName(), UserInfo.getOrganizationId().left(15))
+                    .attribute(Schema.SObjectType.Log__c.fields.Apex_Name__c.getName(), 'Some Area: Some Apex Name');
+
+            log = logBuilder.build();
+            
+            System.assertEquals(null, log.Hash_1__c, 'Hash_1__c should be null');
+            System.assertEquals(null, logBuilder.getTraceId(), 'Hash_1__c should be null');
+            System.assertEquals(true, log.Hash_1__c == logBuilder.getTraceId(), 'Should be true');
+
+
+            log  = logBuilder.tracePoint().build();
+            Logger.getInstance().add(log);
+            Logger.getInstance().flush();
+        }
+
+        Test.stopTest();
+
+        List<Log__c> logs = [SELECT Id, Hash_1__c FROM Log__c];
+        System.assertEquals(log.Hash_1__c, logs[0].Hash_1__c, 'Hash_1__c should be set');
     }
 }
