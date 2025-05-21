@@ -67,7 +67,15 @@
                         
             window.zESettings = {
                 webWidget: {
-                    offset: { horizontal: '0px', vertical: isClassic ? '20px' :  '15px'}
+                    offset: { horizontal: '0px', vertical: isClassic ? '20px' :  '15px'},
+                       launcher: {
+                            label: {
+                              '*': ' '   // Default label for all languages
+                            },
+                            chatLabel: {
+                              '*': 'alo2'     // Label specifically when chat is enabled
+                            }
+                          },
                 }
             }
 
