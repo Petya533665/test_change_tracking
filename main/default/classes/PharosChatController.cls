@@ -5,20 +5,27 @@ public with sharing class PharosChatController {
 
     public static final String OPEN_AI_SECRET = 'OpenAISecret';
 
-    private static final String ERROR_OPENAI_NOT_READY = 'OpenAI token is not configured or is invalid. Please set up OpenAI integration first.';
-    private static final String ERROR_GIT_NOT_INTEGRATED = 'Git integration is not configured. Please set up Git integration first.';
-    private static final String ERROR_CODE_NOT_INDEXED = 'Codebase is not indexed. Please wait for indexing to complete.';
-    private static final String ERROR_INIT_FAILED = 'Chat initialization has failed.';
+    public static final String ERROR_OPENAI_NOT_READY = 'OpenAI token is not configured or is invalid. Please set up OpenAI integration first.';
+    public static final String ERROR_GIT_NOT_INTEGRATED = 'Git integration is not configured. Please set up Git integration first.';
+    public static final String ERROR_CODE_NOT_INDEXED = 'Codebase is not indexed. Please wait for indexing to complete.';
+    public static final String ERROR_INIT_FAILED = 'Chat initialization has failed.';
 
     @AuraEnabled
     public static InitChatResponse initChat() {
-        System.debug('++++++initchat');
+        System.debug('++++initChat');
         List<String> errorMessages = new List<String>();
         try {
             String orgId = UserInfo.getOrganizationId();
             String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
             OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(OPEN_AI_SECRET);
             String secretKey = mdtSettings.Token__c;
+
+            System.debug('++++Oauth mtd: ' + mdtSettings);
+            System.debug('++++openAiKey: ' + openAiKey);
+            System.debug('++++secretKey: ' + secretKey);
+            System.debug('++++git name: ' + GitHubUtils.GIT_USERNAME);
+            System.debug('++++git repo: ' + GitHubUtils.GIT_REPONAME);
+            System.debug('++++git branch: ' + ConfigUtil.GIT_API_SETTINGS.Branch_Name__c);
 
             if (String.isBlank(openAiKey) || String.isBlank(secretKey) || !OpenAI.validateToken(openAiKey)) {
                 errorMessages.add(ERROR_OPENAI_NOT_READY);
@@ -60,26 +67,16 @@ public with sharing class PharosChatController {
     }
 
     public static boolean isCodeIndexed(String logOrgId) {
-        System.debug('++++++call');
         try {
-            System.debug('++++++call2');
             String response = HttpUtils.get(
                     CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + logOrgId,
                     HttpUtils.getHeadersContentTypeJSON(),
                     200
             );
-            System.debug('++++++call3');
             Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(response);
-            System.debug('++++++response: ' + response);
-            System.debug('++++++body: ' + body);
-            System.debug('++++++empty: ' + body.get('empty'));
-            System.debug('++++++empty bool: ' + ((Boolean) body.get('empty')));
-            System.debug('++++++empty bool is false: ' + ((Boolean) body.get('empty') == false));
             return (Boolean) body.get('empty') == false;
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'isCodeIndexed');
-            System.debug('++++++error: ' + e.getMessage());
-            System.debug('++++++error stack trace: ' + e.getStackTraceString());
             return false;
         }
     }
