@@ -1,9 +1,7 @@
 public with sharing class PharosChatController {
     public static final String CHAT_ENV_URL = 'https://ai.pharos.ai/chat';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/init-chat';
-
-    public static final String INDEX_URL = 'https://ai.pharos.ai/index';
-    public static final String CHECK_CODE_INDEXED_ENDPOINT = INDEX_URL + '/namespace-status';
+    public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
 
     public static final String OPEN_AI_SECRET = 'OpenAISecret';
 
@@ -56,7 +54,8 @@ public with sharing class PharosChatController {
             return new InitChatResponse(orgId);
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'initChat');
-            errorMessages.add(ERROR_INIT_FAILED);
+            errorMessages.add(e.getMessage());
+            errorMessages.add(e.getStackTraceString());
             return new InitChatResponse(errorMessages);
         }
     }
@@ -64,7 +63,7 @@ public with sharing class PharosChatController {
     public static boolean isCodeIndexed(String logOrgId) {
         try {
             String response = HttpUtils.get(
-                    CHECK_CODE_INDEXED_ENDPOINT + '?namespace=' + logOrgId,
+                    CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + logOrgId,
                     HttpUtils.getHeadersContentTypeJSON(),
                     200
             );
