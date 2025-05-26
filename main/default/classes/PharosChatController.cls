@@ -22,8 +22,7 @@ public with sharing class PharosChatController {
             if (String.isBlank(openAiKey) || String.isBlank(secretKey) || !OpenAI.validateToken(openAiKey)) {
                 errorMessages.add(ERROR_OPENAI_NOT_READY);
             }
-            Boolean gitConfigPresent = GitHubUtils.GIT_USERNAME != null && GitHubUtils.GIT_REPONAME != null && ConfigUtil.GIT_API_SETTINGS.Branch_Name__c != null;
-            if (!gitConfigPresent || !GitHubUtils.validateGitHubConnection()) {
+            if (!GitHubUtils.validateGitHubConnectionForChat()) {
                 errorMessages.add(ERROR_GIT_NOT_INTEGRATED);
             }
             if (!isCodeIndexed(orgId)) {
@@ -54,23 +53,30 @@ public with sharing class PharosChatController {
             return new InitChatResponse(orgId);
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'initChat');
-            errorMessages.add(e.getMessage());
-            errorMessages.add(e.getStackTraceString());
+            errorMessages.add(ERROR_INIT_FAILED);
             return new InitChatResponse(errorMessages);
         }
     }
 
     public static boolean isCodeIndexed(String logOrgId) {
         try {
+            System.debug('++++++call');
             String response = HttpUtils.get(
                     CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + logOrgId,
                     HttpUtils.getHeadersContentTypeJSON(),
                     200
             );
             Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(response);
+            System.debug('++++++response: ' + response);
+            System.debug('++++++body: ' + body);
+            System.debug('++++++empty: ' + body.get('empty'));
+            System.debug('++++++empty bool: ' + ((Boolean) body.get('empty')));
+            System.debug('++++++empty bool is false: ' + ((Boolean) body.get('empty') == false));
             return (Boolean) body.get('empty') == false;
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'isCodeIndexed');
+            System.debug('++++++error: ' + e.getMessage());
+            System.debug('++++++error stack trace: ' + e.getStackTraceString());
             return false;
         }
     }

@@ -53,6 +53,24 @@ public with sharing class GitHubUtils {
         return false;
     }
 
+    public static Boolean validateGitHubConnectionForChat() {
+        if (String.isBlank(GIT_USERNAME) || String.isBlank(GIT_REPONAME) || String.isBlank(ConfigUtil.GIT_API_SETTINGS.Branch_Name__c)) {
+            return false;
+        }
+
+        List<GitRepoBranchInfo> branches = getRepoBranchesInfos(
+            GIT_USERNAME,
+            GIT_REPONAME,
+            ConfigUtil.GIT_API_SETTINGS.Branch_Name__c
+        );
+        for(GitRepoBranchInfo branch : branches) {
+            if(branch.name == ConfigUtil.GIT_API_SETTINGS.Branch_Name__c) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static List<GitRepoBranchInfo> getRepoBranchesInfos(Object data) {
         String owner;
         String reponame;
