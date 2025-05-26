@@ -55,5 +55,4 @@ private class IssueTrackerBatchTest {
 				Do_Not_Create_Issue__c = doNotCreateIssue
 		);
 	}
-
 }

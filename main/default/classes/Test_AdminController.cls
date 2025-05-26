@@ -59,18 +59,6 @@ public class Test_AdminController {
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
-            'method' => 'getLogAccessData',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'getLogAccessUsers',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
             'method' => 'getMasks',
             'data' => ''
         };
@@ -120,18 +108,6 @@ public class Test_AdminController {
 
         payload = new Map<String, Object>{
             'method' => 'createConnectedApp',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'addPermissionSetToUser',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'removePermissionSetAssignment',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -3253,9 +3229,369 @@ public class Test_AdminController {
         Assert.areEqual(2, newWrapper.scheduleInfoWrappers.size(), 'Number of scheduled jobs do not match');
         Assert.areEqual(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME, newWrapper.scheduleInfoWrappers.get(0).jobName, 'Job Name does not match');
         Assert.areEqual(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME, newWrapper.scheduleInfoWrappers.get(1).jobName, 'Job Name does not match');
-        Assert.areNotEqual(oldWrapper.scheduleInfoWrappers.get(0).submittedDate, newWrapper.scheduleInfoWrappers.get(0).submittedDate, 'Submitted Dates should not match');
-        Assert.isTrue(oldWrapper.scheduleInfoWrappers.get(0).submittedDate < newWrapper.scheduleInfoWrappers.get(0).submittedDate, 'New Submitted Date should be greater');
-        Assert.areNotEqual(oldWrapper.scheduleInfoWrappers.get(1).submittedDate, newWrapper.scheduleInfoWrappers.get(1).submittedDate, 'Submitted Dates should not match');
-        Assert.isTrue(oldWrapper.scheduleInfoWrappers.get(1).submittedDate < newWrapper.scheduleInfoWrappers.get(1).submittedDate, 'New Submitted Date should be greater');
+        Assert.areNotEqual(oldWrapper.scheduleInfoWrappers.get(0).jobId, newWrapper.scheduleInfoWrappers.get(0).jobId, 'Job IDs should not match');
+        Assert.areNotEqual(oldWrapper.scheduleInfoWrappers.get(1).jobId, newWrapper.scheduleInfoWrappers.get(1).jobId, 'Job IDs should not match');
     }
+
+    @IsTest
+    private static void test_hosted_jira_search_users_by_project_id_and_query() {
+        System.assertEquals(true, JiraService.isCloudJiraInstance(), 'should be cloud from init setup');
+        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
+
+        String query = 'username123';
+
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getJiraProjectUsers',
+            'data' => new Map<String, Object>{
+                'projectId' => JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID,
+                'query' => query
+            }
+        };
+
+        // setup mocks
+        JiraService.JIRA_API_URL = JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT;
+        ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c = JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT;
+        ConfigUtil.JIRA_SETTINGS.Jira_Username__c = 'someusername';
+        ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c = 'sometoken';
+        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_HOSTED, JiraService.getJIRAServiceAuthType(), 'should be hosted api');
+        System.assertEquals(true, JiraService.getService().getProjectsEndpoint().contains(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT), 'mocks should be configured to new api url' + JiraService.getService().getProjectsEndpoint());
+
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT));
+        mocks.putAll(createJiraSearchUsersMocks(JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID, query));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Test.startTest();
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(response);
+        String error = (String)mapResponse.get('error');
+        System.assertEquals(null, error);
+
+        Object data = mapResponse.get('data');
+        System.assertEquals(true, String.valueOf(data).contains(query));
+        
+    }
+
+    @IsTest
+    private static void test_cloud_jira_search_users_by_project_id_and_query() {
+        System.assertEquals(true, JiraService.isCloudJiraInstance(), 'should be cloud from init setup');
+        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
+
+        String query = 'username123';
+
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getJiraProjectUsers',
+            'data' => new Map<String, Object>{
+                'projectId' => JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID,
+                'query' => query
+            }
+        };
+        
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT));
+        mocks.putAll(createJiraSearchUsersMocks(JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID, query));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Test.startTest();
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(response);
+        String error = (String)mapResponse.get('error');
+        System.assertEquals(null, error);
+
+        Object data = mapResponse.get('data');
+        System.assertEquals(true, String.valueOf(data).contains(query));
+    }
+
+    @IsTest
+    private static void test_hosted_jira_search_components_by_project_id_and_query() {
+        System.assertEquals(true, JiraService.isCloudJiraInstance(), 'should be cloud from init setup');
+        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
+
+        // hosted jira does not support query parameter for components
+        String query = null;
+
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getJiraProjectComponents',
+            'data' => new Map<String, Object>{
+                'projectId' => JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID,
+                'query' => query
+            }
+        };
+
+        // setup mocks
+        JiraService.JIRA_API_URL = JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT;
+        ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c = JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT;
+        ConfigUtil.JIRA_SETTINGS.Jira_Username__c = 'someusername';
+        ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c = 'sometoken';
+        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_HOSTED, JiraService.getJIRAServiceAuthType(), 'should be hosted api');
+        System.assertEquals(true, JiraService.getService().getProjectsEndpoint().contains(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT), 'mocks should be configured to new api url' + JiraService.getService().getProjectsEndpoint());
+
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT));
+        mocks.putAll(createJiraSearchComponentsMocks(JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID, query));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Test.startTest();
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(response);
+        String error = (String)mapResponse.get('error');
+        System.assertEquals(null, error);
+
+        Object data = mapResponse.get('data');
+        System.assertNotEquals(null, data);
+    }
+
+    @IsTest
+    private static void test_cloud_jira_search_components_by_project_id() {
+        System.assertEquals(true, JiraService.isCloudJiraInstance(), 'should be cloud from init setup');
+        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
+
+        String query = null;
+
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getJiraProjectComponents',
+            'data' => new Map<String, Object>{
+                'projectId' => JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID,
+                'query' => query
+            }
+        };
+        
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT));
+        mocks.putAll(createJiraSearchComponentsMocks(JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID, query));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Test.startTest();
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(response);
+        String error = (String)mapResponse.get('error');
+        System.assertEquals(null, error);
+
+        Object data = mapResponse.get('data');
+        System.assertNotEquals(null, data);
+    }
+
+    @IsTest
+    private static void test_cloud_jira_search_components_by_project_id_and_query() {
+        System.assertEquals(true, JiraService.isCloudJiraInstance(), 'should be cloud from init setup');
+        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
+
+        String query = 'component123';
+
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getJiraProjectComponents',
+            'data' => new Map<String, Object>{
+                'projectId' => JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID,
+                'query' => query
+            }
+        };
+        
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT));
+        mocks.putAll(createJiraSearchComponentsPaginatedMocks(JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID, query));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Test.startTest();
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(response);
+        String error = (String)mapResponse.get('error');
+        System.assertEquals(null, error);
+
+        Object data = mapResponse.get('data');
+        System.assertEquals(true, String.valueOf(data).contains(query));
+    }
+
+    @IsTest
+    private static void test_hosted_jira_search_epics_by_project_id_and_query() {
+        System.assertEquals(true, JiraService.isCloudJiraInstance(), 'should be cloud from init setup');
+        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
+
+        String query = 'epic123';
+
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getJiraEpics',
+            'data' => new Map<String, Object>{
+                'projectId' => JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID,
+                'query' => query
+            }
+        };
+
+        // setup mocks
+        JiraService.JIRA_API_URL = JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT;
+        ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c = JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT;
+        ConfigUtil.JIRA_SETTINGS.Jira_Username__c = 'someusername';
+        ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c = 'sometoken';
+        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_HOSTED, JiraService.getJIRAServiceAuthType(), 'should be hosted api');
+        System.assertEquals(true, JiraService.getService().getProjectsEndpoint().contains(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT), 'mocks should be configured to new api url' + JiraService.getService().getProjectsEndpoint());
+
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT));
+        mocks.putAll(createJiraSearchEpicsMocks(JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID, query));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Test.startTest();
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(response);
+        String error = (String)mapResponse.get('error');
+        System.assertEquals(null, error);
+
+        Object data = mapResponse.get('data');
+        System.assertEquals(true, String.valueOf(data).contains(query));
+    }
+
+    @IsTest
+    private static void test_cloud_jira_search_epics_by_project_id_and_query() {
+        System.assertEquals(true, JiraService.isCloudJiraInstance(), 'should be cloud from init setup');
+        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
+
+        String query = 'epic123';
+
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getJiraEpics',
+            'data' => new Map<String, Object>{
+                'projectId' => JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID,
+                'query' => query
+            }
+        };
+        
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT));
+        mocks.putAll(createJiraSearchEpicsMocks(JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID, query));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Test.startTest();
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(response);
+        String error = (String)mapResponse.get('error');
+        System.assertEquals(null, error);
+
+        Object data = mapResponse.get('data');
+        System.assertEquals(true, String.valueOf(data).contains(query));
+    }
+
+    @TestVisible
+    private static Map<String, HttpCalloutMock> createJiraSearchEpicsMocks(String projectId, String query) {
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.put(JiraService.getService().getEpicsEndpoint(projectId, query), getEpicsMock());
+		return endpoint2TestResp;
+	}
+
+    @TestVisible
+    private static TestDataFactory.SingleRequestMock getEpicsMock() {
+        List<JiraService.JiraIssue> epics = new List<JiraService.JiraIssue>();
+        JiraService.JiraIssue testEpic = new JiraService.JiraIssue();
+        testEpic.id = '123';
+        testEpic.key = 'epic123';
+        epics.add(testEpic);
+
+        JiraService.JQLResponse jqlResponse = new JiraService.JQLResponse();
+        jqlResponse.issues = epics;
+
+        TestDataFactory.SingleRequestMock getEpicsRespMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(jqlResponse)
+        );
+        return getEpicsRespMock;
+    }
+
+    @TestVisible
+    private static Map<String, HttpCalloutMock> createJiraSearchComponentsPaginatedMocks(String projectId, String query) {
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.put(JiraService.getService().getProjectComponentsEndpoint(projectId, query), getProjectComponentsPaginatedMock());
+		return endpoint2TestResp;
+	}
+
+    @TestVisible
+    private static TestDataFactory.SingleRequestMock getProjectComponentsPaginatedMock() {
+        List<JiraService.JiraProjectComponent> components = new List<JiraService.JiraProjectComponent>();
+        JiraService.JiraProjectComponent testComponent = new JiraService.JiraProjectComponent();
+        testComponent.id = '123';
+        testComponent.name = 'component123';
+        components.add(testComponent);
+
+        JiraService.JiraProjectComponentPaginatedResponse paginatedResponse = new JiraService.JiraProjectComponentPaginatedResponse();
+        paginatedResponse.values = components;
+
+        TestDataFactory.SingleRequestMock getProjectComponentsPaginatedRespMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(paginatedResponse)
+        );
+        return getProjectComponentsPaginatedRespMock;
+    }
+
+    @TestVisible
+    private static Map<String, HttpCalloutMock> createJiraSearchComponentsMocks(String projectId, String query) {
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.put(JiraService.getService().getProjectComponentsEndpoint(projectId, query), getProjectComponentsMock());
+		return endpoint2TestResp;
+	}
+
+    @TestVisible
+    private static TestDataFactory.SingleRequestMock getProjectComponentsMock() {
+        List<JiraService.JiraProjectComponent> components = new List<JiraService.JiraProjectComponent>();
+        JiraService.JiraProjectComponent testComponent = new JiraService.JiraProjectComponent();
+        testComponent.id = '123';
+        testComponent.name = 'component123';
+        components.add(testComponent);
+
+        TestDataFactory.SingleRequestMock getProjectComponentsRespMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(components)
+        );
+        return getProjectComponentsRespMock;
+    }
+
+    @TestVisible
+    private static Map<String, HttpCalloutMock> createJiraSearchUsersMocks(String projectId, String query) {
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.put(JiraService.getService().getProjectAssignableUsersEndpoint(projectId, query), getProjectAssignableUsersMock());
+		return endpoint2TestResp;
+	}
+
+    @TestVisible
+	private static TestDataFactory.SingleRequestMock getProjectAssignableUsersMock() {
+		List<JiraService.JiraProjectUser> users = new List<JiraService.JiraProjectUser>();
+		JiraService.JiraProjectUser testUser = new JiraService.JiraProjectUser();
+		testUser.accountId = '123';
+		testUser.name = 'username123';
+        users.add(testUser);
+
+		TestDataFactory.SingleRequestMock getProjectAssignableUsersRespMock = new TestDataFactory.SingleRequestMock(
+			200,
+			'OK',
+			JSON.serialize(users)
+		);
+		return getProjectAssignableUsersRespMock;
+	}
 }

@@ -35,6 +35,13 @@ public with sharing class AdminController {
         return UserInfo.getOrganizationId();
     }
 
+    public Integer userTimezoneOffset {
+        get {
+            return AdminService.getUserTimezoneOffset();
+        }
+        set;
+    }
+
     public static String getAdminPageInitEvent() {
         AnalyticsService.getInstance().trackAdminPageView(UserInfo.getOrganizationId());
         return 'success';
@@ -88,7 +95,11 @@ public with sharing class AdminController {
             } else if (method == 'resetAzureDevOpsSettings') {
                 response.data = AdminService.resetAzureDevOpsSettings();
             } else if (method == 'getJiraProjectUsers') {
-                response.data = AdminService.getJiraProjectUsers(String.valueOf(data));
+                response.data = AdminService.getJiraProjectUsers(data);
+            } else if (method == 'getJiraProjectComponents') {
+                response.data = AdminService.getJiraProjectComponents(data);
+            } else if (method == 'getJiraEpics') {
+                response.data = AdminService.getJiraEpics(data);
             } else if (method == 'getJiraProject') {
                 response.data = AdminService.getJiraProject(String.valueOf(data));
             } else if (method == 'getJiraProjectIssueTypes') {
@@ -113,14 +124,6 @@ public with sharing class AdminController {
                 response.data = AzureService.getProjectTeamMemberWrapper(data);
             } else if (method == 'createConnectedApp') {
                 response.data = AdminService.createConnectedApp(data);
-            } else if (method == 'getLogAccessData') {
-                response.data = AdminService.getLogAccessData();
-            } else if (method == 'getLogAccessUsers') {
-                response.data = AdminService.getLogAccessUsers();
-            } else if (method == 'addPermissionSetToUser') {
-                response.data = AdminService.addPermissionSetToUser(data);
-            } else if (method == 'removePermissionSetAssignment') {
-                response.data = AdminService.removePermissionSetAssignment(data);
             } else if (method == 'getMasks') {
                 response.data = AdminService.getMasks();
             } else if (method == 'saveMask') {

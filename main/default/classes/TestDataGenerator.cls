@@ -237,8 +237,8 @@ public with sharing class TestDataGenerator {
 	public static final String TEST_PLATFORM_EVENT_LOG_HASH1 = '7woH3kUlYkezkkEt3c1eQ8fLj9jXCcmhcCft5AX+3nI=';
 	public static final String TEST_PLATFORM_EVENT_LOG_SUMMARY = 'Divide by 0';
 	public static final String TEST_PLATFORM_EVENT_LOG_TYPE = 'System.MathException';
-	public static final String TEST_PLATFORM_EVENT_LOG_CATEGORY = 'Error';
-	public static final String TEST_PLATFORM_EVENT_LOG_AREA = 'Test Platform Event';
+	public static final String TEST_PLATFORM_EVENT_LOG_CATEGORY = 'Pharos Error';
+	public static final String TEST_PLATFORM_EVENT_LOG_AREA = 'Pharos';
 	public static final String TEST_PLATFORM_EVENT_LOG_STACKTRACE = 'Class.pharos.TestDataGenerator.slack.startPlatformEventTest: line 71, column 1';
 	public static final String TEST_PLATFORM_EVENT_LOG_DETAILS = 'System.MathException: Divide by 0' + '\n\n' + TEST_PLATFORM_EVENT_LOG_STACKTRACE;
 

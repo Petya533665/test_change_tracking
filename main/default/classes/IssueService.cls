@@ -13,9 +13,35 @@ public with sharing class IssueService {
 
 	public static final Integer MAX_TEXT_AREA_27k_SIZE = 27000;
 
+	public static final String LOG_ISSUE_TRACKER_STATUS_FAILED = 'Failed';
+	public static final Integer LOG_ISSUE_TRACKER_MAX_ATTEMPTS = 2;
+
+	public static Set<String> logIdsToSkipProcessing = new Set<String>();
+
 	public static Map<String, List<Log__c>> getMapLogsByHash(List<Log__c> logs) {
+		if (logs.isEmpty()) return new Map<String, List<Log__c>>();
+
+		// track logs to avoid duplicates
+		for (Log__c log : logs) {
+			IssueTrackerLogCounter logCounter = new IssueTrackerLogCounter(log.Id);
+			logCounter.incrementCounter();
+		}
+
 		Map<String, List<Log__c>> mapLogsByHash = new Map<String, List<Log__c>>();
 		for (Log__c log : logs) {
+			IssueTrackerLogCounter logCounter = new IssueTrackerLogCounter(log.Id);
+			// skip logs that have been processed too many times
+			if (logCounter.getCounter() > LOG_ISSUE_TRACKER_MAX_ATTEMPTS) {
+				logIdsToSkipProcessing.add(log.Id);
+				continue;
+			}
+
+			// skip logs that have failed
+			if (log?.Issue_Tracker_Status__c == LOG_ISSUE_TRACKER_STATUS_FAILED) {
+				continue;
+			}
+
+			// add log to map if it has a hash
 			if (String.isNotBlank(log.Hash_1__c)) {
 				if (mapLogsByHash.containsKey(log.Hash_1__c)) {
 					mapLogsByHash.get(log.Hash_1__c).add(log);
@@ -97,6 +123,7 @@ public with sharing class IssueService {
 	public static void issueTracker(Map<String, List<Log__c>> mapLogsByHash, Map<String, Issue__c> mapIssuesByHash, Logger logger) {
 		Map<String, Issue__c> successMapIssuesByHash = new Map<String, Issue__c>();
 		Issue__c issueToCheckAutonumber;
+		Set<String> failedHashes = new Set<String>();
 		List<Issue__c> issuesToUpsert = new List<Issue__c>();
 		List<Issue__c> issuesToInsert = new List<Issue__c>();
 		List<Issue__c> issuesToUpdate = new List<Issue__c>();
@@ -110,12 +137,12 @@ public with sharing class IssueService {
 				}
 				if (issueToCheckAutonumber != null) {
 					List<Issue__c> successIssues = DatabaseUtils.getInstance().performUpsertDML(new List<Issue__c>{issueToCheckAutonumber}, Schema.SObjectType.Issue__c)
-							.handleError(IssueService.class.getName(), '.issueTracker', logger).getSuccessSObjects();
+							.handleError(IssueService.class.getName(), '.issueTracker.issueToCheckAutonumber', logger).getSuccessSObjects();
 					List<Issue__c> issues = [SELECT Id, Name FROM Issue__c WHERE Id IN :successIssues];
 					if (!issues.isEmpty()) {
 						ConfigUtil.SETTINGS.Last_Issue_Number__c = getHighestIssueNumber(issues);
 						DatabaseUtils.getInstance().performUpsertDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c)
-								.handleError(ConfigUtil.class.getName(), 'issueTracker', logger);
+								.handleError(ConfigUtil.class.getName(), 'issueTracker.settings', logger);
 						BlurModeService.AVAILABLE_ISSUES_COUNT = null;
 					}
 				}
@@ -143,14 +170,14 @@ public with sharing class IssueService {
 		}
 		if (!issuesToUpsert.isEmpty()) {
 			List<Issue__c> successIssues = DatabaseUtils.getInstance().performUpsertDML(issuesToUpsert, Schema.SObjectType.Issue__c)
-					.handleError(IssueService.class.getName(), '.issueTracker', logger).getSuccessSObjects();
+					.handleError(IssueService.class.getName(), '.issueTracker.issuesToUpsert', logger).getSuccessSObjects();
 			List<Issue__c> issues = [SELECT Id, Name FROM Issue__c WHERE Id IN :successIssues];
 			if (!issues.isEmpty()) {
 				Integer highestIssueNumber = getHighestIssueNumber(issues);
 				if (highestIssueNumber != null && ConfigUtil.SETTINGS.Last_Issue_Number__c != null && highestIssueNumber > ConfigUtil.SETTINGS.Last_Issue_Number__c) {
 					ConfigUtil.SETTINGS.Last_Issue_Number__c = highestIssueNumber;
 					DatabaseUtils.getInstance().performUpsertDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c)
-							.handleError(ConfigUtil.class.getName(), 'issueTracker', logger);
+							.handleError(ConfigUtil.class.getName(), 'issueTracker.settings', logger);
 					BlurModeService.AVAILABLE_ISSUES_COUNT = null;
 				}
 			}
@@ -158,23 +185,45 @@ public with sharing class IssueService {
 			for (Issue__c issue : successIssues) {
 				successMapIssuesByHash.put(issue.Key__c, issue);
 			}
-		}
-		List<Log__c> logsToUpdate = new List<Log__c>();
-		for (String hash : mapLogsByHash.keySet()) {
-			if (successMapIssuesByHash.containsKey(hash)) {
-				for (Log__c log : mapLogsByHash.get(hash)) {
-					logsToUpdate.add(new Log__c(Id = log.Id, Issue__c = successMapIssuesByHash.get(hash).Id));
+			
+			// collect hashes that failed to create an issue
+			for (String hash : mapIssuesByHash.keySet()) {
+				if (!successMapIssuesByHash.containsKey(hash)) {
+					failedHashes.add(hash);
 				}
 			}
 		}
-		if (!logsToUpdate.isEmpty()) {
-			DatabaseUtils.getInstance().performUpdateDML(logsToUpdate, Schema.SObjectType.Log__c)
-					.handleError(IssueService.class.getName(), '.issueTracker', logger);
+		Map<Id, Log__c> logsToUpdateMap = new Map<Id, Log__c>();
+		for (String hash : mapLogsByHash.keySet()) {
+			if (successMapIssuesByHash.containsKey(hash)) {
+				for (Log__c log : mapLogsByHash.get(hash)) {
+					logsToUpdateMap.put(log.Id, new Log__c(Id = log.Id, Issue__c = successMapIssuesByHash.get(hash).Id));
+				}
+			}
+			if (failedHashes.contains(hash)) {
+				for (Log__c log : mapLogsByHash.get(hash)) {
+					logsToUpdateMap.put(log.Id, new Log__c(Id = log.Id, Issue_Tracker_Status__c = LOG_ISSUE_TRACKER_STATUS_FAILED));
+				}
+			}
+		}
+		if (!logIdsToSkipProcessing.isEmpty()) {
+			for (String logId : logIdsToSkipProcessing) {
+				if (!logsToUpdateMap.containsKey(logId)) {
+					logsToUpdateMap.put(logId, new Log__c(Id = logId, Issue_Tracker_Status__c = LOG_ISSUE_TRACKER_STATUS_FAILED));
+				}
+				else {
+					logsToUpdateMap.get(logId).Issue_Tracker_Status__c = LOG_ISSUE_TRACKER_STATUS_FAILED;
+				}
+			}
+		}
+		if (!logsToUpdateMap.isEmpty()) {
+			DatabaseUtils.getInstance().performUpdateDML(logsToUpdateMap.values(), Schema.SObjectType.Log__c)
+					.handleError(IssueService.class.getName(), '.issueTracker.LogsToUpdate', logger);
 		}
 		List<Issue__c> issuesToCalculate = IssueService.calculateLogsCount(successMapIssuesByHash.keySet());
 		if (!issuesToCalculate.isEmpty()) {
 			List<Issue__c> successIssues = DatabaseUtils.getInstance().performUpdateDML(issuesToCalculate, Schema.SObjectType.Issue__c)
-					.handleError(IssueService.class.getName(), '.issueTracker', logger).getSuccessSObjects();
+					.handleError(IssueService.class.getName(), '.issueTracker.IssuesToCalculate', logger).getSuccessSObjects();
 			Set<Id> issueIds = (new Map<Id, Issue__c>(successIssues)).keySet();
 			Integer logsCount = [
 					SELECT COUNT()
@@ -391,6 +440,39 @@ public with sharing class IssueService {
 		public Map<String, Set<String>> impactedObjects;
 		public Set<String> impactedUsers;
 		public Set<String> exceptionCodes;
+	}
+
+	public class IssueTrackerLogCounter extends IssueTrackerCounter {
+		public IssueTrackerLogCounter(String logId) {
+			super(UserInfo.getOrganizationId(), logId + CacheUtils.KEY_ISSUE_TRACKER_LOG_TRACKING);
+		}
+	}
+
+	public virtual class IssueTrackerCounter {
+
+		private Integer counter;
+		private CacheUtils cacheUtil;
+		private String cacheKey;
+		
+		public IssueTrackerCounter(String corgName, String cacheKey){
+			this.cacheKey = cacheKey;
+			this.counter = 0;
+			this.cacheUtil = new CacheUtils(corgName);
+			Object cacheObject = cacheUtil.getValue(cacheKey);
+			if (cacheObject != null) {
+				this.counter = (Integer)cacheObject;
+			}
+		}
+
+		public IssueTrackerCounter incrementCounter() {
+			this.counter++;
+			this.cacheUtil.putValue(this.cacheKey, this.counter);
+			return this;
+		}
+
+		public Integer getCounter() {
+			return this.counter;
+		}
 	}
 
 }

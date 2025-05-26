@@ -79,12 +79,12 @@ global virtual with sharing class LogBuilder {
 		return this;
 	}
 
-	global LogBuilder tracePoint() {
+	global virtual LogBuilder tracePoint() {
 		LogService.calculateHashes(this.log);
 		return this;
 	}
 
-	global String getTraceId() {
+	global virtual String getTraceId() {
 		return this.log?.Hash_1__c;
 	}
 
