@@ -13,8 +13,22 @@ public with sharing class IssueTriggerHandler {
 			System.Quiddity.RUNTEST_ASYNC
 	};
 
+	/**
+	 * @description This is a test-only static variable to throw a DML exception for testing purposes.
+	 * @see IssueTriggerHandlerTest for usage.
+	 */
+	@TestVisible
+	private static Boolean throwDmlExceptionForTest = false;
+
 	public static void onBeforeInsert(List<Issue__c> newIssues) {
 		updateRecordTypeId(newIssues, null);
+
+		if (Test.isRunningTest() && throwDmlExceptionForTest) {
+			// Simulate a DML exception specifically during the Issue upsert phase
+			DmlException forcedException = new DmlException();
+			forcedException.setMessage('Forced DML exception for testing issue tracker failure.');
+			throw forcedException;
+		}
 	}
 
 	public static void onAfterInsert(List<Issue__c> newIssues) {
@@ -89,9 +103,7 @@ public with sharing class IssueTriggerHandler {
 				}
 				DevOpsCenterBatch.getInstance(setIssueIds).startBatch();
 			}
-		} catch (Exception e) {
-
-		}
+		} catch (Exception e) {}
 	}
 
 	public static void onBeforeUpdate(List<Issue__c> newIssues, Map<Id, Issue__c> oldIssuesMap) {

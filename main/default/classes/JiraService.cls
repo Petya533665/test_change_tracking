@@ -59,16 +59,16 @@ public without sharing class JiraService {
         List<JiraProject> getProjects();
         JiraProject getProject(String projectOrKeyId);
         List<JiraProjectIssueType> getProjectIssueTypes(String projectOrKeyId);
-        List<JiraProjectComponent> getProjectComponents(String projectOrKeyId);
+        List<JiraProjectComponent> getProjectComponents(String projectOrKeyId, String query);
         List<JiraProjectIssueField> getProjectIssueFields(String projectOrKeyId, String issueType);
         List<JiraProjectIssueField> getProjectIssueFields(List<JiraProjectIssueType> issueTypes, String issueTypeId);
         Map<String, JiraProjectIssueField> getProjectIssueCustomFields(String projectOrKeyId, String issueType);
         Map<String, JiraProjectIssueField> getProjectIssueCustomFields(List<JiraProjectIssueField> mapFields);
         Map<String, JiraProjectIssueField> getProjectIssueCustomFields(List<JiraProjectIssueType> issueTypes, String issueTypeId);
-        List<JiraProjectUser> getProjectAssignableUsers(String projectKey);
+        List<JiraProjectUser> getProjectAssignableUsers(String projectKey, String queryOrUsername);
         List<JiraPriority> getPriorities();
         List<JiraPriorityScheme> getPrioritySchemes();
-        List<JiraIssue> getEpics(String projectOrKeyId);
+        List<JiraIssue> getEpics(String projectOrKeyId, String query);
         JiraResourceWrapper getJiraAvailableResources();
         JiraIssue getJiraIssueByKey(String taskKey, Logger logger);
         JiraIssue getJiraIssueByKey(String taskKey, Logger logger, Boolean throwNotFoundException);
@@ -78,7 +78,7 @@ public without sharing class JiraService {
         String getCreateIssueEndpoint();
         String getProjectsEndpoint();
         String getProjectEndpoint(String projectOrKeyId);
-        String getProjectComponentsEndpoint(String projectOrKeyId);
+        String getProjectComponentsEndpoint(String projectOrKeyId, String query);
         String getProjectIssueTypesEndpoint(String projectOrKeyId);
         String getProjectIssueFieldsEndpoint(String projectOrKeyId, String issueType);
         String getPrioritiesEndpoint();
@@ -89,9 +89,10 @@ public without sharing class JiraService {
         String getLinkIssuesEndpoint();
         String getUnLinkIssueEndpoint(String linkId);
         String getJQLEndpoint(String jql);
-        String getEpicsEndpoint(String projectOrKeyId);
+        String getEpicsEndpoint(String projectOrKeyId, String query);
         String getSearchIssueByLabelEndpoint(String label, String projectOrKeyId);
         String getBulkResolutionTasksEndpoint(List<String> taskKeys);
+        String getProjectAssignableUsersEndpoint(String projectOrKeyId, String queryOrUsername);
 
         void linkIssuesAsRelates(String inwardIssueKey, String outwardIssueKey);
         void linkIssuesAsDuplicates(String inwardIssueKey, String outwardIssueKey);
@@ -394,6 +395,7 @@ public without sharing class JiraService {
     public static final String API_REST = '/rest/api/';
     public static final String API_PROJECT = '/project/';
     public static final String API_PROJECT_COMPONENTS = '/components';
+    public static final String API_PROJECT_COMPONENT = '/component';
     public static final String API_ISSUE_CREATE_META = '/issue/createmeta';
     public static final String API_ISSUE_CREATE_COMMENT = '/comment';
     public static final String API_ISSUE_CREATE_META_ISSUE_TYPES = '/issue/createmeta/{0}/issuetypes';
@@ -432,8 +434,15 @@ public without sharing class JiraService {
             return API_REST_BASE + API_PROJECT + projectOrKeyId;
         }
 
-        public virtual String getProjectComponentsEndpoint(String projectOrKeyId) {
-            return API_REST_BASE + API_PROJECT + projectOrKeyId + API_PROJECT_COMPONENTS;
+        public virtual String getProjectComponentsEndpoint(String projectOrKeyId, String query) {
+            String endpoint = API_REST_BASE + API_PROJECT + projectOrKeyId;
+            if(String.isNotBlank(query)) {
+                endpoint += API_PROJECT_COMPONENT + '?query=' + query;
+            }
+            else {
+                endpoint += API_PROJECT_COMPONENTS;
+            }
+            return endpoint;
         }
 
         public virtual String getProjectIssueTypesEndpoint(String projectOrKeyId) {
@@ -445,8 +454,12 @@ public without sharing class JiraService {
             return getProjectIssueTypesEndpoint(projectOrKeyId) + '/' + issueType;
         }
 
-        public virtual String getProjectAssignableUsersEndpoint(String projectKey) {
-            return API_REST_BASE + API_USER_SEARCH_BY_PROJECT + projectKey;
+        public virtual String getProjectAssignableUsersEndpoint(String projectKey, String query) {
+            String endpoint = API_REST_BASE + API_USER_SEARCH_BY_PROJECT + projectKey;
+            if(String.isNotBlank(query)) {
+                endpoint += '&query=' + query;
+            }
+            return endpoint;
         }
 
         public virtual String getPrioritiesEndpoint() {
@@ -487,8 +500,23 @@ public without sharing class JiraService {
             return API_REST_BASE + API_JQL_SEARCH + queryParams.toStringParameters('?');
         }
 
-        public virtual String getEpicsEndpoint(String projectOrKeyId) {
+        public virtual String getEpicsEndpoint(String projectOrKeyId, String query) {
             String jql = 'project="' + projectOrKeyId + '" AND issuetype="Epic"';
+            if(String.isNotBlank(query)) {
+                // limit search to epic key if it starts with the project key
+                // like PTP-123
+                if (query.startsWith(projectOrKeyId + '-')) {
+                    jql += ' AND key = "' + query.trim() + '"';
+                }
+                // like 123, auto-complete will return the epic key
+                else if (query.isNumeric()) {
+                    jql += ' AND key = "' + (projectOrKeyId + '-' + query.trim()) + '"';
+                }
+                // like "test epic", auto-complete will return the epic summary
+                else {
+                    jql += ' AND summary ~ "' + query.trim() + '"';
+                }
+            }
             return getJQLEndpoint(jql);
         }
 
@@ -644,15 +672,22 @@ public without sharing class JiraService {
             return result;
         }
 
-        public virtual List<JiraProjectComponent> getProjectComponents(String projectOrKeyId) {
+        public virtual List<JiraProjectComponent> getProjectComponents(String projectOrKeyId, String query) {
             List<JiraProjectComponent> result = new List<JiraProjectComponent>();
-            String b = getApiData(getProjectComponentsEndpoint(projectOrKeyId));
-            return (List<JiraProjectComponent>)JSON.deserialize(b, List<JiraProjectComponent>.class);
+            String b = getApiData(getProjectComponentsEndpoint(projectOrKeyId, query));
+            if (String.isNotBlank(query)) {
+                JiraProjectComponentPaginatedResponse paginatedResponse = (JiraProjectComponentPaginatedResponse)JSON.deserialize(b, JiraProjectComponentPaginatedResponse.class);
+                result = paginatedResponse?.values;
+            }
+            else {
+                result = (List<JiraProjectComponent>)JSON.deserialize(b, List<JiraProjectComponent>.class);
+            }
+            return result;
         }
 
-        public virtual List<JiraProjectUser> getProjectAssignableUsers(String projectKey) {
+        public virtual List<JiraProjectUser> getProjectAssignableUsers(String projectKey, String query) {
             List<JiraProjectUser> result = new List<JiraProjectUser>();
-            String b = getApiData(getProjectAssignableUsersEndpoint(projectKey));
+            String b = getApiData(getProjectAssignableUsersEndpoint(projectKey, query));
             result = (List<JiraProjectUser>)JSON.deserialize(b, List<JiraProjectUser>.class);
             for(JiraProjectUser ju : result) {
                 if(ju.accountId == null && ju.name != null) {
@@ -677,9 +712,9 @@ public without sharing class JiraService {
             return result;
         }
 
-        public virtual List<JiraIssue> getEpics(String projectOrKeyId) {
+        public virtual List<JiraIssue> getEpics(String projectOrKeyId, String query) {
             List<JiraIssue> result = new List<JiraIssue>();
-            String b = getApiData(getEpicsEndpoint(projectOrKeyId));
+            String b = getApiData(getEpicsEndpoint(projectOrKeyId, query));
             JQLResponse jqlResponse = (JQLResponse)JSON.deserialize(b, JQLResponse.class);
             result = jqlResponse?.issues;
             return result;
@@ -932,6 +967,21 @@ public without sharing class JiraService {
             removeJiraIssueTypes(result);
             return result;
         }
+
+        public override String getProjectAssignableUsersEndpoint(String projectKey, String username) {
+            String endpoint = API_REST_BASE + API_USER_SEARCH_BY_PROJECT + projectKey;
+            if(String.isNotBlank(username)) {
+                endpoint += '&username=' + username;
+            }
+            return endpoint;
+        }
+
+        public override List<JiraProjectComponent> getProjectComponents(String projectOrKeyId, String query) {
+            List<JiraProjectComponent> result = new List<JiraProjectComponent>();
+            String b = getApiData(getProjectComponentsEndpoint(projectOrKeyId, null));
+            result = (List<JiraProjectComponent>)JSON.deserialize(b, List<JiraProjectComponent>.class);
+            return result;
+        }
     }
 
     public class NewTaskCreatedResponse {
@@ -1086,6 +1136,16 @@ public without sharing class JiraService {
         public String emailAddress;
         public String displayName;
         public Boolean active;
+    }
+
+    public class JiraProjectComponentPaginatedResponse {
+        public Boolean isLast;
+        public Integer maxResults;
+        public String nextPage;
+        public String self;
+        public Integer startAt;
+        public Integer total;
+        public List<JiraProjectComponent> values;
     }
 
     public class JiraProjectComponent {

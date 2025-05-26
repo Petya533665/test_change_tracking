@@ -12,7 +12,6 @@ public with sharing class PharosChatController {
 
     @AuraEnabled
     public static InitChatResponse initChat() {
-        System.debug('++++initChat');
         List<String> errorMessages = new List<String>();
         try {
             String orgId = UserInfo.getOrganizationId();
@@ -20,14 +19,7 @@ public with sharing class PharosChatController {
             OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(OPEN_AI_SECRET);
             String secretKey = mdtSettings.Token__c;
 
-            System.debug('++++Oauth mtd: ' + mdtSettings);
-            System.debug('++++openAiKey: ' + openAiKey);
-            System.debug('++++secretKey: ' + secretKey);
-            System.debug('++++git name: ' + GitHubUtils.GIT_USERNAME);
-            System.debug('++++git repo: ' + GitHubUtils.GIT_REPONAME);
-            System.debug('++++git branch: ' + ConfigUtil.GIT_API_SETTINGS.Branch_Name__c);
-
-            if (String.isBlank(openAiKey) || String.isBlank(secretKey) || !OpenAI.validateToken(openAiKey)) {
+            if (!ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c || String.isBlank(openAiKey) || String.isBlank(secretKey) || !OpenAI.validateToken(openAiKey)) {
                 errorMessages.add(ERROR_OPENAI_NOT_READY);
             }
             if (!GitHubUtils.validateGitHubConnectionForChat()) {

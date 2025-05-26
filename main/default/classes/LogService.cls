@@ -147,10 +147,6 @@ global with sharing class LogService {
                 PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Request_Id_External__c, System.Request.getCurrent().getRequestId());
                 PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Organization_Id__c, (String.isNotBlank(incomingOrganizationId)) ? incomingOrganizationId : processor.getOrganizationId());
 
-                if (emailBody.containsIgnoreCase(PHAROS_HIDE_TOKEN) || emailBody.containsIgnoreCase(PHAROS_CODE_TOKEN)) {
-                    PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Category__c, Logger.CATEGORY_PHAROS_ERROR);
-                    PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Area__c, Logger.AREA_PHAROS_ERROR);
-                }
 
                 Boolean isCustomSkip = false;
                 List<ICustomErrorInfo> customLogFields = processor.getCustomInfo();
@@ -223,6 +219,11 @@ global with sharing class LogService {
                 PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Flow_Version__c, processor.getFlowVersion());
                 PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Salesforce_Error_Id__c, processor.getSalesforceErrorId());
                 PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Namespace__c, processor.getNamespace());
+
+                if (processor.getStackTrace()?.containsIgnoreCase(PHAROS_CODE_TOKEN) || processor.getStackTrace()?.containsIgnoreCase(PHAROS_HIDE_TOKEN)) {
+                    PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Category__c, Logger.CATEGORY_PHAROS_ERROR);
+                    PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Area__c, Logger.AREA_PHAROS_ERROR);
+                }
 
                 LogService.processor = processor;
 

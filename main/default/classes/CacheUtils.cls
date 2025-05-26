@@ -59,6 +59,9 @@ public with sharing class CacheUtils {
 	public static final String KEY_POST_PROCESSING_LOG_TRACKING = 'PPLT';
 	public static final Integer KEY_POST_PROCESSING_LOG_TRACKING_TTL = 20*60; // 20 min
 
+	public static final String KEY_ISSUE_TRACKER_LOG_TRACKING = 'ITLT';
+	public static final Integer KEY_ISSUE_TRACKER_LOG_TRACKING_TTL = 20*60; // 20 min
+
 	public static final String KEY_NOTIFICATION_OBJECT_TRACKING = 'NOT';
 	public static final Integer KEY_NOTIFICATION_OBJECT_TRACKING_TTL = 24*60*60; // 24 hours
 
@@ -106,6 +109,7 @@ public with sharing class CacheUtils {
 				MapRequests.put(KEY_GRAPH_API_ROTATION_TOKENS_LOCKED_BY_JOB_ID, KEY_GRAPH_API_ROTATION_TOKENS_LOCKED_BY_JOB_ID_TTL);
 				MapRequests.put(KEY_AZURE_DEV_OPS_API_ROTATION_TOKENS_LOCKED_BY_JOB_ID, KEY_AZURE_DEV_OPS_API_ROTATION_TOKENS_LOCKED_BY_JOB_ID_TTL);
 				MapRequests.put(KEY_POST_PROCESSING_LOG_TRACKING, KEY_POST_PROCESSING_LOG_TRACKING_TTL);
+				MapRequests.put(KEY_ISSUE_TRACKER_LOG_TRACKING, KEY_ISSUE_TRACKER_LOG_TRACKING_TTL);
 				MapRequests.put(KEY_REQUEST_RELATED_SOBJECT, KEY_REQUEST_RELATED_SOBJECT_TTL);
 				MapRequests.put(KEY_POST_PROCESSING_ORCHESTRATOR_LOG_TRACKING, KEY_POST_PROCESSING_ORCHESTRATOR_LOG_TRACKING_TTL);
 				MapRequests.put(KEY_REQUEST_FAILED_JOB_IDS, KEY_REQUEST_FAILED_JOB_IDS_TTL);
@@ -126,34 +130,34 @@ public with sharing class CacheUtils {
 		this.orgName = orgName;
 	}
 
-	public Object getValue(String cacheKeyPrefix, String keyCache) {
-		keyCache = getKeyByKeyCache(keyCache);
-		if(isCacheAvailableForKey(cacheKeyPrefix, keyCache)) {
-			return getCacheValue(keyCache);
+	public Object getValue(String cacheKeyPrefix, String unhashedKey) {
+		String hashedKey = getHashedKey(unhashedKey);
+		if(isCacheAvailableForKey(cacheKeyPrefix, hashedKey)) {
+			return getCacheValue(hashedKey);
 		}
 		return null;
 	}
 
-	public Object getValue(String keyCache) {
-		String key = getKeyByKeyCache(keyCache);
-		if(isCacheAvailableForKey(keyCache, key)) {
-			return getCacheValue(key);
+	public Object getValue(String unhashedKey) {
+		String hashedKey = getHashedKey(unhashedKey);
+		if(isCacheAvailableForKey(unhashedKey, hashedKey)) {
+			return getCacheValue(hashedKey);
 		}
 		return null;
 	}
 
-	public void putValue(String  cacheKeyPrefix, String keyCache, Object toPut) {
-		keyCache = getKeyByKeyCache(keyCache);
-		if(isCacheAvailableForKey(cacheKeyPrefix, keyCache)) {
-			putCacheValue(keyCache, toPut, getTTLValue(cacheKeyPrefix));
+	public void putValue(String  cacheKeyPrefix, String unhashedKey, Object toPut) {
+		String hashedKey = getHashedKey(unhashedKey);
+		if(isCacheAvailableForKey(cacheKeyPrefix, hashedKey)) {
+			putCacheValue(hashedKey, toPut, getTTLValue(cacheKeyPrefix));
 		}
 
 	}
 
-	public void putValue(String keyCache, Object toPut) {
-		String key = getKeyByKeyCache(keyCache);
-		if(isCacheAvailableForKey(keyCache, key)) {
-			putCacheValue(key, toPut, getTTLValue(keyCache.split(':')[0]));
+	public void putValue(String unhashedKey, Object toPut) {
+		String hashedKey = getHashedKey(unhashedKey);
+		if(isCacheAvailableForKey(unhashedKey, hashedKey)) {
+			putCacheValue(hashedKey, toPut, getTTLValue(unhashedKey.split(':')[0]));
 		}
 
 	}
@@ -317,14 +321,17 @@ public with sharing class CacheUtils {
 		return null;
 	}
 
-	private String getKeyByKeyCache(String keyCache) {
-		if(!this.keyMap.containsKey(keyCache)) {
-			String key = keyCache;
-			if (!keyCache.endsWith(CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING)) {
-				key = buildCacheKey(keyCache, this.orgName);
+	private String getHashedKey(String unhashedKey) {
+		if(!this.keyMap.containsKey(unhashedKey)) {
+			String hashedKey = unhashedKey;
+			// skip hashing for tracking keys
+			if (!unhashedKey.endsWith(CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING)
+				&& !unhashedKey.endsWith(CacheUtils.KEY_ISSUE_TRACKER_LOG_TRACKING)) {
+				
+				hashedKey = buildCacheKey(unhashedKey, this.orgName);
 			}
-			this.keyMap.put(keyCache, key);
+			this.keyMap.put(unhashedKey, hashedKey);
 		}
-		return this.keyMap.get(keyCache);
+		return this.keyMap.get(unhashedKey);
 	}
 }

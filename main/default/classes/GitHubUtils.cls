@@ -216,7 +216,7 @@ public with sharing class GitHubUtils {
             result += '    <types>\n';
             for(String member : metaType.member) {
                 result += '        <members>' + member + '</members>\n';
-            }   
+            }
             result += '        <name>' + metaType.type + '</name>\n' + '    </types>\n';
         }
         result += '    <version>' + String.valueOf(GitHubUtils.METADATA_API_VERSION) + '.0' + '</version>\n' + '</Package>';

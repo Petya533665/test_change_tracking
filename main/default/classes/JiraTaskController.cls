@@ -70,7 +70,11 @@ public with sharing class JiraTaskController {
 			methodName = method;
 			Object data = request.get('data');
 			if (method == 'getJiraProjectUsers') {
-				response.data = JiraService.getService().getProjectAssignableUsers(String.valueOf(data));
+				response.data = AdminService.getJiraProjectUsers(data);
+			} else if (method == 'getJiraProjectComponents') {
+				response.data = AdminService.getJiraProjectComponents(data);
+			} else if (method == 'getJiraEpics') {
+				response.data = AdminService.getJiraEpics(data);
 			} else if (method == 'getJiraSettings') {
 				response.data = AdminService.getJiraSettings();
 			} else if (method == 'getCreateMeta') {
