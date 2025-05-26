@@ -59,6 +59,18 @@ public class Test_AdminController {
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
+            'method' => 'getLogAccessData',
+            'data' => ''
+        };
+        AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        payload = new Map<String, Object>{
+            'method' => 'getLogAccessUsers',
+            'data' => ''
+        };
+        AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        payload = new Map<String, Object>{
             'method' => 'getMasks',
             'data' => ''
         };
@@ -108,6 +120,18 @@ public class Test_AdminController {
 
         payload = new Map<String, Object>{
             'method' => 'createConnectedApp',
+            'data' => ''
+        };
+        AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        payload = new Map<String, Object>{
+            'method' => 'addPermissionSetToUser',
+            'data' => ''
+        };
+        AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        payload = new Map<String, Object>{
+            'method' => 'removePermissionSetAssignment',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -3170,5 +3194,68 @@ public class Test_AdminController {
         String endpoint = JiraService.toCustomJiraUiEndpoint('https://jira.com/browse/TEST-123');
         system.assertEquals('https://jira.com/browse/TEST-123', endpoint);
         Test.stopTest();
+    }
+
+    @IsTest
+    static void test_RemoteAction_getPharosRunningUserWrapper() {
+        LogServiceScheduler.runLogServiceSchedulerModes();
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'getPharosRunningUserWrapper',
+                'data' => ''
+            };
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+
+        AdminService.PharosRunningUserWrapper wrapper = (AdminService.PharosRunningUserWrapper) JSON.deserialize(
+                JSON.serialize(response.get('data')), AdminService.PharosRunningUserWrapper.class
+        );
+
+        Assert.areEqual(UserInfo.getFirstName(), wrapper.currentUser.FirstName, 'User First Name does not match');
+        Assert.areEqual(UserInfo.getLastName(), wrapper.currentUser.LastName, 'User Last Name does not match');
+        Assert.areEqual(2, wrapper.scheduleInfoWrappers.size(), 'Number of scheduled jobs do not match');
+        Assert.areEqual(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME, wrapper.scheduleInfoWrappers.get(0).jobName, 'Job Name does not match');
+        Assert.areEqual(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME, wrapper.scheduleInfoWrappers.get(1).jobName, 'Job Name does not match');
+    }
+
+    @IsTest
+    static void test_RemoteAction_resetScheduleJobs() {
+        LogServiceScheduler.runLogServiceSchedulerModes();
+        AdminService.PharosRunningUserWrapper oldWrapper = AdminService.getPharosRunningUserWrapper();
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'resetScheduleJobs',
+                'data' => ''
+            };
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+
+        AdminService.PharosRunningUserWrapper newWrapper = (AdminService.PharosRunningUserWrapper) JSON.deserialize(
+                JSON.serialize(response.get('data')), AdminService.PharosRunningUserWrapper.class
+        );
+
+        Assert.areEqual(UserInfo.getFirstName(), newWrapper.currentUser.FirstName, 'User First Name does not match');
+        Assert.areEqual(UserInfo.getLastName(), newWrapper.currentUser.LastName, 'User Last Name does not match');
+        Assert.areEqual(2, newWrapper.scheduleInfoWrappers.size(), 'Number of scheduled jobs do not match');
+        Assert.areEqual(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME, newWrapper.scheduleInfoWrappers.get(0).jobName, 'Job Name does not match');
+        Assert.areEqual(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME, newWrapper.scheduleInfoWrappers.get(1).jobName, 'Job Name does not match');
+        Assert.areNotEqual(oldWrapper.scheduleInfoWrappers.get(0).submittedDate, newWrapper.scheduleInfoWrappers.get(0).submittedDate, 'Submitted Dates should not match');
+        Assert.isTrue(oldWrapper.scheduleInfoWrappers.get(0).submittedDate < newWrapper.scheduleInfoWrappers.get(0).submittedDate, 'New Submitted Date should be greater');
+        Assert.areNotEqual(oldWrapper.scheduleInfoWrappers.get(1).submittedDate, newWrapper.scheduleInfoWrappers.get(1).submittedDate, 'Submitted Dates should not match');
+        Assert.isTrue(oldWrapper.scheduleInfoWrappers.get(1).submittedDate < newWrapper.scheduleInfoWrappers.get(1).submittedDate, 'New Submitted Date should be greater');
     }
 }

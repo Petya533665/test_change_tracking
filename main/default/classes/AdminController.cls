@@ -113,6 +113,14 @@ public with sharing class AdminController {
                 response.data = AzureService.getProjectTeamMemberWrapper(data);
             } else if (method == 'createConnectedApp') {
                 response.data = AdminService.createConnectedApp(data);
+            } else if (method == 'getLogAccessData') {
+                response.data = AdminService.getLogAccessData();
+            } else if (method == 'getLogAccessUsers') {
+                response.data = AdminService.getLogAccessUsers();
+            } else if (method == 'addPermissionSetToUser') {
+                response.data = AdminService.addPermissionSetToUser(data);
+            } else if (method == 'removePermissionSetAssignment') {
+                response.data = AdminService.removePermissionSetAssignment(data);
             } else if (method == 'getMasks') {
                 response.data = AdminService.getMasks();
             } else if (method == 'saveMask') {
@@ -339,6 +347,10 @@ public with sharing class AdminController {
                 response.data = AdminService.addFlowLogging(data);
             } else if (method == 'removeFlowLogging') {
                 //response.data = AdminService.removeFlowLogging(data);
+            } else if (method.equals('getPharosRunningUserWrapper')) {
+                response.data = AdminService.getPharosRunningUserWrapper();
+            } else if (method.equals('resetScheduleJobs')) {
+                response.data = AdminService.resetScheduleJobs();
             } else {
                 response.error = 'Action not found';
             }
