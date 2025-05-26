@@ -12,6 +12,7 @@ public with sharing class PharosChatController {
 
     @AuraEnabled
     public static InitChatResponse initChat() {
+        System.debug('++++++initchat');
         List<String> errorMessages = new List<String>();
         try {
             String orgId = UserInfo.getOrganizationId();
@@ -59,13 +60,15 @@ public with sharing class PharosChatController {
     }
 
     public static boolean isCodeIndexed(String logOrgId) {
+        System.debug('++++++call');
         try {
-            System.debug('++++++call');
+            System.debug('++++++call2');
             String response = HttpUtils.get(
                     CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + logOrgId,
                     HttpUtils.getHeadersContentTypeJSON(),
                     200
             );
+            System.debug('++++++call3');
             Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(response);
             System.debug('++++++response: ' + response);
             System.debug('++++++body: ' + body);
