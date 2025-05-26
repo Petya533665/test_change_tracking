@@ -42,7 +42,6 @@ public with sharing class PharosChatController {
                     Blob.valueOf(openAiKey)
             );
             String encryptedOpenAiKey = EncodingUtil.base64Encode(encryptedBlob);
-
             String body = JSON.serialize(new Map<String, Object> {
                 'session_id' => orgId,
                 'openai_key' => encryptedOpenAiKey

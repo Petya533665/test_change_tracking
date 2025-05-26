@@ -192,6 +192,8 @@ public with sharing class ConfigUtil {
     public static final String OVERRIDE_HTTP_METHOD_PATCH = '?_HttpMethod=PATCH';
     public static final String EMAIL_SERVICES_FUNCTION_ENDPOINT = BASE_URL + '/services/data/'+API_VERSION+'/sobjects/EmailServicesFunction';
     public static final String EMAIL_SERVICES_ADDRESS_ENDPOINT = BASE_URL + '/services/data/'+API_VERSION+'/sobjects/EmailServicesAddress';
+    public static final String PERMISSIONS_RW_NOT_FOUND_MESSAGE = 'PermissionSet Log_Read_Write not found';
+    public static final String PERMISSIONS_READ_NOT_FOUND_MESSAGE = 'PermissionSet Log_Read not found';
     public static final String FAILED_NO_ERRORS_MESSAGE = 'Request failed with no specified error.';
     public static final String MANY_EMAIL_SERVICE_FOUND_MESSAGE = 'There are many Email Services. Please remove all except one.';
     public static final String APEXUTILSOURCE_NOT_FOUND_MESSAGE = 'Static Resource with name ApexUtilSource not found';
@@ -213,10 +215,17 @@ public with sharing class ConfigUtil {
     public static final String METADATA_CONNECTED_APP_PAYLOAD_RESOURCE_NAME = 'ConnectedAppMetadataPayload';
     public static final String METADATA_REMOTE_SITE_PAYLOAD_RESOURCE_NAME = 'RemoteSiteSettingsPayload';
     public static final String EMAIL_SERVICE_HANDLER_NAME = 'ErrorEmailHandler';
+    public static final String LOG_READ_PERMISSION_SET_NAME = 'Log_Read';
+    public static final String LOG_READ_WRITE_PERMISSION_SET_NAME = 'Log_Read_Write';
     public static final String DEFAULT_ACTION_EMAIL_TEMPLATE_NAME = 'Default_Notification_Template';
     public static final String DEBUG_LOG_SERVICE_SCHEDULER1_NAME = 'DebugLogServiceScheduler1';
     public static final String DEBUG_LOG_SERVICE_SCHEDULER2_NAME = 'DebugLogServiceScheduler2';
     public static final String TRACE_BATCH_SERVICE_SCHEDULER_NAME = 'TraceBatchServiceScheduler';
+
+    public static final Set<String> PHAROS_LOG_SERVICE_SCHEDULER_MODE_NAMES = new Set<String>{
+        PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME,
+        PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME
+    };
 
     public static final Map<String, String> SF_REST_API_HEADERS {
         get {
@@ -838,6 +847,7 @@ public with sharing class ConfigUtil {
     public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG6 = 'flag6';
     public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG7 = 'flag7';
     public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8 = 'flag8';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG9 = 'flag9';
     public static final String CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS = 'progress';
     public static final String CONFIGURATION_OVERVIEW_DATA_KEY_PASSTHROUGHT_MODE_ENABLED = 'passthroughtModeEnabled';
     public static final String CONFIGURATION_OVERVIEW_DATA_KEY_INTEGRATION_PROGRESS = 'integrationProgress';
@@ -901,10 +911,13 @@ public with sharing class ConfigUtil {
     public static final String SENSETIVE_MASK_KEY_REGEX = 'regex';
     public static final String SENSETIVE_MASK_KEY_MASK = '********';
 
+    public static final String PERMISSION_SET_KEY_USER_ID = 'userId';
+    public static final String PERMISSION_SET_KEY_PERMISSION_SET_ID = 'permissionSetId';
 	public static final String SLACK_SERVICE_NAME = 'Slack';
 	public static final String PAGER_DUTY_SERVICE_NAME = 'PagerDuty';
     public static final String TEAMS_SERVICE_NAME = 'Teams';
 
+    public static final String PERMISSION_SET_ASSIGNMENT_KEY_ID = 'assignmentId';
     public static final String LOG_CATEGORIES_KEY_CATEGORIES = 'categories';
     public static final String LOG_CATEGORIES_KEY_RECORDTYPES = 'recordtypes';
     public static final String LOG_CATEGORIES_KEY_MAPPINGS = 'mappings';

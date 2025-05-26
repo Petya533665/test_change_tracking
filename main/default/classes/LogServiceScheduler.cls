@@ -69,25 +69,29 @@ public with sharing class LogServiceScheduler implements Schedulable, Database.A
                 WHERE CronJobDetail.Name = :ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME
                 OR CronJobDetail.Name = :ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME
         ] == 0) {
-            String logServiceSchedulerStartTime = ConfigUtil.PHAROS_SETTINGS.Log_Service_Scheduler_Cron_Exp__c;
-            Integer frequency;
-            try {
-                frequency = Integer.valueOf(logServiceSchedulerStartTime);
-            } catch (Exception e) {}
-            if (frequency == null) frequency = LOG_SERVICE_SCHEDULER_FREQUENCY_START_TIME;
-            AdminService.runScheduler(
-                    ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME,
-                    String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency)}),
-                    String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency)}),
-                    new LogServiceScheduler(LogServiceScheduler.SCHEDULER_MODE.SCHEDULER_MODE_1)
-            );
-            AdminService.runScheduler(
-                    ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME,
-                    String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency + 30)}),
-                    String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency + 30)}),
-                    new LogServiceScheduler(LogServiceScheduler.SCHEDULER_MODE.SCHEDULER_MODE_2)
-            );
+            runLogServiceSchedulerModes();
         }
+    }
+
+    public static void runLogServiceSchedulerModes() {
+        String logServiceSchedulerStartTime = ConfigUtil.PHAROS_SETTINGS.Log_Service_Scheduler_Cron_Exp__c;
+        Integer frequency;
+        try {
+            frequency = Integer.valueOf(logServiceSchedulerStartTime);
+        } catch (Exception e) {}
+        if (frequency == null) frequency = LOG_SERVICE_SCHEDULER_FREQUENCY_START_TIME;
+        AdminService.runScheduler(
+                ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME,
+                String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency)}),
+                String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency)}),
+                new LogServiceScheduler(LogServiceScheduler.SCHEDULER_MODE.SCHEDULER_MODE_1)
+        );
+        AdminService.runScheduler(
+                ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME,
+                String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency + 30)}),
+                String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency + 30)}),
+                new LogServiceScheduler(LogServiceScheduler.SCHEDULER_MODE.SCHEDULER_MODE_2)
+        );
     }
 
     private static final Map<String, String> MAP_EXPRESSIONS = new Map<String, String>{
