@@ -33,16 +33,14 @@ public with sharing class PharosChatController {
                 return new InitChatResponse(errorMessages);
             }
 
-            Blob encryptedBlob = Crypto.encryptWithManagedIV(
-                    'AES256',
-                    EncodingUtil.base64Decode(secretKey),
-                    Blob.valueOf(openAiKey)
-            );
-            String encryptedOpenAiKey = EncodingUtil.base64Encode(encryptedBlob);
-
+            String ns = ConfigUtil.nameSpacePrefix;
+            String instance = System.Url.getOrgDomainUrl().toExternalForm();
+            String session = EncodingUtil.base64Encode(Blob.valueOf(ConnectedOrgService.getSelfConnectedOrgAccessToken()));
             String body = JSON.serialize(new Map<String, Object> {
                 'session_id' => orgId,
-                'openai_key' => encryptedOpenAiKey
+                'sf_namespace' => ns,
+                'sf_instance' => instance,
+                'sf_session' => session
             });
             HttpUtils.post(
                     CHAT_INIT_ENDPOINT,
