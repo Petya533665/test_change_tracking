@@ -1,6 +1,5 @@
 public with sharing class PharosChatController {
     public static final String CHAT_ENV_URL = 'https://ai.pharos.ai/chat';
-    public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
 
     public static final String OPEN_AI_SECRET = 'OpenAISecret';
@@ -11,15 +10,18 @@ public with sharing class PharosChatController {
     public static final String ERROR_INIT_FAILED = 'Chat initialization has failed.';
 
     @AuraEnabled
+    public static string getSfSessionId(){
+        return EncodingUtil.base64Encode(Blob.valueOf(ConnectedOrgService.getSelfConnectedOrgAccessToken()));
+    }
+
+    @AuraEnabled
     public static InitChatResponse initChat() {
         List<String> errorMessages = new List<String>();
         try {
             String orgId = UserInfo.getOrganizationId();
             String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
-            OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(OPEN_AI_SECRET);
-            String secretKey = mdtSettings.Token__c;
 
-            if (!ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c || String.isBlank(openAiKey) || String.isBlank(secretKey) || !OpenAI.validateToken(openAiKey)) {
+            if (!ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c || String.isBlank(openAiKey)|| !OpenAI.validateToken(openAiKey)) {
                 errorMessages.add(ERROR_OPENAI_NOT_READY);
             }
             if (!GitHubUtils.validateGitHubConnectionForChat()) {
@@ -35,20 +37,7 @@ public with sharing class PharosChatController {
 
             String ns = ConfigUtil.nameSpacePrefix;
             String instance = System.Url.getOrgDomainUrl().toExternalForm();
-            String session = EncodingUtil.base64Encode(Blob.valueOf(ConnectedOrgService.getSelfConnectedOrgAccessToken()));
-            String body = JSON.serialize(new Map<String, Object> {
-                'session_id' => orgId,
-                'sf_namespace' => ns,
-                'sf_instance' => instance,
-                'sf_session' => session
-            });
-            HttpUtils.post(
-                    CHAT_INIT_ENDPOINT,
-                    body,
-                    HttpUtils.getHeadersContentTypeJSON(),
-                    200
-            );
-            return new InitChatResponse(orgId);
+            return new InitChatResponse(orgId, ns, instance);
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'initChat');
             errorMessages.add(ERROR_INIT_FAILED);
@@ -75,15 +64,19 @@ public with sharing class PharosChatController {
         @AuraEnabled public Boolean success;
         @AuraEnabled public List<String> errorMessages;
         @AuraEnabled public String sessionId;
+        @AuraEnabled public String namespace;
+        @AuraEnabled public String instance;
 
         public InitChatResponse(List<String> errorMessages) {
             this.success = false;
             this.errorMessages = errorMessages;
         }
 
-        public InitChatResponse(String sessionId) {
+        public InitChatResponse(String sessionId, String namespace, String instance) {
             this.success = true;
             this.sessionId = sessionId;
+            this.namespace = namespace;
+            this.instance = instance;
         }
     }
 }
