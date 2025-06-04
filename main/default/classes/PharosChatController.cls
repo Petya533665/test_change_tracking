@@ -1,5 +1,5 @@
 public with sharing class PharosChatController {
-    public static final String CHAT_ENV_URL = 'https://ai.pharos.ai/chat';
+    public static final String CHAT_ENV_URL = 'https://oa9kb839ng.execute-api.us-east-2.amazonaws.com/production';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
 
