@@ -57,14 +57,14 @@ public with sharing class PharosChatController {
     @AuraEnabled
     public static String getCodeEntityLink(String entity) {
         String type = '';
-        String firstLetter = entity.substring(0, 1);
-        if (entity.contains('.')) {
+        String name = entity.replace('.cls', '');
+        String firstLetter = name.substring(0, 1);
+        if (name.contains('.')) {
             type = 'field';
-        } else if (entity.contains('__')) {
+        } else if (name.contains('__')) {
             type = 'object';
         } else if (firstLetter.equals(firstLetter.toUpperCase())) {
             type = 'class';
-            entity = entity.replace('.cls', '');
         }
 
         String namespacePrefix = ConfigUtil.nameSpacePrefix;
@@ -72,16 +72,16 @@ public with sharing class PharosChatController {
 
         switch on type {
             when 'object' {
-                String objectName = namespacePrefix + entity;
+                String objectName = namespacePrefix + name;
                 List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
                 return objects.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/view';
             }
             when 'field' {
-                String objectName = namespacePrefix + entity.split('\\.').get(0);
+                String objectName = namespacePrefix + name.split('\\.').get(0);
                 List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
                 if (objects.isEmpty()) return null;
                 
-                String fieldName = namespacePrefix + entity.split('\\.').get(1);
+                String fieldName = namespacePrefix + name.split('\\.').get(1);
                 List<FieldDefinition> fields = [SELECT DurableId FROM FieldDefinition 
                     WHERE EntityDefinition.QualifiedApiName = :objectName 
                     AND QualifiedApiName = :fieldName];
@@ -89,7 +89,7 @@ public with sharing class PharosChatController {
             }
             when 'class' {
                 String namespace = namespacePrefix.replace('__', '');
-                List<ApexClass> classes = [SELECT Id FROM ApexClass WHERE Name = :entity AND NamespacePrefix = :namespace];
+                List<ApexClass> classes = [SELECT Id FROM ApexClass WHERE Name = :name AND NamespacePrefix = :namespace];
                 return classes.isEmpty() ? null : instance + '/' + classes[0].Id;
             }
             when else {
