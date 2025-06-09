@@ -57,12 +57,14 @@ public with sharing class PharosChatController {
     @AuraEnabled
     public static String getCodeEntityLink(String entity) {
         String type = '';
+        String firstLetter = entity.substring(0, 1);
         if (entity.contains('.')) {
             type = 'field';
         } else if (entity.contains('__')) {
             type = 'object';
-        } else if (entity.substring(0, 1).equals(entity.substring(0, 1).toUpperCase())) {
+        } else if (firstLetter.equals(firstLetter.toUpperCase())) {
             type = 'class';
+            entity = entity.replace('.cls', '');
         }
 
         String namespacePrefix = ConfigUtil.nameSpacePrefix;
