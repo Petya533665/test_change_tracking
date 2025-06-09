@@ -54,6 +54,48 @@ public with sharing class PharosChatController {
         }
     }
 
+    @AuraEnabled
+    public static String getCodeEntityLink(String entity) {
+        String type = '';
+        if (entity.contains('.')) {
+            type = 'field';
+        } else if (entity.contains('__')) {
+            type = 'object';
+        } else if (entity.substring(0, 1).equals(entity.substring(0, 1).toUpperCase())) {
+            type = 'class';
+        }
+
+        String namespacePrefix = ConfigUtil.nameSpacePrefix;
+        String instance = System.Url.getOrgDomainUrl().toExternalForm();
+
+        switch on type {
+            when 'object' {
+                String objectName = namespacePrefix + entity;
+                List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
+                return objects.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/view';
+            }
+            when 'field' {
+                String objectName = namespacePrefix + entity.split('\\.').get(0);
+                List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
+                if (objects.isEmpty()) return null;
+                
+                String fieldName = namespacePrefix + entity.split('\\.').get(1);
+                List<FieldDefinition> fields = [SELECT DurableId FROM FieldDefinition 
+                    WHERE EntityDefinition.QualifiedApiName = :objectName 
+                    AND QualifiedApiName = :fieldName];
+                return fields.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/FieldsAndRelationships/' + fields[0].DurableId.split('\\.').get(1) + '/view';
+            }
+            when 'class' {
+                String namespace = namespacePrefix.replace('__', '');
+                List<ApexClass> classes = [SELECT Id FROM ApexClass WHERE Name = :entity AND NamespacePrefix = :namespace];
+                return classes.isEmpty() ? null : instance + '/' + classes[0].Id;
+            }
+            when else {
+                return null;
+            }
+        }
+    }
+
     public static boolean isCodeIndexed(String logOrgId) {
         try {
             String response = HttpUtils.get(
