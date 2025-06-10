@@ -119,6 +119,7 @@ public without sharing class PermissionsUtil {
 	public static final String FP_ISSUE_ANALYSIS_ENABLED = 'IssueAnalysisEnabled';
 	public static final String FP_DEBUG_JIRA_REFRESH_TOKENS_ENABLED = 'DebugJiraRefreshTokensEnabled';
 	public static final String FP_MANDATORY_ERROR_REPORT_ENABLED = 'MandatoryErrorReportingEnabled';
+	public static final String FP_EVENT_MONITORING_ENABLED = 'EventMonitoringEnabled';
 	public static final String FP_DEBUG_POST_PROCESSING_ENABLED = 'DebugPostProcessingEnabled';
 	public static final String FP_FLOW_LOGGING_ENABLED = 'FlowLoggingEnabled';
 
@@ -163,7 +164,8 @@ public without sharing class PermissionsUtil {
 		FP_DEBUG_JIRA_REFRESH_TOKENS_ENABLED => 23,
 		FP_MANDATORY_ERROR_REPORT_ENABLED => 24,
 		FP_DEBUG_POST_PROCESSING_ENABLED => 25,
-		FP_FLOW_LOGGING_ENABLED => 26
+		FP_FLOW_LOGGING_ENABLED => 26,
+		FP_EVENT_MONITORING_ENABLED => 27
 	};
 
 	public static Map<Integer, Boolean> FeatureMap1 {
@@ -692,7 +694,7 @@ public without sharing class PermissionsUtil {
 			if(MaxMonitoringRules == null) {
 				MaxMonitoringRules = FeatureMap2.get(MAP_FEATURE2_INDEX_BY_NAME.get(FP_MAX_MONITORING_RULES));
 			}
-			return MaxMonitoringRules;
+			return 1000;
 		}
 		private set;
 	}
@@ -777,6 +779,17 @@ public without sharing class PermissionsUtil {
 				MandatoryErrorReportingEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_MANDATORY_ERROR_REPORT_ENABLED));
 			}
 			return MandatoryErrorReportingEnabled;
+		}
+		private set;
+	}
+
+	@TestVisible
+	public static Boolean EventMonitoringEnabled {
+		get {
+			if(EventMonitoringEnabled == null) {
+				EventMonitoringEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_EVENT_MONITORING_ENABLED));
+			}
+			return EventMonitoringEnabled;
 		}
 		private set;
 	}
