@@ -11,9 +11,10 @@ public with sharing class RuleExportImportService {
 
     public static List<RuleExportImportWizardWrapper> getRuleWizardData() {
         List<RuleExportImportWizardWrapper> wrappers = new List<RuleExportImportWizardWrapper>();
+        Map<String, Schema.SObjectType> globalDescribeMap = Schema.getGlobalDescribe();
         try {
             for (Rule__c currentRule : getRules(null, RuleUtil.RULE_TYPES_FOR_IMPORT_EXPORT, true, true)) {
-                wrappers.add(new RuleExportImportWizardWrapper(currentRule));
+                wrappers.add(new RuleExportImportWizardWrapper(currentRule, globalDescribeMap));
             }
         } catch (Exception e) {
             debugSession(e, 'getRuleWizardData');
@@ -144,6 +145,8 @@ public with sharing class RuleExportImportService {
             .add(ruleIds != null && !ruleIds.isEmpty() ? QBuilder.condition('Id').isIn(ruleIds) : null)
             .add(ruleTypes != null && !ruleTypes.isEmpty() ? QBuilder.condition('Type__c').isIn(ruleTypes) : null)
             .add(isOrderingNeeded ? QBuilder.orderBy('Type__c').ascending() : null)
+            .add(isOrderingNeeded ? QBuilder.orderBy('SobjectType__c').ascending() : null)
+            .add(isOrderingNeeded ? QBuilder.orderBy('Is_Update__c').ascending() : null)
             .add(isOrderingNeeded ? QBuilder.orderBy('Index__c').ascending() : null)
             .build();
 
@@ -213,17 +216,19 @@ public with sharing class RuleExportImportService {
         public String actions;
         public String createdBy;
         public Boolean isActive;
+        //TODO: Remove
         public Decimal index;
         public Boolean isUpdate;
 
-        public RuleExportImportWizardWrapper(Rule__c rule) {
+        public RuleExportImportWizardWrapper(Rule__c rule, Map<String, Schema.SObjectType> globalDescribeMap) {
             this.ruleId = rule.Id;
             this.ruleType = rule.Type__c;
             this.ruleName = rule.Name__c;
-            this.sobjectName = String.isNotBlank(rule.SobjectType__c) ? rule.SobjectType__c : 'Log';
+            this.sobjectName = this.getSobjectNameBySobjectType(rule.SobjectType__c, globalDescribeMap);
             this.actions = this.getRelatedActionTypes(rule.RuleActions__r);
             this.createdBy = rule.CreatedBy.Name;
             this.isActive = rule.Active__c;
+            // TODO: REMOVE
             this.index = rule.Index__c;
             this.isUpdate = rule.Is_Update__c;
         }
@@ -237,6 +242,12 @@ public with sharing class RuleExportImportService {
             }
 
             return String.join(actionTypes, ', ');
+        }
+
+        private String getSobjectNameBySobjectType(String sobjectApiName, Map<String, Schema.SObjectType> globalDescribeMap) {
+            return String.isNotBlank(sobjectApiName) 
+                ? globalDescribeMap.get(sobjectApiName).getDescribe().getLabel() 
+                : SObjectType.Log__c.getLabel();
         }
     }
 
