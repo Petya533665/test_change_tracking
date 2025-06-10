@@ -19,7 +19,13 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
         
         Messaging.InboundEmailResult result = new Messaging.InboundEmailResult();
         Inbound_Email__c inboundEmail = (Inbound_Email__c)PermissionsUtil.newSObject(Schema.SObjectType.Inbound_Email__c);
-        PermissionsUtil.putSObjectField(inboundEmail, Schema.sObjectType.Inbound_Email__c.fields.Plain_Text__c, maskContent(email.plainTextBody));
+        
+        // handle extra size of plain text body, over max size Long Text Area field
+        String plainTextBody = email.plainTextBody;
+        if(plainTextBody != null && plainTextBody.length() > MAX_LENGTH_LONG_TEXT_AREA_FIELD) {
+            plainTextBody = plainTextBody.abbreviate(MAX_LENGTH_LONG_TEXT_AREA_FIELD);
+        }
+        PermissionsUtil.putSObjectField(inboundEmail, Schema.sObjectType.Inbound_Email__c.fields.Plain_Text__c, maskContent(plainTextBody));
         
         FlowService.FlowErrorAbbreviateResult abbreviateResult = new FlowService.FlowErrorAbbreviateResult();
         abbreviateResult.abbreviatedStacktrace = email?.htmlBody;

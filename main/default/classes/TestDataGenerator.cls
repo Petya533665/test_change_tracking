@@ -242,11 +242,15 @@ public with sharing class TestDataGenerator {
 	public static final String TEST_PLATFORM_EVENT_LOG_STACKTRACE = 'Class.pharos.TestDataGenerator.slack.startPlatformEventTest: line 71, column 1';
 	public static final String TEST_PLATFORM_EVENT_LOG_DETAILS = 'System.MathException: Divide by 0' + '\n\n' + TEST_PLATFORM_EVENT_LOG_STACKTRACE;
 
-	public static List<Log__c> getTestPlatformEventLogs() {
+	
+	public static final String TEST_PLATFORM_EVENT_AI_EVENT_RESULT = 'Test Issue Tracker';
+	public static final String TEST_PLATFORM_EVENT_AI_EVENT_LOG_HASH1 = 'dNRmiQXOoKnVR8EGQWyymjX7If8afzQCHLKZG3UTcNU=';
+
+	public static List<Log__c> getTestPlatformEventLogs(String hash1) {
 		List<Log__c> logs = [
 			SELECT Id, Name
 			FROM Log__c
-			WHERE Hash_1__c = :TEST_PLATFORM_EVENT_LOG_HASH1
+			WHERE Hash_1__c = :hash1
 		];
 		return logs;
 	}
@@ -260,8 +264,8 @@ public with sharing class TestDataGenerator {
 		return logs;
 	}
 
-	public static void deleteTestPlatformEventLogs() {
-		List<Log__c> logs = getTestPlatformEventLogs();
+	public static void deleteTestPlatformEventLogs(String logHash1) {
+		List<Log__c> logs = getTestPlatformEventLogs(logHash1);
 		if(!logs.isEmpty()) {
 			Map<Id, Log__c> mapLogs = new Map<Id, Log__c>(logs);
 			List<Log__c> relatedErrors = getTestPlatformEventRelatedErrorLogs(new List<Id>(mapLogs.keySet()));
@@ -274,9 +278,13 @@ public with sharing class TestDataGenerator {
 	}
 
 	public static TestResultLogs getPlatformEventTestLog() {
+		return getPlatformEventTestLog(TEST_PLATFORM_EVENT_LOG_HASH1);
+	}
+
+	public static TestResultLogs getPlatformEventTestLog(String logHash1) {
 		TestResultLogs result = new TestResultLogs();
 
-		List<Log__c> logs = getTestPlatformEventLogs();
+		List<Log__c> logs = getTestPlatformEventLogs(logHash1);
 		if(!logs.isEmpty()) {
 			result.createdLogs.add(ConfigUtil.getSObjectWithoutNameSpace(logs.get(0)));
 			List<Log__c> relatedErrors = getTestPlatformEventRelatedErrorLogs(new List<Id>{logs.get(0).Id});
@@ -292,7 +300,7 @@ public with sharing class TestDataGenerator {
 		Boolean result = false;
 
 		//delete old test Logs and related errors
-		deleteTestPlatformEventLogs();
+		deleteTestPlatformEventLogs(TEST_PLATFORM_EVENT_LOG_HASH1);
 
 		// create Log for Slack Test
 		Log__c log = LogBuilder.getInstance()
@@ -309,6 +317,23 @@ public with sharing class TestDataGenerator {
 		result = true;
 
 		return result;
+	}
+
+	public static Object startPlatformAIEventTest() {
+		Boolean result = false;
+
+		//delete old test Logs and related errors
+		deleteTestPlatformEventLogs(TEST_PLATFORM_EVENT_AI_EVENT_LOG_HASH1);
+
+		EventBus.publish(new AI_Event__e(Result__c = TEST_PLATFORM_EVENT_AI_EVENT_RESULT));
+
+		result = true;
+
+		return result;
+	}
+
+	public static TestResultLogs getPlatformEventTestAIEventLog() {
+		return getPlatformEventTestLog(TEST_PLATFORM_EVENT_AI_EVENT_LOG_HASH1);
 	}
 
 	public static String TEST_JOB_ID = 'testJobId';

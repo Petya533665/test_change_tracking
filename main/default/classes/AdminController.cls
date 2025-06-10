@@ -172,6 +172,8 @@ public with sharing class AdminController {
                 response.data = AdminService.saveSlackSettings(data);
             } else if (method == 'setMonitoringSetting') {
                 response.data = AdminService.setMonitoringSetting(data);
+            } else if (method == 'setEventMonitoringSetting') {
+                response.data = AdminService.setEventMonitoringSetting(data);
             } else if (method == 'setBatchErrorTrackingSetting') {
                 response.data = AdminService.setBatchErrorTrackingSetting(data);
             } else if (method == 'getBatchErrorTrackingSetting') {
@@ -250,6 +252,10 @@ public with sharing class AdminController {
                 response.data = TestDataGenerator.startPlatformEventTest();
             } else if (method == 'getPlatformEventTestLog') {
                 response.data = TestDataGenerator.getPlatformEventTestLog();
+            } else if (method == 'startPlatformAIEventTest') {
+                response.data = TestDataGenerator.startPlatformAIEventTest();
+            } else if (method.equals('getPlatformEventTestAIEventLog')) {
+                response.data = TestDataGenerator.getPlatformEventTestAIEventLog();
             } else if (method == 'getQuickStartState') {
                 response.data = AdminService.getQuickStartState();
             } else if (method == 'setQuickStartState') {
@@ -272,14 +278,20 @@ public with sharing class AdminController {
                 response.data = AdminService.createSelfConnectionOrgOauth(data);
             } else if (method == 'getQSAnotherConnectedOrg') {
                 response.data = ConnectedOrgService.getQSAnotherConnectedOrg();
-            } else if (method == 'getUrlToPlatformEventSubscriberConfig') {
-                response.data = AdminService.getUrlToPlatformEventSubscriberConfig();
+            } else if (method == 'getUrlToPlatformEventSubscriberConfigLogEvent') {
+                response.data = AdminService.getUrlToPlatformEventSubscriberConfigLogEvent();
+            } else if (method.equals('getUrlToPlatformEventSubscriberConfigAIEvent')) {
+                response.data = AdminService.getUrlToPlatformEventSubscriberConfigAIEvent();
             } else if (method == 'getAdminActiveUsers') {
                 response.data = AdminService.getAdminActiveUsers();
-            } else if (method == 'setPlatformEventSubscriberConfig') {
-                response.data = AdminService.setPlatformEventSubscriberConfig(String.valueOf(data));
-            } else if (method == 'getPlatformEventSubscriberConfig') {
-                response.data = AdminService.getPlatformEventSubscriberConfig();
+            } else if (method == 'setPlatformEventSubscriberConfigLogEvent') {
+                response.data = AdminService.setPlatformEventSubscriberConfigLogEvent(String.valueOf(data));
+            } else if (method == 'setPlatformEventSubscriberConfigAIEvent') {
+                response.data = AdminService.setPlatformEventSubscriberConfigAIEvent(String.valueOf(data));
+            } else if (method == 'getPlatformEventSubscriberConfigLogEvent') {
+                response.data = AdminService.getPlatformEventSubscriberConfigLogEvent();
+            } else if (method == 'getPlatformEventSubscriberConfigAIEvent') {
+                response.data = AdminService.getPlatformEventSubscriberConfigAIEvent();
             } else if (method == 'setActions') {
                 response.data = AdminService.setActions(data);
             } else if (method == 'setRuleIndex') {
@@ -354,6 +366,8 @@ public with sharing class AdminController {
                 response.data = AdminService.getPharosRunningUserWrapper();
             } else if (method.equals('resetScheduleJobs')) {
                 response.data = AdminService.resetScheduleJobs();
+            } else if (method == 'getRuleWizardData') {
+                response.data = RuleExportImportService.getRuleWizardData();
             } else {
                 response.error = 'Action not found';
             }

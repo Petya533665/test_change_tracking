@@ -149,7 +149,7 @@ public with sharing class SystemOverviewController {
 		return codeInfoDetails;
 	}
 
-	private static List<Object> getToolingAPIObjects(String query) {
+	public static List<Object> getToolingAPIObjects(String query) {
 		Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId());
 		return HttpUtils.runToolingQuery(
 				corg == null ? System.Url.getOrgDomainUrl().toExternalForm() : corg.Instance_Url__c,
@@ -326,7 +326,7 @@ public with sharing class SystemOverviewController {
 		for (AggregateResult ar : [
 				SELECT TableEnumOrId objectName, COUNT(Id) cnt
 				FROM ApexTrigger
-				WHERE TableEnumOrId IN :objectNames
+				WHERE TableEnumOrId IN :objectNames AND Status = 'Active'
 				GROUP BY TableEnumOrId
 		]) {
 			counts.put((String)ar.get('objectName'), (Integer)ar.get('cnt'));
@@ -346,7 +346,7 @@ public with sharing class SystemOverviewController {
 		List<Object> objects = getToolingAPIObjects(query);
 		for (Object obj : objects) {
 			Map<String, Object> resultMap = (Map<String, Object>) obj;
-			String objectName = (String) resultMap.get('TableEnumOrId');
+			String objectName = (String)resultMap.get('TableEnumOrId');
 			Integer count = Integer.valueOf(resultMap.get('cnt'));
 			counts.put(objectName, count);
 		}
@@ -355,11 +355,37 @@ public with sharing class SystemOverviewController {
 	
 	private static final Set<String> PROCESS_BUILDER_TYPES = new Set<String>{'Workflow', 'CustomEvent', 'InvocableProcess'};
 
-	private static Map<String, Integer> getProcessBuilderCounts(Set<String> objectNames) {
+	public static Map<String, Integer> getProcessBuilderCounts(Set<String> objectNames) {
 		Map<String, Integer> counts = new Map<String, Integer>();
-		for (String objectName : objectNames) {
-			Integer count = [SELECT COUNT() FROM FlowDefinitionView WHERE ProcessType IN :PROCESS_BUILDER_TYPES AND TriggerObjectOrEventId = :objectName];
-			counts.put(objectName, count);
+		String query = 'SELECT Id, ProcessType FROM Flow WHERE Status = \'Active\' AND ProcessType IN (\'Workflow\', \'CustomEvent\', \'InvocableProcess\')';
+		List<Object> objects = SystemOverviewController.getToolingAPIObjects(query);
+		for (Object obj : objects) {
+			Map<String, Object> resultMap = (Map<String, Object>) obj;
+			Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId());
+			String b = HttpUtils.get(
+					(corg == null ? System.Url.getOrgDomainUrl().toExternalForm() : corg.Instance_Url__c) + ConfigUtil.TOOLING_API_GET_FLOW + resultMap.get('Id'),
+					ConfigUtil.SF_REST_API_HEADERS,
+					200
+			);
+			FlowWrapper flowWrapper = (FlowWrapper)JSON.deserialize(b, FlowWrapper.class);
+			if (flowWrapper != null
+					&& flowWrapper.metadata?.processMetadataValues != null
+					&& !flowWrapper.metadata.processMetadataValues.isEmpty()
+					&& flowWrapper.metadata.processMetadataValues.size() > 1) {
+				String stringValue;
+				if (flowWrapper.metadata.processMetadataValues[0]?.name == 'ObjectType') {
+					stringValue = flowWrapper.metadata.processMetadataValues[0]?.value?.stringValue;
+				} else if (flowWrapper.metadata.processMetadataValues[1]?.name == 'ObjectType') {
+					stringValue = flowWrapper.metadata.processMetadataValues[1]?.value?.stringValue;
+				}
+				if (String.isNotBlank(stringValue) && objectNames.contains(stringValue)) {
+					if (counts.containsKey(stringValue)) {
+						counts.put(stringValue, counts.get(stringValue) + 1);
+					} else {
+						counts.put(stringValue, 1);
+					}
+				}
+			}
 		}
 		return counts;
 	}
@@ -367,43 +393,10 @@ public with sharing class SystemOverviewController {
 	private static Map<String, Integer> getFlowCounts(Set<String> objectNames) {
 		Map<String, Integer> counts = new Map<String, Integer>();
 		for (String objectName : objectNames) {
-			Integer count = [SELECT COUNT() FROM FlowDefinitionView WHERE ProcessType NOT IN :PROCESS_BUILDER_TYPES AND TriggerObjectOrEventId = :objectName];
+			Integer count = [SELECT COUNT() FROM FlowDefinitionView WHERE IsActive = TRUE AND ProcessType NOT IN :PROCESS_BUILDER_TYPES AND TriggerObjectOrEventId = :objectName];
 			counts.put(objectName, count);
 		}
 		return counts;
-	}
-
-	@AuraEnabled
-	public static List<String> getObjectAPINames() {
-		List<String> objectAPINames = new List<String>();
-		Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
-		for (String objectName : globalDescribe.keySet()) {
-			Schema.DescribeSObjectResult objResult = globalDescribe.get(objectName).getDescribe();
-			Boolean isSetupObject = false;
-			if (objResult.name.startsWith('Setup') ||
-					objResult.name.startsWith('Auth') ||
-					objResult.name.startsWith('Permission') ||
-					objResult.name.endsWith('Share') ||
-					objResult.name.endsWith('History') ||
-					objResult.name.endsWith('Feed') ||
-					objResult.name.endsWith('Event') ||
-					objResult.name.endsWith('EventStore') ||
-					objResult.name.endsWith('__b') ||
-					objResult.name.contains('Config') ||
-					objResult.name.contains('Setting')) {
-				isSetupObject = true;
-			}
-			if (!isSetupObject) {
-				if (!objResult.isCreateable() &&
-						!objResult.isDeletable() &&
-						objResult.isAccessible() &&
-						!objResult.isUpdateable()) {
-					isSetupObject = true;
-				}
-			}
-			if (!isSetupObject) objectAPINames.add(objResult.name);
-		}
-		return objectAPINames;
 	}
 
 	@AuraEnabled
@@ -472,22 +465,34 @@ public with sharing class SystemOverviewController {
 			}
 		}
 		orgAtAGlance.workflows = 0;
+		String query = 'SELECT COUNT(Id) cnt FROM WorkflowRule';
+		List<Object> objects = SystemOverviewController.getToolingAPIObjects(query);
+		for (Object obj : objects) {
+			Map<String, Object> resultMap = (Map<String, Object>) obj;
+			Integer count = Integer.valueOf(resultMap.get('cnt'));
+			orgAtAGlance.workflows += count;
+		}
 		orgAtAGlance.processes = 0;
 		orgAtAGlance.flows = 0;
 		List<FlowDefinitionView> flowDefinitionViews = [
 				SELECT Id, ProcessType
 				FROM FlowDefinitionView
+				WHERE IsActive = TRUE
 		];
 		for (FlowDefinitionView flowDefinitionView : flowDefinitionViews) {
-			if (flowDefinitionView.ProcessType == 'Workflow') {
+			if (flowDefinitionView.ProcessType == 'Workflow'
+					|| flowDefinitionView.ProcessType == 'CustomEvent'
+					|| flowDefinitionView.ProcessType == 'InvocableProcess') {
 				orgAtAGlance.processes++;
-			} else {
+			} else if (flowDefinitionView.ProcessType != 'Appointments'
+					&& flowDefinitionView.ProcessType != 'RoutingFlow'
+					&& flowDefinitionView.ProcessType != 'ManagedContentAuthoringWorkflow') {
 				orgAtAGlance.flows++;
 			}
 		}
 
 		orgAtAGlance.triggers = 0;
-		Integer triggerCount = [SELECT COUNT() FROM ApexTrigger];
+		Integer triggerCount = [SELECT COUNT() FROM ApexTrigger WHERE Status = 'Active'];
 		orgAtAGlance.triggers = triggerCount;
 
 		orgAtAGlance.linesOfCode = 0;
@@ -726,6 +731,20 @@ public with sharing class SystemOverviewController {
 			this.name = name;
 			this.count = count;
 		}
+	}
+
+	public class FlowWrapper {
+		MetadataWrapper metadata;
+	}
+	public class MetadataWrapper {
+		List<ProcessMetadataValuesWrapper> processMetadataValues;
+	}
+	public class ProcessMetadataValuesWrapper {
+		String name;
+		FlowElementReferenceOrValueWrapper value;
+	}
+	public class FlowElementReferenceOrValueWrapper {
+		String stringValue;
 	}
 
 }

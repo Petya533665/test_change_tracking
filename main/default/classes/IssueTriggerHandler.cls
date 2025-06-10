@@ -19,6 +19,8 @@ public with sharing class IssueTriggerHandler {
 	 */
 	@TestVisible
 	private static Boolean throwDmlExceptionForTest = false;
+	@TestVisible
+	private static final String FORCED_DML_EXCEPTION_MESSAGE = 'Forced DML exception for testing issue tracker failure.';
 
 	public static void onBeforeInsert(List<Issue__c> newIssues) {
 		updateRecordTypeId(newIssues, null);
@@ -26,7 +28,7 @@ public with sharing class IssueTriggerHandler {
 		if (Test.isRunningTest() && throwDmlExceptionForTest) {
 			// Simulate a DML exception specifically during the Issue upsert phase
 			DmlException forcedException = new DmlException();
-			forcedException.setMessage('Forced DML exception for testing issue tracker failure.');
+			forcedException.setMessage(FORCED_DML_EXCEPTION_MESSAGE);
 			throw forcedException;
 		}
 	}

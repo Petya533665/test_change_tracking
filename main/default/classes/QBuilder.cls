@@ -40,7 +40,9 @@ public with sharing class QBuilder {
 	 * Add an OrderBy statement
 	 */
 	public QBuilder add(QOrder ob) {
-		this.orders.add(ob);
+		if (ob != null) {
+			this.orders.add(ob);
+		}
 		return this;
 	}
 

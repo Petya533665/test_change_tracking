@@ -44,15 +44,8 @@ public with sharing class LogTriggerHelper {
                         // catch JSON deserialize issue
                     }
                 }
-                Pattern p = ConfigUtil.SOBJECT_ID_PATTERN;
-                Matcher pm = p.matcher(log.Related_Id__c + ' ' + log.Summary__c + ' ' + log.Details__c);
-                while (pm.find()) {
-                    try {
-                        relatedIds.add(isInternalErrorLog(log, null) ? Id.valueOf(pm.group(1)) : pm.group(1));
-                    } catch (Exception e) {
-                        // catch Invalid id
-                    }
-                }
+                Set<String> relatedIdsFromMessage = ConfigUtil.getRelatedSObjectIds(log.Related_Id__c + ' ' + log.Summary__c + ' ' + log.Details__c, isInternalErrorLog(log, null));
+                relatedIds.addAll(relatedIdsFromMessage);
                 log.Related_Objects__c = !relatedIds.isEmpty() ? JSON.serialize(relatedIds) : null;
             }
         }

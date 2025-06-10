@@ -189,6 +189,7 @@ public with sharing class ConfigUtil {
     public static final String TOOLING_API_CREATE_APEX_EMAIL_NOTIFICATION = TOOLING_API_ENDPOINT + '/sobjects/ApexEmailNotification';
     public static final String TOOLING_API_UPDATE_APEX_EMAIL_NOTIFICATION = TOOLING_API_CREATE_APEX_EMAIL_NOTIFICATION + '/';
     public static final String TOOLING_API_UPDATE_PLATFORM_EVENT_SUBSCRIBER_CONFIG = '/services/data/'+API_VERSION+'/tooling/sobjects/PlatformEventSubscriberConfig';
+    public static final String TOOLING_API_GET_FLOW = '/services/data/'+API_VERSION+'/tooling/sobjects/Flow/';
     public static final String OVERRIDE_HTTP_METHOD_PATCH = '?_HttpMethod=PATCH';
     public static final String EMAIL_SERVICES_FUNCTION_ENDPOINT = BASE_URL + '/services/data/'+API_VERSION+'/sobjects/EmailServicesFunction';
     public static final String EMAIL_SERVICES_ADDRESS_ENDPOINT = BASE_URL + '/services/data/'+API_VERSION+'/sobjects/EmailServicesAddress';
@@ -349,7 +350,7 @@ public with sharing class ConfigUtil {
 
     //From OpenAI
     public static final String OPEN_AI_COMPLETIONS_ENDPOINT = ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_URL + '/v1/chat/completions';
-    public static final String OPEN_AI_USAGE_ENDPOINT = ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_URL + '/v1/usage';
+    public static final String OPEN_AI_USAGE_ENDPOINT = ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_URL + '/dashboard/billing/usage';
     public static final Map<String, String> OPEN_AI_HEADERS {
         get {
             if(OPEN_AI_HEADERS == null) {
@@ -575,6 +576,20 @@ public with sharing class ConfigUtil {
 
     public static void initPharosSettings() {
         PHAROS_SETTINGS = Pharos_Settings__c.getOrgDefaults();
+    }
+
+    public static Event_Monitoring__c EVENT_MONITORING_SETTINGS {
+        get {
+            if (EVENT_MONITORING_SETTINGS == null) {
+                initEventMonitoringSettings();
+            }
+            return EVENT_MONITORING_SETTINGS;
+        }
+        private set;
+    }
+
+    public static void initEventMonitoringSettings() {
+        EVENT_MONITORING_SETTINGS = Event_Monitoring__c.getOrgDefaults();
     }
 
     public static OpenAI_Settings__c OPEN_AI_SETTINGS {
@@ -960,7 +975,8 @@ public with sharing class ConfigUtil {
     public static final String DELETE_MONITORING_RULE_ACTION_KEY_ACTION_RESULT = 'actionResult';
     public static final String DELETE_MONITORING_RULE_ACTION_KEY_RULE_ACTION_RESULT = 'ruleActionResult';
 
-    public static final String PLATFORM_EVENT_SUBSCRIBER_CONFIG_TRIGGER_NAME = 'LogEventTrigger';
+    public static final String PLATFORM_EVENT_SUBSCRIBER_CONFIG_TRIGGER_NAME_AI_EVENT = 'AiEventTrigger';
+    public static final String PLATFORM_EVENT_SUBSCRIBER_CONFIG_TRIGGER_NAME_LOG_EVENT = 'LogEventTrigger';
     public static final String PLATFORM_EVENT_SUBSCRIPTION_CONFIG_URL = System.Url.getOrgDomainUrl().toExternalForm() + '/setup/build/SharedSubscriptionsPage.apexp';
 
     public static String PRODUCTION_LOGIN_URL = 'login.salesforce.com';
@@ -990,6 +1006,29 @@ public with sharing class ConfigUtil {
     public static final Pattern SOBJECT_ID_PATTERN = Pattern.compile('([a-zA-Z0-9]{15,18})');
     public static final String REGEX_SOBJECT_ID = '([a-zA-Z0-9]{15,18})';
     public static final String REGEX_DIGIT = '[0-9]';
+
+    // Maximum number of related IDs based on JSON size calculation for Long Text Area field (32,768 chars)
+    // JSON format: ["id1","id2","id3"] = 2 chars for brackets + (18 chars per ID + 3 chars for quotes and comma) * count - 1 comma
+    // Approximately 21 chars per ID + 2 for brackets = ~21 chars per ID
+    // 32768 / 21 ≈ 1559, using 1500 for safety buffer
+    public static final Integer MAX_RELATED_IDS_COUNT = 1500;
+
+    public static Set<String> getRelatedSObjectIds(String message, Boolean isInternalErrorLog) {
+        Set<String> sObjectIds = new Set<String>();
+        Pattern p = SOBJECT_ID_PATTERN;
+        Matcher pm = p.matcher(message);
+        while (pm.find()) {
+            try {
+                if (sObjectIds.size() >= MAX_RELATED_IDS_COUNT) {
+                    break;
+                }
+                sObjectIds.add(isInternalErrorLog ? Id.valueOf(pm.group(1)) : pm.group(1));
+            } catch (Exception e) {
+                // catch Invalid id
+            }
+        }
+        return sObjectIds;
+    }
 
     public static final Set<String> ASYNC_APEX_JOB_PROCESS_STATUS = new Set<String> {
             'Processing',

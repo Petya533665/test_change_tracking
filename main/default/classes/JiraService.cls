@@ -437,7 +437,7 @@ public without sharing class JiraService {
         public virtual String getProjectComponentsEndpoint(String projectOrKeyId, String query) {
             String endpoint = API_REST_BASE + API_PROJECT + projectOrKeyId;
             if(String.isNotBlank(query)) {
-                endpoint += API_PROJECT_COMPONENT + '?query=' + query;
+                endpoint += API_PROJECT_COMPONENT + '?query=' + EncodingUtil.urlEncode(query?.trim(), 'UTF-8');
             }
             else {
                 endpoint += API_PROJECT_COMPONENTS;
@@ -457,7 +457,7 @@ public without sharing class JiraService {
         public virtual String getProjectAssignableUsersEndpoint(String projectKey, String query) {
             String endpoint = API_REST_BASE + API_USER_SEARCH_BY_PROJECT + projectKey;
             if(String.isNotBlank(query)) {
-                endpoint += '&query=' + query;
+                endpoint += '&query=' + EncodingUtil.urlEncode(query?.trim(), 'UTF-8');
             }
             return endpoint;
         }
@@ -506,15 +506,15 @@ public without sharing class JiraService {
                 // limit search to epic key if it starts with the project key
                 // like PTP-123
                 if (query.startsWith(projectOrKeyId + '-')) {
-                    jql += ' AND key = "' + query.trim() + '"';
+                    jql += ' AND key = "' + EncodingUtil.urlEncode(query.trim(), 'UTF-8') + '"';
                 }
                 // like 123, auto-complete will return the epic key
                 else if (query.isNumeric()) {
-                    jql += ' AND key = "' + (projectOrKeyId + '-' + query.trim()) + '"';
+                    jql += ' AND key = "' + EncodingUtil.urlEncode(projectOrKeyId + '-' + query.trim(), 'UTF-8') + '"';
                 }
                 // like "test epic", auto-complete will return the epic summary
                 else {
-                    jql += ' AND summary ~ "' + query.trim() + '"';
+                    jql += ' AND summary ~ "' + EncodingUtil.urlEncode(query.trim(), 'UTF-8') + '"';
                 }
             }
             return getJQLEndpoint(jql);
@@ -971,7 +971,7 @@ public without sharing class JiraService {
         public override String getProjectAssignableUsersEndpoint(String projectKey, String username) {
             String endpoint = API_REST_BASE + API_USER_SEARCH_BY_PROJECT + projectKey;
             if(String.isNotBlank(username)) {
-                endpoint += '&username=' + username;
+                endpoint += '&username=' + EncodingUtil.urlEncode(username?.trim(), 'UTF-8');
             }
             return endpoint;
         }

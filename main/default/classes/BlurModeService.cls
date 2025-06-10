@@ -13,14 +13,14 @@ public with sharing class BlurModeService {
 				if (Test.isRunningTest() && TEST_OFFSET != null) AVAILABLE_ISSUES_COUNT += TEST_OFFSET;
 				if (AVAILABLE_ISSUES_COUNT == null) return null;
 				if (ConfigUtil.SETTINGS.Last_Issue_Number__c != null) {
-					AVAILABLE_ISSUES_COUNT -= Integer.valueOf(ConfigUtil.SETTINGS.Last_Issue_Number__c);
+					AVAILABLE_ISSUES_COUNT -= Integer.valueOf(ConfigUtil.SETTINGS.Last_Issue_Number__c) + 1;
 				} else {
 					List<Issue__c> issues = [SELECT Id, Name FROM Issue__c WHERE Name != NULL ORDER BY Name DESC LIMIT 1];
 					if (!issues.isEmpty()) {
 						List<String> parts = issues[0].Name.split('-');
 						if (parts.size() == 2) {
 							Integer highestIssueNumber = Integer.valueOf(parts[1].trim());
-							AVAILABLE_ISSUES_COUNT -= highestIssueNumber;
+							AVAILABLE_ISSUES_COUNT -= highestIssueNumber + 1;
 						}
 					}
 				}
@@ -71,8 +71,7 @@ public with sharing class BlurModeService {
 		if (sObjectType == null) return true;
 		String issueId;
 		if (sObjectType == LOG_SOBJECT_TYPE) {
-			List<Log__c> logs = [SELECT Id, Issue__c FROM Log__c WHERE Id = :recordId];
-			if (!logs.isEmpty()) issueId = logs[0].Issue__c;
+			return false;
 		} else if (sObjectType == ISSUE_SOBJECT_TYPE) {
 			issueId = recordId;
 		} else {
@@ -85,7 +84,7 @@ public with sharing class BlurModeService {
 				List<String> parts = issues[0].Name.split('-');
 				if (parts.size() == 2) {
 					String numericPart = parts[1].trim();
-					extractedInteger = Integer.valueOf(numericPart);
+					extractedInteger = Integer.valueOf(numericPart) + 1;
 				}
 			}
 		} else {

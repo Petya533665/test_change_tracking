@@ -2679,7 +2679,6 @@ public class MonitoringUtilTest {
                 monitoringRuleFiltersToInsert.add(rf);
             }
         }
-        system.debug('monitoringRuleFiltersToInsert: ' + json.serialize(monitoringRuleFiltersToInsert));
         
         if (!monitoringRuleFiltersToInsert.isEmpty()) {
             insert monitoringRuleFiltersToInsert;

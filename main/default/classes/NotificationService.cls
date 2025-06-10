@@ -686,14 +686,31 @@ public with sharing class NotificationService {
                     if(rule.isUpdateRule() && oldMap != null && config.getAllExecutedRuleIds().contains(rule.ruleId)) {
                         continue;
                     }
+                    // skip re-evaluate already executed notification rules
                     if(!rule.isUpdateRule() && oldMap != null && rule.ruleType == MonitoringUtil.RULE_TYPE_NOTIFICATION 
                       && config.getAllExecutedRuleIds().contains(rule.ruleId)) {
                         continue;
                     }
+                    // skip already executed rules
                     if(config.getAllRuleIdsToRun().contains(rule.ruleId)) {
                         continue;
                     }
-                    
+
+                    // check if issue has fired insert notification rule
+                    // issue should has only one fired insert notification rule
+                    Boolean issueHasFiredInsertNotificationRule = false;
+                    for(MonitoringUtil.MonitoringRule r : rules) {
+                        if(!r.isUpdateRule()
+                            && r.sobjectType == Schema.SObjectType.Issue__c.getName()
+                            && config.getAllExecutedRuleIds().contains(r.ruleId)
+                            && r.ruleType == MonitoringUtil.RULE_TYPE_NOTIFICATION) {
+
+                            issueHasFiredInsertNotificationRule = true;
+                            break;
+                        }
+                    }
+
+                    // first fire ticketing rule on issue
                     Boolean firstFireTicketingRuleOnIssue = (!rule.isUpdateRule() 
                         && (rule.ruleType == MonitoringUtil.RULE_TYPE_JIRA_UPDATE 
                             || rule.ruleType == MonitoringUtil.RULE_TYPE_AZURE_DEV_OPS)
@@ -703,6 +720,7 @@ public with sharing class NotificationService {
                         && config.getRuleIdsToReRun().isEmpty()
                         && !config.getAllExecutedRuleIds().contains(rule.ruleId));
 
+                    // re-run ticketing rule on issue, regressed issue
                     Boolean reRunTicketingRuleOnIssue = (!rule.isUpdateRule() 
                         && (rule.ruleType == MonitoringUtil.RULE_TYPE_JIRA_UPDATE 
                             || rule.ruleType == MonitoringUtil.RULE_TYPE_AZURE_DEV_OPS)
@@ -710,7 +728,7 @@ public with sharing class NotificationService {
                         && oldMap != null 
                         && !config.getRuleIdsToReRun().isEmpty()
                         && config.getAllExecutedRuleIds().contains(rule.ruleId));
-
+                    
                     if(!rule.isUpdateRule() 
                         && rule.sobjectType == Schema.SObjectType.Issue__c.getName()
                         && (rule.ruleType == MonitoringUtil.RULE_TYPE_JIRA_UPDATE 
@@ -718,6 +736,13 @@ public with sharing class NotificationService {
                         && firstFireTicketingRuleOnIssue == false
                         && reRunTicketingRuleOnIssue == false) {
 
+                        continue;
+                    }
+                    // skip re-evaluate insert notification rules on issue
+                    if(!rule.isUpdateRule() 
+                        && rule.sobjectType == Schema.SObjectType.Issue__c.getName()
+                        && rule.ruleType == MonitoringUtil.RULE_TYPE_NOTIFICATION
+                        && issueHasFiredInsertNotificationRule == true) {
                         continue;
                     }
 

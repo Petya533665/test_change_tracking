@@ -185,6 +185,67 @@ public class JiraNotificationBatchTest {
 	}
 
 	@IsTest
+	private static void test_jira_notification_batch_processing_dosent_rerun_on_update_issue() {
+
+		TestDataFactory.enableIssueTracking();
+		// make regular log
+		Log__c log = IssueTriggerHandlerTest.createPharosLog('hash1', 'hash2', 'hash3');
+		log.Originated_From__c = null;
+		insert log;
+		// complete post processing to fire issue
+		log.Post_Processing_Status__c = LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED;
+		update log;
+
+		List<Issue__c> issues = [SELECT Id, Executable_Rules__c FROM Issue__c WHERE Log__c = :log.Id];
+		System.assertEquals(1, issues.size());
+		Issue__c issue = issues[0];
+
+		// no rules should be fired on insert
+		System.assertEquals(null, issue.Executable_Rules__c);
+		NotificationService.ExecutableRulesConfig config = NotificationService.getExecutableRuleConfig(issue);
+		System.assertEquals(0, config.getAllRuleIdsToRun().size());
+
+		Rule__c testIssueInsertRule1 = createIssueSlackNotificationRule(false);
+		Rule__c testIssueInsertRule2 = createIssueSlackNotificationRule(false);
+		Rule__c testIssueUpdateRule1 = createIssueSlackNotificationRule(true);
+
+		TestDataFactory.createRuleFilterOnUpdate(1, testIssueUpdateRule1, ISSUE_NOTIFICATION_UPDATE_COMPARISON_OPERATOR_NEW_VALUE, ISSUE_NOTIFICATION_UPDATE_NEW_VALUE, ISSUE_NOTIFICATION_FIELD_NAME, false);
+		TestDataFactory.createRuleFilterOnUpdate(2, testIssueUpdateRule1, ISSUE_NOTIFICATION_UPDATE_COMPARISON_OPERATOR_OLD_VALUE, ISSUE_NOTIFICATION_UPDATE_OLD_VALUE, ISSUE_NOTIFICATION_FIELD_NAME, true);
+
+		// simulate insert rule1 should be fired
+		config.a.add(testIssueInsertRule1.Id);
+		issue.Executable_Rules__c = config.toJson();
+		issue.Notification_Integration_Status__c = MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_COMPLETED;
+		update issue;
+
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.put(ConfigUtil.SLACK_POST_MESSAGE_ENDPOINT, createSlackRequestMock());
+		endpoint2TestResp.put(ConfigUtil.SLACK_CONVERSATION_LIST_ENDPOINT, createSlackChannelsRequestMock());
+
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		TestDataFactory.createSlackSettings();
+
+		String executedRulesBefore = [SELECT Executable_Rules__c FROM Issue__c WHERE Id = :issue.Id].Executable_Rules__c;
+
+		Test.startTest();
+		MonitoringUtil.cachedRules.clear();
+		// update issue, shuld dosent trigger update rule1
+		// update rule affected on Average_Frequency__c field, not on Status__c field
+		issue.Status__c = 'Actioned';
+		update issue;
+
+		Test.stopTest();
+		issue = [SELECT Id, Executable_Rules__c, Slack_Integration_Status__c, Notification_Integration_Status__c FROM Issue__c WHERE Id = :issue.Id];
+		System.assertEquals(MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_COMPLETED, issue.Notification_Integration_Status__c);
+		System.assertEquals(executedRulesBefore, issue.Executable_Rules__c);
+		System.assertEquals(null, issue.Slack_Integration_Status__c);
+
+		assertNoInternalLogs();
+	}
+
+	@IsTest
 	private static void test_notifications_slack_positive() {
 		test_notifications_slack(true, false);
 	}
@@ -479,18 +540,16 @@ public class JiraNotificationBatchTest {
 		if (isBatch) {
 			TestDataFactory.disableIssueTracking();
 			PermissionsUtil.IssueTrackingEnabled = false;
-			System.debug(PermissionsUtil.IssueTrackingEnabled);
 		}
 		Log__c log = IssueTriggerHandlerTest.createPharosLog('hash1', 'hash2', 'hash3');
 		insert log;
 		log.Post_Processing_Status__c = LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED;
 		update log;
 		log = [SELECT Id, Type__c, Post_Processing_Status__c FROM Log__c WHERE Id = :log.Id];
-		System.debug(log.Post_Processing_Status__c);
+		
 		if (isBatch) {
 			TestDataFactory.enableIssueTracking();
 			PermissionsUtil.IssueTrackingEnabled = true;
-			System.debug(PermissionsUtil.IssueTrackingEnabled);
 			IssueTrackerBatch.getInstance().startBatch();
 		}
 	}

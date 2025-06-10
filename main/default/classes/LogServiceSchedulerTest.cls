@@ -23,6 +23,7 @@ private class LogServiceSchedulerTest {
 		System.assertEquals(DatabaseUtils.startJobs, new Set<String>{
 				'LogServiceBatch',
 				'ManageTokensBatch',
+				'EventLogProcessingBatch',
 				'RetentionBatch',
 				'MonitoringBatch',
 				'JiraNotificationBatch',

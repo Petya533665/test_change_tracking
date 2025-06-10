@@ -144,6 +144,7 @@ public with sharing class LogServiceScheduler implements Schedulable, Database.A
             when SCHEDULER_MODE_1 {
                 return new Set<DatabaseUtils.PharosBatchImpl>{
                         MonitoringBatch.getInstance(),
+                        EventLogProcessingBatch.getInstance(),
                         JiraNotificationBatch.getInstance(),
                         IssueNotificationBatch.getInstance(),
                         TraceResultNotificationBatch.getInstance(),

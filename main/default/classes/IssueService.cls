@@ -21,12 +21,6 @@ public with sharing class IssueService {
 	public static Map<String, List<Log__c>> getMapLogsByHash(List<Log__c> logs) {
 		if (logs.isEmpty()) return new Map<String, List<Log__c>>();
 
-		// track logs to avoid duplicates
-		for (Log__c log : logs) {
-			IssueTrackerLogCounter logCounter = new IssueTrackerLogCounter(log.Id);
-			logCounter.incrementCounter();
-		}
-
 		Map<String, List<Log__c>> mapLogsByHash = new Map<String, List<Log__c>>();
 		for (Log__c log : logs) {
 			IssueTrackerLogCounter logCounter = new IssueTrackerLogCounter(log.Id);
@@ -195,6 +189,11 @@ public with sharing class IssueService {
 		}
 		Map<Id, Log__c> logsToUpdateMap = new Map<Id, Log__c>();
 		for (String hash : mapLogsByHash.keySet()) {
+			for (Log__c log : mapLogsByHash.get(hash)) {
+				IssueTrackerLogCounter logCounter = new IssueTrackerLogCounter(log.Id);
+				logCounter.incrementCounter();
+			}
+
 			if (successMapIssuesByHash.containsKey(hash)) {
 				for (Log__c log : mapLogsByHash.get(hash)) {
 					logsToUpdateMap.put(log.Id, new Log__c(Id = log.Id, Issue__c = successMapIssuesByHash.get(hash).Id));
@@ -202,7 +201,10 @@ public with sharing class IssueService {
 			}
 			if (failedHashes.contains(hash)) {
 				for (Log__c log : mapLogsByHash.get(hash)) {
-					logsToUpdateMap.put(log.Id, new Log__c(Id = log.Id, Issue_Tracker_Status__c = LOG_ISSUE_TRACKER_STATUS_FAILED));
+					IssueTrackerLogCounter logCounter = new IssueTrackerLogCounter(log.Id);
+					if (logCounter.getCounter() >= LOG_ISSUE_TRACKER_MAX_ATTEMPTS) {
+						logsToUpdateMap.put(log.Id, new Log__c(Id = log.Id, Issue_Tracker_Status__c = LOG_ISSUE_TRACKER_STATUS_FAILED));
+					}
 				}
 			}
 		}

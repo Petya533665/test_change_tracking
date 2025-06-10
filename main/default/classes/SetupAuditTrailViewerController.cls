@@ -33,12 +33,7 @@ public with sharing class SetupAuditTrailViewerController {
             WHERE Id = :recordId
         ];
         data = log.Setup_Audit_Trail__c;
-        String isBlurModeParam = ApexPages.currentPage().getParameters().get(IS_BLUR_MODE_PARAM_NAME);
-        if (String.isNotBlank(isBlurModeParam)) {
-            isBlurMode = Boolean.valueOf(isBlurModeParam);
-        } else {
-            isBlurMode = !BlurModeService.isAvailableDebugView(this.log.Issue__c);
-        }
+        isBlurMode = !BlurModeService.isAvailableDebugView(this.log.Id);
         if (isBlurMode) {
             data = AUDIT_TRAIL_FAKE_DATA;
             blurModeUrlParameter = BlurModeService.getEncryptedUrlParameter();
