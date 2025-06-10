@@ -213,6 +213,8 @@ public with sharing class RuleExportImportService {
         public String actions;
         public String createdBy;
         public Boolean isActive;
+        public Decimal index;
+        public Boolean isUpdate;
 
         public RuleExportImportWizardWrapper(Rule__c rule) {
             this.ruleId = rule.Id;
@@ -222,6 +224,8 @@ public with sharing class RuleExportImportService {
             this.actions = this.getRelatedActionTypes(rule.RuleActions__r);
             this.createdBy = rule.CreatedBy.Name;
             this.isActive = rule.Active__c;
+            this.index = rule.Index__c;
+            this.isUpdate = rule.Is_Update__c;
         }
 
         private String getRelatedActionTypes(List<RuleAction__c> ruleActions) {
