@@ -372,7 +372,7 @@ public with sharing class AdminController {
                 List<String> ruleIds = (List<String>)JSON.deserialize(JSON.serialize(data), List<String>.class);
                 response.data = RuleExportImportService.exportRules(ruleIds);
             } else if (method == 'importRules') {
-                String jsonStr = JSON.serialize(data);
+                String jsonStr = (String)request.get('data');
                 response.data = RuleExportImportService.importRules(jsonStr);
             } else {
                 response.error = 'Action not found';
