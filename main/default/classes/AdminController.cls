@@ -368,6 +368,12 @@ public with sharing class AdminController {
                 response.data = AdminService.resetScheduleJobs();
             } else if (method == 'getRuleWizardData') {
                 response.data = RuleExportImportService.getRuleWizardData();
+            } else if (method == 'exportRules') {
+                List<String> ruleIds = (List<String>)JSON.deserialize(JSON.serialize(data), List<String>.class);
+                response.data = RuleExportImportService.exportRules(ruleIds);
+            } else if (method == 'importRules') {
+                String jsonStr = JSON.serialize(data);
+                response.data = RuleExportImportService.importRules(jsonStr);
             } else {
                 response.error = 'Action not found';
             }
