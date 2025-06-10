@@ -366,14 +366,14 @@ public with sharing class AdminController {
                 response.data = AdminService.getPharosRunningUserWrapper();
             } else if (method.equals('resetScheduleJobs')) {
                 response.data = AdminService.resetScheduleJobs();
-            } else if (method == 'getRuleWizardData') {
+            } else if (method.equals('getRuleWizardData')) {
                 response.data = RuleExportImportService.getRuleWizardData();
-            } else if (method == 'exportRules') {
-                List<String> ruleIds = (List<String>)JSON.deserialize(JSON.serialize(data), List<String>.class);
-                response.data = RuleExportImportService.exportRules(ruleIds);
-            } else if (method == 'importRules') {
-                String jsonStr = (String)request.get('data');
-                response.data = RuleExportImportService.importRules(jsonStr);
+            } else if (method.equals('exportRules')) {
+                response.data = RuleExportImportService.exportRules(
+                    (List<String>)JSON.deserialize(JSON.serialize(data), List<String>.class)
+                );
+            } else if (method.equals('importRules')) {
+                response.data = RuleExportImportService.importRules((String)request.get('data'));
             } else {
                 response.error = 'Action not found';
             }
