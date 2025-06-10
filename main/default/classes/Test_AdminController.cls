@@ -364,7 +364,13 @@ public class Test_AdminController {
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
-            'method' => 'getUrlToPlatformEventSubscriberConfig',
+            'method' => 'getUrlToPlatformEventSubscriberConfigLogEvent',
+            'data' => ''
+        };
+        AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        payload = new Map<String, Object>{
+            'method' => 'getUrlToPlatformEventSubscriberConfigAIEvent',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -374,8 +380,15 @@ public class Test_AdminController {
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
+
         payload = new Map<String, Object>{
-            'method' => 'setPlatformEventSubscriberConfig',
+            'method' => 'setPlatformEventSubscriberConfigLogEvent',
+            'data' => ''
+        };
+        AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        payload = new Map<String, Object>{
+            'method' => 'setPlatformEventSubscriberConfigAIEvent',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -393,7 +406,13 @@ public class Test_AdminController {
         AdminController ctrl = new AdminController();
 
         Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'getPlatformEventSubscriberConfig',
+            'method' => 'getPlatformEventSubscriberConfigLogEvent',
+            'data' => ''
+        };
+        AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        payload = new Map<String, Object>{
+            'method' => 'getPlatformEventSubscriberConfigAIEvent',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -1878,10 +1897,10 @@ public class Test_AdminController {
     }
 
     @IsTest
-    private static void test_admin_service_getUrlToPlatformEventSubscriberConfig() {
+    private static void test_admin_service_getUrlToPlatformEventSubscriberConfigLogEvent() {
         String result;
         Test.startTest();
-        result = AdminService.getUrlToPlatformEventSubscriberConfig();
+        result = AdminService.getUrlToPlatformEventSubscriberConfigLogEvent();
         Test.stopTest();
         System.assertNotEquals(null, result);
     }

@@ -395,10 +395,8 @@ global with sharing virtual class FlowExceptionParser implements IErrorParser {
         String stacktraceRow;
         while(rIterator.hasNext()) {
             stacktraceRow = rIterator.next();
-            Matcher pm = p.matcher(stacktraceRow);
-            while (pm.find()) {
-                relatedIds.add(pm.group(1));
-            }
+            Set<String> relatedIdsFromMessage = ConfigUtil.getRelatedSObjectIds(stacktraceRow, false);
+            relatedIds.addAll(relatedIdsFromMessage);
         }
         if (!relatedIds.isEmpty()) this.relatedObjects = JSON.serialize(relatedIds);
     }

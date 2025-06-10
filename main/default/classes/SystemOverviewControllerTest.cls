@@ -59,15 +59,6 @@ private class SystemOverviewControllerTest {
 	}
 
 	@IsTest
-	private static void test_getObjectAPINames() {
-		Test.startTest();
-		List<String> objectAPINames = SystemOverviewController.getObjectAPINames();
-		Test.stopTest();
-		System.assertNotEquals(null, objectAPINames);
-		System.assert(!objectAPINames.isEmpty());
-	}
-
-	@IsTest
 	private static void test_getRecordCounts() {
 		Test.startTest();
 		List<String> objectAPINames = new List<String>{'Account', 'Contact'};
@@ -90,7 +81,9 @@ private class SystemOverviewControllerTest {
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
 		String workflowQuery = 'SELECT TableEnumOrId, COUNT(Id) cnt FROM WorkflowRule WHERE TableEnumOrId IN (\'Account\') GROUP BY TableEnumOrId';
 		endpoint2TestResp.put('https://test_Instance_Url' + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(workflowQuery, 'UTF-8'), getWorkflowRulesMock());
-
+		String flowQuery = 'SELECT Id, ProcessType FROM Flow WHERE Status = \'Active\' AND ProcessType IN (\'Workflow\', \'CustomEvent\', \'InvocableProcess\')';
+		endpoint2TestResp.put('https://test_Instance_Url' + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(flowQuery, 'UTF-8'), getFlowMock());
+		endpoint2TestResp.put('https://test_Instance_Url' + ConfigUtil.TOOLING_API_GET_FLOW + 'test_id', getFlowWrapperMock());
 		List<SystemOverviewController.ObjectInfo> objectInfos = new List<SystemOverviewController.ObjectInfo>();
 		SystemOverviewController.ObjectInfo info = new SystemOverviewController.ObjectInfo();
 		info.name = 'Account';
@@ -116,10 +109,32 @@ private class SystemOverviewControllerTest {
 		return singleRequestMock;
 	}
 
+	private static TestDataFactory.SingleRequestMock getFlowMock() {
+		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+				200,
+				'OK',
+				'{"size":1,"totalSize":1,"done":true,"records":[{"Id":"test_id", "ProcessType":"Workflow"}]}'
+		);
+		return singleRequestMock;
+	}
+
+	private static TestDataFactory.SingleRequestMock getFlowWrapperMock() {
+		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+				200,
+				'OK',
+				'{"attributes":{"type":"Flow","url":"/services/data/' + ConfigUtil.API_VERSION + '/tooling/sobjects/Flow/test_id"},"Id":"test_id","Status":"Active", "ProcessType":"Workflow", "Metadata":{"processMetadataValues":[{"name":"ObjectType","value":{"stringValue":"Contact"}},{"name":"ObjectVariable","value":{"stringValue":null}}]}}'
+		);
+		return singleRequestMock;
+	}
 
 	@IsTest
 	private static void test_getOrgAtAGlance() {
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		String workflowQuery = 'SELECT COUNT(Id) cnt FROM WorkflowRule';
+		endpoint2TestResp.put('https://test_Instance_Url' + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(workflowQuery, 'UTF-8'), getWorkflowRulesMock());
 		Test.startTest();
+		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
 		SystemOverviewController.OrgAtAGlance orgAtAGlance = SystemOverviewController.getOrgAtAGlance();
 		Test.stopTest();
 		System.assertNotEquals(null, orgAtAGlance);

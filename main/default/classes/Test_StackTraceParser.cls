@@ -2638,4 +2638,219 @@ public class Test_StackTraceParser {
         };
         common_test_case_parse_flow_from_structure(flowStructures, executionPath);
     }
+
+    @IsTest
+    static void test_related_objects_limit_with_many_ids_in_email() {
+        Test_LogService.initSettings();
+
+        // Create email content with the correct format for ApexExceptionParser
+        String orgId = UserInfo.getOrganizationId();
+        String userId = UserInfo.getUserId();
+        
+        String baseApexError = 'Apex script unhandled exception by user/organization: ' + userId.left(15) + '/' + orgId.left(15) + '\n\n' +
+                              'Failed to process batch for job ID 707000000FakeJobId.\n\n' +
+                              'caused by: System.DmlException: Insert failed. First exception on row 0; first error: REQUIRED_FIELD_MISSING, Required fields are missing: [Name]: [Name] --\n\n' +
+                              'Class.TestClass.method1: line 15, column 1\n' +
+                              'Class.TestClass.method2: line 25, column 1\n' +
+                              'Trigger.TestTrigger.trigger1: line 35, column 1\n\n';
+        
+        // Generate more than 1500 unique Salesforce IDs to test the limit (32768 char Long Text Area)
+        Set<String> generatedIds = new Set<String>();
+        generatedIds.add(orgId);
+        generatedIds.add(userId);
+        generatedIds.add('707000000FakeJobId');
+
+        String emailContent = baseApexError + 'Related records and IDs found in this error:\n';
+        
+        // Generate Account IDs (001 prefix) - 800 IDs
+        for (Integer i = 0; i < 800; i++) {
+            String accountId = '001' + String.valueOf(i).leftPad(12, '0') + 'AAA';
+            generatedIds.add(accountId);
+            emailContent += 'Account: ' + accountId + ' ';
+        }
+        
+        // Generate Contact IDs (003 prefix) - 800 IDs
+        for (Integer i = 0; i < 800; i++) {
+            String contactId = '003' + String.valueOf(i).leftPad(12, '0') + 'BBB';
+            generatedIds.add(contactId);
+            emailContent += 'Contact: ' + contactId + ' ';
+        }
+        
+        // 3 orgId, userId, jobId + 800 Account IDs + 800 Contact IDs
+        System.assertEquals(1603, generatedIds.size(), 'Should have generated 1603 unique IDs for testing (exceeds 1500 limit)');
+
+        // Create inbound email with the correct format
+        Messaging.InboundEmail email = new Messaging.InboundEmail();
+        Messaging.InboundEnvelope env = new Messaging.InboundEnvelope();
+        
+        email.subject = 'Developer script exception from ' + UserInfo.getOrganizationName() + ' : TestClass for job ID 707000000FakeJobId. : Insert failed';
+        email.fromAddress = 'system@salesforce.com';
+        email.toAddresses = new List<String>{'test@pharos.com'};
+        email.plainTextBody = emailContent;
+        
+        Messaging.InboundEmail.Header dateHeader = new Messaging.InboundEmail.Header();
+        dateHeader.name = 'Date';
+        dateHeader.value = '01 Jun 2023 14:31:46 -0700';
+        email.headers = new List<Messaging.InboundEmail.Header>{dateHeader};
+
+        // Setup mocks
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        endpoint2TestResp.putAll(createPostProcessingMock(null, null, 1));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        LogTriggerHelper.runPostProcessingBatchInTest = true;
+
+        Test.startTest();
+        
+        ErrorEmailHandler testInbound = new ErrorEmailHandler();
+        testInbound.handleInboundEmail(email, env);
+        
+        Test.stopTest();
+
+        // Verify log was created successfully
+        List<Log__c> logs = [SELECT Id, Related_Objects__c, Details__c, Summary__c, Hash_1__c, Category__c, Stacktrace__c 
+                            FROM Log__c WHERE Category__c = 'Apex' LIMIT 1];
+        
+        System.assertEquals(1, logs.size(), 'One log should be created');
+        
+        Log__c createdLog = logs[0];
+        System.assertNotEquals(null, createdLog.Related_Objects__c, 'Related_Objects__c should be populated');
+        
+        // Verify the JSON is within size limits (32768 character Long Text Area)
+        Integer serializedSize = createdLog.Related_Objects__c.length();
+        System.assert(serializedSize <= 32768, 'Related_Objects__c should not exceed 32k characters. Actual size: ' + serializedSize);
+        
+        // Deserialize and verify the IDs
+        Set<String> deserializedIds = (Set<String>) JSON.deserialize(createdLog.Related_Objects__c, Set<String>.class);
+        
+        // Should have exactly our limit of 1500 IDs
+        System.assertEquals(1500, deserializedIds.size(), 'Should have exactly 1500 IDs due to our limit');
+        
+        // Verify all deserialized IDs are from our generated set
+        for (String id : deserializedIds) {
+            System.assert(generatedIds.contains(id), 'All IDs in Related_Objects__c should be from our generated set. Found: ' + id);
+        }
+        
+        // Verify the IDs are valid Salesforce IDs
+        for (String id : deserializedIds) {
+            if (id.startsWith('001') || id.startsWith('003')) {
+                System.assertEquals(18, id.length(), 'All IDs should be 18 characters long');
+                System.assert(id.startsWith('001') || id.startsWith('003'), 
+                            'IDs should start with expected prefixes. Found: ' + id);
+            }
+        }
+        
+        // Verify that we didn't lose any data due to the limit - the log should still contain all the email content
+        System.assert(createdLog.Details__c.contains('Account:'), 'Details should contain Account references');
+        System.assert(createdLog.Details__c.contains('Contact:'), 'Details should contain Contact references');  
+        System.assertEquals('Apex', createdLog.Category__c, 'Should be categorized as Apex');
+        System.assertNotEquals(null, createdLog.Stacktrace__c, 'Stacktrace should be populated');
+        
+        // Verify inbound email record was created correctly
+        List<Inbound_Email__c> inboundEmails = [SELECT Id, Error__c, Log__c FROM Inbound_Email__c WHERE Log__c = :createdLog.Id];
+        System.assertEquals(1, inboundEmails.size(), 'Inbound email record should be created');
+        System.assertEquals(null, inboundEmails[0].Error__c, 'No error should be recorded');
+        System.assertEquals(createdLog.Id, inboundEmails[0].Log__c, 'Should be linked to our log');
+        
+        System.debug('Test completed successfully. Related_Objects__c size: ' + serializedSize + 
+                    ' characters, containing ' + deserializedIds.size() + ' IDs');
+    }
+
+    @IsTest
+    static void test_abbreviate_plain_text_field_when_exceeds_limit() {
+        Test_LogService.initSettings();
+
+        // Create email content that exceeds MAX_LENGTH_LONG_TEXT_AREA_FIELD (131000 chars)
+        String orgId = UserInfo.getOrganizationId();
+        String userId = UserInfo.getUserId();
+        
+        String baseApexError = 'Apex script unhandled exception by user/organization: ' + userId.left(15) + '/' + orgId.left(15) + '\n\n' +
+                              'Failed to process batch for job ID 707000000FakeJobId.\n\n' +
+                              'caused by: System.DmlException: Insert failed. First exception on row 0; first error: REQUIRED_FIELD_MISSING, Required fields are missing: [Name]: [Name] --\n\n' +
+                              'Class.TestClass.method1: line 15, column 1\n\n';
+        
+        // Create a very long string that exceeds the limit
+        String longContent = '';
+        Integer targetSize = ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD + 10000; // Exceed by 10k chars
+        String repeatableContent = 'This is a long line of text that will be repeated many times to exceed the field limit. ';
+        
+        while (longContent.length() < targetSize) {
+            longContent += repeatableContent;
+        }
+        
+        String finalEmailContent = baseApexError + longContent;
+        System.assert(finalEmailContent.length() > ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD, 
+                     'Email content should exceed the field limit. Actual size: ' + finalEmailContent.length());
+
+        // Create inbound email with very long plain text body
+        Messaging.InboundEmail email = new Messaging.InboundEmail();
+        Messaging.InboundEnvelope env = new Messaging.InboundEnvelope();
+        
+        email.subject = 'Developer script exception from ' + UserInfo.getOrganizationName() + ' : TestClass for job ID 707000000FakeJobId. : Insert failed';
+        email.fromAddress = 'system@salesforce.com';
+        email.toAddresses = new List<String>{'test@pharos.com'};
+        email.plainTextBody = finalEmailContent;
+        
+        Messaging.InboundEmail.Header dateHeader = new Messaging.InboundEmail.Header();
+        dateHeader.name = 'Date';
+        dateHeader.value = '01 Jun 2023 14:31:46 -0700';
+        email.headers = new List<Messaging.InboundEmail.Header>{dateHeader};
+
+        // Setup mocks
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        endpoint2TestResp.putAll(createPostProcessingMock(null, null, 1));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        LogTriggerHelper.runPostProcessingBatchInTest = true;
+
+        Test.startTest();
+        
+        ErrorEmailHandler testInbound = new ErrorEmailHandler();
+        testInbound.handleInboundEmail(email, env);
+        
+        Test.stopTest();
+
+        // Verify inbound email was created with abbreviated plain text
+        List<Inbound_Email__c> inboundEmails = [SELECT Id, Plain_Text__c, Error__c, Log__c FROM Inbound_Email__c LIMIT 1];
+        System.assertEquals(1, inboundEmails.size(), 'One inbound email should be created');
+        
+        Inbound_Email__c createdInboundEmail = inboundEmails[0];
+        
+        // Verify that Plain_Text__c was abbreviated to fit within the limit
+        System.assertNotEquals(null, createdInboundEmail.Plain_Text__c, 'Plain_Text__c should be populated');
+        System.assert(createdInboundEmail.Plain_Text__c.length() <= ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD, 
+                     'Plain_Text__c should not exceed the field limit. Actual size: ' + createdInboundEmail.Plain_Text__c.length());
+        System.assertEquals(ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD, createdInboundEmail.Plain_Text__c.length(), 
+                           'Plain_Text__c should be exactly the maximum allowed size');
+        
+        // Verify that the content was abbreviated, not truncated randomly
+        System.assert(createdInboundEmail.Plain_Text__c.endsWith('...'), 
+                     'Abbreviated text should end with ellipsis');
+        
+        // Verify that essential content is still present at the beginning
+        System.assert(createdInboundEmail.Plain_Text__c.contains('Apex script unhandled exception'), 
+                     'Essential error information should be preserved');
+        System.assert(createdInboundEmail.Plain_Text__c.contains('System.DmlException'), 
+                     'Exception type should be preserved');
+        
+        // Verify that a log was still created successfully despite the large content
+        System.assertNotEquals(null, createdInboundEmail.Log__c, 'A log should be created');
+        System.assertEquals(null, createdInboundEmail.Error__c, 'No error should be recorded in processing');
+        
+        // Verify the created log
+        List<Log__c> logs = [SELECT Id, Category__c, Summary__c, Details__c FROM Log__c WHERE Id = :createdInboundEmail.Log__c];
+        System.assertEquals(1, logs.size(), 'Log should be found');
+        
+        Log__c createdLog = logs[0];
+        System.assertEquals('Apex', createdLog.Category__c, 'Should be categorized as Apex');
+        System.assertNotEquals(null, createdLog.Summary__c, 'Summary should be populated');
+        
+        // The Details__c field should contain the original (non-abbreviated) content since it processes from email.plainTextBody
+        System.assertNotEquals(null, createdLog.Details__c, 'Details should be populated');
+        
+        System.debug('Test completed successfully. Original email size: ' + finalEmailContent.length() + 
+                    ' characters, abbreviated Plain_Text__c size: ' + createdInboundEmail.Plain_Text__c.length() + ' characters');
+    }
 }

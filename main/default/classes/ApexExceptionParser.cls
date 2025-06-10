@@ -264,13 +264,9 @@ global with sharing virtual class ApexExceptionParser implements IErrorParser {
 
         }
 
-        p = ConfigUtil.SOBJECT_ID_PATTERN;
-        pm = p.matcher(message);
-        Set<String> relatedIds = new Set<String>();
-        while (pm.find()) {
-            relatedIds.add(pm.group(1));
-        }
-        if (!relatedIds.isEmpty()) this.relatedObjects = JSON.serialize(relatedIds);
+        // Get related objects from message, try to get as many as possible limited by ConfigUtil.MAX_RELATED_IDS_COUNT
+        Set<String> relatedIds = ConfigUtil.getRelatedSObjectIds(message, false);
+        this.relatedObjects = (!relatedIds.isEmpty()) ? JSON.serialize(relatedIds) : null;
 
         // Find Async jobs information
         p = PATTERN_FAILED_TO;

@@ -6167,6 +6167,31 @@ public with sharing class MetadataService {
         private String[] type_att_info = new String[]{'xsi:type'};
         private String[] field_order_type_info = new String[]{'fullName', 'active','businessProcess','compactLayoutAssignment','description','label','picklistValues'};
     }
+    public class EventSettings extends Metadata {
+		public String type = 'EventSettings';
+		public String fullName;
+		private String[] fullName_type_info = new String[]{'fullName',SOAP_M_URI,'string','0','1','false'};
+		public Boolean bypassMeteringBlock;
+		public Boolean enableApexLimitEvents;
+		public Boolean enableDeleteMonitoringData;
+		public Boolean enableDynamicStreamingChannel;
+		public Boolean enableEventLogGeneration;
+		public Boolean enableEventLogWaveIntegration;
+		public Boolean enableLoginForensics;
+		public Boolean enableStreamingApi;
+		public Boolean enableTransactionSecurityPolicies;
+		private String[] bypassMeteringBlock_type_info = new String[]{'bypassMeteringBlock',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] enableApexLimitEvents_type_info = new String[]{'enableApexLimitEvents',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] enableDeleteMonitoringData_type_info = new String[]{'enableDeleteMonitoringData',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] enableDynamicStreamingChannel_type_info = new String[]{'enableDynamicStreamingChannel',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] enableEventLogGeneration_type_info = new String[]{'enableEventLogGeneration',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] enableEventLogWaveIntegration_type_info = new String[]{'enableEventLogWaveIntegration',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] enableLoginForensics_type_info = new String[]{'enableLoginForensics',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] enableStreamingApi_type_info = new String[]{'enableStreamingApi',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] enableTransactionSecurityPolicies_type_info = new String[]{'enableTransactionSecurityPolicies',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] apex_schema_type_info = new String[]{SOAP_M_URI,'true','false'};
+		private String[] field_order_type_info = new String[]{'fullName','bypassMeteringBlock','enableApexLimitEvents','enableDeleteMonitoringData','enableDynamicStreamingChannel','enableEventLogGeneration','enableEventLogWaveIntegration','enableLoginForensics','enableStreamingApi','enableTransactionSecurityPolicies'};
+	}
     public class EventSubscription extends Metadata {
         public String type = 'EventSubscription';
         public String fullName;

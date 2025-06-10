@@ -9,6 +9,7 @@ public with sharing class RuleUtil {
 	public static final String KEY_RULE_COMPARISON_OPERATORS = 'comparisonOperators';
 	public static final String KEY_RULE_FILTER_COMPARISON_OPERATORS = 'ruleFilterComparisonOperators';
 	public static final String KEY_RULE_FILTERS = 'ruleFilters';
+	public static final String KEY_EVENT_FIELDS = 'eventFields';
 	public static final String KEY_RULE_ACTIONS = 'ruleActions';
 	public static final String KEY_RULE_ACTION_ID = 'ruleActionId';
 	public static final String KEY_ACTION_ID = 'actionId';
@@ -45,6 +46,7 @@ public with sharing class RuleUtil {
 	public static final String RULE_TYPE_JIRA_UPDATE = 'JIRA Update';
 	public static final String RULE_TYPE_AZURE_DEV_OPS = 'Azure Dev Ops';
 	public static final String RULE_TYPE_NOTIFICATION = 'Notification';
+	public static final String RULE_TYPE_EVENT_MONITORING = 'Event Monitoring';
 	public static final String RULE_TYPE_BROADCAST = 'Broadcast';
 	public static final Set<String> IGNORE_RULE_TYPES_FOR_MONITORING_EVENTS = new Set<String>{RULE_TYPE_JIRA_UPDATE, RULE_TYPE_NOTIFICATION, RULE_TYPE_BROADCAST};
 	public static final Map<String, RuleType> MAP_RULE_TYPE = new Map<String, RuleType> {
@@ -59,7 +61,16 @@ public with sharing class RuleUtil {
 	public static final Map<String, Boolean> MAP_RULES_ENABLED = new Map<String, Boolean> {
 			RULE_TYPE_MONITORING => ConfigUtil.SETTINGS.Monitoring_Enabled__c,
 			RULE_TYPE_ARCHIVAL => ConfigUtil.SETTINGS.Archival_Enabled__c,
-			RULE_TYPE_NOTIFICATION => PermissionsUtil.NotificationIntegrationEnabled
+			RULE_TYPE_NOTIFICATION => PermissionsUtil.NotificationIntegrationEnabled,
+			RULE_TYPE_EVENT_MONITORING => PermissionsUtil.EventMonitoringEnabled && ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c
+	};
+
+	public static final List<String> RULE_TYPES_FOR_IMPORT_EXPORT = new List<String>{
+		RULE_TYPE_MONITORING,
+		RULE_TYPE_ARCHIVAL,
+		RULE_TYPE_JIRA_UPDATE,
+		RULE_TYPE_AZURE_DEV_OPS,
+		RULE_TYPE_NOTIFICATION
 	};
 
 	public enum ComparisonOperator {
@@ -230,7 +241,8 @@ public with sharing class RuleUtil {
 					ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
 			},
 			RULE_TYPE_BROADCAST => new List<String> {
-			}
+			},
+			RULE_TYPE_EVENT_MONITORING => new List<String>()
 	};
 	public static final Map<String, String> MAP_ACTION_SUBTYPES = new Map<String, String> {
 			RULE_TYPE_NOTIFICATION => ACTION_SUBTYPE_NOTIFICATION

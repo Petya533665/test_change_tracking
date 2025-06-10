@@ -53,24 +53,6 @@ public with sharing class GitHubUtils {
         return false;
     }
 
-    public static Boolean validateGitHubConnectionForChat() {
-        if (String.isBlank(GIT_USERNAME) || String.isBlank(GIT_REPONAME) || String.isBlank(ConfigUtil.GIT_API_SETTINGS.Branch_Name__c)) {
-            return false;
-        }
-
-        List<GitRepoBranchInfo> branches = getRepoBranchesInfos(
-            GIT_USERNAME,
-            GIT_REPONAME,
-            ConfigUtil.GIT_API_SETTINGS.Branch_Name__c
-        );
-        for(GitRepoBranchInfo branch : branches) {
-            if(branch.name == ConfigUtil.GIT_API_SETTINGS.Branch_Name__c) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public static List<GitRepoBranchInfo> getRepoBranchesInfos(Object data) {
         String owner;
         String reponame;
@@ -216,7 +198,7 @@ public with sharing class GitHubUtils {
             result += '    <types>\n';
             for(String member : metaType.member) {
                 result += '        <members>' + member + '</members>\n';
-            }
+            }   
             result += '        <name>' + metaType.type + '</name>\n' + '    </types>\n';
         }
         result += '    <version>' + String.valueOf(GitHubUtils.METADATA_API_VERSION) + '.0' + '</version>\n' + '</Package>';

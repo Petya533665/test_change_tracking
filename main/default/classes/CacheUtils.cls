@@ -60,7 +60,7 @@ public with sharing class CacheUtils {
 	public static final Integer KEY_POST_PROCESSING_LOG_TRACKING_TTL = 20*60; // 20 min
 
 	public static final String KEY_ISSUE_TRACKER_LOG_TRACKING = 'ITLT';
-	public static final Integer KEY_ISSUE_TRACKER_LOG_TRACKING_TTL = 20*60; // 20 min
+	public static final Integer KEY_ISSUE_TRACKER_LOG_TRACKING_TTL = 60*60; // 1 hour, wait for hourly batch process to run
 
 	public static final String KEY_NOTIFICATION_OBJECT_TRACKING = 'NOT';
 	public static final Integer KEY_NOTIFICATION_OBJECT_TRACKING_TTL = 24*60*60; // 24 hours

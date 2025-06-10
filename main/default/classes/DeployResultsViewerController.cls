@@ -22,12 +22,7 @@ public with sharing class DeployResultsViewerController {
 
         timeZoneOffset = AdminService.getUserTimezoneOffset();
         data = log.Deploy_Results__c;
-        String isBlurModeParam = ApexPages.currentPage().getParameters().get(IS_BLUR_MODE_PARAM_NAME);
-        if (String.isNotBlank(isBlurModeParam)) {
-            isBlurMode = Boolean.valueOf(isBlurModeParam);
-        } else {
-            isBlurMode = !BlurModeService.isAvailableDebugView(this.log.Issue__c);
-        }
+        isBlurMode = !BlurModeService.isAvailableDebugView(this.log.Id);
         if (isBlurMode) {
             data = DEPLOY_RESULT_FAKE_DATA;
             blurModeUrlParameter = BlurModeService.getEncryptedUrlParameter();

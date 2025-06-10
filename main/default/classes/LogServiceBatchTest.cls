@@ -270,10 +270,11 @@ private class LogServiceBatchTest {
     }
 
     private static String getPlatformEventConfigMockURL() {
-        String triggerId = AdminService.platformEventSubscriberTriggerId;
+        PlatformEventSubscriberConfigService configService = new PlatformEventSubscriberConfigService(Log_Event__e.SObjectType);
+        String triggerId = configService.getTriggerId();
         String query = new QBuilder('PlatformEventSubscriberConfig')
             .selectFields(new Set<String>{'Id','UserId', 'PlatformEventConsumerId', 'DeveloperName', 'MasterLabel','BatchSize'})
-            .add(QBuilder.condition('DeveloperName').equalsTo(AdminService.PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME))
+            .add(QBuilder.condition('DeveloperName').equalsTo(configService.PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME))
             .add(QBuilder.condition('PlatformEventConsumerId').equalsTo(triggerId))
             .addLimit(1)
             .build();

@@ -197,7 +197,7 @@ public class IssueTriggerHandlerTest {
 		insert createPharosLog('hash1_1', 'hash2_1', 'hash3_1');
 		List<Issue__c> issues = [SELECT Id, Name FROM Issue__c];
 		if (!issues.isEmpty()) {
-			BlurModeService.TEST_OFFSET = IssueService.getHighestIssueNumber(issues);
+			BlurModeService.TEST_OFFSET = IssueService.getHighestIssueNumber(issues) + 1;
 		}
 		Database.rollback(sp);
 	}
@@ -284,34 +284,6 @@ public class IssueTriggerHandlerTest {
 		logs2.add(createPharosLog('hash1_3', 'hash2_3', 'hash3_3'));
 		insert logs2;
 		System.assertEquals(0, [SELECT COUNT() FROM Issue__c]);
-	}
-
-	@IsTest
-	private static void test_skip_max_attempts_log() {
-		TestDataFactory.enableIssueTracking();
-		Log__c testLog = createPharosLog('hash_max_attempts', 'hash2', 'hash3');
-		// Do not insert the log, as getMapLogsByHash operates on the input list directly
-		List<Log__c> logs = new List<Log__c>{ testLog };
-
-		Test.startTest();
-
-		// Call 1: Counter becomes 1. Log should be included.
-		Map<String, List<Log__c>> mapLogsByHash1 = IssueService.getMapLogsByHash(logs);
-		System.assertEquals(1, mapLogsByHash1.size(), 'Log should be included on first pass');
-		System.assert(mapLogsByHash1.containsKey('hash_max_attempts'), 'Map should contain the log hash on first pass');
-
-		// Call 2: Counter becomes 2. Log should be included.
-		Map<String, List<Log__c>> mapLogsByHash2 = IssueService.getMapLogsByHash(logs);
-		System.assertEquals(1, mapLogsByHash2.size(), 'Log should be included on second pass');
-		System.assert(mapLogsByHash2.containsKey('hash_max_attempts'), 'Map should contain the log hash on second pass');
-
-		// Call 3: Counter becomes 3. Log should be skipped as LOG_ISSUE_TRACKER_MAX_ATTEMPTS is 2 (>= check).
-		// Note: The IssueTrackerLogCounter uses Cache, which persists within a single transaction context in tests.
-		Map<String, List<Log__c>> mapLogsByHash3 = IssueService.getMapLogsByHash(logs);
-		System.assertEquals(0, mapLogsByHash3.size(), 'Log should be skipped on third pass due to max attempts');
-		System.assert(!mapLogsByHash3.containsKey('hash_max_attempts'), 'Map should not contain the log hash on third pass');
-
-		Test.stopTest();
 	}
 
 	@IsTest
@@ -465,7 +437,67 @@ public class IssueTriggerHandlerTest {
 		System.assertEquals(1, logs.size(), 'The Log record should still exist.');
 		Log__c resultLog = logs[0];
 		System.assertEquals(null, resultLog.Issue__c, 'Log should not be linked to any Issue.');
+		System.assertNotEquals(IssueService.LOG_ISSUE_TRACKER_STATUS_FAILED, resultLog.Issue_Tracker_Status__c,
+				'Log\'s Issue_Tracker_Status__c should not be updated to Failed after forced exception.');
+
+		IssueService.IssueTrackerLogCounter logCounter = new IssueService.IssueTrackerLogCounter(logToFail.Id);
+		System.assertEquals(1, logCounter.getCounter(), 'Log counter should be 1.');
+	}
+
+	@IsTest
+	private static void test_issue_upsert_failure_marks_log_failed_via_forced_exception_and_batch() {
+		TestDataFactory.enableIssueTracking();
+		String uniqueHash = 'issue_upsert_forced_fail_test_';
+
+		// Create a standard log that *would* normally create an issue
+		Log__c logToFail = createPharosLog(uniqueHash, 'hash2_force_fail', 'hash3_force_fail');
+		// Ensure the log meets trigger criteria to be processed
+		logToFail.Originated_From__c = IssueService.ORIGINATED_FROM_BROADCAST;
+		logToFail.Post_Processing_Status__c = IssueService.POST_PROCESSING_STATUS_COMPLETED;
+
+		// Force the exception
+		IssueTriggerHandler.throwDmlExceptionForTest = true;
+		insert logToFail;
+
+		// 1. Verify no Issue was actually created with this hash
+		List<Issue__c> issues = [SELECT Id FROM Issue__c WHERE Key__c = :uniqueHash];
+		System.assertEquals(0, issues.size(), 'No Issue record should have been created due to the forced DML exception.');
+
+		// 2. Verify the Log record was updated correctly
+		List<Log__c> logs = [SELECT Id, Issue__c, Issue_Tracker_Status__c FROM Log__c WHERE Id = :logToFail.Id];
+		System.assertEquals(1, logs.size(), 'The Log record should still exist.');
+		Log__c resultLog = logs[0];
+		System.assertEquals(null, resultLog.Issue__c, 'Log should not be linked to any Issue.');
+		System.assertNotEquals(IssueService.LOG_ISSUE_TRACKER_STATUS_FAILED, resultLog.Issue_Tracker_Status__c,
+				'Log\'s Issue_Tracker_Status__c should not be updated to Failed after forced exception.');
+
+		IssueService.IssueTrackerLogCounter logCounter = new IssueService.IssueTrackerLogCounter(logToFail.Id);
+		System.assertEquals(1, logCounter.getCounter(), 'Log counter should be 1.');
+
+		Test.startTest();
+		IssueTrackerBatch.getInstance().startBatch();
+		Test.stopTest();
+
+		logCounter = new IssueService.IssueTrackerLogCounter(logToFail.Id);
+		System.assert(logCounter.getCounter() == 2, 'Log counter should be 2, incremented by 1 for the first attempt and 1 for the second attempt by the batch');
+		// 3. Verify the Log record was updated correctly
+		logs = [SELECT Id, Issue__c, Issue_Tracker_Status__c FROM Log__c WHERE Id = :logToFail.Id];
+		System.assertEquals(1, logs.size(), 'The Log record should still exist.');
+		resultLog = logs[0];
+		System.assertEquals(null, resultLog.Issue__c, 'Log should not be linked to any Issue.');
 		System.assertEquals(IssueService.LOG_ISSUE_TRACKER_STATUS_FAILED, resultLog.Issue_Tracker_Status__c,
 				'Log\'s Issue_Tracker_Status__c should be updated to Failed after forced exception.');
+
+		List<Log__c> internalErrorLogs = [SELECT Id, Area__c, Category__c, Details__c FROM Log__c WHERE Id != :resultLog.Id LIMIT 10];
+		// for each by attempt, there should be 2 internal error logs
+		System.assertEquals(2, internalErrorLogs.size(), 'There should be 2 internal error logs.');
+		for (Log__c log : internalErrorLogs) {
+			System.assertEquals(Logger.AREA_PHAROS_ERROR, log.Area__c,
+					'Internal error log should have area Pharos.');
+			System.assertEquals(Logger.CATEGORY_PHAROS_ERROR, log.Category__c,
+					'Internal error log should have category Pharos Error.');
+			System.assert(log.Details__c.contains(IssueTriggerHandler.FORCED_DML_EXCEPTION_MESSAGE),
+					'Internal error log should have the forced DML exception message.');
+		}
 	}
 }

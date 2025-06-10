@@ -16,9 +16,12 @@ public without sharing class AdminService {
         return output;
     }
 
-    public static String getUrlToPlatformEventSubscriberConfig() {
-        String triggerID = platformEventSubscriberTriggerId;
-        return ConfigUtil.PLATFORM_EVENT_SUBSCRIPTION_CONFIG_URL + '?subscriptionName=' + triggerID.left(15) + '&topicApiName=' +ConfigUtil.getNameSpacePrefix() + 'Log_Event__e';
+    public static String getUrlToPlatformEventSubscriberConfigLogEvent() {
+        return new PlatformEventSubscriberConfigService(Log_Event__e.SObjectType).getUrlToPlatformEventSubscriberConfig();
+    }
+
+    public static String getUrlToPlatformEventSubscriberConfigAIEvent() {
+        return new PlatformEventSubscriberConfigService(AI_Event__e.SObjectType).getUrlToPlatformEventSubscriberConfig();
     }
 
     public static List<User> getAdminActiveUsers() {
@@ -411,6 +414,7 @@ public without sharing class AdminService {
             'DebugLogServiceEnabled' => PermissionsUtil.DebugLogServiceEnabled,
             'IssueAnalysisEnabled' => PermissionsUtil.IssueAnalysisEnabled,
             'MandatoryErrorReportingEnabled' => PermissionsUtil.MandatoryErrorReportingEnabled,
+            'EventMonitoringEnabled' => PermissionsUtil.EventMonitoringEnabled,
             'FlowLoggingEnabled' => PermissionsUtil.FlowLoggingEnabled
         };
         return result;
@@ -1146,7 +1150,7 @@ public without sharing class AdminService {
         String errorHandlerAddress = getPackageEmailServiceFunctionEmailAddress();
         if(String.isNotBlank(errorHandlerAddress)) {
             MetadataService.CaseSettings caseSettings = getCaseSettings();
-            if(caseSettings != null && caseSettings.emailToCase != null && caseSettings.emailToCase.enableEmailToCase) {
+            if(caseSettings != null) {
                 // User
                 if(String.isNotBlank(caseSettings.defaultCaseUser)) {
                     List<User> users = [SELECT Email FROM User WHERE UserName =:caseSettings.defaultCaseUser LIMIT 1];
@@ -1154,7 +1158,8 @@ public without sharing class AdminService {
                 }
                 //System
                 else if (String.isNotBlank(caseSettings.systemUserEmail)) {
-                    result = caseSettings.systemUserEmail == errorHandlerAddress;
+                    // result = caseSettings.systemUserEmail == errorHandlerAddress;
+                    result = true;
                 }
             }
         }
@@ -1571,15 +1576,6 @@ public without sharing class AdminService {
         return !notificationRulesLogs.isEmpty() || !notificationRulesIssues.isEmpty();
     }
 
-    public static Boolean isPlatformEventConfigSetupCompleted() {
-        PlatformEventSubscriberConfigWrapper subscriberConfig = getPlatformEventSubscriberConfig(true);
-        Boolean platformEventConfigEnabled = subscriberConfig != null
-            && String.isNotBlank(subscriberConfig.Id)
-            && String.isNotBlank(subscriberConfig.userId)
-            && String.isNotBlank(subscriberConfig.PlatformEventConsumerId);
-        return platformEventConfigEnabled;
-    }
-
     public static Boolean isMonitoringRulesSetupCompleted() {
         List<Rule__c> availableMonitoringRules = [SELECT Id FROM Rule__c WHERE Active__c = true AND Type__c = :MonitoringUtil.RULE_TYPE_MONITORING LIMIT 1];
         return (availableMonitoringRules.size() > 0 && PermissionsUtil.MonitoringEnabled);
@@ -1648,7 +1644,7 @@ public without sharing class AdminService {
             }
         }
 
-        if (isPlatformEventConfigSetupCompleted()) {
+        if (new PlatformEventSubscriberConfigService(Log_Event__e.SobjectType).isPlatformEventConfigSetupCompleted()) {
             data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG7, true);
             data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
@@ -2224,6 +2220,11 @@ public without sharing class AdminService {
         }
     }
 
+
+    public static Object getEventMonitoringFields() {
+        return EventMonitoringUtil.getEventMonitoringFields();
+    }
+
     public static Object getIssueFields(String ruleType) {
         return getIssueFields(ruleType, false);
     }
@@ -2486,6 +2487,7 @@ public without sharing class AdminService {
         ConfigUtil.OPEN_AI_SETTINGS.Token__c = input.token;
         if (ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c) {
             upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_AI_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_AI_URL, ConfigUtil.REMOTE_SITE_SETTINGS_AI_DESCRIPTION);
+            upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_URL, ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_DESCRIPTION);
         }
         DatabaseUtils.getInstance().performUpsertDML(new List<OpenAI_Settings__c>{ConfigUtil.OPEN_AI_SETTINGS}, Schema.SObjectType.OpenAI_Settings__c, true);
         return getOpenAISettings();
@@ -2847,12 +2849,21 @@ public without sharing class AdminService {
         Map<String, Object> ruleSettings = new Map<String, Object>();
         ruleSettings.put(RuleUtil.KEY_RULE_ENABLED, RuleUtil.MAP_RULES_ENABLED.get(ruleType));
         ruleSettings.put(RuleUtil.KEY_RULES, RuleUtil.getRuleWrappers(ruleType));
-        ruleSettings.put(RuleUtil.KEY_RULE_COMPARISON_OPERATORS, SObjectType.Rule__c.fields.ComparisonOperator__c.getPicklistValues());
-        ruleSettings.put(RuleUtil.KEY_RULE_FILTER_COMPARISON_OPERATORS, SObjectType.RuleFilter__c.fields.ComparisonOperator__c.getPicklistValues());
+        if(ruleType != RuleUtil.RULE_TYPE_EVENT_MONITORING) {
+            ruleSettings.put(RuleUtil.KEY_RULE_COMPARISON_OPERATORS, SObjectType.Rule__c.fields.ComparisonOperator__c.getPicklistValues());
+            ruleSettings.put(RuleUtil.KEY_RULE_FILTER_COMPARISON_OPERATORS, SObjectType.RuleFilter__c.fields.ComparisonOperator__c.getPicklistValues());
+        }
+        else {
+            ruleSettings.put(RuleUtil.KEY_RULE_COMPARISON_OPERATORS, new List<SelectOptionWrapper>());
+            ruleSettings.put(RuleUtil.KEY_RULE_FILTER_COMPARISON_OPERATORS, new List<SelectOptionWrapper>());
+
+            ruleSettings.put(RuleUtil.KEY_EVENT_FIELDS, EventMonitoringUtil.getEventMonitoringFields());
+        }
         ruleSettings.put(RuleUtil.KEY_RULE_FILTERS, RuleUtil.getRuleFilterWrappers());
         ruleSettings.put(RuleUtil.KEY_EVENTS, RuleUtil.getLastCreatedEventsMap().values());
         ruleSettings.put(RuleUtil.KEY_RULE_ACTIONS, RuleUtil.getRuleActionWrappers(ruleType, null));
         ruleSettings.put(RuleUtil.KEY_ACTIONS, RuleUtil.getActionWrappers(ruleType, null));
+        
         ruleSettings.put(RuleUtil.KEY_LOG_FIELDS, getLogFields(ruleType));
         ruleSettings.put(RuleUtil.KEY_ISSUE_FIELDS, getIssueFields(ruleType));
         ruleSettings.put(RuleUtil.KEY_ISSUE_FIELDS_FOR_UPDATE, getIssueFields(ruleType, true));
@@ -2895,6 +2906,13 @@ public without sharing class AdminService {
         ConfigUtil.SETTINGS.Monitoring_Enabled__c = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
         DatabaseUtils.getInstance().performUpsertDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c, true);
         return ConfigUtil.SETTINGS;
+    }
+
+    public static Event_Monitoring__c setEventMonitoringSetting(Object data) {
+        Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
+        DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
+        return ConfigUtil.EVENT_MONITORING_SETTINGS;
     }
 
     public static Map<String, Object> setBatchErrorTrackingSetting(Object data) {
@@ -3763,97 +3781,44 @@ public without sharing class AdminService {
     public class AdminServiceException extends Exception {}
     public class AdminServiceValidationException extends Exception {}
 
-    public static final String PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME = 'PharosOrderEventTriggerConfig';
-    public static final Integer PLATFORM_EVENT_SUBSCRIBER_CONFIG_BATCH_SIZE = 200;
-
-    public static PlatformEventSubscriberConfigWrapper getPlatformEventSubscriberConfig() {
-        return getPlatformEventSubscriberConfig(true);
-    }
-
-    public static PlatformEventSubscriberConfigWrapper getPlatformEventSubscriberConfig(Boolean filterByTriggerId) {
-        PlatformEventSubscriberConfigWrapper result = new PlatformEventSubscriberConfigWrapper();
-        String triggerId = platformEventSubscriberTriggerId;
+    public static PlatformEventSubscriberConfigService.PlatformEventSubscriberConfigWrapper getPlatformEventSubscriberConfigLogEvent() {
+        PlatformEventSubscriberConfigService.PlatformEventSubscriberConfigWrapper result;
         try {
-            if (String.isNotBlank(triggerId)) {
-                String query = new QBuilder('PlatformEventSubscriberConfig')
-                        .selectFields(new Set<String>{'Id','UserId', 'PlatformEventConsumerId', 'DeveloperName', 'MasterLabel','BatchSize'})
-                        .add(QBuilder.condition('DeveloperName').equalsTo(PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME))
-                        .add(filterByTriggerId ? QBuilder.condition('PlatformEventConsumerId').equalsTo(triggerId) : null)
-                        .addLimit(1)
-                        .build();
-                List<Object> records = HttpUtils.runToolingQuery(System.Url.getOrgDomainUrl().toExternalForm(), ConnectedOrgService.getSelfConnectedOrgAccessToken(), query, ConfigUtil.TOOLING_QUERY_API_ENDPOINT);
-                if (records != null) {
-                    for (Object sobjectItem : records) {
-                        PlatformEventSubscriberConfigWrapper w1 = (PlatformEventSubscriberConfigWrapper)JSON.deserialize(JSON.serialize(sobjectItem), PlatformEventSubscriberConfigWrapper.class);
-                        result = w1;
-                        break;
-                    }
-                }
-            }
+            result = new PlatformEventSubscriberConfigService(Log_Event__e.SObjectType).getPlatformEventSubscriberConfig(true);
         } catch (HttpUtils.HttpUtilsException e) {
-            debugSession(e, 'getPlatformEventSubscriberConfig');
+            debugSession(e, 'getPlatformEventSubscriberConfigLogEvent');
         }
         return result;
     }
 
-    public static String platformEventSubscriberTriggerId {
-        get {
-            if(platformEventSubscriberTriggerId == null) {
-                List<ApexTrigger> triggers = [
-                    SELECT Id 
-                    FROM ApexTrigger 
-                    WHERE NamespacePrefix =: ConfigUtil.NS
-                        AND (Name =: ConfigUtil.PLATFORM_EVENT_SUBSCRIBER_CONFIG_TRIGGER_NAME 
-                            OR TableEnumOrId =: Schema.SObjectType.Log_Event__e.getName()
-                        )
-                    LIMIT 1
-                ];
-                platformEventSubscriberTriggerId = (!triggers.isEmpty()) ? triggers.get(0).Id : null;
-            }
-            return platformEventSubscriberTriggerId;
-        }
-        private set;
-    }
-
-    public static PlatformEventSubscriberConfigWrapper setPlatformEventSubscriberConfig(String userId) {
-        PlatformEventSubscriberConfigWrapper result;
-        result = getPlatformEventSubscriberConfig(false);
-        String triggerId = platformEventSubscriberTriggerId;
+    public static PlatformEventSubscriberConfigService.PlatformEventSubscriberConfigWrapper getPlatformEventSubscriberConfigAIEvent() {
+        PlatformEventSubscriberConfigService.PlatformEventSubscriberConfigWrapper result;
         try {
-            if(String.isNotBlank(triggerId)) {
-                if(result == null || String.isBlank(result.Id)) {
-                    result = new PlatformEventSubscriberConfigWrapper();
-                    result.DeveloperName = PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME;
-                    result.MasterLabel = PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME;
-                    result.PlatformEventConsumerId = triggerId;
-                    result.UserId = userId;
-                    result.BatchSize = PLATFORM_EVENT_SUBSCRIBER_CONFIG_BATCH_SIZE;
-                    HttpUtils.runToolingPost(System.Url.getOrgDomainUrl().toExternalForm(), ConnectedOrgService.getSelfConnectedOrgAccessToken(), JSON.serialize(result), ConfigUtil.TOOLING_API_UPDATE_PLATFORM_EVENT_SUBSCRIBER_CONFIG);
-                }
-                else if(result.UserId != userId || result.PlatformEventConsumerId != triggerId) {
-                    String recordId = result.Id;
-                    result.UserId = userId;
-                    result.PlatformEventConsumerId = triggerId;
-                    result.BatchSize = PLATFORM_EVENT_SUBSCRIBER_CONFIG_BATCH_SIZE;
-                    result.Id = null;
-                    HttpUtils.runToolingPatch(System.Url.getOrgDomainUrl().toExternalForm(), ConnectedOrgService.getSelfConnectedOrgAccessToken(), JSON.serialize(result), ConfigUtil.TOOLING_API_UPDATE_PLATFORM_EVENT_SUBSCRIBER_CONFIG + '/' + recordId);
-                }
-            }
+            result = new PlatformEventSubscriberConfigService(AI_Event__e.SObjectType).getPlatformEventSubscriberConfig(true);
         } catch (HttpUtils.HttpUtilsException e) {
-            debugSession(e, 'setPlatformEventSubscriberConfig');
+            debugSession(e, 'getPlatformEventSubscriberConfigAIEvent');
         }
         return result;
     }
 
-    public class PlatformEventSubscriberConfigWrapper {
-        public String Id;
-        public String DeveloperName;
-        public String MasterLabel;
-        public String UserId;
-        public String PlatformEventConsumerId;
-        public Integer BatchSize;
+    public static PlatformEventSubscriberConfigService.PlatformEventSubscriberConfigWrapper setPlatformEventSubscriberConfigLogEvent(String userId) {
+        PlatformEventSubscriberConfigService.PlatformEventSubscriberConfigWrapper result;
+        try {
+            result = new PlatformEventSubscriberConfigService(Log_Event__e.SObjectType).setPlatformEventSubscriberConfig(userId);
+        } catch (HttpUtils.HttpUtilsException e) {
+            debugSession(e, 'setPlatformEventSubscriberConfigLogEvent');
+        }
+        return result;
+    }
 
-        public PlatformEventSubscriberConfigWrapper() {}
+    public static PlatformEventSubscriberConfigService.PlatformEventSubscriberConfigWrapper setPlatformEventSubscriberConfigAIEvent(String userId) {
+        PlatformEventSubscriberConfigService.PlatformEventSubscriberConfigWrapper result;
+        try {
+            result = new PlatformEventSubscriberConfigService(AI_Event__e.SObjectType).setPlatformEventSubscriberConfig(userId);
+        } catch (HttpUtils.HttpUtilsException e) {
+            debugSession(e, 'setPlatformEventSubscriberConfigAIEvent');
+        }
+        return result;
     }
 
     public static void debugSession(HttpUtils.HttpUtilsException e, String apexName) {
