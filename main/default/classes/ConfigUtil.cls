@@ -350,7 +350,7 @@ public with sharing class ConfigUtil {
 
     //From OpenAI
     public static final String OPEN_AI_COMPLETIONS_ENDPOINT = ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_URL + '/v1/chat/completions';
-    public static final String OPEN_AI_USAGE_ENDPOINT = ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_URL + '/dashboard/billing/usage';
+    public static final String OPEN_AI_USAGE_ENDPOINT = ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_URL + '/v1/usage';
     public static final Map<String, String> OPEN_AI_HEADERS {
         get {
             if(OPEN_AI_HEADERS == null) {
