@@ -101,7 +101,7 @@ public with sharing class PharosChatController {
                             .add(QBuilder.condition('DeveloperName').equalsTo(name))
                             .add(QBuilder.condition('NamespacePrefix').equalsTo(namespace))
                             .build();
-                    List<Object> lwcComponents = HttpUtils.runToolingQuery(instance, ConnectedOrgService.getSelfConnectedOrgAccessToken(), query);
+                    List<Object> lwcComponents = HttpUtils.runToolingQuery(instance, ConnectedOrgService.getSelfConnectedOrgAccessToken(), query, ConfigUtil.TOOLING_QUERY_API_ENDPOINT);
                     return lwcComponents.isEmpty() ? null : instance + '/lightning/setup/LightningComponentBundles/page?address=/' + ((Map<String, Object>)lwcComponents[0]).get('Id');
                 }
             }
