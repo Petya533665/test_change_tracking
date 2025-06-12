@@ -59,23 +59,20 @@ public with sharing class PharosChatController {
         String type = '';
         String name = entity.replace('.cls', '');
         String firstLetter = name.substring(0, 1);
-        if (name.contains('.')) {
+        if (name.contains('/') || name.contains('(')) {
+            return null;
+        } else if (name.contains('.')) {
             type = 'field';
         } else if (name.contains('__')) {
             type = 'object';
-        } else if (firstLetter.equals(firstLetter.toUpperCase())) {
-            type = 'class';
+        } else {
+            type = 'other';
         }
 
         String namespacePrefix = ConfigUtil.nameSpacePrefix;
         String instance = System.Url.getOrgDomainUrl().toExternalForm();
 
         switch on type {
-            when 'object' {
-                String objectName = namespacePrefix + name;
-                List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
-                return objects.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/view';
-            }
             when 'field' {
                 String objectName = namespacePrefix + name.split('\\.').get(0);
                 List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
@@ -87,10 +84,26 @@ public with sharing class PharosChatController {
                     AND QualifiedApiName = :fieldName];
                 return fields.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/FieldsAndRelationships/' + fields[0].DurableId.split('\\.').get(1) + '/view';
             }
-            when 'class' {
+            when 'object' {
+                String objectName = namespacePrefix + name;
+                List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
+                return objects.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/view';
+            }
+            when 'other' {
+                // search Apex class first, if not found search LWC component
                 String namespace = namespacePrefix.replace('__', '');
                 List<ApexClass> classes = [SELECT Id FROM ApexClass WHERE Name = :name AND NamespacePrefix = :namespace];
-                return classes.isEmpty() ? null : instance + '/' + classes[0].Id;
+                if (!classes.isEmpty()) {
+                    return instance + '/' + classes[0].Id;
+                } else {
+                    String query = new QBuilder('LightningComponentBundle')
+                            .selectFields(new Set<String>{'Id'})
+                            .add(QBuilder.condition('DeveloperName').equalsTo(name))
+                            .add(QBuilder.condition('NamespacePrefix').equalsTo(namespace))
+                            .build();
+                    List<Object> lwcComponents = HttpUtils.runToolingQuery(instance, ConnectedOrgService.getSelfConnectedOrgAccessToken(), query);
+                    return lwcComponents.isEmpty() ? null : instance + '/lightning/setup/LightningComponentBundles/page?address=/' + ((Map<String, Object>)lwcComponents[0]).get('Id');
+                }
             }
             when else {
                 return null;
