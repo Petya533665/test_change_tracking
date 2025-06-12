@@ -57,7 +57,7 @@ public with sharing class PharosChatController {
     @AuraEnabled
     public static String getCodeEntityLink(String entity) {
         String type = '';
-        String name = entity.replace('.cls', '');
+        String name = entity.replaceAll('\\.cls|\\.js', '');
         String firstLetter = name.substring(0, 1);
         if (name.contains('/') || name.contains('(')) {
             return null;
