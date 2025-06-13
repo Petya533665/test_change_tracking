@@ -1,5 +1,5 @@
 public with sharing class PharosChatController {
-    public static final String CHAT_ENV_URL = 'https://ai.pharos.ai/chat';
+    public static final String CHAT_ENV_URL = 'https://oa9kb839ng.execute-api.us-east-2.amazonaws.com/production';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
 
@@ -57,7 +57,7 @@ public with sharing class PharosChatController {
     @AuraEnabled
     public static String getCodeEntityLink(String entity) {
         String type = '';
-        String name = entity.replace('.cls', '');
+        String name = entity.replaceAll('\\.cls|\\.js', '');
         if (name.contains('/') || name.contains('(')) {
             return null;
         } else if (name.contains('.')) {
@@ -65,7 +65,7 @@ public with sharing class PharosChatController {
         } else if (name.contains('__')) {
             type = 'object';
         } else {
-            type = 'class';
+            type = 'other';
         }
 
         String namespacePrefix = ConfigUtil.nameSpacePrefix;
@@ -76,10 +76,10 @@ public with sharing class PharosChatController {
                 String objectName = namespacePrefix + name.split('\\.').get(0);
                 List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
                 if (objects.isEmpty()) return null;
-                
+
                 String fieldName = namespacePrefix + name.split('\\.').get(1);
-                List<FieldDefinition> fields = [SELECT DurableId FROM FieldDefinition 
-                    WHERE EntityDefinition.QualifiedApiName = :objectName 
+                List<FieldDefinition> fields = [SELECT DurableId FROM FieldDefinition
+                    WHERE EntityDefinition.QualifiedApiName = :objectName
                     AND QualifiedApiName = :fieldName];
                 return fields.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/FieldsAndRelationships/' + fields[0].DurableId.split('\\.').get(1) + '/view';
             }
@@ -88,10 +88,21 @@ public with sharing class PharosChatController {
                 List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
                 return objects.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/view';
             }
-            when 'class' {
+            when 'other' {
+                // search Apex class first, if not found search LWC component
                 String namespace = namespacePrefix.replace('__', '');
                 List<ApexClass> classes = [SELECT Id FROM ApexClass WHERE Name = :name AND NamespacePrefix = :namespace];
-                return classes.isEmpty() ? null : instance + '/' + classes[0].Id;
+                if (!classes.isEmpty()) {
+                    return instance + '/' + classes[0].Id;
+                } else {
+                    String query = new QBuilder('LightningComponentBundle')
+                            .selectFields(new Set<String>{'Id'})
+                            .add(QBuilder.condition('DeveloperName').equalsTo(name))
+                            .add(QBuilder.condition('NamespacePrefix').equalsTo(namespace))
+                            .build();
+                    List<Object> lwcComponents = HttpUtils.runToolingQuery(instance, ConnectedOrgService.getSelfConnectedOrgAccessToken(), query);
+                    return lwcComponents.isEmpty() ? null : instance + '/lightning/setup/LightningComponentBundles/page?address=/' + ((Map<String, Object>)lwcComponents[0]).get('Id');
+                }
             }
             when else {
                 return null;
