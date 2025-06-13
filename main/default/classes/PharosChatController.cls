@@ -1,5 +1,5 @@
 public with sharing class PharosChatController {
-    public static final String CHAT_ENV_URL = 'https://oa9kb839ng.execute-api.us-east-2.amazonaws.com/production';
+    public static final String CHAT_ENV_URL = 'https://ai.pharos.ai/chat';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
 
@@ -57,8 +57,7 @@ public with sharing class PharosChatController {
     @AuraEnabled
     public static String getCodeEntityLink(String entity) {
         String type = '';
-        String name = entity.replaceAll('\\.cls|\\.js', '');
-        String firstLetter = name.substring(0, 1);
+        String name = entity.replace('.cls', '');
         if (name.contains('/') || name.contains('(')) {
             return null;
         } else if (name.contains('.')) {
@@ -66,7 +65,7 @@ public with sharing class PharosChatController {
         } else if (name.contains('__')) {
             type = 'object';
         } else {
-            type = 'other';
+            type = 'class';
         }
 
         String namespacePrefix = ConfigUtil.nameSpacePrefix;
@@ -89,21 +88,10 @@ public with sharing class PharosChatController {
                 List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
                 return objects.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/view';
             }
-            when 'other' {
-                // search Apex class first, if not found search LWC component
+            when 'class' {
                 String namespace = namespacePrefix.replace('__', '');
                 List<ApexClass> classes = [SELECT Id FROM ApexClass WHERE Name = :name AND NamespacePrefix = :namespace];
-                if (!classes.isEmpty()) {
-                    return instance + '/' + classes[0].Id;
-                } else {
-                    String query = new QBuilder('LightningComponentBundle')
-                            .selectFields(new Set<String>{'Id'})
-                            .add(QBuilder.condition('DeveloperName').equalsTo(name))
-                            .add(QBuilder.condition('NamespacePrefix').equalsTo(namespace))
-                            .build();
-                    List<Object> lwcComponents = HttpUtils.runToolingQuery(instance, ConnectedOrgService.getSelfConnectedOrgAccessToken(), query, ConfigUtil.TOOLING_QUERY_API_ENDPOINT);
-                    return lwcComponents.isEmpty() ? null : instance + '/lightning/setup/LightningComponentBundles/page?address=/' + ((Map<String, Object>)lwcComponents[0]).get('Id');
-                }
+                return classes.isEmpty() ? null : instance + '/' + classes[0].Id;
             }
             when else {
                 return null;
