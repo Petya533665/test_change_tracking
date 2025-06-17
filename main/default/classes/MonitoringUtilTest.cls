@@ -803,9 +803,15 @@ public class MonitoringUtilTest {
         test_rule_notification('Monitoring', 'PagerDuty Notification', false);
     }
 
+    private static void setCountRulesPermissions() {
+        PermissionsUtil.MaxMonitoringRules = 10;
+        PermissionsUtil.MaxJiraRules = 10;
+        PermissionsUtil.MaxNotificationRules = 10;
+    }
 
     public static void test_rule_notification(String type, String eventType, Boolean isPositive) {
         PermissionsUtil.MonitoringEnabled = true;
+        setCountRulesPermissions();
         PermissionsUtil.JiraIntegrationEnabled = true;
         PermissionsUtil.PagerDutyIntegrationEnabled = true;
         TestDataFactory.enableMaxArchivalRules();
@@ -946,7 +952,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1028,7 +1034,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1107,7 +1113,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1190,7 +1196,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1276,7 +1282,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1360,7 +1366,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1437,7 +1443,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1517,7 +1523,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1594,7 +1600,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1676,7 +1682,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1753,7 +1759,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1836,7 +1842,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -1948,7 +1954,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
         
         Test.startTest();
         insert logs;
@@ -2072,7 +2078,7 @@ public class MonitoringUtilTest {
 
         // 4. Setup Permissions & Run Test
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -2197,7 +2203,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -2320,7 +2326,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -2443,7 +2449,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -2566,7 +2572,7 @@ public class MonitoringUtilTest {
         Event__c lastEvent = data.lastEvent;
 
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10;
+        setCountRulesPermissions();
 
         Test.startTest();
         insert logs;
@@ -3713,7 +3719,7 @@ public class MonitoringUtilTest {
     @IsTest
     private static void test_rule_spike_with_custom_logs_positive() {
         PermissionsUtil.MonitoringEnabled = true;
-        PermissionsUtil.MaxMonitoringRules = 10; 
+        setCountRulesPermissions();
         TestConstants tc = new TestConstants(); // For access to constants
 
         DateTime testStartTime = Datetime.now();
@@ -3973,5 +3979,139 @@ public class MonitoringUtilTest {
             ruleConfig.filterLogic = null; // Single group usually means no complex filter logic
         }
         // If neither withGroupFilter nor withMultiGroupFilter is true, this method does nothing to the filters.
+    }
+
+    @IsTest
+    static void testCreateEventsNullPointerExceptionFixed() {
+        // Test that the createEvents method now handles null values gracefully after the fixes
+        
+        // Create a simple rule record for ID purposes
+        Rule__c rule = new Rule__c(
+            Active__c = true,
+            Type__c = MonitoringUtil.RULE_TYPE_MONITORING
+        );
+        insert rule;
+
+        // Create an action record
+        Action__c action = new Action__c(
+            Action_Type__c = MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION,
+            Body__c = 'Test notification body',
+            SlackChannels__c = 'C07P14C5UC8',
+            Subject__c = 'Test Event'
+        );
+        insert action;
+
+        // Create a test log to get a valid ID
+        Log__c testLog = new Log__c(
+            Summary__c = 'Test log for null safety verification'
+        );
+        insert testLog;
+
+        Test.startTest();
+
+        // Test the specific NPE scenario: MonitoringRule with null Set values in groupRecordIds
+        MonitoringUtil.MonitoringRule monitoringRule = new MonitoringUtil.MonitoringRule(rule);
+        monitoringRule.ruleType = MonitoringUtil.RULE_TYPE_MONITORING;
+        monitoringRule.aggregateTypeString = 'Count';
+        monitoringRule.recordIds = new Set<String>();
+        monitoringRule.groupFieldNames = new Set<String>{'Type__c'};
+        
+        // Create the problematic groupRecordIds with null Set values
+        monitoringRule.groupRecordIds = new Map<String, Set<String>>();
+        monitoringRule.groupRecordIds.put('testKey1', null); // This would have caused NPE before the fix
+        monitoringRule.groupRecordIds.put('testKey2', new Set<String>{testLog.Id});
+        
+        MonitoringUtil.Action testAction = new MonitoringUtil.Action(action);
+        monitoringRule.actions = new List<MonitoringUtil.Action>{testAction};
+
+        List<MonitoringUtil.MonitoringRule> rules = new List<MonitoringUtil.MonitoringRule>{monitoringRule};
+        
+        List<Event__c> events;
+        Boolean methodExecutedSuccessfully = false;
+        String exceptionDetails = '';
+        
+        try {
+            // This should now work without throwing NPE due to the fixes
+            events = MonitoringUtil.createEvents(rules);
+            methodExecutedSuccessfully = true;
+        } catch(Exception e) {
+            exceptionDetails = 'Exception: ' + e.getTypeName() + ' Message: ' + e.getMessage() + ' Stack: ' + e.getStackTraceString();
+        }
+        
+        Test.stopTest();
+        
+        if (!methodExecutedSuccessfully) {
+            System.assert(false, 'Method should not throw exception after fixes. ' + exceptionDetails);
+        }
+        
+        // Verify that the method executed successfully
+        System.assertNotEquals(null, events, 'Events list should not be null');
+        System.assertEquals(1, events.size(), 'Should create 1 event for the 1 rule');
+        
+        // Verify the event was created with proper null handling
+        Event__c event = events[0];
+        System.assertNotEquals(null, event.Id, 'Event should be successfully inserted');
+        System.assertNotEquals(null, event.RecordCount__c, 'RecordCount should not be null');
+        System.assertEquals(1, event.RecordCount__c, 'Should count the one valid record set (ignoring null set)');
+    }
+    
+    @IsTest
+    static void testCreateEventsArchivalNullSafety() {
+        // Test archival rules with null archivalLogs
+        Rule__c rule = new Rule__c(
+            Active__c = true,
+            Type__c = MonitoringUtil.RULE_TYPE_ARCHIVAL
+        );
+        insert rule;
+
+        Action__c action = new Action__c(
+            Action_Type__c = MonitoringUtil.ACTION_TYPE_LOCAL_ARCHIVAL,
+            Body__c = 'Test archival action'
+        );
+        insert action;
+
+        Test.startTest();
+
+        MonitoringUtil.MonitoringRule archivalRule = new MonitoringUtil.MonitoringRule(rule);
+        archivalRule.ruleType = MonitoringUtil.RULE_TYPE_ARCHIVAL;
+        archivalRule.archivalLogs = null; // This would have caused NPE before the fix
+        archivalRule.actions = new List<MonitoringUtil.Action>{new MonitoringUtil.Action(action)};
+
+        List<Event__c> events = MonitoringUtil.createEvents(new List<MonitoringUtil.MonitoringRule>{archivalRule});
+        
+        Test.stopTest();
+
+        System.assertEquals(1, events.size(), 'Should create 1 archival event');
+        System.assertEquals(0, events[0].RecordCount__c, 'Should handle null archivalLogs gracefully');
+    }
+
+    @IsTest
+    static void testCreateEventsCompleteNullHandling() {
+        // Test monitoring rule with various null fields
+        Rule__c rule = new Rule__c(
+            Active__c = true,
+            Type__c = MonitoringUtil.RULE_TYPE_MONITORING
+        );
+        insert rule;
+
+        Test.startTest();
+
+        MonitoringUtil.MonitoringRule nullFieldsRule = new MonitoringUtil.MonitoringRule(rule);
+        nullFieldsRule.ruleType = MonitoringUtil.RULE_TYPE_MONITORING;
+        nullFieldsRule.aggregateTypeString = null; // null aggregate type
+        nullFieldsRule.recordIds = null; // null recordIds
+        nullFieldsRule.groupFieldNames = null; // null groupFieldNames
+        nullFieldsRule.groupRecordIds = null; // null groupRecordIds
+        nullFieldsRule.actions = null; // null actions
+
+        List<Event__c> events = MonitoringUtil.createEvents(new List<MonitoringUtil.MonitoringRule>{nullFieldsRule});
+        
+        Test.stopTest();
+
+        System.assertEquals(1, events.size(), 'Should create 1 event');
+        Event__c event = events[0];
+        System.assertEquals(0, event.RecordCount__c, 'Should handle null recordIds gracefully');
+        System.assert(event.Description__c.contains('Unknown'), 'Should use fallback for null aggregateTypeString');
+        System.assert(event.Description__c.contains(':0'), 'Should use fallback value of 0');
     }
 }

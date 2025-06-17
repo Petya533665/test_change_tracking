@@ -83,6 +83,9 @@ public with sharing class CacheUtils {
 	public static final String KEY_REQUEST_TRACE_RESULT_BATCH_TIMESTAMP = 'RTRBT';
 	public static final Integer KEY_REQUEST_TRACE_RESULT_BATCH_TIMESTAMP_TTL = 24*60*60; // 24 hours
 
+	public static final String KEY_SLACK_RATE_LIMIT = 'SRL';
+	public static final Integer KEY_SLACK_RATE_LIMIT_TTL = 60*60; // 1 hour
+
 	public static final String PARTITION_NAME = 'PharosPartition';
 	public static final String FULL_PARTITION_NAME = Cache.OrgPartition.createFullyQualifiedPartition(ConfigUtil.getNameSpace(), PARTITION_NAME);
 
@@ -116,6 +119,7 @@ public with sharing class CacheUtils {
 				MapRequests.put(KEY_REQUEST_NOTIFICATION_TIMESTAMP, KEY_REQUEST_NOTIFICATION_TIMESTAMP_TTL);
 				MapRequests.put(KEY_REQUEST_LOG_INDEX_BATCH_TIMESTAMP, KEY_REQUEST_LOG_INDEX_BATCH_TIMESTAMP_TTL);
 				MapRequests.put(KEY_REQUEST_TRACE_RESULT_BATCH_TIMESTAMP, KEY_REQUEST_TRACE_RESULT_BATCH_TIMESTAMP_TTL);
+				MapRequests.put(KEY_SLACK_RATE_LIMIT, KEY_SLACK_RATE_LIMIT_TTL);
 			}
 			return MapRequests;
 		}
