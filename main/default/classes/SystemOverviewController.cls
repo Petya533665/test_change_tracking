@@ -189,14 +189,14 @@ public with sharing class SystemOverviewController {
 					isSetupObject = true;
 				}
 				if (!isSetupObject) {
-					if (objResult.isAccessible() && (
+					if (!objResult.isAccessible() ||
 							!objResult.isCreateable()
 									|| !objResult.isDeletable()
 									|| !objResult.isUpdateable()
 									|| !objResult.isQueryable()
 									|| !objResult.isSearchable()
 									|| objResult.isDeprecatedAndHidden()
-					)) {
+					) {
 						isSetupObject = true;
 					}
 				}

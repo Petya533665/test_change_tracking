@@ -2753,8 +2753,6 @@ public class Test_StackTraceParser {
         System.assertEquals(null, inboundEmails[0].Error__c, 'No error should be recorded');
         System.assertEquals(createdLog.Id, inboundEmails[0].Log__c, 'Should be linked to our log');
         
-        System.debug('Test completed successfully. Related_Objects__c size: ' + serializedSize + 
-                    ' characters, containing ' + deserializedIds.size() + ' IDs');
     }
 
     @IsTest
@@ -2850,7 +2848,5 @@ public class Test_StackTraceParser {
         // The Details__c field should contain the original (non-abbreviated) content since it processes from email.plainTextBody
         System.assertNotEquals(null, createdLog.Details__c, 'Details should be populated');
         
-        System.debug('Test completed successfully. Original email size: ' + finalEmailContent.length() + 
-                    ' characters, abbreviated Plain_Text__c size: ' + createdInboundEmail.Plain_Text__c.length() + ' characters');
     }
 }

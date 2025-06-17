@@ -1,6 +1,13 @@
 public with sharing class NotificationService {
 
     public ENUM NOTIFICATION_SERVICE_TYPE {LOG, ISSUE, TRACE_RESULT, EVENT_ACTION}
+    
+    public enum ActionStatus {
+        PENDING,
+        COMPLETED,
+        RATE_LIMITED,
+        FAILED
+    }
     private Logger logger;
     private NotificationServiceInterface strategy;
 
@@ -13,6 +20,100 @@ public with sharing class NotificationService {
 
     public static Map<NOTIFICATION_SERVICE_TYPE, Integer> mapCountRecordsByType = new Map<NOTIFICATION_SERVICE_TYPE, Integer>();
     
+    // Test visible flag to control iterator expansion behavior
+    @TestVisible
+    private static Boolean disableIteratorExpansion = false;
+    
+    /**
+     * Safe sleep utility for rate limiting with governor limit protection
+     * Sleeps for specified milliseconds to help with API rate limiting
+     */
+    @TestVisible
+    private static void safeSleep(Integer milliseconds) {
+        // Skip sleep in test context to avoid timeouts
+        if (Test.isRunningTest()) {
+            return;
+        }
+        
+        // Limit sleep time to prevent governor limit issues (max 5 seconds)
+        Integer sleepTime = Math.min(milliseconds, 5000);
+        
+        Long startTime = System.currentTimeMillis();
+        Long endTime = startTime + sleepTime;
+        
+        // Simple busy wait loop with CPU time checks
+        while (System.currentTimeMillis() < endTime) {
+            // Check CPU time to prevent governor limit violations
+            if (Limits.getCpuTime() > (Limits.getLimitCpuTime() * 0.8)) {
+                break; // Exit if approaching CPU limit
+            }
+            
+            // Small iteration to prevent infinite tight loop
+            Integer dummy = Math.mod(System.now().millisecond(), 1000);
+        }
+    }
+    
+    // Interface for batch context management
+    public interface BatchContextManager {
+        void setIterationContext(String recordId, ActionIteration iteration);
+        ActionIteration getIterationContext(String recordId);
+        void clearIterationContext(String recordId);
+    }
+    
+    // Base implementation of BatchContextManager to eliminate duplicate code across batch classes
+    public abstract class BaseBatchContextManager implements BatchContextManager {
+        // Instance variables to store iteration contexts between batch executions
+        protected Map<String, List<ActionIteration>> recordIterationQueues = new Map<String, List<ActionIteration>>();
+        protected Map<String, ActionIteration> recordCurrentIterations = new Map<String, ActionIteration>();
+        
+        public void setIterationContext(String recordId, ActionIteration iteration) {
+            // Add to the queue for this record
+            if (!this.recordIterationQueues.containsKey(recordId)) {
+                this.recordIterationQueues.put(recordId, new List<ActionIteration>());
+            }
+            this.recordIterationQueues.get(recordId).add(iteration);
+            
+            // If this is the first iteration added, set it as current
+            if (!this.recordCurrentIterations.containsKey(recordId)) {
+                this.recordCurrentIterations.put(recordId, iteration);
+            }
+        }
+        
+        public ActionIteration getIterationContext(String recordId) {
+            return this.recordCurrentIterations.get(recordId);
+        }
+        
+        public void clearIterationContext(String recordId) {
+            // Move to next iteration instead of fully clearing
+            List<ActionIteration> queue = this.recordIterationQueues.get(recordId);
+            if (queue != null && !queue.isEmpty()) {
+                // Remove the completed iteration from the queue
+                queue.remove(0);
+                
+                if (!queue.isEmpty()) {
+                    // Set the next iteration as current
+                    ActionIteration nextIteration = queue[0];
+                    this.recordCurrentIterations.put(recordId, nextIteration);
+                } else {
+                    // No more iterations, clear everything
+                    this.recordCurrentIterations.remove(recordId);
+                    this.recordIterationQueues.remove(recordId);
+                }
+            }
+        }
+    }
+    
+    // Test helper methods for controlling iterator behavior
+    @TestVisible
+    public static void enableIteratorExpansionForTests() {
+        disableIteratorExpansion = false; // Enable expansion by setting disable flag to false
+    }
+    
+    @TestVisible
+    public static void disableIteratorExpansionForTests() {
+        disableIteratorExpansion = true; // Disable expansion by setting disable flag to true (default test behavior)
+    }
+
     public static void incrementCountRecords(NOTIFICATION_SERVICE_TYPE serviceType) {
         if(NotificationService.mapCountRecordsByType.get(serviceType) == null) {
             NotificationService.mapCountRecordsByType.put(serviceType, 1);
@@ -64,8 +165,8 @@ public with sharing class NotificationService {
         return this.strategy.getQueryLocator();
     }
 
-    public void batchExecuteIteration(Database.BatchableContext info, List<SObject> scope) {
-        this.strategy.batchExecuteIteration(info, scope);
+    public void batchExecuteIteration(Database.BatchableContext info, List<SObject> scope, BatchContextManager batchContextManager) {
+        this.strategy.batchExecuteIteration(info, scope, batchContextManager);
     }
 
     public void finish(Database.BatchableContext info) {
@@ -103,10 +204,11 @@ public with sharing class NotificationService {
 
         // notifications batches
         void startNotificationBatch();
-        void batchExecuteIteration(Database.BatchableContext info, List<SObject> scope);
+        void batchExecuteIteration(Database.BatchableContext info, List<SObject> scope, BatchContextManager batchContextManager);
         void finish(Database.BatchableContext info);
         Object notificationBatchInstance();
         void executeIteration();
+        void executeIteration(ActionIteration targetIteration);
         void setIterationRecordFailedStatus();
         void setRecordFailedStatusThrowBySendErrors();
         void sendTicketing();
@@ -132,6 +234,13 @@ public with sharing class NotificationService {
         void addRecordToUpdateMap(String recordId, Boolean isTicketingRule, NotificationService.ExecutableRulesConfig config);
         Schema.SObjectField getRuleSubTypeSObjectField(MonitoringUtil.MonitoringRule rule);
         Schema.SObjectType getRecordSobjectType();
+
+        // Action iteration methods
+        List<ActionIteration> getActionIterations(SObject record);
+        void executeActionIteration(ActionIteration iteration);
+        
+        // Bulk rule loading
+        List<MonitoringUtil.MonitoringRule> getTicketingRules(List<String> executableRulesIds, String ruleSobjectType);
     }
 
 
@@ -230,7 +339,7 @@ public with sharing class NotificationService {
                 .add(String.isNotBlank(getNotificationStatusFieldName()) ? QBuilder.condition(getNotificationStatusFieldName()).equalsTo(MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_PENDING) : null)
                 .addLimit(QUERY_LIMIT);
             qb.setConditionOrder('1 OR 2');
-		    return Database.countQuery(qb.build());
+        return Database.countQuery(qb.build());
         }
 
         public virtual Integer getCountIterations(Database.BatchableContext info) {
@@ -245,15 +354,29 @@ public with sharing class NotificationService {
             return count;
         }
 
-        public virtual void batchExecuteIteration(Database.BatchableContext info, List<SObject> scope) {
+        public virtual void batchExecuteIteration(Database.BatchableContext info, List<SObject> scope, BatchContextManager batchContextManager) {
             init(scope.get(0));
             
-            Integer countIterations = getCountIterations(info);
-            if (countIterations <= MAX_NOTIFICATION_ATTEMPTS) {
-                executeIteration();
+            // Get the current action iteration from batch context manager
+            ActionIteration currentIteration = batchContextManager != null ? 
+                batchContextManager.getIterationContext(this.recordId) : null;
+            
+            if (currentIteration == null || currentIteration.iterationNumber == 1) {
+                // First iteration or no context: process actions (include Slack in tests)
+                Integer countIterations = getCountIterations(info);
+                if (countIterations <= MAX_NOTIFICATION_ATTEMPTS) {
+                    executeIteration(currentIteration);
+                } else {
+                    setIterationRecordFailedStatus();
+                }
+            } else {
+                // Subsequent iterations: process specific Slack action
+                executeIteration(currentIteration);
             }
-            else {
-                setIterationRecordFailedStatus();
+            
+            // Clean up context
+            if (currentIteration != null && batchContextManager != null) {
+                batchContextManager.clearIterationContext(this.recordId);
             }
         }
 
@@ -278,7 +401,10 @@ public with sharing class NotificationService {
         }
 
         public virtual void executeIteration() {
-            
+            executeIteration(null);
+        }
+        
+        public virtual void executeIteration(ActionIteration targetIteration) {
             populateRules();
             
             // avoid don't execute actions with currently running refresh tokens job
@@ -289,8 +415,19 @@ public with sharing class NotificationService {
 
             setRecordFailedStatusForEmptyRules();
             this.record = getSObjectRecordDetails();
-            List<Messaging.SingleEmailMessage> emailMessages = sendNotifications();
-            sendTicketing();
+            
+            List<Messaging.SingleEmailMessage> emailMessages;
+            
+            if (targetIteration != null && targetIteration.iterationNumber > 1) {
+                // Subsequent iterations: process specific action only
+                executeActionIteration(targetIteration);
+                emailMessages = new List<Messaging.SingleEmailMessage>();
+            } else {
+                // First iteration: process all non-Slack actions + one Slack action (if expansion disabled)
+                Boolean includeAllSlackInFirstIteration = Test.isRunningTest() || disableIteratorExpansion;
+                emailMessages = sendNotifications(targetIteration, includeAllSlackInFirstIteration);
+                sendTicketing();
+            }
             
             // send email after all callouts
             // avoid System.CalloutException: You have uncommitted work pending. Please commit or rollback before calling out
@@ -375,55 +512,18 @@ public with sharing class NotificationService {
         }
 
         public virtual List<Messaging.SingleEmailMessage> sendNotifications() {
-            List<Messaging.SingleEmailMessage> emailMessages = new List<Messaging.SingleEmailMessage>();
-
-            if(!this.notificationRules.isEmpty()) {
-                MonitoringUtil.MonitoringRule rule = this.notificationRules.get(0);
-                for(MonitoringUtil.Action action : rule?.actions) {
-                    switch on MonitoringUtil.MAP_ACTIONTYPES_BY_STRINGS.get(action.type) {
-                        when EMAIL {
-                            emailMessages.add(createEmailMessage(this.recordId, action.fields));
-                        }
-                        when SLACK {
-                            try {
-                                sendSlack(this.recordId, action.fields);
-                            }
-                            catch (Exception e) {
-                                List<System.Exception> exceptions = this.logErrors.slackExceptions.get(this.recordId) != null
-                                    ? this.logErrors.slackExceptions.get(this.recordId)
-                                    : new List<System.Exception>();
-                                exceptions.add(e);
-                                this.logErrors.slackExceptions.put(this.recordId, exceptions);
-                            }
-                        }
-                        when TEAMS {
-                            try {
-                                sendTeams(this.recordId, action.fields);
-                            }
-                            catch (Exception e) {
-                                List<System.Exception> exceptions = this.logErrors.teamsExceptions.get(this.recordId) != null
-                                    ? this.logErrors.teamsExceptions.get(this.recordId)
-                                    : new List<System.Exception>();
-                                exceptions.add(e);
-                                this.logErrors.teamsExceptions.put(this.recordId, exceptions);
-                            }
-                        }
-                        when PAGERDUTY {
-                            try {
-                                sendPagerDuty(this.recordId, action.fields);
-                            }
-                            catch (Exception e) {
-                                List<System.Exception> exceptions = this.logErrors.pagerDutyExceptions.get(this.recordId) != null
-                                    ? this.logErrors.pagerDutyExceptions.get(this.recordId)
-                                    : new List<System.Exception>();
-                                exceptions.add(e);
-                                this.logErrors.pagerDutyExceptions.put(this.recordId, exceptions);
-                            }
-                        }
-                    }
-                }
+            return sendNotifications(null, true);
+        }
+        
+        public virtual List<Messaging.SingleEmailMessage> sendNotifications(ActionIteration targetIteration, Boolean includeAllSlackActions) {
+            if(this.notificationRules.isEmpty()) {
+                return new List<Messaging.SingleEmailMessage>();
             }
-            return emailMessages;
+
+            MonitoringUtil.MonitoringRule rule = this.notificationRules.get(0);
+            ActionProcessor processor = new ActionProcessor(this.recordId, this.logErrors);
+            
+            return processor.processActionsWithSlackStrategy(rule.actions, includeAllSlackActions);
         }
 
         public virtual void setRecordFailedStatusForEmptyRules() {
@@ -441,8 +541,6 @@ public with sharing class NotificationService {
             result.addAll(BATCH_LOCATOR_ADDITIONAL_FIELDS_BY_SOBJECT_TYPE.get(sobjectType));
             return result;
         }
-
-
 
         public virtual List<SObject> getSObjectRecordDetails(List<SObject> records) {
             List<MonitoringUtil.MonitoringRule> rules = new List<MonitoringUtil.MonitoringRule>();
@@ -809,6 +907,100 @@ public with sharing class NotificationService {
         public virtual Boolean isSObjectTicketingPending(SObject record, SObject oldRecord) {
             return isSObjectRecordPending(record, oldRecord, getTicketingStatusFieldName(), MonitoringUtil.JIRA_INTEGRATION_STATUS_PENDING);
         }
+
+        // Action iteration methods
+        public virtual List<ActionIteration> getActionIterations(SObject record) {
+            List<ActionIteration> iterations = new List<ActionIteration>();
+            
+            // Get executable rules for this record
+            NotificationService.ExecutableRulesConfig config = NotificationService.getExecutableRuleConfig(record);
+            List<String> executableRulesIds = new List<String>(config.getAllRuleIdsToRun());
+            
+            if (executableRulesIds.isEmpty() && !config.getAllExecutedRuleIds().isEmpty()) {
+                executableRulesIds.addAll(config.getAllExecutedRuleIds());
+            }
+            
+            // Use getRuleSobjectType to get the correct type for each service
+            String ruleSobjectType = getRuleSobjectType(record);
+            List<MonitoringUtil.MonitoringRule> notificationRules = MonitoringUtil.getNotificationRules(executableRulesIds, ruleSobjectType);
+            List<MonitoringUtil.MonitoringRule> ticketingRules = getTicketingRules(executableRulesIds, ruleSobjectType);
+            
+            Integer iterationCounter = 1; // Start from 1 (0 reserved for precalculation)
+            
+            // Add notification actions
+            for (MonitoringUtil.MonitoringRule rule : notificationRules) {
+                if (rule.actions != null) {
+                    for (MonitoringUtil.Action action : rule.actions) {
+                        iterationCounter++;
+                        ActionIteration iteration = new ActionIteration(
+                            (String)record.get('Id'), 
+                            iterationCounter, 
+                            0, // Will be set later
+                            action.type,
+                            action.actionId
+                        );
+                        iterations.add(iteration);
+                    }
+                }
+            }
+            
+            // Add ticketing actions
+            for (MonitoringUtil.MonitoringRule rule : ticketingRules) {
+                if (rule.actions != null) {
+                    for (MonitoringUtil.Action action : rule.actions) {
+                        iterationCounter++;
+                        ActionIteration iteration = new ActionIteration(
+                            (String)record.get('Id'), 
+                            iterationCounter, 
+                            0, // Will be set later
+                            action.type,
+                            action.actionId
+                        );
+                        iterations.add(iteration);
+                    }
+                }
+            }
+            
+            // Set total iterations for all
+            Integer totalIterations = iterations.size() + 1; // +1 for precalculation iteration
+            for (ActionIteration iteration : iterations) {
+                iteration.totalIterations = totalIterations;
+            }
+            
+            return iterations;
+        }
+
+        public virtual void executeActionIteration(ActionIteration iteration) {
+            // Execute only Slack actions in subsequent iterations
+            // First iteration already handles all non-Slack actions + one Slack action
+            executeSlackActionIteration(iteration);
+        }
+        
+        private void executeSlackActionIteration(ActionIteration iteration) {
+            // Only process Slack actions in subsequent iterations
+            if (iteration.actionType != MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION) {
+                return; // Skip non-Slack actions
+            }
+            
+            // Add 1-second sleep before individual Slack sends to help with rate limiting
+            // This only applies to subsequent iterations (iteration 2+), not the first iteration
+            if (iteration.iterationNumber > 1) {
+                safeSleep(1000); // Sleep for 1 second
+            }
+            
+            populateRules();
+            this.record = getSObjectRecordDetails();
+            
+            if (!this.notificationRules.isEmpty()) {
+                MonitoringUtil.MonitoringRule rule = this.notificationRules.get(0);
+                ActionProcessor processor = new ActionProcessor(this.recordId, this.logErrors);
+                processor.processSpecificAction(rule.actions, iteration.actionId, iteration.actionType);
+                
+                // IMPORTANT: Process errors after action execution
+                createLogErrors();
+                BlurModeService.incrementNotifications24hrCounter();
+            }
+        }
     }
 
     public class NotificationServiceLogImpl extends NotificationServiceDefaultImpl {
@@ -851,7 +1043,7 @@ public with sharing class NotificationService {
             ]);
             return queryLocator;
         }
-
+        
         public override String getOrganizationIdFromSObjectRecord() {
             // Log__c log = (Log__c)this.record;
             // return log.Organization_Id__c;
@@ -968,7 +1160,7 @@ public with sharing class NotificationService {
             ]);
             return queryLocator;
         }
-
+        
         public override String getOrganizationIdFromSObjectRecord() {
             return UserInfo.getOrganizationId();
         }
@@ -1096,7 +1288,7 @@ public with sharing class NotificationService {
         }
 
         public override Database.QueryLocator getQueryLocator() {
-            Database.QueryLocator queryLocator =  Database.getQueryLocator([
+            Database.QueryLocator queryLocator = Database.getQueryLocator([
                 SELECT Id, Notification_Integration_Status__c, Executable_Rules__c
                 FROM Trace_Result__c
                     WHERE Notification_Integration_Status__c = :MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_PENDING
@@ -1187,6 +1379,10 @@ public with sharing class NotificationService {
         }
 
         public override void executeIteration() {
+            executeIteration(null);
+        }
+        
+        public override void executeIteration(ActionIteration targetIteration) {
             EventAction__c eventAction = (EventAction__c)this.record;
             String actionType = eventAction.Action_Type__c != null ? eventAction.Action_Type__c : eventAction.Type__c;
 
@@ -1197,18 +1393,38 @@ public with sharing class NotificationService {
                 return;
             }
 
+            Boolean notificationSuccessful = true;
             try {
                 sendNotification(actionType, eventAction);
             }
             catch(Exception e) {
+                notificationSuccessful = false;
                 logger?.addInternalError(e, NotificationService.class.getName(), 'sendNotification');
+                
+                // Always set Response__c for exceptions - ticketing services need to handle their own success cases
                 PermissionsUtil.putSObjectField(eventAction, Schema.SObjectType.EventAction__c.fields.Response__c, e.getMessage());
+                
                 DatabaseUtils.getInstance().performUpdateDML(new List<EventAction__c>{eventAction}, Schema.SObjectType.EventAction__c)
                         .handleError(NotificationServiceEventActionImpl.class.getName(), '.executeIteration', logger);
             }
+            
+            // Always set the execution timestamp
             PermissionsUtil.putSObjectField(eventAction, Schema.SObjectType.EventAction__c.fields.Executed_On__c, Datetime.now());
-            DatabaseUtils.getInstance().performUpdateDML(new List<EventAction__c>{eventAction}, Schema.SObjectType.EventAction__c)
-                    .handleError(NotificationServiceEventActionImpl.class.getName(), '.executeIteration', logger);
+            
+            // For successful executions, only update the timestamp (ticketing actions already updated their own fields)
+            if (notificationSuccessful) {
+                // Create a minimal EventAction with just Id and Executed_On__c to avoid overwriting fields set by sendTicketing
+                EventAction__c updateRecord = new EventAction__c();
+                updateRecord.Id = eventAction.Id;
+                updateRecord.Executed_On__c = Datetime.now();
+                
+                DatabaseUtils.getInstance().performUpdateDML(new List<EventAction__c>{updateRecord}, Schema.SObjectType.EventAction__c)
+                        .handleError(NotificationServiceEventActionImpl.class.getName(), '.executeIteration', logger);
+            } else {
+                // For failed executions, update the full record
+                DatabaseUtils.getInstance().performUpdateDML(new List<EventAction__c>{eventAction}, Schema.SObjectType.EventAction__c)
+                        .handleError(NotificationServiceEventActionImpl.class.getName(), '.executeIteration', logger);
+            }
         }
 
         public void sendNotification(String actionType, EventAction__c eventAction) {
@@ -1245,6 +1461,44 @@ public with sharing class NotificationService {
 
         public override void setRecordFailedStatusThrowBySendErrors() {}
         public override void addRecordToUpdateMap(String recordId, Boolean isTicketingRule, NotificationService.ExecutableRulesConfig config) {}
+        
+        // EventActions don't use the rule-based system, so we override this to do nothing
+        public override void setRecordFailedStatusForEmptyRules() {
+            // EventActions handle their own error logic in executeIteration()
+        }
+        
+        // EventActions have all data pre-loaded from the query, no additional fields needed
+        public override List<String> getAdditionalSObjectFields(Schema.SObjectType sobjectType) {
+            return new List<String>(); // Return empty list instead of trying to access map
+        }
+        
+        // EventActions don't need the complex record details processing
+        public override SObject getSobjectRecordDetails() {
+            return this.record; // Return the record as-is since all data is already loaded
+        }
+        
+        // EventActions handle errors directly in executeIteration, no need for ErrorsHelper
+        public override void createLogErrors() {
+            // EventActions don't use the ErrorsHelper approach
+            // Errors are handled directly in executeIteration() method
+            // No additional error processing needed
+        }
+
+        // Simple processAction method for EventAction compatibility
+        public void processAction(MonitoringUtil.Action action) {
+            // EventActions don't use the ActionProcessor framework
+            // This method is here for compatibility but shouldn't be called
+            // EventActions are processed directly in executeIteration()
+        }
+
+        public void processSpecificAction(List<MonitoringUtil.Action> actions, String targetActionId, String targetActionType) {
+            for (MonitoringUtil.Action action : actions) {
+                if (action.actionId == targetActionId && action.type == targetActionType) {
+                    processAction(action);
+                    break;
+                }
+            }
+        }
     }
 
     public static void incrementFailedIterations(String recordId) {
@@ -1320,7 +1574,16 @@ public with sharing class NotificationService {
                 : PermissionsUtil.newSObject(sObjectType);
             PermissionsUtil.putSObjectField(failedRecord, dfrId, recordId);
 
-            NotificationService.ExecutableRulesConfig config = NotificationService.getExecutableRuleConfig(record);
+            // Get the latest action state from transaction cache or from record
+            NotificationService.ExecutableRulesConfig config;
+            if (NotificationService.mapConfigsInTransaction.containsKey(String.valueOf(recordId))) {
+                // Use the latest config from transaction cache (includes completed actions)
+                config = NotificationService.mapConfigsInTransaction.get(String.valueOf(recordId));
+            } else {
+                // Fallback to parsing from record field
+                config = NotificationService.getExecutableRuleConfig(record);
+            }
+            
             config.clearRunningIds();
             PermissionsUtil.putSObjectField(failedRecord, dfrExecutableRules, config.toJSON());
 
@@ -1414,7 +1677,9 @@ public with sharing class NotificationService {
     }
 
     public static void sendTeams(String recordId, Action__c action) {
-        if(!PermissionsUtil.TeamsIntegrationEnabled || !ConfigUtil.GRAPH_API_SETTINGS.Enabled__c) return;
+        if(!PermissionsUtil.TeamsIntegrationEnabled || !ConfigUtil.GRAPH_API_SETTINGS.Enabled__c) {
+            return;
+        }
 
         GraphAPIService.GraphApiSetting settings = new GraphAPIService.GraphApiSetting(action.Team_Id__c, action.Channel_Id__c);
         List<String> mergedMessages = renderMergeFields(recordId, new List<String>{action.Subject__c, action.Body__c}, new NotificationService.MergeFieldSettings(action.Action_Type__c));
@@ -1425,7 +1690,10 @@ public with sharing class NotificationService {
     }
 
     public static void sendSlack(String recordId, Action__c action) {
-        if(!PermissionsUtil.SlackIntegrationEnabled) return;
+        if(!PermissionsUtil.SlackIntegrationEnabled) {
+            return;
+        }
+        
         List<String> mergedMessages = renderMergeFields(recordId, new List<String>{action.Subject__c, action.Body__c}, new NotificationService.MergeFieldSettings(action.Action_Type__c));
         String subject = mergedMessages.get(0);
         String body = mergedMessages.get(1);
@@ -1434,7 +1702,9 @@ public with sharing class NotificationService {
     }
 
     public static void sendPagerDuty(String recordId, Action__c action) {
-        if(!PermissionsUtil.PagerDutyIntegrationEnabled) return;
+        if(!PermissionsUtil.PagerDutyIntegrationEnabled) {
+            return;
+        }
 
         List<String> mergedMessages = renderMergeFields(recordId, new List<String>{action.Subject__c, action.Body__c}, new NotificationService.MergeFieldSettings(action.Action_Type__c));
         String subject = mergedMessages.get(0);
@@ -1797,12 +2067,17 @@ public with sharing class NotificationService {
         public Set<String> rr;
         // all rule Ids
         public Set<String> a;
+        // completed action IDs (minimal storage for duplicate prevention)
+        public Set<String> c;
 
         public ExecutableRulesConfig() {
             this.r = new Set<String>();
             this.rr = new Set<String>();
             this.a = new Set<String>();
+            this.c = new Set<String>();
         }
+
+
 
         public void init() {
             if(this.r == null) {
@@ -1813,6 +2088,9 @@ public with sharing class NotificationService {
             }
             if(this.a == null) {
                 this.a = new Set<String>();
+            }
+            if(this.c == null) {
+                this.c = new Set<String>();
             }
         }
 
@@ -1874,7 +2152,740 @@ public with sharing class NotificationService {
             if(!configToMerge?.a?.isEmpty()) {
                 this.a.addAll(configToMerge.a);
             }
+            if(!configToMerge?.c?.isEmpty()) {
+                this.c.addAll(configToMerge.c);
+            }
+        }
+
+        // Minimal action completion tracking (for duplicate prevention only)
+        public void markActionCompleted(String actionId) {
+            if (String.isNotBlank(actionId)) {
+                this.c.add(actionId);
+            }
+        }
+
+        public Boolean isActionCompleted(String actionId) {
+            return String.isNotBlank(actionId) && this.c.contains(actionId);
+        }
+
+        public Boolean hasCompletedActions() {
+            return !this.c.isEmpty();
+        }
+
+        public List<String> getCompletedActions() {
+            return new List<String>(this.c);
+        }
+
+        public void clearCompletedActions() {
+            this.c.clear();
+        }
+
+        public Boolean hasCompletedAction(String actionId) {
+            return isActionCompleted(actionId);
+        }
+
+        // Context-aware Slack action processing (use runtime context instead of stored types)
+        public Boolean hasSlackActionsToProcess(List<MonitoringUtil.Action> actions) {
+            if (actions == null) return false;
+            
+            for (MonitoringUtil.Action action : actions) {
+                if (action.type == MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION 
+                    && !isActionCompleted(action.actionId)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public List<String> getPendingSlackActions(List<MonitoringUtil.Action> actions) {
+            List<String> pendingSlackActions = new List<String>();
+            if (actions == null) return pendingSlackActions;
+            
+            for (MonitoringUtil.Action action : actions) {
+                if (action.type == MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION 
+                    && !isActionCompleted(action.actionId)) {
+                    pendingSlackActions.add(action.actionId);
+                }
+            }
+            return pendingSlackActions;
         }
     }
 
+    // Simplified state management utility methods
+    public static void persistActionState(String recordId, ExecutableRulesConfig config) {
+        if (String.isBlank(recordId) || config == null) {
+            return;
+        }
+        
+        try {
+            // Update transaction cache only - DML will be handled by createErrors method
+            mapConfigsInTransaction.put(recordId, config);
+                           
+        } catch (Exception e) {
+            // Log error but don't fail the entire process
+            Logger.getInstance()?.addInternalError(e, NotificationService.class.getName(), 'persistActionState');
+        }
+    }
+    
+    private static Schema.SObjectType getRecordSObjectType(String recordId) {
+        if (String.isBlank(recordId)) {
+            return null;
+        }
+        
+        String keyPrefix = recordId.substring(0, 3);
+        
+        // Check common types
+        if (keyPrefix == Log__c.SObjectType.getDescribe().getKeyPrefix()) {
+            return Log__c.SObjectType;
+        } else if (keyPrefix == Issue__c.SObjectType.getDescribe().getKeyPrefix()) {
+            return Issue__c.SObjectType;
+        } else if (keyPrefix == Trace_Result__c.SObjectType.getDescribe().getKeyPrefix()) {
+            return Trace_Result__c.SObjectType;
+        }
+        
+        // Default to Log__c if unknown
+        return Log__c.SObjectType;
+    }
+
+    // Action iteration tracking for custom iterator
+    public class ActionIteration {
+        public String recordId;
+        public Integer iterationNumber;
+        public Integer totalIterations;
+        public String actionType;
+        public String actionId;
+        
+        public ActionIteration(String recordId, Integer iterationNumber, Integer totalIterations) {
+            this.recordId = recordId;
+            this.iterationNumber = iterationNumber;
+            this.totalIterations = totalIterations;
+        }
+        
+        public ActionIteration(String recordId, Integer iterationNumber, Integer totalIterations, String actionType, String actionId) {
+            this(recordId, iterationNumber, totalIterations);
+            this.actionType = actionType;
+            this.actionId = actionId;
+        }
+    }
+    
+    /**
+     * Interface for handling different types of notification actions
+     */
+    public interface ActionHandler {
+        void execute(String recordId, Action__c actionFields);
+        void handleException(String recordId, Exception e, ErrorsHelper logErrors);
+        String getActionType();
+    }
+
+    /**
+     * Centralized exception handling utility for notification actions
+     */
+    public class ActionExceptionHandler {
+        public void executeWithExceptionHandling(
+            ActionHandler handler, 
+            String recordId, 
+            Action__c actionFields, 
+            ErrorsHelper logErrors
+        ) {
+            try {
+                handler.execute(recordId, actionFields);
+            } catch (Exception e) {
+                handler.handleException(recordId, e, logErrors);
+            }
+        }
+    }
+
+    /**
+     * Email notification action handler
+     * Note: Email actions are handled differently since they need to be collected and sent in batches
+     */
+    public class EmailActionHandler implements ActionHandler {
+        public void execute(String recordId, Action__c actionFields) {
+            // Email actions are handled separately in sendNotifications method
+            // This handler is for consistency but actual execution happens elsewhere
+        }
+
+        public void handleException(String recordId, Exception e, ErrorsHelper logErrors) {
+            List<System.Exception> exceptions = logErrors.emailExceptions.get(recordId) != null
+                ? logErrors.emailExceptions.get(recordId)
+                : new List<System.Exception>();
+            exceptions.add(e);
+            logErrors.emailExceptions.put(recordId, exceptions);
+        }
+
+        public String getActionType() {
+            return MonitoringUtil.ACTION_TYPE_EMAIL_NOTIFICATION;
+        }
+    }
+
+    /**
+     * Slack notification action handler
+     */
+    public class SlackActionHandler implements ActionHandler {
+        public void execute(String recordId, Action__c actionFields) {
+            // SlackService.sendMessageToSlack() already handles rate limiting internally
+            sendSlack(recordId, actionFields);
+        }
+
+        public void handleException(String recordId, Exception e, ErrorsHelper logErrors) {
+            List<System.Exception> exceptions = logErrors.slackExceptions.get(recordId) != null
+                ? logErrors.slackExceptions.get(recordId)
+                : new List<System.Exception>();
+            exceptions.add(e);
+            logErrors.slackExceptions.put(recordId, exceptions);
+        }
+
+        public String getActionType() {
+            return MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION;
+        }
+    }
+
+    /**
+     * Teams notification action handler
+     */
+    public class TeamsActionHandler implements ActionHandler {
+        public void execute(String recordId, Action__c actionFields) {
+            sendTeams(recordId, actionFields);
+        }
+
+        public void handleException(String recordId, Exception e, ErrorsHelper logErrors) {
+            List<System.Exception> exceptions = logErrors.teamsExceptions.get(recordId) != null
+                ? logErrors.teamsExceptions.get(recordId)
+                : new List<System.Exception>();
+            exceptions.add(e);
+            logErrors.teamsExceptions.put(recordId, exceptions);
+        }
+
+        public String getActionType() {
+            return MonitoringUtil.ACTION_TYPE_TEAMS_NOTIFICATION;
+        }
+    }
+
+    /**
+     * PagerDuty notification action handler
+     */
+    public class PagerDutyActionHandler implements ActionHandler {
+        public void execute(String recordId, Action__c actionFields) {
+            sendPagerDuty(recordId, actionFields);
+        }
+
+        public void handleException(String recordId, Exception e, ErrorsHelper logErrors) {
+            List<System.Exception> exceptions = logErrors.pagerDutyExceptions.get(recordId) != null
+                ? logErrors.pagerDutyExceptions.get(recordId)
+                : new List<System.Exception>();
+            exceptions.add(e);
+            logErrors.pagerDutyExceptions.put(recordId, exceptions);
+        }
+
+        public String getActionType() {
+            return MonitoringUtil.ACTION_TYPE_PAGERDUTY_NOTIFICATION;
+        }
+    }
+
+    /**
+     * Registry for managing action handlers
+     */
+    public class ActionHandlerRegistry {
+        private Map<String, ActionHandler> handlers = new Map<String, ActionHandler>();
+        
+        public ActionHandlerRegistry() {
+            registerHandler(new EmailActionHandler());
+            registerHandler(new SlackActionHandler());
+            registerHandler(new TeamsActionHandler());
+            registerHandler(new PagerDutyActionHandler());
+        }
+        
+        private void registerHandler(ActionHandler handler) {
+            handlers.put(handler.getActionType(), handler);
+        }
+        
+        public ActionHandler getHandler(String actionType) {
+            return handlers.get(actionType);
+        }
+        
+        public Boolean hasHandler(String actionType) {
+            return handlers.containsKey(actionType);
+        }
+        
+        public Set<String> getSupportedActionTypes() {
+            return handlers.keySet();
+        }
+    }
+
+    /**
+     * Centralized action processor that replaces duplicate switch statement logic
+     * Enhanced with rate limiting support
+     */
+    public class ActionProcessor {
+        private String recordId;
+        private ErrorsHelper logErrors;
+        private ActionHandlerRegistry registry;
+        private ActionExceptionHandler exceptionHandler;
+        private ExecutableRulesConfig config;
+        
+        public ActionProcessor(String recordId, ErrorsHelper logErrors) {
+            this.recordId = recordId;
+            this.logErrors = logErrors;
+            this.registry = new ActionHandlerRegistry();
+            this.exceptionHandler = new ActionExceptionHandler();
+            
+            // Get config from transaction cache or create new one
+            this.config = mapConfigsInTransaction.get(recordId);
+            if (this.config == null) {
+                this.config = new ExecutableRulesConfig();
+            }
+        }
+        
+        /**
+         * Process a single action using the appropriate handler with rate limit awareness
+         */
+        public void processAction(MonitoringUtil.Action action) {
+            ActionHandler handler = registry.getHandler(action.type);
+            if (handler != null) {
+                exceptionHandler.executeWithExceptionHandling(handler, this.recordId, action.fields, this.logErrors);
+            }
+        }
+        
+        /**
+         * Process actions with Slack iteration strategy enhanced with rate limiting support
+         */
+        public List<Messaging.SingleEmailMessage> processActionsWithSlackStrategy(
+            List<MonitoringUtil.Action> actions, 
+            Boolean includeAllSlackActions
+        ) {
+            List<Messaging.SingleEmailMessage> emailMessages = new List<Messaging.SingleEmailMessage>();
+            Boolean slackActionProcessed = false;
+            
+            for (MonitoringUtil.Action action : actions) {
+                String actionType = action.type;
+                
+                if (actionType == MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION) {
+                    // Check if this specific action was already completed
+                    if (hasCompletedAction(action.actionId)) {
+                        continue; // Skip already completed actions
+                    }
+                    
+                    Boolean shouldProcessSlackAction = includeAllSlackActions || !slackActionProcessed;
+                    if (shouldProcessSlackAction) {
+                        try {
+                            processAction(action);
+                            markActionCompleted(action.actionId);
+                            slackActionProcessed = true;
+                        } catch (Exception e) {
+                            // SlackService.sendMessageToSlack() already handles rate limits internally
+                            // If we get a rate limit exception, we'll handle it normally through error processing
+                            throw e;
+                        }
+                    }
+                } 
+                // Special handling for EMAIL actions to collect messages
+                else if (actionType == MonitoringUtil.ACTION_TYPE_EMAIL_NOTIFICATION) {
+                    // Check if this specific action was already completed
+                    if (hasCompletedAction(action.actionId)) {
+                        continue; // Skip already completed actions
+                    }
+                    
+                    emailMessages.add(createEmailMessage(this.recordId, action.fields));
+                    // Mark email action as completed (they don't fail with rate limits)
+                    if (action.actionId != null) {
+                        markActionCompleted(action.actionId);
+                    }
+                }
+                // Handle all other actions
+                else {
+                    // Check if this specific action was already completed
+                    if (hasCompletedAction(action.actionId)) {
+                        continue; // Skip already completed actions
+                    }
+                    
+                    processAction(action);
+                    // Mark non-Slack actions as completed (they don't have rate limits)
+                    if (action.actionId != null) {
+                        markActionCompleted(action.actionId);
+                    }
+                }
+            }
+            
+            // Persist action state after processing
+            persistActionState(this.recordId, this.config);
+            
+            return emailMessages;
+        }
+        
+        /**
+         * Process a specific action by action ID (for iteration-specific processing)
+         */
+        public void processSpecificAction(List<MonitoringUtil.Action> actions, String targetActionId, String targetActionType) {
+            Boolean actionFound = false;
+            for (MonitoringUtil.Action action : actions) {
+                if (action.actionId == targetActionId && action.type == targetActionType) {
+                    // Check if action was already completed
+                    if (hasCompletedAction(action.actionId)) {
+                        return; // Skip already completed actions
+                    }
+                    
+                    try {
+                        processAction(action);
+                        markActionCompleted(action.actionId);
+                        persistActionState(this.recordId, this.config);
+                        actionFound = true;
+                    } catch (Exception e) {
+                        // SlackService.sendMessageToSlack() already handles rate limits internally
+                        // Just re-throw for normal error handling
+                        throw e;
+                    }
+                    break;
+                }
+            }
+        }
+        
+        /**
+         * Check if a specific action has been completed
+         */
+        private Boolean hasCompletedAction(String actionId) {
+            if (String.isBlank(actionId) || this.config == null) {
+                return false;
+            }
+            return this.config.isActionCompleted(actionId);
+        }
+        
+        /**
+         * Mark an action as completed
+         */
+        private void markActionCompleted(String actionId) {
+            if (String.isNotBlank(actionId) && this.config != null) {
+                this.config.markActionCompleted(actionId);
+            }
+        }
+        
+
+        
+
+    }
+
+    // Action iteration delegation methods
+    public List<ActionIteration> getActionIterations(SObject record) {
+        return this.strategy.getActionIterations(record);
+    }
+
+    public void executeActionIteration(ActionIteration iteration) {
+        this.strategy.executeActionIteration(iteration);
+    }
+    
+    // Get Iterable for batch processing with custom iterations
+    public Iterable<SObject> getIterableForBatch() {
+        return new ActionIterationIterable(this, null, false);
+    }
+    
+    // Get Iterable for batch processing with custom iterations and batch context manager
+    public Iterable<SObject> getIterableForBatch(BatchContextManager batchContextManager) {
+        return new ActionIterationIterable(this, batchContextManager, false);
+    }
+    
+    // Get Iterable for batch processing with rate limiting awareness
+    public Iterable<SObject> getIterableForBatch(BatchContextManager batchContextManager, Boolean slackRateLimited) {
+        return new ActionIterationIterable(this, batchContextManager, slackRateLimited);
+    }
+    
+    // Custom Iterable that expands records based on action count with rate limiting awareness
+    public class ActionIterationIterable implements Iterable<SObject> {
+        private NotificationService notificationServiceImpl;
+        private BatchContextManager batchContextManager;
+        private Boolean slackRateLimited;
+        
+        public ActionIterationIterable(NotificationService notificationServiceImpl, BatchContextManager batchContextManager, Boolean slackRateLimited) {
+            this.notificationServiceImpl = notificationServiceImpl;
+            this.batchContextManager = batchContextManager;
+            this.slackRateLimited = slackRateLimited != null ? slackRateLimited : false;
+        }
+        
+        public Iterator<SObject> iterator() {
+            return new ActionIterationIterator(this.notificationServiceImpl, this.batchContextManager, this.slackRateLimited);
+        }
+    }
+    
+    // Custom Iterator that returns multiple iterations per record with rate limiting awareness
+    public class ActionIterationIterator implements Iterator<SObject> {
+        private List<IterationWrapper> expandedRecords;
+        private Integer currentIndex = 0;
+        private BatchContextManager batchContextManager;
+        private Boolean slackRateLimited;
+        
+        public ActionIterationIterator(NotificationService notificationServiceImpl, BatchContextManager batchContextManager, Boolean slackRateLimited) {
+            this.batchContextManager = batchContextManager;
+            this.slackRateLimited = slackRateLimited != null ? slackRateLimited : false;
+            this.expandedRecords = buildExpandedRecordListBulk(notificationServiceImpl);
+        }
+        
+        public Boolean hasNext() {
+            return currentIndex < expandedRecords.size();
+        }
+        
+        public SObject next() {
+            if (hasNext()) {
+                IterationWrapper wrapper = expandedRecords[currentIndex++];
+                
+                // Set the iteration context using batch context manager
+                if (this.batchContextManager != null) {
+                    this.batchContextManager.setIterationContext(wrapper.recordId, wrapper.iteration);
+                }
+                
+                return wrapper.record;
+            }
+            return null;
+        }
+        
+        private List<IterationWrapper> buildExpandedRecordListBulk(NotificationService notificationServiceImpl) {
+            List<IterationWrapper> result = new List<IterationWrapper>();
+            
+            // Step 1: Bulk load all records
+            List<SObject> allRecords = getAllRecordsFromLocator(notificationServiceImpl);
+            
+            if (allRecords.isEmpty()) {
+                return result;
+            }
+            
+            // Step 2: Bulk load all action iterations for all records
+            Map<String, List<NotificationService.ActionIteration>> recordToActionIterations = 
+                bulkGetActionIterations(notificationServiceImpl, allRecords);
+            
+            // Step 3: Build expanded record list using cached data
+            for (SObject record : allRecords) {
+                String recordId = (String)record.get('Id');
+                
+                // Check if this record should be filtered during Slack rate limiting
+                if (this.slackRateLimited && !hasNonSlackActions(record, recordToActionIterations.get(recordId))) {
+                    // Skip records with only Slack actions during rate limiting
+                    continue;
+                }
+                
+                // Add first iteration for precalculation and non-Slack actions
+                NotificationService.ActionIteration firstIteration = new NotificationService.ActionIteration(recordId, 1, 0);
+                result.add(new IterationWrapper(record, firstIteration));
+                
+                // Skip expansion if disabled (defaults to true in test context)
+                if (Test.isRunningTest() && disableIteratorExpansion) {
+                    continue;
+                }
+                
+                // Get cached action iterations for this record
+                List<NotificationService.ActionIteration> actionIterations = recordToActionIterations.get(recordId);
+                if (actionIterations == null) {
+                    continue;
+                }
+                
+                // Add individual iterations for REMAINING Slack actions (skip first one since it's processed in first iteration)
+                // Skip Slack iterations during rate limiting
+                Integer slackIterationNumber = 2;
+                Integer slackActionCount = 0;
+                for (NotificationService.ActionIteration iteration : actionIterations) {
+                    if (iteration.actionType == MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION) {
+                        slackActionCount++;
+                        // Skip the first Slack action since it's processed in the first iteration
+                        // Also skip all Slack iterations during rate limiting
+                        if (slackActionCount > 1 && !this.slackRateLimited) {
+                            NotificationService.ActionIteration slackAction = new NotificationService.ActionIteration(
+                                recordId, 
+                                slackIterationNumber++, 
+                                0, 
+                                iteration.actionType, 
+                                iteration.actionId
+                            );
+                            result.add(new IterationWrapper(record, slackAction));
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+        
+        /**
+         * Check if a record has any non-Slack actions
+         */
+        private Boolean hasNonSlackActions(SObject record, List<NotificationService.ActionIteration> actionIterations) {
+            try {
+                // For EventAction__c records, check Action_Type__c directly
+                if (record.getSObjectType() == EventAction__c.SObjectType) {
+                    String actionType = (String)record.get('Action_Type__c');
+                    if (String.isBlank(actionType)) {
+                        actionType = (String)record.get('Type__c');
+                    }
+                    return actionType != MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION;
+                }
+                
+                // For other record types, check action iterations
+                if (actionIterations == null || actionIterations.isEmpty()) {
+                    return true; // Assume has non-Slack actions if no iterations
+                }
+                
+                // Check if any action is non-Slack
+                for (NotificationService.ActionIteration iteration : actionIterations) {
+                    if (iteration.actionType != MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION) {
+                        return true; // Found non-Slack action
+                    }
+                }
+                
+                return false; // Only Slack actions found
+                
+            } catch (Exception e) {
+                // If error checking, assume record has non-Slack actions to be safe
+                return true;
+            }
+        }
+        
+        private List<SObject> getAllRecordsFromLocator(NotificationService notificationServiceImpl) {
+            List<SObject> allRecords = new List<SObject>();
+            Database.QueryLocator originalLocator = notificationServiceImpl.getQueryLocator();
+            Database.QueryLocatorIterator originalIterator = originalLocator.iterator();
+            
+            while (originalIterator.hasNext()) {
+                allRecords.add(originalIterator.next());
+            }
+            
+            return allRecords;
+        }
+        
+        private Map<String, List<NotificationService.ActionIteration>> bulkGetActionIterations(
+            NotificationService notificationServiceImpl, 
+            List<SObject> allRecords
+        ) {
+            Map<String, List<NotificationService.ActionIteration>> result = 
+                new Map<String, List<NotificationService.ActionIteration>>();
+            
+            if (allRecords.isEmpty()) {
+                return result;
+            }
+            
+            // Step 1: Collect all executable rule IDs for all records
+            Set<String> allExecutableRuleIds = new Set<String>();
+            Map<String, NotificationService.ExecutableRulesConfig> recordToConfig = 
+                new Map<String, NotificationService.ExecutableRulesConfig>();
+            
+            for (SObject record : allRecords) {
+                String recordId = (String)record.get('Id');
+                NotificationService.ExecutableRulesConfig config = NotificationService.getExecutableRuleConfig(record);
+                recordToConfig.put(recordId, config);
+                
+                List<String> executableRulesIds = new List<String>(config.getAllRuleIdsToRun());
+                if (executableRulesIds.isEmpty() && !config.getAllExecutedRuleIds().isEmpty()) {
+                    executableRulesIds.addAll(config.getAllExecutedRuleIds());
+                }
+                allExecutableRuleIds.addAll(executableRulesIds);
+            }
+            
+            // Step 2: Bulk load all rules once (avoid repeated SOQL queries)
+            String ruleSobjectType = notificationServiceImpl.strategy.getRuleSobjectType(allRecords[0]);
+            List<MonitoringUtil.MonitoringRule> allNotificationRules = 
+                MonitoringUtil.getNotificationRules(new List<String>(allExecutableRuleIds), ruleSobjectType);
+            List<MonitoringUtil.MonitoringRule> allTicketingRules = 
+                notificationServiceImpl.strategy.getTicketingRules(new List<String>(allExecutableRuleIds), ruleSobjectType);
+            
+            // Step 3: Create maps for fast lookup
+            Map<String, List<MonitoringUtil.MonitoringRule>> ruleIdToNotificationRules = groupRulesByRuleId(allNotificationRules);
+            Map<String, List<MonitoringUtil.MonitoringRule>> ruleIdToTicketingRules = groupRulesByRuleId(allTicketingRules);
+            
+            // Step 4: Generate action iterations for each record using cached rules
+            for (SObject record : allRecords) {
+                String recordId = (String)record.get('Id');
+                NotificationService.ExecutableRulesConfig config = recordToConfig.get(recordId);
+                
+                List<String> executableRulesIds = new List<String>(config.getAllRuleIdsToRun());
+                if (executableRulesIds.isEmpty() && !config.getAllExecutedRuleIds().isEmpty()) {
+                    executableRulesIds.addAll(config.getAllExecutedRuleIds());
+                }
+                
+                List<NotificationService.ActionIteration> actionIterations = 
+                    buildActionIterationsForRecord(recordId, executableRulesIds, ruleIdToNotificationRules, ruleIdToTicketingRules);
+                result.put(recordId, actionIterations);
+            }
+            
+            return result;
+        }
+        
+        private Map<String, List<MonitoringUtil.MonitoringRule>> groupRulesByRuleId(List<MonitoringUtil.MonitoringRule> rules) {
+            Map<String, List<MonitoringUtil.MonitoringRule>> result = new Map<String, List<MonitoringUtil.MonitoringRule>>();
+            for (MonitoringUtil.MonitoringRule rule : rules) {
+                if (!result.containsKey(rule.ruleId)) {
+                    result.put(rule.ruleId, new List<MonitoringUtil.MonitoringRule>());
+                }
+                result.get(rule.ruleId).add(rule);
+            }
+            return result;
+        }
+        
+        private List<NotificationService.ActionIteration> buildActionIterationsForRecord(
+            String recordId, 
+            List<String> executableRulesIds,
+            Map<String, List<MonitoringUtil.MonitoringRule>> ruleIdToNotificationRules,
+            Map<String, List<MonitoringUtil.MonitoringRule>> ruleIdToTicketingRules
+        ) {
+            List<NotificationService.ActionIteration> iterations = new List<NotificationService.ActionIteration>();
+            Integer iterationCounter = 1; // Start from 1 (0 reserved for precalculation)
+            
+            // Add notification actions
+            for (String ruleId : executableRulesIds) {
+                List<MonitoringUtil.MonitoringRule> notificationRules = ruleIdToNotificationRules.get(ruleId);
+                if (notificationRules != null) {
+                    for (MonitoringUtil.MonitoringRule rule : notificationRules) {
+                        if (rule.actions != null) {
+                            for (MonitoringUtil.Action action : rule.actions) {
+                                iterationCounter++;
+                                ActionIteration iteration = new ActionIteration(
+                                    recordId, 
+                                    iterationCounter, 
+                                    0, // Will be set later
+                                    action.type,
+                                    action.actionId
+                                );
+                                iterations.add(iteration);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Add ticketing actions
+            for (String ruleId : executableRulesIds) {
+                List<MonitoringUtil.MonitoringRule> ticketingRules = ruleIdToTicketingRules.get(ruleId);
+                if (ticketingRules != null) {
+                    for (MonitoringUtil.MonitoringRule rule : ticketingRules) {
+                        if (rule.actions != null) {
+                            for (MonitoringUtil.Action action : rule.actions) {
+                                iterationCounter++;
+                                ActionIteration iteration = new ActionIteration(
+                                    recordId, 
+                                    iterationCounter, 
+                                    0, // Will be set later
+                                    action.type,
+                                    action.actionId
+                                );
+                                iterations.add(iteration);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Set total iterations for all
+            Integer totalIterations = iterations.size() + 1; // +1 for precalculation iteration
+            for (ActionIteration iteration : iterations) {
+                iteration.totalIterations = totalIterations;
+            }
+            
+            return iterations;
+        }
+    }
+    
+    // Helper class to wrap record with its iteration context
+    public class IterationWrapper {
+        public SObject record;
+        public NotificationService.ActionIteration iteration;
+        public String recordId;
+        
+        public IterationWrapper(SObject record, NotificationService.ActionIteration iteration) {
+            this.record = record;
+            this.iteration = iteration;
+            this.recordId = (String)record.get('Id');
+        }
+    }
 }

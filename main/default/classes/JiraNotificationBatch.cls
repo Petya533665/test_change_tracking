@@ -1,6 +1,12 @@
-public with sharing class JiraNotificationBatch extends DatabaseUtils.PharosBatchImpl implements Database.Batchable<SObject>, Database.Stateful, Database.AllowsCallouts, Database.RaisesPlatformEvents {
+public with sharing class JiraNotificationBatch extends DatabaseUtils.PharosBatchImpl implements Database.Batchable<SObject>, Database.Stateful, Database.AllowsCallouts, Database.RaisesPlatformEvents, NotificationService.BatchContextManager {
 
     private NotificationService notificationServiceImpl;
+    private NotificationService.BaseBatchContextManager contextManager = new BaseBatchContextManagerImpl();
+    
+    // Concrete implementation of the abstract base class
+    private class BaseBatchContextManagerImpl extends NotificationService.BaseBatchContextManager {
+        // No additional implementation needed - inherits all methods from base class
+    }
 
     private static JiraNotificationBatch instance = null;
 
@@ -28,13 +34,28 @@ public with sharing class JiraNotificationBatch extends DatabaseUtils.PharosBatc
         return notificationServiceImpl.getSObjectRecordsCount();
     }
     
-    public Database.QueryLocator start(Database.BatchableContext bc) {
+    public Iterable<SObject> start(Database.BatchableContext bc) {
         NotificationService.putNotificationTimeStamp(Datetime.now());
-        return this.notificationServiceImpl.getQueryLocator();
+        Boolean slackRateLimited = SlackService.isCurrentlyRateLimited();
+        return this.notificationServiceImpl.getIterableForBatch(this, slackRateLimited);
     }
 
     public void execute(Database.BatchableContext info, List<SObject> scope) {
-        this.notificationServiceImpl.batchExecuteIteration(info, scope);
+        // Now each scope contains a single record with its iteration context
+        this.notificationServiceImpl.batchExecuteIteration(info, scope, this);
+    }
+
+    // BatchContextManager interface implementation - delegate to contextManager
+    public void setIterationContext(String recordId, NotificationService.ActionIteration iteration) {
+        contextManager.setIterationContext(recordId, iteration);
+    }
+    
+    public NotificationService.ActionIteration getIterationContext(String recordId) {
+        return contextManager.getIterationContext(recordId);
+    }
+    
+    public void clearIterationContext(String recordId) {
+        contextManager.clearIterationContext(recordId);
     }
 
     public void finish(Database.BatchableContext info) {

@@ -760,31 +760,62 @@ public with sharing class MonitoringUtil {
             newEvent.Criteria__c = monitoringRule.criteria;
 
             if(monitoringRule.ruleType == RULE_TYPE_ARCHIVAL) {
-                newEvent.RecordCount__c = monitoringRule.archivalLogs.size();
-                newEvent.Records__c = JSON.serialize(monitoringRule.archivalLogs).abbreviate(MAX_SIZE_IDS_TEXTAREA_FILED);
+                // Fix: Added null check for archivalLogs
+                List<Id> archivalLogsToProcess = monitoringRule.archivalLogs != null ? monitoringRule.archivalLogs : new List<Id>();
+                newEvent.RecordCount__c = archivalLogsToProcess.size();
+                newEvent.Records__c = JSON.serialize(archivalLogsToProcess).abbreviate(MAX_SIZE_IDS_TEXTAREA_FILED);
             }
             else {
-                newEvent.RecordCount__c = monitoringRule.recordIds.size();
-                if(!monitoringRule.groupRecordIds?.isEmpty()) {
+                // Fix: Added null check for recordIds
+                newEvent.RecordCount__c = monitoringRule.recordIds != null ? monitoringRule.recordIds.size() : 0;
+                if(monitoringRule.groupRecordIds != null && !monitoringRule.groupRecordIds.isEmpty()) {
                     newEvent.Records__c = JSON.serialize(monitoringRule.groupRecordIds).abbreviate(MAX_SIZE_IDS_TEXTAREA_FILED);
                     newEvent.Grouped_Field_Values__c = JSON.serialize(monitoringRule.groupRecordIds.keySet()).abbreviate(MAX_SIZE_TEXTAREA_FILED);
-                    newEvent.RecordCount__c = (monitoringRule.groupRecordIds != null && !monitoringRule.groupRecordIds.isEmpty() && monitoringRule.groupRecordIds.values() != null && !monitoringRule.groupRecordIds.values().isEmpty()) ? monitoringRule.groupRecordIds.values().get(0).size() : 0;
+                    // Fix: Added null check for individual Set<String> values in the collection
+                    Set<String> firstGroupRecordSet = null;
+                    if (monitoringRule.groupRecordIds != null && !monitoringRule.groupRecordIds.isEmpty() && monitoringRule.groupRecordIds.values() != null && !monitoringRule.groupRecordIds.values().isEmpty()) {
+                        for (Set<String> recordSet : monitoringRule.groupRecordIds.values()) {
+                            if (recordSet != null) {
+                                firstGroupRecordSet = recordSet;
+                                break;
+                            }
+                        }
+                    }
+                    newEvent.RecordCount__c = (firstGroupRecordSet != null) ? firstGroupRecordSet.size() : 0;
                 }
                 else {
-                    newEvent.Records__c = JSON.serialize(monitoringRule.recordIds).abbreviate(MAX_SIZE_IDS_TEXTAREA_FILED);
+                    // Fix: Added null check for recordIds serialization
+                    Set<String> recordIdsToSerialize = monitoringRule.recordIds != null ? monitoringRule.recordIds : new Set<String>();
+                    newEvent.Records__c = JSON.serialize(recordIdsToSerialize).abbreviate(MAX_SIZE_IDS_TEXTAREA_FILED);
+                }
+                // Fix: Added null checks for aggregateTypeString and value
+                String aggregateTypeStr = monitoringRule.aggregateTypeString != null ? monitoringRule.aggregateTypeString : 'Unknown';
+                String valueStr = '0';
+                try {
+                    valueStr = monitoringRule.value != null ? monitoringRule.value.toPlainString() : '0';
+                } catch (Exception e) {
+                    // Fallback if value access fails
+                    valueStr = '0';
                 }
                 newEvent.Description__c = 'Rule Id:' + monitoringRule.ruleId
-                        + ' ' + monitoringRule.aggregateTypeString + ':' + monitoringRule.value.toPlainString();
-                if(!monitoringRule.groupFieldNames.isEmpty()) {
-                    newEvent.Description__c += json.serialize(monitoringRule.groupValues);
+                        + ' ' + aggregateTypeStr + ':' + valueStr;
+                // Fix: Added null checks for groupFieldNames and groupValues
+                if(monitoringRule.groupFieldNames != null && !monitoringRule.groupFieldNames.isEmpty()) {
+                    Map<Integer, Map<String, Decimal>> groupValuesToSerialize = monitoringRule.groupValues != null ? monitoringRule.groupValues : new Map<Integer, Map<String, Decimal>>();
+                    newEvent.Description__c += json.serialize(groupValuesToSerialize);
                 }
                 newEvent.Description__c = newEvent.Description__c.abbreviate(255);
 
                 Map<String, Integer> actionsMap = new Map<String, Integer>();
-                for(Action ent : monitoringRule.actions) {
-                    Integer actionCount = actionsMap.get(ent.type) != null ? actionsMap.get(ent.type) : 0;
-                    actionCount += 1;
-                    actionsMap.put(ent.type, actionCount);
+                // Fix: Added null check for actions collection
+                if (monitoringRule.actions != null) {
+                    for(Action ent : monitoringRule.actions) {
+                        if (ent != null && ent.type != null) {
+                            Integer actionCount = actionsMap.get(ent.type) != null ? actionsMap.get(ent.type) : 0;
+                            actionCount += 1;
+                            actionsMap.put(ent.type, actionCount);
+                        }
+                    }
                 }
                 if(!actionsMap.isEmpty()) {
                     newEvent.Actions__c = JSON.serialize(actionsMap);
@@ -1270,10 +1301,11 @@ public with sharing class MonitoringUtil {
         public String comparisonOperator;
         public MonitoringUtil.ComparisonOperator comparisonOperatorType;
         public Decimal threshold;
+        @TestVisible
         private Decimal value;
         @TestVisible
         private Map<Integer, Map<String, Decimal>> groupValues;
-        @TestVisible
+        @TestVisible 
         private Map<String, Set<String>> groupRecordIds;
         public Set<String> groupFieldNames;
         public List<Id> archivalLogs;

@@ -244,7 +244,13 @@ public with sharing class TestDataGenerator {
 
 	
 	public static final String TEST_PLATFORM_EVENT_AI_EVENT_RESULT = 'Test Issue Tracker';
-	public static final String TEST_PLATFORM_EVENT_AI_EVENT_LOG_HASH1 = 'dNRmiQXOoKnVR8EGQWyymjX7If8afzQCHLKZG3UTcNU=';
+	public static final String TEST_PLATFORM_EVENT_AI_EVENT_LOG_HASH1 = '9Qkp2PmuHB8UWV1UrIoQjKmUwerm9THng6KM6VWWdTk=';
+	public static final String TEST_PLATFORM_EVENT_AI_EVENT_LOG_SUMMARY = 'Divide by 0';
+	public static final String TEST_PLATFORM_EVENT_AI_EVENT_LOG_TYPE = 'System.MathException';
+	public static final String TEST_PLATFORM_EVENT_AI_EVENT_LOG_CATEGORY = 'Pharos Error';
+	public static final String TEST_PLATFORM_EVENT_AI_EVENT_LOG_AREA = 'Pharos';
+	public static final String TEST_PLATFORM_EVENT_AI_EVENT_LOG_STACKTRACE = 'Class.pharos.TestDataGenerator.AiEvent.createPlatformAIEventTest: line 341, column 1';
+	public static final String TEST_PLATFORM_EVENT_AI_EVENT_LOG_DETAILS = 'System.MathException: Divide by 0' + '\n\n' + TEST_PLATFORM_EVENT_LOG_STACKTRACE;
 
 	public static List<Log__c> getTestPlatformEventLogs(String hash1) {
 		List<Log__c> logs = [
@@ -330,6 +336,20 @@ public with sharing class TestDataGenerator {
 		result = true;
 
 		return result;
+	}
+
+	public static void createPlatformAIEventTest() {
+		Logger.getInstance().add(
+			LogBuilder.getInstance()
+				.category(TEST_PLATFORM_EVENT_AI_EVENT_LOG_CATEGORY)
+				.summary(TEST_PLATFORM_EVENT_AI_EVENT_LOG_SUMMARY)
+				.area(TEST_PLATFORM_EVENT_AI_EVENT_LOG_AREA)
+				.type(TEST_PLATFORM_EVENT_AI_EVENT_LOG_TYPE)
+				.stackTrace(TEST_PLATFORM_EVENT_AI_EVENT_LOG_STACKTRACE)
+				.details(TEST_PLATFORM_EVENT_AI_EVENT_LOG_DETAILS)
+				.createIssue()
+				.build()
+		);
 	}
 
 	public static TestResultLogs getPlatformEventTestAIEventLog() {

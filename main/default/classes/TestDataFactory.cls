@@ -283,6 +283,17 @@ public class TestDataFactory {
         return rn1;
     }
 
+    public static List<RuleAction__c> createRuleActions(Rule__c rule, List<Action__c> actions) {
+        List<RuleAction__c> ruleActions = new List<RuleAction__c>();
+        for(Action__c action : actions) {
+            RuleAction__c ra = new RuleAction__c();
+            ra.Action__c = action.Id;
+            ra.Rule__c = rule.Id;
+            ruleActions.add(ra);
+        }
+        return ruleActions;
+    }
+
     public static Rule__c createNotificationRule(Action__c action) {
         return createNotificationRule(action, null, null);
     }
