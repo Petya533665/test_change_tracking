@@ -807,6 +807,7 @@ public with sharing class AIAnalysisService {
 			formattedData += formatText(severityEstimate);
 			formattedData += formatTitle('Severity Assessment Details');
 			formattedData += formatText(justification);
+			System.debug('+++++formattedData basic: ' + formattedData);
 			return formattedData;
 		}
 	}
@@ -833,6 +834,7 @@ public with sharing class AIAnalysisService {
 				formattedData += formatTitle(section.subtitle);
 				formattedData += formatText(section.description);
 			}
+			System.debug('+++++formattedData explain: ' + formattedData);
 			return formattedData;
 		}
 	}

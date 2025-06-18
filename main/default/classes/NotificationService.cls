@@ -1697,10 +1697,6 @@ public with sharing class NotificationService {
         List<String> mergedMessages = renderMergeFields(recordId, new List<String>{action.Subject__c, action.Body__c}, new NotificationService.MergeFieldSettings(action.Action_Type__c));
         String subject = mergedMessages.get(0);
         String body = mergedMessages.get(1);
-        System.debug('+++++subject: ' + subject);
-        System.debug('+++++body: ' + body);
-        System.debug('+++++action: ' + action);
-        System.debug('+++++recordId: ' + recordId);
         String message = subject + ConfigUtil.NEW_LINE_CARRIAGE_RETURN + body;
         SlackService.sendMessageToSlack(message, action.SlackChannels__c);
     }
@@ -1887,7 +1883,6 @@ public with sharing class NotificationService {
         }
 
         public Map<String, List<String>> parse(Map<String, List<String>> contentsMap) {
-            System.debug('+++++contentsMap: ' + contentsMap);
             Map<String, List<String>> result = new Map<String, List<String>>();
             Set<String> allFields = new Set<String>();
 
@@ -1945,8 +1940,6 @@ public with sharing class NotificationService {
                     }
                     List<String> contentList = new List<String>();
                     for (String content : contents) {
-                        System.debug('+++++content: ' + content);
-                        System.debug('+++++tempMap: ' + tempMap);
                         contentList.add(matchContent(content, tempMap, objectAPIName));
                     }
                     result.put(objId, contentList);
