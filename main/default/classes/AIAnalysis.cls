@@ -210,6 +210,8 @@ public with sharing class AIAnalysis {
 		String convertedData = '';
 		for (String analysis : AIAnalysisService.ANALYSIS_MAP.keySet()) {
 			convertedData += getFormattedData(issueId, analysis, context);
+			System.debug('++++++formData args: ' + issueId + analysis + context);
+			System.debug('++++++convData: ' + convertedData);
 		}
 		return convertedData;
 	}
