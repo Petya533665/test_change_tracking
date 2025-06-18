@@ -1,5 +1,7 @@
 @IsTest
 private class RuleExportImportServiceTest {
+
+    private static final String SOBJECT_ISSUE_NAME = SObjectType.Issue__c.getName();
     
     @TestSetup
     static void setupTestData() {
@@ -8,19 +10,19 @@ private class RuleExportImportServiceTest {
             new Action__c(
                 Name__c = 'Test Action 1',
                 Action_Type__c = 'Email Notification',
-                SobjectType__c = 'Monitoring',
+                SobjectType__c = SOBJECT_ISSUE_NAME,
                 Description__c = 'Test Action 1 Description'
             ),
             new Action__c(
                 Name__c = 'Test Action 2',
                 Action_Type__c = 'Slack Notification',
-                SobjectType__c = 'Monitoring',
+                SobjectType__c = SOBJECT_ISSUE_NAME,
                 Description__c = 'Test Action 2 Description'
             ),
             new Action__c(
                 Name__c = 'Test Action 3',
                 Action_Type__c = 'Teams Notification',
-                SobjectType__c = 'Monitoring',
+                SobjectType__c = SOBJECT_ISSUE_NAME,
                 Description__c = 'Test Action 3 Description'
             )
         };
@@ -34,7 +36,7 @@ private class RuleExportImportServiceTest {
                 Name__c = 'TEST_RULE_1',
                 Index__c = 1,
                 Type__c = 'Monitoring',
-                SobjectType__c = 'Monitoring'
+                SobjectType__c = SOBJECT_ISSUE_NAME
             ),
             new Rule__c(
                 Description__c = 'Test Description 2',
@@ -42,7 +44,7 @@ private class RuleExportImportServiceTest {
                 Name__c = 'TEST_RULE_2',
                 Index__c = 2,
                 Type__c = 'Monitoring',
-                SobjectType__c = 'Monitoring'
+                SobjectType__c = SOBJECT_ISSUE_NAME
             )
         };
         insert rules;
