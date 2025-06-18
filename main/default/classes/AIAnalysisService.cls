@@ -147,6 +147,7 @@ public with sharing class AIAnalysisService {
 	}
 
 	public String getFormattedData(String analysis, String context) {
+		System.debug('++++++getFormattedData args: ' + analysis + context);
 		return this.strategies.get(ANALYSIS_MAP.get(analysis)).getFormattedData(context);
 	}
 
@@ -807,7 +808,6 @@ public with sharing class AIAnalysisService {
 			formattedData += formatText(severityEstimate);
 			formattedData += formatTitle('Severity Assessment Details');
 			formattedData += formatText(justification);
-			System.debug('+++++formattedData basic: ' + formattedData);
 			return formattedData;
 		}
 	}
@@ -834,7 +834,6 @@ public with sharing class AIAnalysisService {
 				formattedData += formatTitle(section.subtitle);
 				formattedData += formatText(section.description);
 			}
-			System.debug('+++++formattedData explain: ' + formattedData);
 			return formattedData;
 		}
 	}
