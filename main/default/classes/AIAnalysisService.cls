@@ -383,7 +383,7 @@ public with sharing class AIAnalysisService {
 
 	public static final String AI_ANALYSIS_ENDPOINT = 'https://ai.pharos.ai/ai_pharos_ai';
 
-	public static final String OPEN_AI_MODEL = 'gpt-4o';
+	public static final String OPEN_AI_MODEL = 'o3';
 
 	public interface RequestInterface {
 		void startAnalysis();
