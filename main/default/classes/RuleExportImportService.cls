@@ -79,6 +79,17 @@ public with sharing class RuleExportImportService {
         return exportData;
     }
 
+    public static String exportRulesWithDownloadUrl(List<String> ruleIds) {
+        List<RuleExportImportWrapper> rules = exportRules(ruleIds);
+        ContentVersion cv = new ContentVersion();
+        cv.Title = 'exported-rules.json';
+        cv.PathOnClient = 'exported-rules.json';
+        cv.VersionData = Blob.valueOf(JSON.serialize(rules));
+        cv.IsMajorVersion = true;
+        insert cv;
+        return '/sfc/servlet.shepherd/document/download/' + cv.ContentDocumentId;
+    }
+
     /**
      * Import rules,
      * used to import rules

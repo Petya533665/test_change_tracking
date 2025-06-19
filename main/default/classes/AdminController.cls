@@ -374,6 +374,10 @@ public with sharing class AdminController {
                 );
             } else if (method.equals('importRules')) {
                 response.data = RuleExportImportService.importRules((String)request.get('data'));
+            } else if (method.equals('exportRulesWithDownloadUrl')) {
+                response.data = RuleExportImportService.exportRulesWithDownloadUrl(
+                    (List<String>)JSON.deserialize(JSON.serialize(data), List<String>.class)
+                );
             } else {
                 response.error = 'Action not found';
             }
