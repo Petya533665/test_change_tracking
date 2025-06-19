@@ -549,7 +549,7 @@ public with sharing class AIAnalysisService {
 		}
 
 		public virtual String formatText(String text) {
-			return '<p>' + replaceParagraphTag(text) + '</p>\n';
+			return '<p>' + replaceParagraphTag(text).replaceAll('\n', '<br>') + '</p>\n';
 		}
 
 		public virtual String formatCode(String code) {
