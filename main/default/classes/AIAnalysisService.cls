@@ -147,7 +147,6 @@ public with sharing class AIAnalysisService {
 	}
 
 	public String getFormattedData(String analysis, String context) {
-		System.debug('++++++getFormattedData args: ' + analysis + context);
 		return this.strategies.get(ANALYSIS_MAP.get(analysis)).getFormattedData(context);
 	}
 

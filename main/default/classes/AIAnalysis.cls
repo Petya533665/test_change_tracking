@@ -209,9 +209,10 @@ public with sharing class AIAnalysis {
 	public String getFormattedData(String issueId, String context) {
 		String convertedData = '';
 		for (String analysis : AIAnalysisService.ANALYSIS_MAP.keySet()) {
-			convertedData += getFormattedData(issueId, analysis, context);
-			System.debug('++++++formData args: ' + issueId + analysis + context);
-			System.debug('++++++convData: ' + convertedData);
+			String formattedData = getFormattedData(issueId, analysis, context);
+			if (formattedData != null) {
+				convertedData += formattedData;
+			}
 		}
 		return convertedData;
 	}
