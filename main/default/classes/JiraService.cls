@@ -81,6 +81,7 @@ public without sharing class JiraService {
         String getProjectComponentsEndpoint(String projectOrKeyId, String query);
         String getProjectIssueTypesEndpoint(String projectOrKeyId);
         String getProjectIssueFieldsEndpoint(String projectOrKeyId, String issueType);
+        String getProjectIssueFieldsEndpoint(String projectOrKeyId, String issueType, Integer startAt, Integer maxResults);
         String getPrioritiesEndpoint();
         String getPrioritySchemesEndpoint();
         String getPutJiraTaskPropertiesEndpoint(String issueKey);
@@ -422,6 +423,11 @@ public without sharing class JiraService {
     public static final String JIRA_API_JQL_ISSUE_KEY = 'key';
     public static final String JIRA_API_JQL_ISSUE_FIELDS = 'fields';
     public static final String JIRA_API_JQL_ISSUE_RESOLUTION_DATE = 'resolutiondate';
+    public static final String API_PAGINATION_MAX_RESULTS = 'maxResults';
+    public static final String API_PAGINATION_START_AT = 'startAt';
+    public static final String API_PAGINATION_MAX_RESULTS_DEFAULT_VALUE = '200';
+    public static final String API_PAGINATION_START_AT_DEFAULT_VALUE = '0';
+    public static final Integer API_PAGINATION_MAX_CALLS = 5; // 5 call by 200 fields = 1000 fields
 
 
     public abstract class JiraServiceDefaultImpl implements JiraServiceInterface {
@@ -451,7 +457,14 @@ public without sharing class JiraService {
         }
 
         public virtual String getProjectIssueFieldsEndpoint(String projectOrKeyId, String issueType) {
-            return getProjectIssueTypesEndpoint(projectOrKeyId) + '/' + issueType;
+            return getProjectIssueFieldsEndpoint(projectOrKeyId, issueType, null, null);
+        }
+
+        public virtual String getProjectIssueFieldsEndpoint(String projectOrKeyId, String issueType, Integer startAt, Integer maxResults) {
+            return getProjectIssueTypesEndpoint(projectOrKeyId) 
+                + '/' + issueType 
+                + '?' + API_PAGINATION_MAX_RESULTS + '=' + (maxResults != null ? String.valueOf(maxResults) : API_PAGINATION_MAX_RESULTS_DEFAULT_VALUE) 
+                + '&' + API_PAGINATION_START_AT + '=' + (startAt != null ? String.valueOf(startAt) : API_PAGINATION_START_AT_DEFAULT_VALUE);
         }
 
         public virtual String getProjectAssignableUsersEndpoint(String projectKey, String query) {
@@ -616,17 +629,30 @@ public without sharing class JiraService {
             return result;
         }
 
-        public virtual List<JiraProjectIssueField> deserializeProjectIssueFields(String jsonData) {
-            List<JiraProjectIssueField> result = new List<JiraProjectIssueField>();
-            JiraProjectIssueTypeFieldsWrapper wrapper = (JiraProjectIssueTypeFieldsWrapper)JSON.deserialize(jsonData, JiraProjectIssueTypeFieldsWrapper.class);
-            result = wrapper.fields;
-            return result;
-        }
-
         public virtual List<JiraProjectIssueField> getProjectIssueFields(String projectOrKeyId, String issueType) {
             List<JiraProjectIssueField> result = new List<JiraProjectIssueField>();
-            String b = getApiData(getProjectIssueFieldsEndpoint(projectOrKeyId, issueType));
-            result = deserializeProjectIssueFields(b);
+            Integer startAt = Integer.valueOf(API_PAGINATION_START_AT_DEFAULT_VALUE);
+            Integer maxResults = Integer.valueOf(API_PAGINATION_MAX_RESULTS_DEFAULT_VALUE);
+            Integer callCount = 0;
+            Boolean hasMoreData = true;
+            
+            while (hasMoreData && callCount < API_PAGINATION_MAX_CALLS) {
+                String b = getApiData(getProjectIssueFieldsEndpoint(projectOrKeyId, issueType, startAt, maxResults));
+                JiraProjectIssueTypeFieldsWrapper wrapper = (JiraProjectIssueTypeFieldsWrapper)JSON.deserialize(b, JiraProjectIssueTypeFieldsWrapper.class);
+                
+                if (wrapper != null && wrapper.getFields() != null && !wrapper.getFields().isEmpty()) {
+                    result.addAll(wrapper.getFields());
+                    
+                    // Check if we have more data based on total count
+                    hasMoreData = (startAt + wrapper.getFields().size()) < wrapper.total;
+                    startAt += maxResults;
+                } else {
+                    hasMoreData = false;
+                }
+                
+                callCount++;
+            }
+            
             return result;
         }
 
@@ -661,10 +687,10 @@ public without sharing class JiraService {
         public virtual Map<String, JiraProjectIssueField> getProjectIssueCustomFields(List<JiraProjectIssueField> fields) {
             Map<String, JiraProjectIssueField> result = new Map<String, JiraProjectIssueField>();
             for(JiraProjectIssueField field : fields) {
-                if(field?.key != null && field?.key?.startsWith('customfield')) {
+                if(field?.key != null && field?.key?.startsWith('customfield') && field?.operations?.contains('set')) {
                     result.put(field.key, field);
                 }
-                else if (field?.fieldId != null && field?.fieldId?.startsWith('customfield')) {
+                else if (field?.fieldId != null && field?.fieldId?.startsWith('customfield') && field?.operations?.contains('set')) {
                     field.key = field.fieldId;
                     result.put(field.key, field);
                 }
@@ -952,13 +978,6 @@ public without sharing class JiraService {
             return result;
         }
 
-        public override List<JiraProjectIssueField> deserializeProjectIssueFields(String jsonData) {
-            List<JiraProjectIssueField> result = new List<JiraProjectIssueField>();
-            JiraSearchIssueTypeFieldsWrapper wrapper = (JiraSearchIssueTypeFieldsWrapper)JSON.deserialize(jsonData, JiraSearchIssueTypeFieldsWrapper.class);
-            result = wrapper.values;
-            return result;
-        }
-
         public override List<JiraProjectIssueType> getProjectIssueTypes(String projectOrKeyId) {
             List<JiraProjectIssueType> result = new List<JiraProjectIssueType>();
             String b = getApiData(getProjectIssueTypesEndpoint(projectOrKeyId));
@@ -1110,23 +1129,48 @@ public without sharing class JiraService {
         public Integer startAt;
         public Integer maxResults;
         public Integer total;
+        // cloud version
         public List<JiraProjectIssueField> fields;
-    }
-
-    public class JiraSearchIssueTypeFieldsWrapper {
-        public Integer startAt;
-        public Integer maxResults;
-        public Integer total;
+        // hosted version
         public List<JiraProjectIssueField> values;
+
+        public List<JiraProjectIssueField> getFields() {
+            return (this.fields != null && !this.fields.isEmpty()) ? this.fields : this.values;
+        }
     }
 
     public class JiraProjectIssueField {
+        // schema of the field
+        public JiraProjectIssueFieldSchema schema;
+        // allowed operations {set, add, remove}
+        public List<String> operations;
+        // allowed values
+        public List<JiraProjectIssueFieldAllowedValue> allowedValues;
+
         public Boolean required;
         public String name;
         // api version 3
         public String key;
         // api version 2
         public String fieldId;
+    }
+
+    public class JiraProjectIssueFieldSchema {
+        public String type;
+        public String items;
+        public String custom;
+        public String customId;
+    }
+
+    public class JiraProjectIssueFieldAllowedValue {
+        // "http://jira.teties.com/rest/api/2/customFieldOption/10100"
+        public String self;
+        // "true"
+        public String value;
+        // "10100"
+        public String id; 
+        // false/true
+        public Boolean disabled;
     }
 
     public class JiraProjectUser {
