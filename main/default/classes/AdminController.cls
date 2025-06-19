@@ -374,10 +374,6 @@ public with sharing class AdminController {
                 );
             } else if (method.equals('importRules')) {
                 response.data = RuleExportImportService.importRules((String)request.get('data'));
-            } else if (method.equals('exportRulesWithDownloadUrl')) {
-                response.data = RuleExportImportService.exportRulesWithDownloadUrl(
-                    (List<String>)JSON.deserialize(JSON.serialize(data), List<String>.class)
-                );
             } else {
                 response.error = 'Action not found';
             }
@@ -407,5 +403,38 @@ public with sharing class AdminController {
         public Object data;
         public String error;
         public String stack;
+    }
+    
+    private static String generateDownloadUrl(Map<String, Object> data) {
+        try {
+            String content = (String)data.get('content');
+            String filename = (String)data.get('filename');
+            String contentType = (String)data.get('contentType');
+            
+            if (String.isBlank(content) || String.isBlank(filename)) {
+                return null;
+            }
+            
+            // Create a ContentVersion record to store the file
+            ContentVersion cv = new ContentVersion();
+            cv.Title = filename;
+            cv.PathOnClient = filename;
+            cv.VersionData = Blob.valueOf(content);
+            cv.IsMajorVersion = true;
+            
+            insert cv;
+            
+            // Get the ContentDocument ID
+            cv = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id];
+            
+            // Generate a download URL using the ContentDocument ID
+            String downloadUrl = '/sfc/servlet.shepherd/document/download/' + cv.ContentDocumentId;
+            
+            return downloadUrl;
+            
+        } catch (Exception e) {
+            Logger.getInstance().addInternalError(e, AdminController.class.getName(), 'generateDownloadUrl');
+            return null;
+        }
     }
 }
