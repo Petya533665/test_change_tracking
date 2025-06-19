@@ -39,9 +39,9 @@ public with sharing class RuleExportImportService {
      * Export rules,
      * used to export rules
      */
-    public static String exportRules(List<String> ruleIds) {
+    public static List<RuleExportImportWrapper> exportRules(List<String> ruleIds) {
         if (ruleIds == null || ruleIds.isEmpty()) {
-            return null;
+            return new List<RuleExportImportWrapper>();
         }
 
         List<RuleExportImportWrapper> exportData = new List<RuleExportImportWrapper>();
@@ -76,36 +76,21 @@ public with sharing class RuleExportImportService {
            debugSession(e, 'exportRules');
         }
 
-        return generateDownloadUrl(JSON.serialize(exportData));
+        return exportData;
     }
-    
-    private static String generateDownloadUrl(String content) {
-        try {
-            if (String.isBlank(content)) {
-                return null;
-            }
-            
-            // Create a ContentVersion record to store the file
-            ContentVersion cv = new ContentVersion();
-            cv.Title = 'exported-rules.json';
-            cv.PathOnClient = 'exported-rules.json';
-            cv.VersionData = Blob.valueOf(content);
-            cv.IsMajorVersion = true;
-            
-            insert cv;
-            
-            // Get the ContentDocument ID
-            cv = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id];
-            
-            // Generate a download URL using the ContentDocument ID
-            String downloadUrl = '/sfc/servlet.shepherd/document/download/' + cv.ContentDocumentId;
-            
-            return downloadUrl;
-            
-        } catch (Exception e) {
-            debugSession(e, 'generateDownloadUrl');
-            return null;
-        }
+
+    public static String exportRulesWithDownloadUrl(List<String> ruleIds) {
+        List<RuleExportImportWrapper> rules = exportRules(ruleIds);
+        
+        ContentVersion cv = new ContentVersion();
+        cv.Title = 'exported-rules.json';
+        cv.PathOnClient = 'exported-rules.json';
+        cv.VersionData = Blob.valueOf(JSON.serialize(rules));
+        cv.IsMajorVersion = true;
+        
+        insert cv;
+        cv = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id];
+        return '/sfc/servlet.shepherd/document/download/' + cv.ContentDocumentId;
     }
 
     /**
