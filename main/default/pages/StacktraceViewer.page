@@ -1,9 +1,6 @@
 <apex:page showHeader="true" sidebar="false" standardController="Log__c" extensions="StacktraceViewerController"
            lightningStyleSheets="true">
     <base href="/apex/StacktraceViewer"/>
-
-    <apex:includeScript value="{!URLFOR($Resource.libs, '/libs/jsplumb.min.js')}" />
-
     <apex:slds />
     <style>
         html,
