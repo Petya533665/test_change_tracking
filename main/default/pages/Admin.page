@@ -134,7 +134,9 @@
             <apex:stylesheet value="{!URLFOR($Resource.adminapp, 'styles.css')}"/>
             <script src="{!URLFOR($Resource.adminapp, 'runtime.js')}"/>
             <script src="{!URLFOR($Resource.adminapp, 'polyfills.js')}"/>
+            <script src="{!URLFOR($Resource.adminapp, 'vendor.js')}"/>
             <script src="{!URLFOR($Resource.adminapp, 'main.js')}"/>
+            <script src="{!URLFOR($Resource.adminapp, 'scripts.js')}"/>
         </apex:outputPanel>
 
 
