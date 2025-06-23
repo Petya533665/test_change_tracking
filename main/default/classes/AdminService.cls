@@ -2009,9 +2009,6 @@ public without sharing class AdminService {
     }
 
     public static Object getJiraProjectUsers(Object data) {
-        if (data instanceof String) {
-            return getJiraProjectUsers(String.valueOf(data));
-        }
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         String projectId = (input.get('projectId') != null) ? (String)input.get('projectId') : null;
         String query = (input.get('query') != null) ? (String)input.get('query') : null;
