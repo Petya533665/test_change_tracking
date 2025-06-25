@@ -254,7 +254,7 @@ public with sharing class TestDataGenerator {
 
 	public static List<Log__c> getTestPlatformEventLogs(String hash1) {
 		List<Log__c> logs = [
-			SELECT Id, Name
+			SELECT Id, Name, User_Id__c, User_Name__c
 			FROM Log__c
 			WHERE Hash_1__c = :hash1
 		];
@@ -354,6 +354,44 @@ public with sharing class TestDataGenerator {
 
 	public static TestResultLogs getPlatformEventTestAIEventLog() {
 		return getPlatformEventTestLog(TEST_PLATFORM_EVENT_AI_EVENT_LOG_HASH1);
+	}
+
+	public static final String TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_HASH1 = 'Bf3D2kE7hKOs1zPE8K2il+uj/S4J0ZpUb+1zpxCIEqs=';
+	public static final String TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_SUMMARY = 'Divide by 0';
+	public static final String TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_TYPE = 'System.MathException';
+	public static final String TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_CATEGORY = 'Pharos Error';
+	public static final String TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_AREA = 'Pharos';
+	public static final String TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_STACKTRACE = 'Class.pharos.TestDataGenerator.startErrorTrackingRequiresConfigurationTest: line 343, column 1';
+	public static final String TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_DETAILS = 'System.MathException: Divide by 0' + '\n\n' + TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_STACKTRACE;
+
+	public static Object startErrorTrackingRequiresConfigurationTest(Object data) {
+		Boolean result = false;
+
+		User user = (User) JSON.deserialize(JSON.serialize(data), User.class);
+
+		//delete old test Logs and related errors
+		deleteTestPlatformEventLogs(TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_HASH1);
+
+		Log__c log = LogBuilder.getInstance()
+			.category(TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_CATEGORY)
+			.summary(TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_SUMMARY)
+			.area(TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_AREA)
+			.type(TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_TYPE)
+			.stackTrace(TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_STACKTRACE)
+			.details(TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_DETAILS)
+			.attribute(Schema.SObjectType.Log__c.fields.User_Id__c.name, user.Id)
+			.attribute(Schema.SObjectType.Log__c.fields.User_Name__c.name, user.Email)
+			.createIssue()
+			.build();
+		Logger.getInstance().add(log);
+		Logger.getInstance().flush();
+		result = true;
+
+		return result;
+	}
+
+	public static TestResultLogs getErrorTrackingRequiresConfigurationLog() {
+		return getPlatformEventTestLog(TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_HASH1);
 	}
 
 	public static String TEST_JOB_ID = 'testJobId';

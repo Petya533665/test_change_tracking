@@ -33,6 +33,10 @@ public with sharing class ManageTokensBatch extends DatabaseUtils.PharosBatchImp
 	}
 
 	public void execute(Database.BatchableContext batchableContext, List<TokenTypeWrapper> scope) {
+		if (scope == null || scope.isEmpty()) {
+			return; // Skip processing for empty scope
+		}
+		
 		TokenTypeWrapper token = scope.get(0);
 		switch on token?.type {
 			when JIRA {
@@ -136,7 +140,10 @@ public with sharing class ManageTokensBatch extends DatabaseUtils.PharosBatchImp
 		}
 
 		public TokenTypeWrapper next() {
-			return this.tokens[this.index++];
+			if (hasNext()) {
+				return this.tokens[this.index++];
+			}
+			return null;
 		}
 	}
 }

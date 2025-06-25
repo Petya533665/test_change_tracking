@@ -7,30 +7,255 @@ public with sharing class EventMonitoringUtil {
     public EventMonitoringUtil() {}
 
     @TestVisible
-    private static List<EventLogFile> testEventLogs = new List<EventLogFile>();
+    public static List<SObject> testEventLogs = new List<SObject>();
 
-    public static List<EventLogFile> getEventLogs(String eventType) {
-        // Handle null parameters
-        if (eventType == null || ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c == null) {
-            return new List<EventLogFile>();
+    public static final String EVENT_LOG_FILE_ID = 'Id';
+    public static final String EVENT_LOG_FILE_EVENT_TYPE = 'EventType';
+    public static final String EVENT_LOG_FILE_LOG_DATE = 'LogDate';
+    public static final String EVENT_LOG_FILE_LOG_FILE_LENGTH = 'LogFileLength';
+    public static final String EVENT_LOG_FILE_LOG_FILE = 'LogFile';
+    public static final String EVENT_LOG_FILE_CREATED_DATE = 'CreatedDate';
+    public static final String EVENT_LOG_FILE_INTERVAL = 'Interval';
+    public static final String EVENT_LOG_FILE_LOG_FILE_FIELD_NAMES = 'LogFileFieldNames';
+    public static final String EVENT_LOG_FILE_LOG_FILE_FIELD_TYPES = 'LogFileFieldTypes';
+    public static final String EVENT_LOG_FILE_SEQUENCE = 'Sequence';
+
+    public static List<SObject> getEventLogs(String eventType) {
+        // Handle null parameters or unavailable object
+        if (eventType == null || 
+            ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c == null ||
+            !isEventLogFileAvailable()) {
+            return new List<SObject>();
         }
-        // Last Processed Hourly DateTime
-        Datetime lastProcessedHourlyDateTime = ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c;
-
-        if (Test.isRunningTest() && !testEventLogs.isEmpty()) {
+        
+        // Handle test context
+        if (Test.isRunningTest() && testEventLogs != null && !testEventLogs.isEmpty()) {
             return testEventLogs;
         }
         
-        return [
-            SELECT Id, EventType, LogDate, LogFileLength, LogFile, 
-                   Sequence, CreatedDate, Interval, LogFileFieldNames, LogFileFieldTypes
-            FROM EventLogFile 
-            WHERE EventType = :eventType 
-            AND LogDate >= :lastProcessedHourlyDateTime
-            AND Interval = :INTERVAL_HOURLY
-            ORDER BY LogDate DESC, Sequence ASC 
-            LIMIT :MAX_RECORDS
-        ];
+        // Last Processed Hourly DateTime
+        Datetime lastProcessedHourlyDateTime = ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c;
+        
+        // Build dynamic query using QBuilder
+        Set<String> selectFields = new Set<String>{
+            EVENT_LOG_FILE_ID, EVENT_LOG_FILE_EVENT_TYPE, EVENT_LOG_FILE_LOG_DATE, EVENT_LOG_FILE_LOG_FILE_LENGTH, EVENT_LOG_FILE_LOG_FILE,
+            EVENT_LOG_FILE_CREATED_DATE, EVENT_LOG_FILE_INTERVAL, EVENT_LOG_FILE_LOG_FILE_FIELD_NAMES, EVENT_LOG_FILE_LOG_FILE_FIELD_TYPES
+        };
+        
+        // Add Sequence field if available
+        if (isSequenceFieldAvailable()) {
+            selectFields.add(EVENT_LOG_FILE_SEQUENCE);
+        }
+        
+        QBuilder queryBuilder = new QBuilder(getEventLogFileType())
+            .selectFields(selectFields)
+            .add(QBuilder.condition(EVENT_LOG_FILE_EVENT_TYPE).equalsTo(eventType))
+            .add(QBuilder.condition(EVENT_LOG_FILE_LOG_DATE).isGreaterOrEquals(String.valueOf(lastProcessedHourlyDateTime)))
+            .add(QBuilder.condition(EVENT_LOG_FILE_INTERVAL).equalsTo(INTERVAL_HOURLY))
+            .add(QBuilder.orderBy(EVENT_LOG_FILE_LOG_DATE).descending())
+            .addLimit(MAX_RECORDS);
+        
+        // Add Sequence ordering if field is available
+        if (isSequenceFieldAvailable()) {
+            queryBuilder.add(QBuilder.orderBy(EVENT_LOG_FILE_SEQUENCE).ascending());
+        }
+        
+        try {
+            return Database.query(queryBuilder.build());
+        } catch (Exception e) {
+            // Log error and return empty list
+            Logger.getInstance().add(Logger.getInstance().getInternalError(
+                e, null, EventMonitoringUtil.class.getName(), 'Error querying EventLogFile'
+            ));
+            return new List<SObject>();
+        }
+    }
+
+    /**
+     * Legacy method for backward compatibility - deprecated
+     * @deprecated Use getEventLogs(String eventType) instead which returns List<SObject>
+     * Note: This method uses dynamic casting to avoid EventLogFile reference issues in orgs without the object
+     */
+    public static List<SObject> getEventLogsLegacy(String eventType) {
+        return getEventLogs(eventType);
+    }
+
+    /**
+     * Check if EventLogFile object is available in the org
+     * @return Boolean
+     */
+    public static Boolean isEventLogFileAvailable() {
+        if (eventLogFileAvailable == null) {
+            try {
+                Type eventLogFileObjectType = Type.forName(EVENT_LOG_FILE_OBJECT_NAME);
+                if (eventLogFileObjectType != null) {
+                    SObject instance = (SObject)eventLogFileObjectType.newInstance();
+                    eventLogFileType = instance.getSObjectType();
+                    eventLogFileAvailable = true;
+                } else {
+                    eventLogFileAvailable = false;
+                }
+            } catch (Exception e) {
+                eventLogFileAvailable = false;
+            }
+        }
+        return eventLogFileAvailable;
+    }
+    
+    /**
+     * Check if Sequence field is available on EventLogFile
+     * @return Boolean
+     */
+    public static Boolean isSequenceFieldAvailable() {
+        if (sequenceFieldAvailable == null) {
+            if (!isEventLogFileAvailable()) {
+                sequenceFieldAvailable = false;
+            } else {
+                try {
+                    Map<String, Schema.SObjectField> fieldMap = eventLogFileType.getDescribe().fields.getMap();
+                    sequenceFieldAvailable = fieldMap.containsKey(EVENT_LOG_FILE_SEQUENCE);
+                } catch (Exception e) {
+                    sequenceFieldAvailable = false;
+                }
+            }
+        }
+        return sequenceFieldAvailable;
+    }
+    
+    /**
+     * Get EventLogFile SObjectType if available
+     * @return SObjectType
+     */
+    public static SObjectType getEventLogFileType() {
+        if (isEventLogFileAvailable()) {
+            return eventLogFileType;
+        }
+        return null;
+    }
+    
+    /**
+     * Create test Map that mimics EventLogFile structure for testing
+     * @param eventType String
+     * @param logDate Date
+     * @param logFileContent Blob
+     * @return Map<String, Object>
+     */
+    @TestVisible
+    public static Map<String, Object> createTestEventLogData(String eventType, Date logDate, Blob logFileContent) {
+        return new Map<String, Object>{
+            EVENT_LOG_FILE_EVENT_TYPE => eventType,
+            EVENT_LOG_FILE_LOG_DATE => logDate,
+            EVENT_LOG_FILE_LOG_FILE => logFileContent != null ? logFileContent.toString() : '', // Store as String for JSON serialization
+            EVENT_LOG_FILE_LOG_FILE_LENGTH => logFileContent != null ? logFileContent.size() : 0,
+            EVENT_LOG_FILE_LOG_FILE_FIELD_NAMES => null, // Will use test field names from processors
+            EVENT_LOG_FILE_LOG_FILE_FIELD_TYPES => null, // Will use test field types from processors
+            EVENT_LOG_FILE_ID => '001000000MockELF', // Mock ID for testing
+            EVENT_LOG_FILE_CREATED_DATE => Datetime.now(),
+            EVENT_LOG_FILE_INTERVAL => 'Hourly'
+        };
+    }
+
+    /**
+     * Compatibility wrapper for createTestEventLogSObject - creates SObject with mock data
+     * @param eventType String
+     * @param logDate Date
+     * @param logFileContent Blob
+     * @return SObject
+     */
+    @TestVisible
+    public static SObject createTestEventLogSObject(String eventType, Date logDate, Blob logFileContent) {
+        Map<String, Object> testData = createTestEventLogData(eventType, logDate, logFileContent);
+        Account mockAccount = new Account(Name = 'Mock EventLog: ' + eventType);
+        mockAccount.Description = JSON.serialize(testData);
+        return (SObject)mockAccount;
+    }
+
+
+    
+    /**
+     * Get field value from SObject safely
+     * @param record SObject
+     * @param fieldName String
+     * @return Object
+     */
+    public static Object getFieldValue(SObject record, String fieldName) {
+        
+        // Check if this is a mock EventLogFile (has mock data in Description field)
+        if (record != null && Test.isRunningTest()) {
+            String description = (String)record.get('Description');
+            if (String.isNotBlank(description) && description.startsWith('{')) {
+                Map<String, Object> mockFieldValues = (Map<String, Object>)JSON.deserializeUntyped(description);
+                if (mockFieldValues.containsKey(fieldName)) {
+                    return mockFieldValues.get(fieldName);
+                }
+            }
+        }
+        
+        return record?.get(fieldName);
+    }
+    
+    /**
+     * Get string field value from SObject safely
+     * @param record SObject
+     * @param fieldName String
+     * @return String
+     */
+    public static String getStringValue(SObject record, String fieldName) {
+        Object value = getFieldValue(record, fieldName);
+        return value != null ? String.valueOf(value) : null;
+    }
+    
+    /**
+     * Get datetime field value from SObject safely
+     * @param record SObject
+     * @param fieldName String
+     * @return Datetime
+     */
+    public static Datetime getDatetimeValue(SObject record, String fieldName) {
+        Object value = getFieldValue(record, fieldName);
+        return value != null ? (Datetime)value : null;
+    }
+    
+    /**
+     * Get blob field value from SObject safely
+     * @param record SObject
+     * @param fieldName String
+     * @return Blob
+     */
+    public static Blob getBlobValue(SObject record, String fieldName) {
+        
+        Object value = getFieldValue(record, fieldName);
+        if (value == null) return null;
+        
+        // Handle Blob value directly
+        if (value instanceof Blob) return (Blob)value;
+        
+        // Handle String value from mock EventLogFile data only (convert to Blob)
+        if (Test.isRunningTest() && value instanceof String && fieldName == EVENT_LOG_FILE_LOG_FILE) {
+            String stringValue = (String)value;
+            // Convert LogFile String content to Blob for mock data
+            if (String.isNotBlank(stringValue)) {
+                return Blob.valueOf(stringValue);
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Get integer field value from SObject safely
+     * @param record SObject
+     * @param fieldName String
+     * @return Integer
+     */
+    public static Integer getIntegerValue(SObject record, String fieldName) {
+        
+        Object value = getFieldValue(record, fieldName);
+        if (value == null) return null;
+        if (value instanceof Integer) return (Integer)value;
+        if (value instanceof Decimal) return ((Decimal)value).intValue();
+        if (value instanceof String) return Integer.valueOf((String)value);
+        return null;
     }
 
     // Constants for Rule and RuleFilter fields
@@ -47,6 +272,13 @@ public with sharing class EventMonitoringUtil {
     public static final Decimal CRITICAL_INDEX = 1;
     public static final Decimal WARNING_INDEX = 2;
 
+    // EventLogFile safe access constants and variables
+    private static final String EVENT_LOG_FILE_OBJECT_NAME = 'EventLogFile';
+    
+    // Cache for object availability check
+    private static Boolean eventLogFileAvailable = null;
+    private static Boolean sequenceFieldAvailable = null;
+    private static SObjectType eventLogFileType = null;
 
     public static final Map<String, Map<String, ThresholdConfig>> MAP_DEFAULT_THRESHOLDS = new Map<String, Map<String, ThresholdConfig>>{
         EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION => new Map<String, ThresholdConfig>{

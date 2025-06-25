@@ -37,6 +37,10 @@ public with sharing class RetentionBatch extends DatabaseUtils.PharosBatchImpl i
 	}
 
 	public void execute(Database.BatchableContext BC, List<Rule__c> scope) {
+		if (scope == null || scope.isEmpty()) {
+			return; // Skip processing for empty scope
+		}
+		
 		List<MonitoringUtil.MonitoringRule> rules = MonitoringUtil.getArchivalRules(new List<Id>{scope.get(0).Id});
 		Map<Id, MonitoringUtil.Event> mapEventsByIds = MonitoringUtil.getLastCreatedEventsMap();
 		List<String> logFields = MonitoringUtil.getLogFieldNames(rules);

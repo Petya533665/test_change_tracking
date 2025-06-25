@@ -456,4 +456,239 @@ private class RuleUtilTest {
 		return ev;
 	}
 
+	// ===============================================
+	// ADDITIONAL METADATA VALIDATION TESTS
+	// ===============================================
+
+	/**
+	 * Test successful validation of additional metadata for JIRA actions
+	 */
+	@IsTest
+	public static void test_validate_additional_metadata_success() {
+		Test.startTest();
+		
+		// Create a JIRA action with valid additional metadata
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = 'TEST';
+		action.jiraIssueType = 'Bug';
+		action.additionalMetadata = '{"customfield_10100":"Option1,Option2","customfield_10101":"2023-04-13"}';
+		
+		// Mock JIRA service responses
+		Map<String, HttpCalloutMock> endpoint2TestResp = JiraNotificationBatchTest.createJiraMocks();
+		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
+		
+		// This should not throw an exception
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action should be created successfully');
+		System.assertEquals(action.additionalMetadata, result.Additional_Metadata__c, 'Additional metadata should be preserved');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation failure for invalid JSON in additional metadata
+	 */
+	@IsTest
+	public static void test_validate_additional_metadata_invalid_json() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = 'TEST';
+		action.jiraIssueType = 'Bug';
+		action.additionalMetadata = 'invalid json format';
+		
+		try {
+			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			System.assert(false, 'Should have thrown RuleUtilException for invalid JSON');
+		} catch (RuleUtil.RuleUtilException e) {
+			System.assert(e.getMessage().contains('Invalid JSON format'), 'Should indicate JSON format error');
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation failure for invalid field values
+	 */
+	@IsTest
+	public static void test_validate_additional_metadata_invalid_field_values() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = 'TEST';
+		action.jiraIssueType = 'Bug';
+		// Invalid date format
+		action.additionalMetadata = '{"customfield_10101":"invalid-date-format"}';
+		
+		// Mock JIRA service responses
+		Map<String, HttpCalloutMock> endpoint2TestResp = JiraNotificationBatchTest.createJiraMocks();
+		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
+		
+		try {
+			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			System.assert(false, 'Should have thrown RuleUtilException for invalid field value');
+		} catch (RuleUtil.RuleUtilException e) {
+			System.assert(e.getMessage().contains('Invalid value for custom field'), 'Should indicate field validation error');
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation passes for non-JIRA actions
+	 */
+	@IsTest
+	public static void test_validate_additional_metadata_non_jira_action() {
+		Test.startTest();
+		
+		// Create a non-JIRA action with additional metadata
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_EMAIL_NOTIFICATION;
+		action.additionalMetadata = '{"some":"metadata"}';
+		
+		// This should not validate JIRA fields and should not throw an exception
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Non-JIRA action should be created successfully');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation skipped when no additional metadata
+	 */
+	@IsTest
+	public static void test_validate_additional_metadata_blank() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = 'TEST';
+		action.jiraIssueType = 'Bug';
+		action.additionalMetadata = null;
+		
+		// This should not throw an exception
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action should be created successfully');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation for JIRA ticket comment actions
+	 */
+	@IsTest
+	public static void test_validate_additional_metadata_jira_comment() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_TICKET_COMMENT;
+		action.jiraProject = 'TEST';
+		action.jiraIssueType = 'Bug';
+		action.additionalMetadata = '{"customfield_10100":"Option1"}';
+		
+		// Mock JIRA service responses
+		Map<String, HttpCalloutMock> endpoint2TestResp = JiraNotificationBatchTest.createJiraMocks();
+		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
+		
+		// This should validate since it's a JIRA-related action
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'JIRA comment action should be created successfully');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation when JIRA project or issue type is missing
+	 */
+	@IsTest
+	public static void test_validate_additional_metadata_missing_project_info() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = null; // Missing project
+		action.jiraIssueType = 'Bug';
+		action.additionalMetadata = '{"customfield_10100":"Option1"}';
+		
+		// This should not throw an exception since we can't validate without project info
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action should be created when project info is missing');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation with empty custom fields map
+	 */
+	@IsTest
+	public static void test_validate_additional_metadata_empty_fields() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = 'TEST';
+		action.jiraIssueType = 'Bug';
+		action.additionalMetadata = '{}'; // Empty JSON object
+		
+		// This should not throw an exception
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action should be created with empty metadata');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation with blank field values (should be skipped)
+	 */
+	@IsTest
+	public static void test_validate_additional_metadata_blank_values() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = 'TEST';
+		action.jiraIssueType = 'Bug';
+		action.additionalMetadata = '{"customfield_10100":"","customfield_10101":null}';
+		
+		// Mock JIRA service responses
+		Map<String, HttpCalloutMock> endpoint2TestResp = JiraNotificationBatchTest.createJiraMocks();
+		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
+		
+		// This should not throw an exception since blank values are skipped
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action should be created with blank field values');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation for unknown custom field
+	 */
+	@IsTest
+	public static void test_validate_additional_metadata_unknown_field() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = 'TEST';
+		action.jiraIssueType = 'Bug';
+		action.additionalMetadata = '{"customfield_99999":"SomeValue"}'; // Unknown field
+		
+		// Mock JIRA service responses
+		Map<String, HttpCalloutMock> endpoint2TestResp = JiraNotificationBatchTest.createJiraMocks();
+		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
+		
+		try {
+			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			System.assert(false, 'Should have thrown RuleUtilException for unknown field');
+		} catch (RuleUtil.RuleUtilException e) {
+			System.assert(e.getMessage().contains('is not available for the selected project'), 'Should indicate field not available');
+		}
+		
+		Test.stopTest();
+	}
+
 }

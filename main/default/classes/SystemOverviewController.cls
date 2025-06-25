@@ -49,6 +49,12 @@ public with sharing class SystemOverviewController {
 			'editReadonlyFields' => 'PermissionsEditReadonlyFields'
 	};
 
+	private static final String STANDARD_OBJECTS_TYPE = 'Standard Objects';
+	private static final String CUSTOM_OBJECTS_TYPE = 'Custom Objects';
+	private static final String CUSTOM_SETTINGS_TYPE = 'Custom Settings';
+	private static final String CUSTOM_METADATA_TYPES_TYPE = 'Custom Metadata Types';
+	private static final String BIG_OBJECTS_TYPE = 'Big Objects';
+
 	@AuraEnabled
 	public static String getNameSpacePrefix() {
 		return ConfigUtil.nameSpacePrefix;
@@ -163,48 +169,51 @@ public with sharing class SystemOverviewController {
 		List<ObjectInfo> objectInfos = new List<ObjectInfo>();
 		Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
 		for (String objectName : globalDescribe.keySet()) {
-			Schema.DescribeSObjectResult objResult = globalDescribe.get(objectName).getDescribe();
-			ObjectInfo objectInfo = new ObjectInfo(objResult);
-			if (objResult.isCustom()) {
-				if (objResult.isCustomSetting()) {
-					objectInfo.type = 'Custom Settings';
-				} else if (objectName.endsWith('__mdt')) {
-					objectInfo.type = 'Custom Metadata Types';
-				} else if (!objResult.name.endsWith('__b')) {
-					objectInfo.type = 'Custom Objects';
-				}
-			} else {
-				Boolean isSetupObject = false;
-				if (objResult.name.startsWith('Setup') ||
-						objResult.name.startsWith('Auth') ||
-						objResult.name.startsWith('Permission') ||
-						objResult.name.endsWith('Share') ||
-						objResult.name.endsWith('History') ||
-						objResult.name.endsWith('Feed') ||
-						objResult.name.endsWith('Event') ||
-						objResult.name.endsWith('EventStore') ||
-						objResult.name.endsWith('__b') ||
-						objResult.name.contains('Config') ||
-						objResult.name.contains('Setting')) {
-					isSetupObject = true;
-				}
-				if (!isSetupObject) {
-					if (!objResult.isAccessible() ||
-							!objResult.isCreateable()
-									|| !objResult.isDeletable()
-									|| !objResult.isUpdateable()
-									|| !objResult.isQueryable()
-									|| !objResult.isSearchable()
-									|| objResult.isDeprecatedAndHidden()
-					) {
-						isSetupObject = true;
-					}
-				}
-				if (!isSetupObject) objectInfo.type = 'Standard Objects';
+			Schema.DescribeSObjectResult describeSObjectResult = globalDescribe.get(objectName).getDescribe();
+			String objectType = getObjectType(describeSObjectResult);
+			if (String.isNotBlank(objectType)) {
+				objectInfos.add(new ObjectInfo(describeSObjectResult, objectType));
 			}
-			if (String.isNotBlank(objectInfo.type)) objectInfos.add(objectInfo);
 		}
 		return objectInfos;
+	}
+
+	public static String getObjectType(Schema.DescribeSObjectResult describeSObjectResult) {
+		if (!describeSObjectResult.isAccessible()
+				|| !describeSObjectResult.isCreateable()
+				|| !describeSObjectResult.isDeletable()
+				|| !describeSObjectResult.isUpdateable()
+				|| !describeSObjectResult.isQueryable()
+				|| !describeSObjectResult.isSearchable()
+				|| describeSObjectResult.isDeprecatedAndHidden()) {
+			return null;
+		}
+		if (describeSObjectResult.isCustom()) {
+			if (describeSObjectResult.isCustomSetting()) {
+				return CUSTOM_SETTINGS_TYPE;
+			} else if (describeSObjectResult.name.endsWith('__mdt')) {
+				return CUSTOM_METADATA_TYPES_TYPE;
+			} else if (describeSObjectResult.name.endsWith('__b')) {
+				return BIG_OBJECTS_TYPE;
+			} else {
+				return CUSTOM_OBJECTS_TYPE;
+			}
+		} else {
+			if (describeSObjectResult.name.startsWith('Setup') ||
+					describeSObjectResult.name.startsWith('Auth') ||
+					describeSObjectResult.name.startsWith('Permission') ||
+					describeSObjectResult.name.endsWith('Share') ||
+					describeSObjectResult.name.endsWith('History') ||
+					describeSObjectResult.name.endsWith('Feed') ||
+					describeSObjectResult.name.endsWith('Event') ||
+					describeSObjectResult.name.endsWith('EventStore') ||
+					describeSObjectResult.name.endsWith('__b') ||
+					describeSObjectResult.name.contains('Config') ||
+					describeSObjectResult.name.contains('Setting')) {
+				return null;
+			}
+		}
+		return STANDARD_OBJECTS_TYPE;
 	}
 
 	@AuraEnabled
@@ -425,43 +434,17 @@ public with sharing class SystemOverviewController {
 		orgAtAGlance.customSettings = 0;
 		Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
 		for (String objectName : globalDescribe.keySet()) {
-			Schema.DescribeSObjectResult objResult = globalDescribe.get(objectName).getDescribe();
-			if (objResult.isCustom()) {
-				if (objResult.isCustomSetting()) {
-					orgAtAGlance.customSettings++;
-				} else if (objectName.endsWith('__mdt')) {
-					orgAtAGlance.customMetadata++;
-				} else if (!objResult.name.endsWith('__b')) {
-					orgAtAGlance.customObjects++;
-				}
-			} else {
-				Boolean isSetupObject = false;
-				if (objResult.name.startsWith('Setup') ||
-						objResult.name.startsWith('Auth') ||
-						objResult.name.startsWith('Permission') ||
-						objResult.name.endsWith('Share') ||
-						objResult.name.endsWith('History') ||
-						objResult.name.endsWith('Feed') ||
-						objResult.name.endsWith('Event') ||
-						objResult.name.endsWith('EventStore') ||
-						objResult.name.endsWith('__b') ||
-						objResult.name.contains('Config') ||
-						objResult.name.contains('Setting')) {
-					isSetupObject = true;
-				}
-				if (!isSetupObject) {
-					if (objResult.isAccessible() && (
-							!objResult.isCreateable()
-									|| !objResult.isDeletable()
-									|| !objResult.isUpdateable()
-									|| !objResult.isQueryable()
-									|| !objResult.isSearchable()
-									|| objResult.isDeprecatedAndHidden()
-					)) {
-						isSetupObject = true;
-					}
-				}
-				if (!isSetupObject) orgAtAGlance.standardObjects++;
+			Schema.DescribeSObjectResult describeSObjectResult = globalDescribe.get(objectName).getDescribe();
+			String objectType = getObjectType(describeSObjectResult);
+			if (String.isBlank(objectType)) continue;
+			if (objectType.equals(STANDARD_OBJECTS_TYPE)) {
+				orgAtAGlance.standardObjects++;
+			} else if (objectType.equals(CUSTOM_OBJECTS_TYPE)) {
+				orgAtAGlance.customObjects++;
+			} else if (objectType.equals(CUSTOM_METADATA_TYPES_TYPE)) {
+				orgAtAGlance.customMetadata++;
+			} else if (objectType.equals(CUSTOM_SETTINGS_TYPE)) {
+				orgAtAGlance.customSettings++;
 			}
 		}
 		orgAtAGlance.workflows = 0;
@@ -682,13 +665,17 @@ public with sharing class SystemOverviewController {
 		@AuraEnabled
 		public String type {get; set;}
 		@AuraEnabled
+		public String namespacePrefix { get; set; }
+		@AuraEnabled
 		public Integer recordCount {get; set;}
 		@AuraEnabled
 		public List<ObjectInfoAutomation> automations {get; set;}
 		public ObjectInfo() {}
-		public ObjectInfo(Schema.DescribeSObjectResult objResult) {
-			this.name = objResult.name;
-			this.label = objResult.label;
+		public ObjectInfo(Schema.DescribeSObjectResult describeSObjectResult, String objectType) {
+			this.name = describeSObjectResult.name;
+			this.label = describeSObjectResult.label;
+			this.type = objectType;
+			this.namespacePrefix = name.countMatches('__') > 1 ? name.substringBefore('__') : null;
 		}
 	}
 

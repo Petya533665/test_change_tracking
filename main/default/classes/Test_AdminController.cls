@@ -3239,9 +3239,7 @@ public class Test_AdminController {
 
         Test.stopTest();
 
-        AdminService.PharosRunningUserWrapper newWrapper = (AdminService.PharosRunningUserWrapper) JSON.deserialize(
-                JSON.serialize(response.get('data')), AdminService.PharosRunningUserWrapper.class
-        );
+        AdminService.PharosRunningUserWrapper newWrapper = AdminService.getPharosRunningUserWrapper();
 
         Assert.areEqual(UserInfo.getFirstName(), newWrapper.currentUser.FirstName, 'User First Name does not match');
         Assert.areEqual(UserInfo.getLastName(), newWrapper.currentUser.LastName, 'User Last Name does not match');

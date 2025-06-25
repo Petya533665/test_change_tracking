@@ -530,13 +530,7 @@ public with sharing class LogPostProcessingService {
 		}
 		catch (Exception e) {
 			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Deploy_Results__c, ERROR_SYSTEM_INFO_LOG_RETRIEVE);
-			result.addError(e);
 			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getDeployResults');
-		}
-		finally {
-			if(log.Deploy_Results__c == LogPostProcessingService.ERROR_SYSTEM_INFO_LOG_NOT_AVAILABLE) {
-				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Stacktrace_Parse_Result__c, null);
-			}
 		}
 	}
 

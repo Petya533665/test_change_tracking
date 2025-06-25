@@ -871,19 +871,22 @@ public without sharing class AdminService {
     }
 
     public static String getPackageEmailServiceFunctionEmailAddress() {
+        List<EmailServicesAddress> addresses = getEmailServicesAddresses();
+        return !addresses.isEmpty() ? getEmailFromEmailServiceAddress(addresses.get(0)) : null;
+    }
+
+    public static List<EmailServicesAddress> getEmailServicesAddresses() {
+        List<EmailServicesAddress> addresses = new List<EmailServicesAddress>();
         List<EmailServicesFunction> packageFunctions = getPackageEmailServicesFunctions();
-        if(!packageFunctions.isEmpty()) {
-            List<EmailServicesAddress> adresses = [
-                SELECT LocalPart, EmailDomainName, IsActive
+        if (!packageFunctions.isEmpty()) {
+            addresses = [
+                SELECT DeveloperName, RunAsUserId, LocalPart, EmailDomainName, IsActive
                 FROM EmailServicesAddress
                 WHERE FunctionId = :packageFunctions.get(0).Id AND IsActive = true
-                LIMIT 1
+                ORDER BY CreatedDate ASC
             ];
-            if(!adresses.isEmpty()) {
-                return getEmailFromEmailServiceAddress(adresses.get(0));
-            }
         }
-        return null;
+        return addresses;
     }
 
     public static String getEmailFromEmailServiceAddress(EmailServicesAddress address) {
@@ -1004,17 +1007,20 @@ public without sharing class AdminService {
                 }
             }
 
-            b = HttpUtils.post(
-                ConfigUtil.EMAIL_SERVICES_ADDRESS_ENDPOINT,
-                ConfigUtil.getRequestBodyCreateEmailService(functionId),
-                ConfigUtil.SF_REST_API_HEADERS,
-                201
-            );
-            try {
-                response = (SObjectsCreateResponse)JSON.deserialize(b, SObjectsCreateResponse.class);
-            }
-            catch(Exception e) {
-                throw new AdminServiceException(b);
+            List<EmailServicesAddress> addresses = getEmailServicesAddresses();
+            if (addresses.isEmpty()) {
+                b = HttpUtils.post(
+                    ConfigUtil.EMAIL_SERVICES_ADDRESS_ENDPOINT,
+                    ConfigUtil.getRequestBodyCreateEmailService(functionId),
+                    ConfigUtil.SF_REST_API_HEADERS,
+                    201
+                );
+                try {
+                    response = (SObjectsCreateResponse)JSON.deserialize(b, SObjectsCreateResponse.class);
+                }
+                catch(Exception e) {
+                    throw new AdminServiceException(b);
+                }
             }
 
             try {
@@ -1111,7 +1117,7 @@ public without sharing class AdminService {
         String errorHandlerAddress = getPackageEmailServiceFunctionEmailAddress();
         if(String.isNotBlank(errorHandlerAddress)) {
             try {
-                MetadataService.CaseSettings caseSettings = getCaseSettings();
+                MetadataService.CaseSettings caseSettings = CASE_SETTINGS;
                 if(caseSettings != null && caseSettings.emailToCase != null && caseSettings.emailToCase.enableEmailToCase) {
                     result = true;
                 }
@@ -1127,7 +1133,7 @@ public without sharing class AdminService {
         String errorHandlerAddress = getPackageEmailServiceFunctionEmailAddress();
         if(String.isNotBlank(errorHandlerAddress)) {
             try {
-                MetadataService.CaseSettings caseSettings = getCaseSettings();
+                MetadataService.CaseSettings caseSettings = CASE_SETTINGS;
                 if(caseSettings != null && caseSettings.emailToCase != null && caseSettings.emailToCase.enableEmailToCase) {
                     // User
                     if(String.isNotBlank(caseSettings.defaultCaseUser)) {
@@ -1147,23 +1153,45 @@ public without sharing class AdminService {
     public static Boolean getEmailToCaseErrorTracking() {
         Boolean result = false;
 
-        String errorHandlerAddress = getPackageEmailServiceFunctionEmailAddress();
-        if(String.isNotBlank(errorHandlerAddress)) {
-            MetadataService.CaseSettings caseSettings = getCaseSettings();
-            if(caseSettings != null) {
+        if (String.isNotBlank(getPackageEmailServiceFunctionEmailAddress())) {
+            MetadataService.CaseSettings caseSettings = CASE_SETTINGS;
+            if (caseSettings != null) {
                 // User
-                if(String.isNotBlank(caseSettings.defaultCaseUser)) {
-                    List<User> users = [SELECT Email FROM User WHERE UserName =:caseSettings.defaultCaseUser LIMIT 1];
-                    result = (!users.isEmpty() && users.get(0).Email == errorHandlerAddress);
+                if (String.isNotBlank(caseSettings.defaultCaseUser)) {
+                    List<User> users = getUserByUsername(caseSettings.defaultCaseUser);
+                    List<Log__c> logs = TestDataGenerator.getTestPlatformEventLogs(TestDataGenerator.TEST_ERROR_TRACKING_REQUIRES_CONFIGURATION_HASH1);
+                    result = !users.isEmpty() 
+                        && !logs.isEmpty() 
+                        && users.get(0).Id == logs.get(0).User_Id__c
+                        && users.get(0).Email == logs.get(0).User_Name__c;
                 }
                 //System
                 else if (String.isNotBlank(caseSettings.systemUserEmail)) {
-                    // result = caseSettings.systemUserEmail == errorHandlerAddress;
                     result = true;
                 }
             }
         }
         return result;
+    }
+
+    public static User getEmailToCaseDefaultCaseUserData() {
+        User user = new User();
+        if (String.isNotBlank(getPackageEmailServiceFunctionEmailAddress())) {
+            MetadataService.CaseSettings caseSettings = CASE_SETTINGS;
+            if (caseSettings != null) {
+                // User
+                if (String.isNotBlank(caseSettings.defaultCaseUser)) {
+                    List<User> users = getUserByUsername(caseSettings.defaultCaseUser);
+                    user = !users.isEmpty() ? users.get(0) : user;
+                }
+            }
+        }
+
+        return user;
+    }
+
+    public static List<User> getUserByUsername(String username) {
+        return [SELECT Id, Email FROM User WHERE UserName =:username LIMIT 1];
     }
 
     public static Boolean getAutomatedFlowErrorTracking() {
@@ -1193,6 +1221,16 @@ public without sharing class AdminService {
         return service;
     }
 
+    public static final MetadataService.CaseSettings CASE_SETTINGS {
+        get {
+            if (CASE_SETTINGS == null) {
+                CASE_SETTINGS = getCaseSettings();
+            }
+            return CASE_SETTINGS;
+        }
+        private set;
+    }
+
     public static MetadataService.CaseSettings getCaseSettings() {
         MetadataService.MetadataPort service = getCaseSettingsService();
 
@@ -1219,21 +1257,12 @@ public without sharing class AdminService {
     public static Boolean setEmailToCaseTracking(Boolean value) {
         String errorHandlerAddress = getPackageEmailServiceFunctionEmailAddress();
         if(value && String.isNotBlank(errorHandlerAddress)) {
-            MetadataService.CaseSettings caseSettings = getCaseSettings();
+            MetadataService.CaseSettings caseSettings = CASE_SETTINGS;
             if(caseSettings != null && caseSettings.emailToCase != null && caseSettings.emailToCase.enableEmailToCase) {
                 // User
                 if(String.isNotBlank(caseSettings.defaultCaseUser)) {
-                    List<User> caseErrorUser = [SELECT Id, Email FROM User WHERE Username = :caseSettings.defaultCaseUser LIMIT 1];
-                    if(!caseErrorUser.isEmpty() && caseErrorUser.get(0).Email == errorHandlerAddress) {
-                        setEmailToCaseErrorTrackingStatus(ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED);
-                    }
-                    else if(!caseErrorUser.isEmpty()) {
-                        PermissionsUtil.putSObjectField(caseErrorUser.get(0), Schema.SObjectType.User.fields.Email, errorHandlerAddress);
-                        DatabaseUtils.getInstance().performUpdateDML(caseErrorUser, Schema.SObjectType.User, true);
-
-                        PermissionsUtil.putSObjectField(ConfigUtil.SETTINGS, Schema.SObjectType.Logger_Settings__c.fields.Enable_Email_To_Case_Error_Tracking__c, ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_PENDING);
-                        DatabaseUtils.getInstance().performUpdateDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c, true);
-                    }
+                    setEmailToCaseErrorTrackingStatus(ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED);
+                    
                     return true;
                 }
                 //System
@@ -2009,9 +2038,6 @@ public without sharing class AdminService {
     }
 
     public static Object getJiraProjectUsers(Object data) {
-        if (data instanceof String) {
-            return getJiraProjectUsers(String.valueOf(data));
-        }
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         String projectId = (input.get('projectId') != null) ? (String)input.get('projectId') : null;
         String query = (input.get('query') != null) ? (String)input.get('query') : null;
@@ -4024,7 +4050,8 @@ public without sharing class AdminService {
         return new PharosRunningUserWrapper();
     }
 
-    public static PharosRunningUserWrapper resetScheduleJobs() {
+    public static Boolean resetScheduleJobs() {
+        Boolean result = false;
         for (CronTrigger currentCronTrigger : getCronTriggers()) {
             try {
                 System.abortJob(currentCronTrigger.Id);
@@ -4033,16 +4060,73 @@ public without sharing class AdminService {
 
         LogServiceScheduler.runLogServiceSchedulerModes();
 
-        return getPharosRunningUserWrapper();
+        result = true;
+
+        return result;
+    }
+
+    public static Boolean resetEmailAddressContextUser() {
+        Boolean result = false;
+
+        List<EmailServicesAddress> addresses = getEmailServicesAddresses();
+        if (addresses.isEmpty()) {
+            return true;
+        }
+
+        List<EmailServicesAddress> addressesToDelete = new List<EmailServicesAddress>();
+        if (addresses.size() > 1) {
+            for (Integer i = addresses.size() - 1; i >= 0; i--) {
+                if (i != 0) {
+                    addressesToDelete.add(addresses.get(i));
+                    addresses.remove(i);
+                }
+            }
+        }
+        
+        updateEmailServicesAddress(addresses.get(0));
+        deleteEmailServicesAddresses(addressesToDelete);
+
+        result = true;
+
+        return result;
+    }
+
+    private static void deleteEmailServicesAddresses(List<EmailServicesAddress> addressesToDelete) {
+        for (EmailServicesAddress currentEmailServicesAddress : addressesToDelete) {
+            HttpUtils.del(
+                ConfigUtil.EMAIL_SERVICES_ADDRESS_ENDPOINT + '/' + currentEmailServicesAddress.Id,
+                ConfigUtil.SF_REST_API_HEADERS,
+                204
+            );
+        }
+    }
+
+    private static void updateEmailServicesAddress(EmailServicesAddress emailServicesAddress) {
+        Id currentUserId = UserInfo.getUserId();
+        if (!emailServicesAddress.RunAsUserId.equals(currentUserId)) {
+            String requestBody = '{'+
+                '  "RunAsUserId": "' + currentUserId + '"' +
+            '}';
+
+            HttpUtils.patch(
+                ConfigUtil.EMAIL_SERVICES_ADDRESS_ENDPOINT + '/' + emailServicesAddress.Id,
+                requestBody,
+                ConfigUtil.SF_REST_API_HEADERS,
+                204
+            );
+        }
+        
     }
 
     public class PharosRunningUserWrapper {
         public User currentUser;
         public List<PharosRunningUserScheduleInfoWrapper> scheduleInfoWrappers;
+        public List<PharosRunningUserEmailServiceInfoWrapper> emailServiceInfoWrappers;
 
         public PharosRunningUserWrapper() {
             this.currentUser = getUserInfo();
             this.scheduleInfoWrappers = this.getPharosRunningUserScheduleInfoWrappers();
+            this.emailServiceInfoWrappers = this.getPharosRunningUserEmailServiceInfoWrappers();
         }
 
         private List<PharosRunningUserScheduleInfoWrapper> getPharosRunningUserScheduleInfoWrappers() {
@@ -4054,6 +4138,31 @@ public without sharing class AdminService {
             }
 
             return pharosRunningUserScheduleInfoWrapper;
+        }
+
+        private List<PharosRunningUserEmailServiceInfoWrapper> getPharosRunningUserEmailServiceInfoWrappers() {
+            List<PharosRunningUserEmailServiceInfoWrapper> emailServiceInfoWrappers =
+                new List<PharosRunningUserEmailServiceInfoWrapper>();
+
+            List<EmailServicesAddress> addresses = getEmailServicesAddresses();
+            Map<Id, User> userNameByUserIdMap = new Map<Id, User>(getUsersByUserIds(getEmailServicesAddressRunAsUserIds(addresses)));
+            for (EmailServicesAddress currentEmailServicesAddress : addresses) {
+                emailServiceInfoWrappers.add(new PharosRunningUserEmailServiceInfoWrapper(
+                    currentEmailServicesAddress,
+                    userNameByUserIdMap.get(currentEmailServicesAddress.RunAsUserId)
+                ));
+            }
+
+            return emailServiceInfoWrappers;
+        }
+
+        private Set<Id> getEmailServicesAddressRunAsUserIds(List<EmailServicesAddress> addresses) {
+            Set<Id> userIds = new Set<Id>();
+            for (EmailServicesAddress currentEmailServicesAddress : addresses) {
+                userIds.add(currentEmailServicesAddress.RunAsUserId);
+            }
+
+            return userIds;
         }
     }
 
@@ -4073,6 +4182,18 @@ public without sharing class AdminService {
         }
     }
 
+    public class PharosRunningUserEmailServiceInfoWrapper {
+        public String emailServiceName;
+        public String contextUser;
+        public String emailAddress;
+
+        public PharosRunningUserEmailServiceInfoWrapper(EmailServicesAddress emailServicesAddress, User user) {
+            this.emailServiceName = emailServicesAddress.DeveloperName;
+            this.contextUser = user.Name;
+            this.emailAddress = getEmailFromEmailServiceAddress(emailServicesAddress);
+        }
+    }
+
     private static List<CronTrigger> getCronTriggers() {
         return [
             SELECT Id, CronJobDetail.Name, NextFireTime, StartTime, OwnerId, LastModifiedBy.Name 
@@ -4080,5 +4201,9 @@ public without sharing class AdminService {
             WHERE CronJobDetail.Name IN :ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_NAMES
             ORDER BY CronJobDetail.Name ASC
         ];
+    }
+
+    private static List<User> getUsersByUserIds(Set<Id> userIds) {
+        return [SELECT Name FROM User WHERE Id IN :userIds];
     }
 }

@@ -377,10 +377,10 @@ private class EventLogProcessingBatchTest {
         }
 
         // Create test EventLogFile with generated data
-        EventLogFile testLogFile = createDefaultEventLogFile(eventType != null ? eventType : EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION);
+        SObject testLogFile = createDefaultEventLogFile(eventType != null ? eventType : EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION);
 
         // Set test event logs
-        EventMonitoringUtil.testEventLogs = new List<EventLogFile>{testLogFile};
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
         EventLogProcessors.testEventLogFieldNames = generateNameFields();
         EventLogProcessors.testEventLogFieldTypes = generateTypeFields();
 
@@ -520,14 +520,22 @@ private class EventLogProcessingBatchTest {
         return testThresholds;
     }
 
-    private static EventLogFile createDefaultEventLogFile(String eventType) {
+    private static SObject createDefaultEventLogFile(String eventType) {
         String fileContent = generateTestDataForDefaultConfig(eventType);
-        return new EventLogFile(
-            EventType = eventType,
-            LogDate = Date.today(),
-            LogFileLength = fileContent.length(),
-            LogFile = Blob.valueOf(fileContent)
+        SObject testEventLog = EventMonitoringUtil.createTestEventLogSObject(
+            eventType,
+            Date.today(),
+            Blob.valueOf(fileContent)
         );
+        
+        if (testEventLog == null) {
+            // Fallback for orgs without EventLogFile - create a mock SObject
+            Account mockAccount = new Account(Name = 'Test Mock EventLog Batch - ' + eventType);
+            testEventLog = (SObject)mockAccount;
+            testEventLog.put('Id', '001000000000BatchTest'); // Mock ID
+        }
+        
+        return testEventLog;
     }
 
     private static String generateTestDataForDefaultConfig(String eventType) {
@@ -622,15 +630,21 @@ private class EventLogProcessingBatchTest {
         
         // Create test data for ApexUnexpectedException with specific data that will trigger anomalies
         String csvData = generateApexUnexpectedExceptionCsvData();
-        EventLogFile testLogFile = new EventLogFile(
-            EventType = eventType,
-            LogDate = Date.today(),
-            LogFileLength = csvData.length(),
-            LogFile = Blob.valueOf(csvData)
+        SObject testLogFile = EventMonitoringUtil.createTestEventLogSObject(
+            eventType,
+            Date.today(),
+            Blob.valueOf(csvData)
         );
         
+        if (testLogFile == null) {
+            // Fallback for orgs without EventLogFile
+            Account mockAccount = new Account(Name = 'Test Mock EventLog Exception 1');
+            testLogFile = (SObject)mockAccount;
+            testLogFile.put('Id', '001000000000Exception1'); // Mock ID
+        }
+        
         // Set test event logs
-        EventMonitoringUtil.testEventLogs = new List<EventLogFile>{testLogFile};
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
         EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionFieldNames();
         EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionFieldTypes();
         
@@ -689,15 +703,21 @@ private class EventLogProcessingBatchTest {
         
         // Create test data for ApexUnexpectedException
         String csvData = generateApexUnexpectedExceptionCsvData();
-        EventLogFile testLogFile = new EventLogFile(
-            EventType = eventType,
-            LogDate = Date.today(),
-            LogFileLength = csvData.length(),
-            LogFile = Blob.valueOf(csvData)
+        SObject testLogFile = EventMonitoringUtil.createTestEventLogSObject(
+            eventType,
+            Date.today(),
+            Blob.valueOf(csvData)
         );
         
+        if (testLogFile == null) {
+            // Fallback for orgs without EventLogFile
+            Account mockAccount = new Account(Name = 'Test Mock EventLog Exception 2');
+            testLogFile = (SObject)mockAccount;
+            testLogFile.put('Id', '001000000000Exception2'); // Mock ID
+        }
+        
         // Set test event logs
-        EventMonitoringUtil.testEventLogs = new List<EventLogFile>{testLogFile};
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
         EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionFieldNames();
         EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionFieldTypes();
         
@@ -746,15 +766,21 @@ private class EventLogProcessingBatchTest {
         
         // Create test data with multiple exception records
         String csvData = generateMultipleApexUnexpectedExceptionCsvData();
-        EventLogFile testLogFile = new EventLogFile(
-            EventType = eventType,
-            LogDate = Date.today(),
-            LogFileLength = csvData.length(),
-            LogFile = Blob.valueOf(csvData)
+        SObject testLogFile = EventMonitoringUtil.createTestEventLogSObject(
+            eventType,
+            Date.today(),
+            Blob.valueOf(csvData)
         );
         
+        if (testLogFile == null) {
+            // Fallback for orgs without EventLogFile
+            Account mockAccount = new Account(Name = 'Test Mock EventLog Exception 3');
+            testLogFile = (SObject)mockAccount;
+            testLogFile.put('Id', '001000000000Exception3'); // Mock ID
+        }
+        
         // Set test event logs
-        EventMonitoringUtil.testEventLogs = new List<EventLogFile>{testLogFile};
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
         EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionFieldNames();
         EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionFieldTypes();
         
