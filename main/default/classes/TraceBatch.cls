@@ -48,14 +48,14 @@ public with sharing class TraceBatch extends DatabaseUtils.PharosBatchImpl imple
 
     public void execute(Database.BatchableContext BC, List<Trace_Request__c> scope) {
 		try {
-            if(!scope.isEmpty()) {
+            if(scope != null && !scope.isEmpty()) {
                 Trace_Request__c traceRequest = (Trace_Request__c)scope.get(0);
                 Boolean checkConsistencyTraceFlag = traceRequest.Status__c == TraceService.TRACE_REQUEST_STATUS_IN_PROGRESS;
 			    this.traceServiceInst.processNewTraceFlag(traceRequest, checkConsistencyTraceFlag);
             }
         }
         catch(Exception e) {
-            String scopeId = (!scope.isEmpty()) ? scope.get(0)?.Id : null;
+            String scopeId = (scope != null && !scope.isEmpty()) ? scope.get(0)?.Id : null;
             this.traceServiceInst?.loggerInstance?.add(this.traceServiceInst.loggerInstance.getInternalError(e, scopeId, TraceBatch.class.getName(), 'execute.processTraceFlag'));
         }
     }

@@ -121,7 +121,7 @@ private class LogServiceBatchTest {
         Test.stopTest();
 
         log = [SELECT Post_Processing_Status__c, Stacktrace_Parse_Result__c FROM Log__c WHERE Id = :log.Id LIMIT 1];
-        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_FAILED, log.Post_Processing_Status__c);
+        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, log.Post_Processing_Status__c);
         System.assertEquals(JSON.serialize(null), log.Stacktrace_Parse_Result__c);
     }
 
@@ -165,7 +165,7 @@ private class LogServiceBatchTest {
         Test.stopTest();
 
         log = [SELECT Post_Processing_Status__c FROM Log__c WHERE Id = :log.Id LIMIT 1];
-        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_FAILED, log.Post_Processing_Status__c);
+        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, log.Post_Processing_Status__c);
     }
 
     @IsTest
@@ -707,5 +707,34 @@ private class LogServiceBatchTest {
         System.assertEquals('100000000000007', cachedValue.get(5).id);
         System.assertEquals('100000000000008', cachedValue.get(6).id);
         System.assertEquals('100000000000009', cachedValue.get(7).id);
+    }
+
+    @IsTest
+    static void whenDeployRequestToolingFailedPostProcessingShouldBeCompleted() {
+        delete [SELECT Id FROM Logger_Settings__c];
+        delete [SELECT Id FROM Connected_Orgs_Settings__c];
+        delete [SELECT Id FROM Connected_Org__c];
+        Test_LogService.initSettings();
+        
+        Test.startTest();
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        endpoint2TestResp.putAll(Test_StackTraceParser.createPostProcessingMock(null, null, null, false));
+
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Log__c log = new Log__c();
+        log.Hash_1__c = 'hash1';
+        log.Category__c = 'Apex';
+        log.Type__c = 'Custom';
+        log.Organization_Id__c = UserInfo.getOrganizationId().left(15);
+        log.Post_Processing_Status__c = LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED;
+        insert log;
+
+        LogPostProcessingBatch.getInstance().startBatch();
+        Test.stopTest();
+
+        log = [SELECT Post_Processing_Status__c FROM Log__c WHERE Id = :log.Id LIMIT 1];
+        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, log.Post_Processing_Status__c);
     }
 }

@@ -47,6 +47,10 @@ public with sharing class MonitoringBatch extends DatabaseUtils.PharosBatchImpl 
     }
 
     public void execute(Database.BatchableContext BC, List<Rule__c> scope) {
+        if (scope == null || scope.isEmpty()) {
+            return; // Skip processing for empty scope
+        }
+        
         // clear cached rules for Test context
         MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
         

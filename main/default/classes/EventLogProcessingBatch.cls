@@ -99,7 +99,10 @@ public class EventLogProcessingBatch extends DatabaseUtils.PharosBatchImpl imple
      */
 
     public override Boolean initialValidation() {
-        return PermissionsUtil.EventMonitoringEnabled && this.isEnabled && this.lastProcessedHourlyDateTime != null;
+        return EventMonitoringUtil.isEventLogFileAvailable() 
+            && PermissionsUtil.EventMonitoringEnabled 
+            && this.isEnabled 
+            && this.lastProcessedHourlyDateTime != null;
     }
 
     /**
@@ -113,11 +116,11 @@ public class EventLogProcessingBatch extends DatabaseUtils.PharosBatchImpl imple
     /**
      * Get the event logs for the batch
      * @param enabledMembers List<EventLogFileType>
-     * @return List<EventLogFile>
+     * @return List<SObject>
      */
-    private List<EventLogFile> getEventLogs(List<EventLogFileType> enabledMembers) {
+    private List<SObject> getEventLogs(List<EventLogFileType> enabledMembers) {
         if (enabledMembers == null || enabledMembers.isEmpty()) {
-            return new List<EventLogFile>();
+            return new List<SObject>();
         }
         String eventType = enabledMembers[0].type;
         return EventMonitoringUtil.getEventLogs(eventType);
@@ -148,24 +151,31 @@ public class EventLogProcessingBatch extends DatabaseUtils.PharosBatchImpl imple
      * @param scope List<EventLogFileType>
      */
     public void execute(Database.BatchableContext BC, List<EventLogFileType> scope) {
-        List<EventLogFile> eventLogs = getEventLogs(scope);
+        List<SObject> eventLogs = getEventLogs(scope);
         
-        for (EventLogFile logFile : eventLogs) {
+        for (SObject logFile : eventLogs) {
             try {
+                // Get EventType safely from SObject
+                String eventType = EventMonitoringUtil.getStringValue(logFile, EventMonitoringUtil.EVENT_LOG_FILE_EVENT_TYPE);
+                if (String.isBlank(eventType)) {
+                    continue;
+                }
+
                 // Create a processor for the log file
-                EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(logFile.EventType);
+                EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(eventType);
 
                 // Create a detector for the event type
-                AnomalyDetectors.IAnomalyDetector detector = AnomalyDetectors.createDetector(logFile.EventType);
+                AnomalyDetectors.IAnomalyDetector detector = AnomalyDetectors.createDetector(eventType);
 
                 // Process the log file in batches
                 EventLogProcessors.BatchEventDataProcessor batchProcessor = new EventLogProcessors.BatchEventDataProcessor(detector, this.logger);
                 
                 // Process the log file with batch callback
-                processor.batchProcessLogFile(logFile, batchProcessor);
+                processor.batchProcessLogFileSObject(logFile, batchProcessor);
             }
             catch (Exception e) {
-                this.logger.add(this.logger.getInternalError(e, logFile.Id, EventLogProcessingBatch.class.getName(), 'Error processing log file'));
+                String logFileId = EventMonitoringUtil.getStringValue(logFile, EventMonitoringUtil.EVENT_LOG_FILE_ID);
+                this.logger.add(this.logger.getInternalError(e, logFileId, EventLogProcessingBatch.class.getName(), 'Error processing log file'));
             }
         }
 

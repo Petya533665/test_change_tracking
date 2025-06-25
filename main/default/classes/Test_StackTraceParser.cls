@@ -1111,10 +1111,15 @@ public class Test_StackTraceParser {
 
     @TestVisible
     private static Map<String, HttpCalloutMock> createPostProcessingMock(String flowDeveloperName, String flowNamespace, Integer flowVersion) {
+        return createPostProcessingMock(flowDeveloperName, flowNamespace, flowVersion, true);
+    }
+
+    @TestVisible
+    private static Map<String, HttpCalloutMock> createPostProcessingMock(String flowDeveloperName, String flowNamespace, Integer flowVersion, Boolean isPositiveDeployResultsMock) {
         Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
         endpoint2TestResp.putAll(getApexClassesMock());
         endpoint2TestResp.putAll(getApexTriggersMock());
-        endpoint2TestResp.putAll(getDeployResultsMock());
+        endpoint2TestResp.putAll(isPositiveDeployResultsMock ? getDeployResultsMock() : getDeployResultsBadRequestMock());
         endpoint2TestResp.putAll(getSObjectDescribeMock());
         endpoint2TestResp.putAll(getAuditTrailsMock());
         endpoint2TestResp.putAll(getInstalledPackagesMock());
@@ -1247,14 +1252,7 @@ public class Test_StackTraceParser {
         deployResult.completedDate = DateTime.now();
         deployResults.add(deployResult);
 
-        String query = new QBuilder('deployRequest')
-            .selectFields(LogPostProcessingService.DEPLOY_RESULT_FIELDS)
-            .add(QBuilder.condition('Status').isIn(new List<String>{'Succeeded', 'SucceededPartial'}))
-            .addLimit(10)
-            .add(new QOrder('CompletedDate').descending())
-            .build();
-
-        endpoint2TestResp.put(Test_LogService.CONNECETED_ORG_INSTANCE_URL + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(query, 'UTF-8'), new TestDataFactory.SingleRequestMock(
+        endpoint2TestResp.put(Test_LogService.CONNECETED_ORG_INSTANCE_URL + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(getDeployRequestDynamicQuery(), 'UTF-8'), new TestDataFactory.SingleRequestMock(
             200,
             'OK',
             JSON.serialize(new Map<String, Object>{
@@ -1262,6 +1260,35 @@ public class Test_StackTraceParser {
             })
         ));
         return endpoint2TestResp;
+    }
+
+    private static Map<String, HttpCalloutMock> getDeployResultsBadRequestMock() {
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+
+        endpoint2TestResp.put(Test_LogService.CONNECETED_ORG_INSTANCE_URL + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(getDeployRequestDynamicQuery(), 'UTF-8'), new TestDataFactory.SingleRequestMock(
+            400,
+            'Bad Request',
+            JSON.serialize(getHttpMockDeployResultErrorList())
+        ));
+        return endpoint2TestResp;
+    }
+
+    private static String getDeployRequestDynamicQuery() {
+        return new QBuilder('deployRequest')
+            .selectFields(LogPostProcessingService.DEPLOY_RESULT_FIELDS)
+            .add(QBuilder.condition('Status').isIn(new List<String>{'Succeeded', 'SucceededPartial'}))
+            .addLimit(10)
+            .add(new QOrder('CompletedDate').descending())
+            .build();
+    }
+
+    private static List<Map<String, String>> getHttpMockDeployResultErrorList() {
+        return new List<Map<String, String>>{
+            new Map<String, String>{
+                'errorCode' => 'INVALID_TYPE',
+                'message' => 'sObject type \'DeployRequest\' is not supported.'
+            }
+        };
     }
 
     private static Map<String, HttpCalloutMock> getAuditTrailsMock() {
@@ -2848,5 +2875,40 @@ public class Test_StackTraceParser {
         // The Details__c field should contain the original (non-abbreviated) content since it processes from email.plainTextBody
         System.assertNotEquals(null, createdLog.Details__c, 'Details should be populated');
         
+    }
+
+    @IsTest
+    static void whenDeployRequestToolingFailedPostProcessingShouldBeCompleted() {
+
+        Test_LogService.initSettings();
+        
+        Messaging.InboundEmail email = new Messaging.InboundEmail() ;
+        Messaging.InboundEnvelope env = new Messaging.InboundEnvelope();
+        
+        List<string> emails = new List<string>{'testemail1@gmail.com'};
+        
+        email.subject = 'An error occurred with your "DY_New_Screen_Flow" flow';
+        email.fromAddress = 'system@salesforce.com';
+        email.toAddresses = emails;
+        email.htmlBody = Test_LogService.getTestStub('FLOW_STACKTRACE_MULTIPLE_EDGES_ON_ELEMENT');
+
+        Test.startTest();
+        StackTraceParser.corg = ConnectedOrgService.getConnectedOrgById(Test_LogService.CONNECETED_ORG_NAME);
+        Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(Test_LogService.getTestStub('FLOW_STACKTRACE_MULTIPLE_EDGES_ON_ELEMENT_METADATA')));
+
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.putAll(createPostProcessingMock('DY_New_Screen_Flow', 'testnewmp', 1, false));
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        LogTriggerHelper.runPostProcessingBatchInTest = true;
+
+        ErrorEmailHandler testInbound = new ErrorEmailHandler();
+        testInbound.handleInboundEmail(email, env);
+        Test.stopTest();
+
+        Log__c failedFlowLog = [SELECT Id, Stacktrace_Parse_Result__c, Post_Processing_Status__c FROM Log__c WHERE Category__c = 'Flow' LIMIT 1];
+        System.assertNotEquals(null, failedFlowLog.Stacktrace_Parse_Result__c);
+        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, failedFlowLog.Post_Processing_Status__c);
     }
 }

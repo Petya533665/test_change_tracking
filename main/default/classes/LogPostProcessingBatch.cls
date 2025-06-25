@@ -71,6 +71,10 @@ public with sharing class LogPostProcessingBatch extends DatabaseUtils.PharosBat
     private Set<Id> orchestratorLogIdsForBroadcastInTransaction = new Set<Id>();
 
     public void execute(Database.BatchableContext BC, List<Log__c> scope) {
+        if (scope == null || scope.isEmpty()) {
+            return; // Skip processing for empty scope
+        }
+        
         // Counter (stored in cache) to limit Log processing number to 2 and prevent recursion
         Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(scope[0].Organization_Id__c);
         String cacheKey = corg?.Name + scope[0].Id + CacheUtils.KEY_POST_PROCESSING_LOG_TRACKING;

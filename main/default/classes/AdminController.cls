@@ -366,18 +366,26 @@ public with sharing class AdminController {
                 response.data = AdminService.getPharosRunningUserWrapper();
             } else if (method.equals('resetScheduleJobs')) {
                 response.data = AdminService.resetScheduleJobs();
+            } else if (method.equals('resetEmailAddressContextUser')) {
+                response.data = AdminService.resetEmailAddressContextUser();
+            } else if (method.equals('getEmailToCaseDefaultCaseUserData')) {
+                response.data = AdminService.getEmailToCaseDefaultCaseUserData();
+            } else if (method.equals('startErrorTrackingRequiresConfigurationTest')) {
+                response.data = TestDataGenerator.startErrorTrackingRequiresConfigurationTest(data);
+            } else if (method.equals('getErrorTrackingRequiresConfigurationLog')) {
+                response.data = TestDataGenerator.getErrorTrackingRequiresConfigurationLog();
             } else if (method.equals('getRuleWizardData')) {
                 response.data = RuleExportImportService.getRuleWizardData();
             } else if (method.equals('exportRules')) {
                 response.data = RuleExportImportService.exportRules(
                     (List<String>)JSON.deserialize(JSON.serialize(data), List<String>.class)
                 );
+            }  else if (method.equals('exportRulesWithDownloadUrl')) {
+                response.data = RuleExportImportService.exportRulesWithDownloadUrl(
+                        (List<String>)JSON.deserialize(JSON.serialize(data), List<String>.class)
+                );
             } else if (method.equals('importRules')) {
                 response.data = RuleExportImportService.importRules((String)request.get('data'));
-            } else if (method.equals('exportRulesWithDownloadUrl')) {
-                response.data = RuleExportImportService.exportRulesWithDownloadUrl(
-                    (List<String>)JSON.deserialize(JSON.serialize(data), List<String>.class)
-                );
             } else {
                 response.error = 'Action not found';
             }

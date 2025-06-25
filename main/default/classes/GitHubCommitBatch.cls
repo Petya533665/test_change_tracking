@@ -145,6 +145,10 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
     }
 
     public void execute(Database.BatchableContext info, List<AWSCallTypeWrapper> scope) {
+        if (scope == null || scope.isEmpty()) {
+            return; // Skip processing for empty scope
+        }
+        
         AWSCallTypeWrapper token = scope.get(0);
         switch on token?.type {
             when GIT {

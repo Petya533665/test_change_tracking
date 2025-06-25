@@ -396,18 +396,35 @@ public class EventLogProcessors {
         /**
          * Batch Process EventLogFile
          * 
-         * This method is used to process event data from a log file.
+         * @deprecated Use batchProcessLogFileSObject instead for safe SObject access
+         * This method is kept for backward compatibility but delegates to the safe SObject version
+         */
+        public virtual void batchProcessLogFile(SObject logFile, IBatchProcessor batchProcessor) {
+            // Delegate to the safe SObject version
+            batchProcessLogFileSObject(logFile, batchProcessor);
+        }
+
+        /**
+         * Batch Process EventLogFile using SObject for safe access
+         * 
+         * This method is used to process a log file in batches using SObject for safe field access.
          * It uses the CSVParser to parse the log file and the requiredHeaders to validate the headers.
          * It also provides methods chunk process the csv rows and process them in batches. after processing the batch, it calls the callback to process the batch results.
          */
-        public virtual void batchProcessLogFile(EventLogFile logFile, IBatchProcessor batchProcessor) {
-            if (logFile?.LogFile == null) return;
+        public virtual void batchProcessLogFileSObject(SObject logFile, IBatchProcessor batchProcessor) {
+            if (logFile == null) return;
+
+            // Get LogFile blob safely
+            Blob logFileBlob = EventMonitoringUtil.getBlobValue(logFile, EventMonitoringUtil.EVENT_LOG_FILE_LOG_FILE);
+            if (logFileBlob == null) return;
 
             // Create field metadata config
-            this.fieldMetadataConfig = (Test.isRunningTest()) ? new FieldMetadataConfig(testEventLogFieldNames, testEventLogFieldTypes) : new FieldMetadataConfig(logFile.LogFileFieldNames, logFile.LogFileFieldTypes);
+            String fieldNames = Test.isRunningTest() ? testEventLogFieldNames : EventMonitoringUtil.getStringValue(logFile, EventMonitoringUtil.EVENT_LOG_FILE_LOG_FILE_FIELD_NAMES);
+            String fieldTypes = Test.isRunningTest() ? testEventLogFieldTypes : EventMonitoringUtil.getStringValue(logFile, EventMonitoringUtil.EVENT_LOG_FILE_LOG_FILE_FIELD_TYPES);
+            this.fieldMetadataConfig = new FieldMetadataConfig(fieldNames, fieldTypes);
 
             // Parse the log file, retrieve the headers
-            csvParser.parse(logFile.LogFile.toString());
+            csvParser.parse(logFileBlob.toString());
     
             // Validate headers
             List<String> headers = csvParser.getHeaders();

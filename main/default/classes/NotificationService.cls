@@ -91,9 +91,14 @@ public with sharing class NotificationService {
                 queue.remove(0);
                 
                 if (!queue.isEmpty()) {
-                    // Set the next iteration as current
-                    ActionIteration nextIteration = queue[0];
-                    this.recordCurrentIterations.put(recordId, nextIteration);
+                    // Set the next iteration as current - safe access
+                    ActionIteration nextIteration = queue.size() > 0 ? queue[0] : null;
+                    if (nextIteration != null) {
+                        this.recordCurrentIterations.put(recordId, nextIteration);
+                    } else {
+                        this.recordCurrentIterations.remove(recordId);
+                        this.recordIterationQueues.remove(recordId);
+                    }
                 } else {
                     // No more iterations, clear everything
                     this.recordCurrentIterations.remove(recordId);
@@ -210,6 +215,7 @@ public with sharing class NotificationService {
         void executeIteration();
         void executeIteration(ActionIteration targetIteration);
         void setIterationRecordFailedStatus();
+        NotificationService.ExecutableRulesConfig clearRunningIdsInConfig(String recordId, SObject record);
         void setRecordFailedStatusThrowBySendErrors();
         void sendTicketing();
         Integer getSObjectRecordsCount();
@@ -355,29 +361,48 @@ public with sharing class NotificationService {
         }
 
         public virtual void batchExecuteIteration(Database.BatchableContext info, List<SObject> scope, BatchContextManager batchContextManager) {
+            if (scope == null || scope.isEmpty()) {
+                return; // Skip processing for empty scope
+            }
             init(scope.get(0));
             
             // Get the current action iteration from batch context manager
             ActionIteration currentIteration = batchContextManager != null ? 
                 batchContextManager.getIterationContext(this.recordId) : null;
             
-            if (currentIteration == null || currentIteration.iterationNumber == 1) {
-                // First iteration or no context: process actions (include Slack in tests)
-                Integer countIterations = getCountIterations(info);
-                if (countIterations <= MAX_NOTIFICATION_ATTEMPTS) {
+            // Apply MAX_NOTIFICATION_ATTEMPTS check to ALL iterations
+            Integer countIterations = getCountIterations(info);
+            if (countIterations <= MAX_NOTIFICATION_ATTEMPTS) {
+                if (currentIteration == null || currentIteration.iterationNumber == 1) {
+                    // First iteration or no context: process actions (include Slack in tests)
                     executeIteration(currentIteration);
                 } else {
-                    setIterationRecordFailedStatus();
+                    // Subsequent iterations: process specific Slack action
+                    executeIteration(currentIteration);
                 }
             } else {
-                // Subsequent iterations: process specific Slack action
-                executeIteration(currentIteration);
+                // Exceeded max attempts - fail the record
+                setIterationRecordFailedStatus();
             }
             
             // Clean up context
             if (currentIteration != null && batchContextManager != null) {
                 batchContextManager.clearIterationContext(this.recordId);
             }
+        }
+
+        public virtual NotificationService.ExecutableRulesConfig clearRunningIdsInConfig(String recordId, SObject record) {
+            NotificationService.ExecutableRulesConfig config;
+            if (NotificationService.mapConfigsInTransaction.containsKey(String.valueOf(recordId))) {
+                // Use the latest config from transaction cache (includes completed actions)
+                config = NotificationService.mapConfigsInTransaction.get(String.valueOf(recordId));
+            } else {
+                // Fallback to parsing from record field
+                config = NotificationService.getExecutableRuleConfig(record);
+            }
+            
+            config.clearRunningIds();
+            return config;
         }
 
         public virtual void finish(Database.BatchableContext info) {
@@ -470,7 +495,11 @@ public with sharing class NotificationService {
                 setRecordFailedStatusThrowBySendErrors();
             }
             else if(!this.ticketingRules.isEmpty()) {
-                MonitoringUtil.MonitoringRule rule = this.ticketingRules.get(0);
+                MonitoringUtil.MonitoringRule rule = this.ticketingRules.size() > 0 ? this.ticketingRules.get(0) : null;
+                if (rule == null) {
+                    setRecordFailedStatusThrowBySendErrors();
+                    return;
+                }
                 for(MonitoringUtil.Action action : rule.actions) {
                     switch on MonitoringUtil.MAP_ACTIONTYPES_BY_STRINGS.get(action.type) {
                         when JIRA, AZURE_DEV_OPS {
@@ -520,8 +549,11 @@ public with sharing class NotificationService {
                 return new List<Messaging.SingleEmailMessage>();
             }
 
-            MonitoringUtil.MonitoringRule rule = this.notificationRules.get(0);
-            ActionProcessor processor = new ActionProcessor(this.recordId, this.logErrors);
+            MonitoringUtil.MonitoringRule rule = this.notificationRules.size() > 0 ? this.notificationRules.get(0) : null;
+            if (rule == null) {
+                return new List<Messaging.SingleEmailMessage>();
+            }
+            ActionProcessor processor = new ActionProcessor(this.recordId, this.logErrors, this.record);
             
             return processor.processActionsWithSlackStrategy(rule.actions, includeAllSlackActions);
         }
@@ -993,7 +1025,7 @@ public with sharing class NotificationService {
             
             if (!this.notificationRules.isEmpty()) {
                 MonitoringUtil.MonitoringRule rule = this.notificationRules.get(0);
-                ActionProcessor processor = new ActionProcessor(this.recordId, this.logErrors);
+                ActionProcessor processor = new ActionProcessor(this.recordId, this.logErrors, this.record);
                 processor.processSpecificAction(rule.actions, iteration.actionId, iteration.actionType);
                 
                 // IMPORTANT: Process errors after action execution
@@ -1058,6 +1090,11 @@ public with sharing class NotificationService {
             if(log.Notification_Integration_Status__c == MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_PENDING) {
                 PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Notification_Integration_Status__c, MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_FAILED);
             }
+
+            // clear running ids in config
+            NotificationService.ExecutableRulesConfig config = clearRunningIdsInConfig(log.Id, log);
+            PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Executable_Rules__c, config.toJSON());
+
             DatabaseUtils.getInstance().performUpdateDML(new List<Log__c>{log}, Schema.SObjectType.Log__c)
                     .handleError(NotificationServiceLogImpl.class.getName(), '.setIterationRecordFailedStatus', logger);
         }
@@ -1173,6 +1210,10 @@ public with sharing class NotificationService {
             if(issue.Notification_Integration_Status__c == MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_PENDING) {
                 PermissionsUtil.putSObjectField(issue, Schema.SObjectType.Issue__c.fields.Notification_Integration_Status__c, MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_FAILED);
             }
+            // clear running ids in config
+            NotificationService.ExecutableRulesConfig config = clearRunningIdsInConfig(issue.Id, issue);
+            PermissionsUtil.putSObjectField(issue, Schema.SObjectType.Issue__c.fields.Executable_Rules__c, config.toJSON());
+
             DatabaseUtils.getInstance().performUpdateDML(new List<Issue__c>{issue}, Schema.SObjectType.Issue__c)
                     .handleError(NotificationServiceIssueImpl.class.getName(), '.setIterationRecordFailedStatus', logger);
         }
@@ -1311,6 +1352,11 @@ public with sharing class NotificationService {
             if(traceResult.Notification_Integration_Status__c == MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_PENDING) {
                 PermissionsUtil.putSObjectField(traceResult, Schema.SObjectType.Trace_Result__c.fields.Notification_Integration_Status__c, MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_FAILED);
             }
+
+            // clear running ids in config
+            NotificationService.ExecutableRulesConfig config = clearRunningIdsInConfig(traceResult.Id, traceResult);
+            PermissionsUtil.putSObjectField(traceResult, Schema.SObjectType.Trace_Result__c.fields.Executable_Rules__c, config.toJSON());
+
             DatabaseUtils.getInstance().performUpdateDML(new List<Trace_Result__c>{traceResult}, Schema.SObjectType.Trace_Result__c)
                     .handleError(NotificationServiceTraceResultImpl.class.getName(), '.setIterationRecordFailedStatus', logger);
         }
@@ -2422,6 +2468,7 @@ public with sharing class NotificationService {
         private ActionHandlerRegistry registry;
         private ActionExceptionHandler exceptionHandler;
         private ExecutableRulesConfig config;
+        private SObject record; // Add record reference to load config from database
         
         public ActionProcessor(String recordId, ErrorsHelper logErrors) {
             this.recordId = recordId;
@@ -2429,11 +2476,56 @@ public with sharing class NotificationService {
             this.registry = new ActionHandlerRegistry();
             this.exceptionHandler = new ActionExceptionHandler();
             
-            // Get config from transaction cache or create new one
+            // Get config from transaction cache first
             this.config = mapConfigsInTransaction.get(recordId);
             if (this.config == null) {
-                this.config = new ExecutableRulesConfig();
+                // Fallback: try to get the record and load config from Executable_Rules__c field
+                this.config = loadConfigFromRecord(recordId);
             }
+        }
+        
+        /**
+         * Constructor that accepts the record directly (more efficient)
+         */
+        public ActionProcessor(String recordId, ErrorsHelper logErrors, SObject record) {
+            this.recordId = recordId;
+            this.logErrors = logErrors;
+            this.registry = new ActionHandlerRegistry();
+            this.exceptionHandler = new ActionExceptionHandler();
+            this.record = record;
+            
+            // Get config from transaction cache first
+            this.config = mapConfigsInTransaction.get(recordId);
+            if (this.config == null) {
+                // Load config from the provided record
+                this.config = NotificationService.getExecutableRuleConfig(record);
+            }
+        }
+        
+        /**
+         * Load configuration from record in database
+         */
+        private ExecutableRulesConfig loadConfigFromRecord(String recordId) {
+            try {
+                // Determine record type and query appropriately
+                Schema.SObjectType recordType = getRecordSObjectType(recordId);
+                if (recordType == null) {
+                    return new ExecutableRulesConfig(); // Fallback to empty config
+                }
+                
+                String query = 'SELECT Id, Executable_Rules__c FROM ' + recordType.getDescribe().getName() + ' WHERE Id = :recordId LIMIT 1';
+                List<SObject> records = Database.query(query);
+                
+                if (!records.isEmpty()) {
+                    return NotificationService.getExecutableRuleConfig(records[0]);
+                }
+            } catch (Exception e) {
+                // Log error but don't fail the entire process
+                Logger.getInstance()?.addInternalError(e, NotificationService.class.getName(), 'loadConfigFromRecord');
+            }
+            
+            // Fallback to empty config if record not found or error occurred
+            return new ExecutableRulesConfig();
         }
         
         /**
@@ -2774,6 +2866,9 @@ public with sharing class NotificationService {
             }
             
             // Step 2: Bulk load all rules once (avoid repeated SOQL queries)
+            if (allRecords == null || allRecords.isEmpty()) {
+                return result;
+            }
             String ruleSobjectType = notificationServiceImpl.strategy.getRuleSobjectType(allRecords[0]);
             List<MonitoringUtil.MonitoringRule> allNotificationRules = 
                 MonitoringUtil.getNotificationRules(new List<String>(allExecutableRuleIds), ruleSobjectType);

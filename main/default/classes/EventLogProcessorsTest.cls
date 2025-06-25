@@ -40,7 +40,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + String.join(dataRows, '\n');
-        EventLogFile logFile = createTestEventLogFile(
+        SObject logFile = createTestEventLogFile(
             EventLogProcessors.EVENT_TYPE_WAVE_INTERACTION, 
             fileContent
         );
@@ -105,7 +105,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_API, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_API, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -166,7 +166,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_CALLOUT, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_CALLOUT, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -220,7 +220,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_EXECUTION, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_EXECUTION, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -278,7 +278,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_REST_API, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_REST_API, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -342,7 +342,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_SOAP, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_SOAP, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -398,7 +398,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_TRIGGER, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_TRIGGER, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -449,7 +449,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -495,7 +495,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_API_TOTAL_USAGE, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_API_TOTAL_USAGE, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -547,7 +547,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_ASYNCHRONOUS_REPORT_RUN, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_ASYNCHRONOUS_REPORT_RUN, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -607,7 +607,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_BLOCKED_REDIRECT, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_BLOCKED_REDIRECT, fileContent);
         
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_BLOCKED_REDIRECT);
@@ -646,7 +646,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_BULK_API, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_BULK_API, fileContent);
         
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_BULK_API);
@@ -697,7 +697,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_AURA_REQUEST, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_AURA_REQUEST, fileContent);
         
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_AURA_REQUEST);
@@ -748,7 +748,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_BULK_API_REQUEST, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_BULK_API_REQUEST, fileContent);
         
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_BULK_API_REQUEST);
@@ -802,7 +802,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_BULK_API_2, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_BULK_API_2, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_BULK_API_2);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -849,7 +849,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CHANGE_SET_OPERATION, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CHANGE_SET_OPERATION, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CHANGE_SET_OPERATION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -890,7 +890,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONCURRENT_LONG_RUNNING_APEX_LIMIT, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONCURRENT_LONG_RUNNING_APEX_LIMIT, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONCURRENT_LONG_RUNNING_APEX_LIMIT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -929,7 +929,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONSOLE, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONSOLE, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONSOLE);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -977,7 +977,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONTENT_DISTRIBUTION, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONTENT_DISTRIBUTION, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONTENT_DISTRIBUTION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1013,7 +1013,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONTENT_DOCUMENT_LINK, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONTENT_DOCUMENT_LINK, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONTENT_DOCUMENT_LINK);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1052,7 +1052,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONTENT_TRANSFER, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONTENT_TRANSFER, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONTENT_TRANSFER);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1094,7 +1094,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONTINUATION_CALLOUT_SUMMARY, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CONTINUATION_CALLOUT_SUMMARY, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONTINUATION_CALLOUT_SUMMARY);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1133,7 +1133,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CORS_VIOLATION, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CORS_VIOLATION, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CORS_VIOLATION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1167,7 +1167,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CSP_VIOLATION, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_CSP_VIOLATION, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CSP_VIOLATION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1213,7 +1213,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_DASHBOARD, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_DASHBOARD, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_DASHBOARD);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1261,7 +1261,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_DATABASE_SAVE, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_DATABASE_SAVE, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_DATABASE_SAVE);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1298,7 +1298,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_DOCUMENT_ATTACHMENT_DOWNLOADS, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_DOCUMENT_ATTACHMENT_DOWNLOADS, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_DOCUMENT_ATTACHMENT_DOWNLOADS);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1335,7 +1335,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_EXTERNAL_CUSTOM_APEX_CALLOUT, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_EXTERNAL_CUSTOM_APEX_CALLOUT, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_EXTERNAL_CUSTOM_APEX_CALLOUT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1385,7 +1385,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_EXTERNAL_CROSS_ORG_CALLOUT, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_EXTERNAL_CROSS_ORG_CALLOUT, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_EXTERNAL_CROSS_ORG_CALLOUT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1438,7 +1438,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_EXTERNAL_DATA_SOURCE_CALLOUT, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_EXTERNAL_DATA_SOURCE_CALLOUT, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_EXTERNAL_DATA_SOURCE_CALLOUT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1498,7 +1498,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_EXTERNAL_ODATA_CALLOUT, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_EXTERNAL_ODATA_CALLOUT, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_EXTERNAL_ODATA_CALLOUT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1554,7 +1554,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_FLOW_EXECUTION, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_FLOW_EXECUTION, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_FLOW_EXECUTION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1594,7 +1594,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_GROUP_MEMBERSHIP, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_GROUP_MEMBERSHIP, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_GROUP_MEMBERSHIP);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1638,7 +1638,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_HOSTNAME_REDIRECTS, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_HOSTNAME_REDIRECTS, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_HOSTNAME_REDIRECTS);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1680,7 +1680,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_INSECURE_EXTERNAL_ASSETS, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_INSECURE_EXTERNAL_ASSETS, fileContent);
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_INSECURE_EXTERNAL_ASSETS);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
@@ -1727,7 +1727,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_INSUFFICIENT_ACCESS, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_INSUFFICIENT_ACCESS, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -1772,7 +1772,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_KNOWLEDGE_ARTICLE_VIEW, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_KNOWLEDGE_ARTICLE_VIEW, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -1829,7 +1829,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -1910,7 +1910,7 @@ private class EventLogProcessorsTest {
         // RECORD_ID "["001xx000003G9yzAAC","001xx000003G9yzAAD"]"
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LIGHTNING_INTERACTION, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LIGHTNING_INTERACTION, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -1990,7 +1990,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LIGHTNING_LOGGER, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LIGHTNING_LOGGER, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2065,7 +2065,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LIGHTNING_PAGE_VIEW, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LIGHTNING_PAGE_VIEW, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2149,7 +2149,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LIGHTNING_PERFORMANCE, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LIGHTNING_PERFORMANCE, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2216,7 +2216,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LOGIN, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LOGIN, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2278,7 +2278,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LOGIN_AS, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LOGIN_AS, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2328,7 +2328,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LOGOUT, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_LOGOUT, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2379,7 +2379,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_METADATA_API_OPERATION, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_METADATA_API_OPERATION, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2427,7 +2427,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_MULTIBLOCK_REPORT, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_MULTIBLOCK_REPORT, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2475,7 +2475,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_NAMED_CREDENTIAL, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_NAMED_CREDENTIAL, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2527,7 +2527,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_ONE_COMMERCE_USAGE, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_ONE_COMMERCE_USAGE, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2596,7 +2596,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_PACKAGE_INSTALL, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_PACKAGE_INSTALL, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2646,7 +2646,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_PERMISSION_UPDATE, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_PERMISSION_UPDATE, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2690,7 +2690,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_PLATFORM_ENCRYPTION, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_PLATFORM_ENCRYPTION, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2740,7 +2740,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_PRICING, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_PRICING, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2791,7 +2791,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_QUEUED_EXECUTION, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_QUEUED_EXECUTION, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2845,7 +2845,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_REPORT, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_REPORT, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2906,7 +2906,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_REPORT_EXPORT, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_REPORT_EXPORT, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -2957,7 +2957,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_REST_API, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_REST_API, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3015,7 +3015,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_SANDBOX, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_SANDBOX, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3053,7 +3053,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_SEARCH, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_SEARCH, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3090,7 +3090,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_SEARCH_CLICK, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_SEARCH_CLICK, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3134,7 +3134,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_SITES, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_SITES, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3193,7 +3193,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_TIME_BASED_WORKFLOW, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_TIME_BASED_WORKFLOW, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3242,7 +3242,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_TRANSACTION_SECURITY, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_TRANSACTION_SECURITY, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3309,7 +3309,7 @@ private class EventLogProcessorsTest {
 
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_UI_TELEMETRY_NAVIGATION_TIMING, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_UI_TELEMETRY_NAVIGATION_TIMING, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3420,7 +3420,7 @@ private class EventLogProcessorsTest {
 
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_UI_TELEMETRY_RESOURCE_TIMING, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_UI_TELEMETRY_RESOURCE_TIMING, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3527,7 +3527,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_URI, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_URI, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3598,7 +3598,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_VISUALFORCE_REQUEST, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_VISUALFORCE_REQUEST, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3666,7 +3666,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_WAVE_CHANGE, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_WAVE_CHANGE, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3739,7 +3739,7 @@ private class EventLogProcessorsTest {
         
         // Create test file content
         String fileContent = csvHeader + csvData;
-        EventLogFile logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_WAVE_DOWNLOAD, fileContent);
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_WAVE_DOWNLOAD, fileContent);
         
         // Process the test data
         Test.startTest();
@@ -3918,11 +3918,17 @@ private class EventLogProcessorsTest {
         return String.join(rows, '\n');
     }
     
-    private static EventLogFile createTestEventLogFile(String eventType, String content) {
-        return new EventLogFile(
-            EventType = eventType,
-            LogDate = DateTime.now(),
-            LogFile = Blob.valueOf(content)
+    private static SObject createTestEventLogFile(String eventType, String content) {
+        // Create mock EventLogFile data
+        Map<String, Object> testData = EventMonitoringUtil.createTestEventLogData(
+            eventType,
+            Date.today(),
+            Blob.valueOf(content)
         );
+        
+        // Create Account with mock data stored in Description field
+        Account mockAccount = new Account(Name = 'Mock EventLog: ' + eventType);
+        mockAccount.Description = JSON.serialize(testData);
+        return (SObject)mockAccount;
     }
 }
