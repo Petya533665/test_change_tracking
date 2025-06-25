@@ -3,5 +3,5 @@
     <description>Pharos.ai - Jira integration API login URL</description>
     <disableProtocolSecurity>false</disableProtocolSecurity>
     <isActive>true</isActive>
-    <url>https://jira.teties.com</url>
+    <url>https://goldenratio.atlassian.net</url>
 </RemoteSiteSetting>
