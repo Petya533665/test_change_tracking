@@ -45,10 +45,19 @@
                 '*'
             );
         }
+        
+        let chart = null;
 
         let chartData = null;
 
         let _chartData = null;
+
+        let _visibleFilters = {
+            TRIGGER: true,
+            WORKFLOW: true,
+            PROCESS: true,
+            FLOW: true,
+        };
 
         const filterField = {
             [ORG_LIMITS_CHART_NAME]: 'value',
@@ -127,6 +136,21 @@
                     return a.count - b.count;
                 })
             } else if (chartName === OBJECT_AUTOMATIONS_CHART_NAME) {
+                chartData.forEach(item => {
+                    if (item.automations && Array.isArray(item.automations)) {
+                        item.automations.forEach(automation => {
+                            if (automation.type === 'Trigger') {
+                                _visibleFilters.TRIGGER = automation.visible;
+                            } else if (automation.type === 'Workflow') {
+                                _visibleFilters.WORKFLOW = automation.visible;
+                            } else if (automation.type === 'Process') {
+                                _visibleFilters.PROCESS = automation.visible;
+                            } else if (automation.type === 'Flow') {
+                                _visibleFilters.FLOW = automation.visible;
+                            }
+                        });
+                    }
+                });
                 _chartData = chartData
                     .filter(item => {
                         if (!item.automations || !Array.isArray(item.automations)) {
@@ -135,7 +159,6 @@
                         return item.automations.some(automation =>
                             automation.count > 0
                         );
-
                     })
                     .sort((a, b) => {
                         const sumA = a.automations.reduce((sum, automation) =>
@@ -159,7 +182,7 @@
         function sendHeight() {
             let containerElement = document.getElementById('chart-container');
             if (containerElement) {
-                let height = containerElement.scrollHeight + 20;
+                let height = getHeight() ? getHeight() + 20 : containerElement.scrollHeight + 20;
                 window.parent.postMessage(
                     {
                         type: 'height',
@@ -177,7 +200,7 @@
                 ej.base.registerLicense('ORg4AjUWIQA/Gnt2VVhkQlFadVdJXGFWfVJpTGpQdk5xdV9DaVZUTWY/P1ZhSXxQdkZhWX9dc3NQR2hZVUQ=');
 
                 let chart = new ej.charts.Chart({
-                    height: getHeight(),
+                    height: getHeight() + 'px',
                     primaryXAxis: {
                         valueType: 'Category',
                         labelFormat: 'y',
@@ -193,6 +216,7 @@
                         enableHighlight: true,
                     },
                 });
+
                 if (chartName === LOG_LIMITS_CHART_NAME) {
                     chart.primaryYAxis = {
                         valueType: 'Double',
@@ -212,7 +236,7 @@
                         try {
                             if (args.series.properties.dataSource[args.point.index]) {
                                 let record = args.series.properties.dataSource[args.point.index];
-                                let text = args.point.y + '% (' + record.value  + '/' + record.max + ')';
+                                let text = args.point.y + '% (' + record.value + '/' + record.max + ')';
                                 if (record.category) text += '<br/>' + record.category;
                                 if (record.operation) text += '<br/>' + record.operation;
                                 args.text = text;
@@ -230,11 +254,11 @@
                         minimum: 0,
                         maximum: 100,
                     }
-                    chart.tooltipRender = function(args) {
+                    chart.tooltipRender = function (args) {
                         try {
                             if (args.series.properties.dataSource[args.point.index]) {
                                 let record = args.series.properties.dataSource[args.point.index];
-                                let text = args.point.y + '% (' + record.value  + '/' + record.max + ')';
+                                let text = args.point.y + '% (' + record.value + '/' + record.max + ')';
                                 args.text = text;
                             }
                         } catch (e) {}
@@ -251,7 +275,7 @@
                     };
                 }
                 if (
-                    chartName === OBJECT_AUTOMATIONS_CHART_NAME
+                    chartName === OBJECT_AUTOMATIONS_CHART_NAME 
                     || chartName === SENSITIVE_PERMISSIONS_CHART_NAME
                 ) {
                     chart.primaryYAxis = {
@@ -264,16 +288,14 @@
                 if (chartName === SENSITIVE_PERMISSIONS_CHART_NAME) {
                     chart.tooltip.format += ' users';
                 }
-                console.log(chartName);
-                console.log(JSON.stringify(getSeries()));
                 chart.appendTo(containerElement);
+                chart.refresh();
                 sendHeight();
             }
         }
 
         function getHeight() {
-            let height = getChartData() && getChartData().length >= 10 ? getChartData().length * 40 : 400;
-            return height + 'px';
+            return getChartData() && getChartData().length >= 10 ? getChartData().length * 40 : 400;
         }
 
         function getSeries() {
@@ -382,25 +404,23 @@
                         data.label = object.label;
                         return data;
                     });
-
-
                 let series = [
                     {
                         type: 'StackingBar', name: 'Trigger',
                         dataSource: stackedData, xName: 'label', yName: 'Trigger',
-                        fill: '#9d53f2',
+                        fill: '#9d53f2', visible: _visibleFilters.TRIGGER,
                     }, {
                         type: 'StackingBar', name: 'Workflow',
                         dataSource: stackedData, xName: 'label', yName: 'Workflow',
-                        fill: '#c398f5',
+                        fill: '#c398f5', visible: _visibleFilters.WORKFLOW,
                     }, {
                         type: 'StackingBar', name: 'Process',
                         dataSource: stackedData, xName: 'label', yName: 'Process',
-                        fill: '#3196ed',
+                        fill: '#3196ed', visible: _visibleFilters.PROCESS,
                     }, {
                         type: 'StackingBar', name: 'Flow',
                         dataSource: stackedData, xName: 'label', yName: 'Flow',
-                        fill: '#76b9f2',
+                        fill: '#76b9f2', visible: _visibleFilters.FLOW,
                     }
                 ];
 
