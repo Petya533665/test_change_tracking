@@ -1750,7 +1750,7 @@ public without sharing class JiraService {
             List<Map<String, String>> result = new List<Map<String, String>>();
             for (String value : values) {
                 if (String.isNotBlank(value?.trim())) {
-                    result.add(new Map<String, String>{'value' => value.trim()});
+                    result.add(new Map<String, String>{'id' => value.trim()});
                 }
             }
             return result;
@@ -1778,7 +1778,7 @@ public without sharing class JiraService {
             List<Map<String, String>> result = new List<Map<String, String>>();
             for (String value : values) {
                 if (String.isNotBlank(value?.trim())) {
-                    result.add(new Map<String, String>{'value' => value.trim()});
+                    result.add(new Map<String, String>{'id' => value.trim()});
                 }
             }
             return result;
@@ -1802,7 +1802,7 @@ public without sharing class JiraService {
     // Radio button transformer
     public class RadioButtonTransformer extends BaseJiraFieldTransformer {
         public override Object transform(String rawValue) {
-            return new Map<String, String>{'value' => rawValue};
+            return new Map<String, String>{'id' => rawValue};
         }
 
         public override JiraFieldValidationResult validateInput(String rawValue) {
