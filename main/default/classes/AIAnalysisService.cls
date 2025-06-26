@@ -598,7 +598,7 @@ public with sharing class AIAnalysisService {
 		}
 
 		public virtual String replaceHTMLTags(String text) {
-			return text.replaceAll('<br>', '\n')
+			return text.replaceAll('<br>', '')
 					.replaceAll('<p>', '').replaceAll('</p>', '')
 					.replaceAll('<strong>', '*').replaceAll('</strong>', '*')
 					.replaceAll('<b>', '*').replaceAll('</b>', '*')
