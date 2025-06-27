@@ -11,7 +11,7 @@ public with sharing class OpenAI {
 					headers,
 					401
 			);
-			return !response.contains('Incorrect API key');
+			return !response.contains('Incorrect API key') && !response.contains('Invalid authorization header');
 		} catch (HttpUtils.HttpUtilsException e) {
 			return true;
 		}
