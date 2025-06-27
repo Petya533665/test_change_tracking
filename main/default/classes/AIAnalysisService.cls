@@ -71,7 +71,7 @@ public with sharing class AIAnalysisService {
 	public static final String PENDING_STATUS = 'Pending';
 
 	public static final String AWS_ERROR_STATUS = 'error';
-	public static final Integer ANALYSIS_TIMEOUT_MIN = 30;
+	public static final Integer ANALYSIS_TIMEOUT_MIN = 2;
 
 	private static final Set<String>  CODE_ANALYSIS_CATEGORIES = new Set<String> {APEX_CATEGORY, ERROR_CATEGORY, INTEGRATION_CATEGORY};
 	private static final Set<String>  FLOW_ANALYSIS_CATEGORIES = new Set<String> {FLOW_CATEGORY, PROCESS_BUILDER_CATEGORY};
