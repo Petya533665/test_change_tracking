@@ -1472,9 +1472,17 @@ public with sharing class RuleUtil {
 						if (field == null) {
 							throw new RuleUtilException('Custom field "' + fieldKey + '" is not available for the selected project and issue type.');
 						}
-						
-						// Validate field value
-						validateFieldValue(fieldKey, fieldValue, field);
+
+						Boolean isFieldValueRenderedAtRuntime = false;
+						if (fieldValue?.trim()?.startsWith('{!') && fieldValue?.trim()?.endsWith('}')) {
+							isFieldValueRenderedAtRuntime = true;
+						}
+
+						// If field value is not rendered at runtime, validate it
+						if (!isFieldValueRenderedAtRuntime) {
+							// Validate field value
+							validateFieldValue(fieldKey, fieldValue, field);
+						}
 					}
 				}
 			} catch (JSONException e) {
