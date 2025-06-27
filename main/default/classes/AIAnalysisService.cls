@@ -712,6 +712,7 @@ public with sharing class AIAnalysisService {
 
 		public override String formatText(String text) {
 			return replaceHTMLTags(text)
+					.replaceAll('\n', '  \n')
 					.replaceAll('<code>', '`').replaceAll('</code>', '`')
 					.replaceAll('<li>', '\n - ').replaceAll('</li>', '') + '\n';
 		}
