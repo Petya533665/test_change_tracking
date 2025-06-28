@@ -421,7 +421,7 @@ public with sharing class DatabaseUtils {
 		// check duplicate jobs
 		List<AsyncApexJob> currentJobs = getCurrentJobs(jobNames);
 		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck current jobs: ' + currentJobs);
-		if (!currentJobs.isEmpty()) {
+		if (currentJobs.size() >= 3) {
 			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck returning false: duplicate jobs found');
 			return false;
 		}
