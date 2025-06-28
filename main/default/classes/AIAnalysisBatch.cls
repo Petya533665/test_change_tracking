@@ -5,8 +5,17 @@ public with sharing class AIAnalysisBatch extends DatabaseUtils.PharosBatchImpl 
 	private static AIAnalysisBatch instance = null;
 
 	public static AIAnalysisBatch getInstance(Set<String> issueIds) {
+		System.debug('++++AIAnalysisBatch.getInstance called with issue IDs: ' + issueIds);
+		System.debug('++++AIAnalysisBatch instance already exists: ' + (instance != null));
+		
+		if (instance != null) {
+			System.debug('++++AIAnalysisBatch returning existing instance with issue IDs: ' + instance.issueIds);
+		}
+		
 		if (instance == null) {
+			System.debug('++++AIAnalysisBatch creating new instance');
 			instance = new AIAnalysisBatch(issueIds, Logger.getInstance());
+			System.debug('++++AIAnalysisBatch new instance created with issue IDs: ' + instance.issueIds);
 		}
 		return instance;
 	}
@@ -37,10 +46,18 @@ public with sharing class AIAnalysisBatch extends DatabaseUtils.PharosBatchImpl 
 	}
 
 	public void execute(Database.BatchableContext BC, List<String> scope) {
+		System.debug('++++AIAnalysisBatch.execute called with scope: ' + scope);
+		System.debug('++++AIAnalysisBatch.execute scope size: ' + scope.size());
+		
 		AIAnalysis analysis = AIAnalysis.getInstance(new Set<String>(scope));
+		System.debug('++++AIAnalysisBatch.execute got AIAnalysis instance: ' + (analysis != null));
+		
 		if (analysis != null) {
+			System.debug('++++AIAnalysisBatch.execute calling analysis.init() and analysis.analysis()');
 			analysis.init();
 			analysis.analysis();
+		} else {
+			System.debug('++++AIAnalysisBatch.execute ERROR: AIAnalysis instance is null!');
 		}
 	}
 
