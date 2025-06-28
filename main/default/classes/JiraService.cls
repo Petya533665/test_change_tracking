@@ -81,7 +81,6 @@ public without sharing class JiraService {
         String getProjectComponentsEndpoint(String projectOrKeyId, String query);
         String getProjectIssueTypesEndpoint(String projectOrKeyId);
         String getProjectIssueFieldsEndpoint(String projectOrKeyId, String issueType);
-        String getProjectIssueFieldsEndpoint(String projectOrKeyId, String issueType, Integer startAt, Integer maxResults);
         String getPrioritiesEndpoint();
         String getPrioritySchemesEndpoint();
         String getPutJiraTaskPropertiesEndpoint(String issueKey);
@@ -106,7 +105,6 @@ public without sharing class JiraService {
         Map<String, DateTime> getResolutionDatetimeByTaskKey(List<String> taskKeys, Logger logger);
         void putJiraTaskPriority(String taskKey, String taskPriorityName);
         void putJiraTaskProperties(String issueKey, Id recordId);
-        Object transformCustomFieldValue(String rawValue, JiraProjectIssueField field, Logger logger);
     }
 
     public static final String URL_PATH_SLASH = '/';
@@ -424,11 +422,6 @@ public without sharing class JiraService {
     public static final String JIRA_API_JQL_ISSUE_KEY = 'key';
     public static final String JIRA_API_JQL_ISSUE_FIELDS = 'fields';
     public static final String JIRA_API_JQL_ISSUE_RESOLUTION_DATE = 'resolutiondate';
-    public static final String API_PAGINATION_MAX_RESULTS = 'maxResults';
-    public static final String API_PAGINATION_START_AT = 'startAt';
-    public static final String API_PAGINATION_MAX_RESULTS_DEFAULT_VALUE = '200';
-    public static final String API_PAGINATION_START_AT_DEFAULT_VALUE = '0';
-    public static final Integer API_PAGINATION_MAX_CALLS = 5; // 5 call by 200 fields = 1000 fields
 
 
     public abstract class JiraServiceDefaultImpl implements JiraServiceInterface {
@@ -458,14 +451,7 @@ public without sharing class JiraService {
         }
 
         public virtual String getProjectIssueFieldsEndpoint(String projectOrKeyId, String issueType) {
-            return getProjectIssueFieldsEndpoint(projectOrKeyId, issueType, null, null);
-        }
-
-        public virtual String getProjectIssueFieldsEndpoint(String projectOrKeyId, String issueType, Integer startAt, Integer maxResults) {
-            return getProjectIssueTypesEndpoint(projectOrKeyId) 
-                + '/' + issueType 
-                + '?' + API_PAGINATION_MAX_RESULTS + '=' + (maxResults != null ? String.valueOf(maxResults) : API_PAGINATION_MAX_RESULTS_DEFAULT_VALUE) 
-                + '&' + API_PAGINATION_START_AT + '=' + (startAt != null ? String.valueOf(startAt) : API_PAGINATION_START_AT_DEFAULT_VALUE);
+            return getProjectIssueTypesEndpoint(projectOrKeyId) + '/' + issueType;
         }
 
         public virtual String getProjectAssignableUsersEndpoint(String projectKey, String query) {
@@ -630,30 +616,17 @@ public without sharing class JiraService {
             return result;
         }
 
+        public virtual List<JiraProjectIssueField> deserializeProjectIssueFields(String jsonData) {
+            List<JiraProjectIssueField> result = new List<JiraProjectIssueField>();
+            JiraProjectIssueTypeFieldsWrapper wrapper = (JiraProjectIssueTypeFieldsWrapper)JSON.deserialize(jsonData, JiraProjectIssueTypeFieldsWrapper.class);
+            result = wrapper.fields;
+            return result;
+        }
+
         public virtual List<JiraProjectIssueField> getProjectIssueFields(String projectOrKeyId, String issueType) {
             List<JiraProjectIssueField> result = new List<JiraProjectIssueField>();
-            Integer startAt = Integer.valueOf(API_PAGINATION_START_AT_DEFAULT_VALUE);
-            Integer maxResults = Integer.valueOf(API_PAGINATION_MAX_RESULTS_DEFAULT_VALUE);
-            Integer callCount = 0;
-            Boolean hasMoreData = true;
-            
-            while (hasMoreData && callCount < API_PAGINATION_MAX_CALLS) {
-                String b = getApiData(getProjectIssueFieldsEndpoint(projectOrKeyId, issueType, startAt, maxResults));
-                JiraProjectIssueTypeFieldsWrapper wrapper = (JiraProjectIssueTypeFieldsWrapper)JSON.deserialize(b, JiraProjectIssueTypeFieldsWrapper.class);
-                
-                if (wrapper != null && wrapper.getFields() != null && !wrapper.getFields().isEmpty()) {
-                    result.addAll(wrapper.getFields());
-                    
-                    // Check if we have more data based on total count
-                    hasMoreData = (startAt + wrapper.getFields().size()) < wrapper.total;
-                    startAt += maxResults;
-                } else {
-                    hasMoreData = false;
-                }
-                
-                callCount++;
-            }
-            
+            String b = getApiData(getProjectIssueFieldsEndpoint(projectOrKeyId, issueType));
+            result = deserializeProjectIssueFields(b);
             return result;
         }
 
@@ -688,72 +661,16 @@ public without sharing class JiraService {
         public virtual Map<String, JiraProjectIssueField> getProjectIssueCustomFields(List<JiraProjectIssueField> fields) {
             Map<String, JiraProjectIssueField> result = new Map<String, JiraProjectIssueField>();
             for(JiraProjectIssueField field : fields) {
-                if(field?.key != null && field?.key?.startsWith('customfield') && field?.operations?.contains('set') && isJiraCustomFieldHasAllowedType(field)) {
+                if(field?.key != null && field?.key?.startsWith('customfield')) {
                     result.put(field.key, field);
                 }
-                else if (field?.fieldId != null && field?.fieldId?.startsWith('customfield') && field?.operations?.contains('set') && isJiraCustomFieldHasAllowedType(field)) {
+                else if (field?.fieldId != null && field?.fieldId?.startsWith('customfield')) {
                     field.key = field.fieldId;
                     result.put(field.key, field);
                 }
             }
             return result;
         }
-
-        public virtual Boolean isJiraCustomFieldHasAllowedType(JiraProjectIssueField field) {
-            if (field?.schema?.custom == null) {
-                return false;
-            }
-            
-            // Use the plugin pattern to determine if field type is supported
-            return getSupportedFieldTypes().contains(field.schema.custom);
-        }
-        
-        public virtual Set<String> getSupportedFieldTypes() {
-            return FIELD_TRANSFORMERS.keySet();
-        }
-
-        public virtual Object transformCustomFieldValue(String rawValue, JiraProjectIssueField field, Logger logger) {
-            if (String.isBlank(rawValue) || field?.schema?.custom == null) {
-                return rawValue;
-            }
-
-            try {
-                JiraFieldTransformer transformer = getFieldTransformer(field.schema.custom);
-                if (transformer != null) {
-                    JiraFieldValidationResult validationResult = transformer.validateInput(rawValue);
-                    if (!validationResult.isValid) {
-                        logger?.add(logger.getInternalError(
-                            new JiraServiceException('Invalid field value: ' + validationResult.errorMessage), 
-                            null, 
-                            JiraService.class.getName(), 
-                            'transformCustomFieldValue'
-                        ));
-                        return rawValue; // Return original value if validation fails
-                    }
-                    return transformer.transform(rawValue);
-                }
-                return rawValue; // Return as-is if no transformer found
-            } catch (Exception e) {
-                logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'transformCustomFieldValue'));
-                return rawValue; // Fallback to original value
-            }
-        }
-
-        private virtual JiraFieldTransformer getFieldTransformer(String customType) {
-            return FIELD_TRANSFORMERS.get(customType);
-        }
-
-        private final Map<String, JiraFieldTransformer> FIELD_TRANSFORMERS = new Map<String, JiraFieldTransformer>{
-            'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes' => new MultiCheckboxTransformer(),
-            'com.atlassian.jira.plugin.system.customfieldtypes:multiselect' => new MultiSelectTransformer(),
-            'com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons' => new RadioButtonTransformer(),
-            'com.atlassian.jira.plugin.system.customfieldtypes:datepicker' => new DatePickerTransformer(),
-            'com.atlassian.jira.plugin.system.customfieldtypes:datetime' => new DateTimeTransformer(),
-            'com.atlassian.jira.plugin.system.customfieldtypes:float' => new NumberTransformer(),
-            'com.atlassian.jira.plugin.system.customfieldtypes:textarea' => new TextAreaTransformer(),
-            'com.atlassian.jira.plugin.system.customfieldtypes:textfield' => new TextFieldTransformer(),
-            'com.atlassian.jira.plugin.system.customfieldtypes:url' => new UrlTransformer()
-        };
 
         public virtual List<JiraProjectComponent> getProjectComponents(String projectOrKeyId, String query) {
             List<JiraProjectComponent> result = new List<JiraProjectComponent>();
@@ -1035,6 +952,13 @@ public without sharing class JiraService {
             return result;
         }
 
+        public override List<JiraProjectIssueField> deserializeProjectIssueFields(String jsonData) {
+            List<JiraProjectIssueField> result = new List<JiraProjectIssueField>();
+            JiraSearchIssueTypeFieldsWrapper wrapper = (JiraSearchIssueTypeFieldsWrapper)JSON.deserialize(jsonData, JiraSearchIssueTypeFieldsWrapper.class);
+            result = wrapper.values;
+            return result;
+        }
+
         public override List<JiraProjectIssueType> getProjectIssueTypes(String projectOrKeyId) {
             List<JiraProjectIssueType> result = new List<JiraProjectIssueType>();
             String b = getApiData(getProjectIssueTypesEndpoint(projectOrKeyId));
@@ -1186,48 +1110,23 @@ public without sharing class JiraService {
         public Integer startAt;
         public Integer maxResults;
         public Integer total;
-        // cloud version
         public List<JiraProjectIssueField> fields;
-        // hosted version
-        public List<JiraProjectIssueField> values;
+    }
 
-        public List<JiraProjectIssueField> getFields() {
-            return (this.fields != null && !this.fields.isEmpty()) ? this.fields : this.values;
-        }
+    public class JiraSearchIssueTypeFieldsWrapper {
+        public Integer startAt;
+        public Integer maxResults;
+        public Integer total;
+        public List<JiraProjectIssueField> values;
     }
 
     public class JiraProjectIssueField {
-        // schema of the field
-        public JiraProjectIssueFieldSchema schema;
-        // allowed operations {set, add, remove}
-        public List<String> operations;
-        // allowed values
-        public List<JiraProjectIssueFieldAllowedValue> allowedValues;
-
         public Boolean required;
         public String name;
         // api version 3
         public String key;
         // api version 2
         public String fieldId;
-    }
-
-    public class JiraProjectIssueFieldSchema {
-        public String type;
-        public String items;
-        public String custom;
-        public String customId;
-    }
-
-    public class JiraProjectIssueFieldAllowedValue {
-        // "http://jira.teties.com/rest/api/2/customFieldOption/10100"
-        public String self;
-        // "true"
-        public String value;
-        // "10100"
-        public String id; 
-        // false/true
-        public Boolean disabled;
     }
 
     public class JiraProjectUser {
@@ -1653,275 +1552,5 @@ public without sharing class JiraService {
         public Long iat;
         public Long exp;
         public String aud;
-    }
-
-    // JIRA Field Transformer Plugin Pattern
-    public interface JiraFieldTransformer {
-        Object transform(String rawValue);
-        JiraFieldValidationResult validateInput(String rawValue);
-    }
-
-    public class JiraFieldValidationResult {
-        public Boolean isValid;
-        public String errorMessage;
-
-        public JiraFieldValidationResult(Boolean isValid, String errorMessage) {
-            this.isValid = isValid;
-            this.errorMessage = errorMessage;
-        }
-
-        public JiraFieldValidationResult(Boolean isValid) {
-            this(isValid, null);
-        }
-    }
-
-    // Base transformer class with common functionality
-    public abstract class BaseJiraFieldTransformer implements JiraFieldTransformer {
-        public abstract Object transform(String rawValue);
-        
-        public virtual JiraFieldValidationResult validateInput(String rawValue) {
-            if (String.isBlank(rawValue)) {
-                return new JiraFieldValidationResult(false, 'Value cannot be blank');
-            }
-            return new JiraFieldValidationResult(true);
-        }
-
-        protected virtual String formatDateForJira(String rawValue, Boolean includeTime) {
-            if (String.isBlank(rawValue)) {
-                return null;
-            }
-            
-            try {
-                DateTime dt = null;
-                
-                // Try ISO format first (2023-04-13T19:03:25.153Z)
-                if (rawValue.contains('T') && rawValue.contains('Z')) {
-                    dt = (DateTime)JSON.deserialize('"' + rawValue + '"', DateTime.class);
-                }
-                // Try date only format (2023-04-13)
-                else if (Pattern.matches('\\d{4}-\\d{2}-\\d{2}', rawValue)) {
-                    List<String> parts = rawValue.split('-');
-                    dt = DateTime.newInstance(
-                        Integer.valueOf(parts[0]), 
-                        Integer.valueOf(parts[1]), 
-                        Integer.valueOf(parts[2])
-                    );
-                }
-                // Try datetime format without timezone (2023-04-13 19:03:25)
-                else if (rawValue.contains(' ') && rawValue.split(' ').size() == 2) {
-                    String[] dateTimeParts = rawValue.split(' ');
-                    String[] dateParts = dateTimeParts[0].split('-');
-                    String[] timeParts = dateTimeParts[1].split(':');
-                    
-                    if (dateParts.size() == 3 && timeParts.size() >= 2) {
-                        Integer hour = Integer.valueOf(timeParts[0]);
-                        Integer minute = Integer.valueOf(timeParts[1]);
-                        Integer second = timeParts.size() > 2 ? Integer.valueOf(timeParts[2]) : 0;
-                        
-                        dt = DateTime.newInstance(
-                            Integer.valueOf(dateParts[0]), 
-                            Integer.valueOf(dateParts[1]), 
-                            Integer.valueOf(dateParts[2]),
-                            hour, minute, second
-                        );
-                    }
-                }
-                
-                if (dt != null) {
-                    if (includeTime) {
-                        return dt.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss.SSS\'+0000\'');
-                    } else {
-                        return dt.formatGmt('yyyy-MM-dd');
-                    }
-                }
-                
-            } catch (Exception e) {
-                // Return null if parsing fails
-            }
-            
-            return rawValue; // Return original if all parsing fails
-        }
-    }
-
-    // Multi-checkbox transformer
-    public class MultiCheckboxTransformer extends BaseJiraFieldTransformer {
-        public override Object transform(String rawValue) {
-            List<String> values = rawValue.split(',');
-            List<Map<String, String>> result = new List<Map<String, String>>();
-            for (String value : values) {
-                if (String.isNotBlank(value?.trim())) {
-                    result.add(new Map<String, String>{'id' => value.trim()});
-                }
-            }
-            return result;
-        }
-
-        public override JiraFieldValidationResult validateInput(String rawValue) {
-            if (String.isBlank(rawValue)) {
-                return new JiraFieldValidationResult(false, 'Multi-checkbox value cannot be blank');
-            }
-            
-            List<String> values = rawValue.split(',');
-            for (String value : values) {
-                if (String.isBlank(value?.trim())) {
-                    return new JiraFieldValidationResult(false, 'Multi-checkbox contains empty values');
-                }
-            }
-            return new JiraFieldValidationResult(true);
-        }
-    }
-
-    // Multi-select transformer
-    public class MultiSelectTransformer extends BaseJiraFieldTransformer {
-        public override Object transform(String rawValue) {
-            List<String> values = rawValue.split(',');
-            List<Map<String, String>> result = new List<Map<String, String>>();
-            for (String value : values) {
-                if (String.isNotBlank(value?.trim())) {
-                    result.add(new Map<String, String>{'id' => value.trim()});
-                }
-            }
-            return result;
-        }
-
-        public override JiraFieldValidationResult validateInput(String rawValue) {
-            if (String.isBlank(rawValue)) {
-                return new JiraFieldValidationResult(false, 'Multi-select value cannot be blank');
-            }
-            
-            List<String> values = rawValue.split(',');
-            for (String value : values) {
-                if (String.isBlank(value?.trim())) {
-                    return new JiraFieldValidationResult(false, 'Multi-select contains empty values');
-                }
-            }
-            return new JiraFieldValidationResult(true);
-        }
-    }
-
-    // Radio button transformer
-    public class RadioButtonTransformer extends BaseJiraFieldTransformer {
-        public override Object transform(String rawValue) {
-            return new Map<String, String>{'id' => rawValue};
-        }
-
-        public override JiraFieldValidationResult validateInput(String rawValue) {
-            if (String.isBlank(rawValue)) {
-                return new JiraFieldValidationResult(false, 'Radio button value cannot be blank');
-            }
-            return new JiraFieldValidationResult(true);
-        }
-    }
-
-    // Date picker transformer
-    public class DatePickerTransformer extends BaseJiraFieldTransformer {
-        public override Object transform(String rawValue) {
-            return formatDateForJira(rawValue, false);
-        }
-
-        public override JiraFieldValidationResult validateInput(String rawValue) {
-            if (String.isBlank(rawValue)) {
-                return new JiraFieldValidationResult(false, 'Date value cannot be blank');
-            }
-            
-            // Validate date format
-            if (!Pattern.matches('\\d{4}-\\d{2}-\\d{2}', rawValue) && 
-                !rawValue.contains('T') && 
-                !rawValue.contains(' ')) {
-                return new JiraFieldValidationResult(false, 'Invalid date format. Expected: YYYY-MM-DD, YYYY-MM-DD HH:mm:ss, or ISO format');
-            }
-            
-            return new JiraFieldValidationResult(true);
-        }
-    }
-
-    // DateTime transformer
-    public class DateTimeTransformer extends BaseJiraFieldTransformer {
-        public override Object transform(String rawValue) {
-            return formatDateForJira(rawValue, true);
-        }
-
-        public override JiraFieldValidationResult validateInput(String rawValue) {
-            if (String.isBlank(rawValue)) {
-                return new JiraFieldValidationResult(false, 'DateTime value cannot be blank');
-            }
-            
-            // Validate datetime format
-            if (!rawValue.contains('T') && 
-                !rawValue.contains(' ') && 
-                !Pattern.matches('\\d{4}-\\d{2}-\\d{2}', rawValue)) {
-                return new JiraFieldValidationResult(false, 'Invalid datetime format. Expected: YYYY-MM-DD HH:mm:ss, YYYY-MM-DD, or ISO format');
-            }
-            
-            return new JiraFieldValidationResult(true);
-        }
-    }
-
-    // Number transformer
-    public class NumberTransformer extends BaseJiraFieldTransformer {
-        public override Object transform(String rawValue) {
-            try {
-                return Decimal.valueOf(rawValue);
-            } catch (Exception e) {
-                return rawValue; // Fallback to string if not numeric
-            }
-        }
-
-        public override JiraFieldValidationResult validateInput(String rawValue) {
-            if (String.isBlank(rawValue)) {
-                return new JiraFieldValidationResult(false, 'Number value cannot be blank');
-            }
-            
-            try {
-                Decimal.valueOf(rawValue);
-                return new JiraFieldValidationResult(true);
-            } catch (Exception e) {
-                return new JiraFieldValidationResult(false, 'Invalid number format: ' + rawValue);
-            }
-        }
-    }
-
-    // Text area transformer
-    public class TextAreaTransformer extends BaseJiraFieldTransformer {
-        public override Object transform(String rawValue) {
-            return rawValue;
-        }
-
-        public override JiraFieldValidationResult validateInput(String rawValue) {
-            // Text areas can be blank, so just return true
-            return new JiraFieldValidationResult(true);
-        }
-    }
-
-    // Text field transformer
-    public class TextFieldTransformer extends BaseJiraFieldTransformer {
-        public override Object transform(String rawValue) {
-            return rawValue;
-        }
-
-        public override JiraFieldValidationResult validateInput(String rawValue) {
-            // Text fields can be blank, so just return true
-            return new JiraFieldValidationResult(true);
-        }
-    }
-
-    // URL transformer
-    public class UrlTransformer extends BaseJiraFieldTransformer {
-        public override Object transform(String rawValue) {
-            return rawValue;
-        }
-
-        public override JiraFieldValidationResult validateInput(String rawValue) {
-            if (String.isBlank(rawValue)) {
-                return new JiraFieldValidationResult(false, 'URL value cannot be blank');
-            }
-            
-            // Basic URL validation
-            if (!rawValue.startsWith('http://') && !rawValue.startsWith('https://')) {
-                return new JiraFieldValidationResult(false, 'URL must start with http:// or https://');
-            }
-            
-            return new JiraFieldValidationResult(true);
-        }
     }
 }

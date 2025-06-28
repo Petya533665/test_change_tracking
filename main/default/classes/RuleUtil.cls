@@ -1,7 +1,5 @@
 public with sharing class RuleUtil {
 
-	public class RuleUtilException extends Exception {}
-
 	public static final String KEY_RULE = 'rule';
 	public static final String KEY_RULES = 'rules';
 	public static final String KEY_RULE_ID = 'ruleId';
@@ -1405,11 +1403,6 @@ public with sharing class RuleUtil {
 		}
 
 		public Action__c getAction(String recordTypeName) {
-			// Validate additionalMetadata if present and action is JIRA-related
-			if (String.isNotBlank(additionalMetadata) && isJiraAction()) {
-				validateAdditionalMetadata();
-			}
-			
 			Schema.RecordTypeInfo recordTypeInfo = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(recordTypeName);
 			return new Action__c(
 					Id = id,
@@ -1442,143 +1435,6 @@ public with sharing class RuleUtil {
 					SobjectType__c = sObjectType,
 					Is_Update__c = isUpdate != null ? isUpdate : false
 			);
-		}
-		
-		/**
-		 * Validates additionalMetadata for JIRA custom fields
-		 * Throws an exception if validation fails
-		 */
-		private void validateAdditionalMetadata() {
-			try {
-				// Parse the JSON metadata
-				Map<String, String> customFields = (Map<String, String>)JSON.deserialize(additionalMetadata, Map<String, String>.class);
-				
-				// If we have JIRA project and issue type, get the custom fields for validation
-				if (String.isNotBlank(jiraProject) && String.isNotBlank(jiraIssueType)) {
-					Map<String, JiraService.JiraProjectIssueField> projectCustomFields = 
-						JiraService.getService().getProjectIssueCustomFields(jiraProject, jiraIssueType);
-					
-					// Validate each custom field
-					for (String fieldKey : customFields.keySet()) {
-						String fieldValue = customFields.get(fieldKey);
-						
-						// Skip validation for blank values
-						if (String.isBlank(fieldValue)) {
-							continue;
-						}
-						
-						// Check if field exists in project
-						JiraService.JiraProjectIssueField field = projectCustomFields.get(fieldKey);
-						if (field == null) {
-							throw new RuleUtilException('Custom field "' + fieldKey + '" is not available for the selected project and issue type.');
-						}
-
-						Boolean isFieldValueRenderedAtRuntime = false;
-						if (fieldValue?.trim()?.startsWith('{!') && fieldValue?.trim()?.endsWith('}')) {
-							isFieldValueRenderedAtRuntime = true;
-						}
-
-						// If field value is not rendered at runtime, validate it
-						if (!isFieldValueRenderedAtRuntime) {
-							// Validate field value
-							validateFieldValue(fieldKey, fieldValue, field);
-						}
-					}
-				}
-			} catch (JSONException e) {
-				throw new RuleUtilException('Invalid JSON format in Additional Metadata: ' + e.getMessage());
-			} catch (Exception e) {
-				// Re-throw RuleUtilException as-is, wrap others
-				if (e instanceof RuleUtilException) {
-					throw e;
-				}
-				throw new RuleUtilException('Error validating Additional Metadata: ' + e.getMessage());
-			}
-		}
-		
-		/**
-		 * Helper method to validate field value using JiraService
-		 */
-		private void validateFieldValue(String fieldKey, String fieldValue, JiraService.JiraProjectIssueField field) {
-			// Use the JiraService to perform validation through the plugin pattern
-			try {
-				// This will validate the field and return the transformed value or original if validation fails
-				Object transformedValue = JiraService.getService().transformCustomFieldValue(fieldValue, field, null);
-				
-				// If the transformed value is the same as input but the field has a transformer,
-				// it might indicate a validation failure. We need to validate directly.
-				if (field.schema?.custom != null) {
-					JiraService.JiraServiceDefaultImpl service = new JiraService.JiraService_Hosted_9_4_14_Impl();
-					
-					// Check if this field type is supported
-					if (!service.isJiraCustomFieldHasAllowedType(field)) {
-						// Field type is not supported, skip validation
-						return;
-					}
-					
-					// Use a simple validation approach for common field types
-					validateBasicFieldTypes(fieldKey, fieldValue, field.schema.custom);
-				}
-			} catch (Exception e) {
-				throw new RuleUtilException('Error validating field "' + fieldKey + '": ' + e.getMessage());
-			}
-		}
-		
-		/**
-		 * Basic validation for common JIRA field types
-		 */
-		private void validateBasicFieldTypes(String fieldKey, String fieldValue, String customType) {
-			switch on customType {
-				when 'com.atlassian.jira.plugin.system.customfieldtypes:datepicker', 
-					 'com.atlassian.jira.plugin.system.customfieldtypes:datetime' {
-					// Basic date validation
-					if (!isValidDateFormat(fieldValue)) {
-						throw new RuleUtilException('Invalid date format for field "' + fieldKey + '". Expected formats: YYYY-MM-DD, YYYY-MM-DD HH:mm:ss, or ISO format.');
-					}
-				}
-				when 'com.atlassian.jira.plugin.system.customfieldtypes:float' {
-					// Basic number validation
-					try {
-						Decimal.valueOf(fieldValue);
-					} catch (Exception e) {
-						throw new RuleUtilException('Invalid number format for field "' + fieldKey + '": ' + fieldValue);
-					}
-				}
-				when 'com.atlassian.jira.plugin.system.customfieldtypes:url' {
-					// Basic URL validation
-					if (!fieldValue.startsWith('http://') && !fieldValue.startsWith('https://')) {
-						throw new RuleUtilException('Invalid URL format for field "' + fieldKey + '". URL must start with http:// or https://');
-					}
-				}
-				when 'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes',
-					 'com.atlassian.jira.plugin.system.customfieldtypes:multiselect' {
-					// Basic multi-value validation
-					List<String> values = fieldValue.split(',');
-					for (String value : values) {
-						if (String.isBlank(value?.trim())) {
-							throw new RuleUtilException('Multi-value field "' + fieldKey + '" contains empty values');
-						}
-					}
-				}
-			}
-		}
-		
-		/**
-		 * Basic date format validation
-		 */
-		private Boolean isValidDateFormat(String dateValue) {
-			// Check for basic date patterns
-			return Pattern.matches('\\d{4}-\\d{2}-\\d{2}', dateValue) ||  // YYYY-MM-DD
-				   dateValue.contains('T') ||  // ISO format
-				   (dateValue.contains(' ') && dateValue.split(' ').size() == 2); // YYYY-MM-DD HH:mm:ss
-		}
-		
-		/**
-		 * Checks if this action is JIRA-related
-		 */
-		private Boolean isJiraAction() {
-			return type == ACTION_TYPE_JIRA_NOTIFICATION || 
-				   type == ACTION_TYPE_JIRA_TICKET_COMMENT;
 		}
 
 	}

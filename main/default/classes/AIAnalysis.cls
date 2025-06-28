@@ -11,7 +11,7 @@ public with sharing class AIAnalysis {
 		System.debug('++++AIAnalysis instance already exists: ' + (instance != null));
 		
 		if (instance != null) {
-			System.debug('++++AIAnalysis returning existing instance with issues: ' + instance.issues.keySet());
+			System.debug('++++AIAnalysis rxeturning existing instance with issues: ' + instance.issues.keySet());
 			System.debug('++++AIAnalysis existing instance events count: ' + (instance.events != null ? instance.events.size() : 0));
 		}
 		
