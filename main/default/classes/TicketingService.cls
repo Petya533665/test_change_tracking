@@ -385,10 +385,7 @@ public with sharing class TicketingService {
             }
             if(this.taskInfo.customFields != null) {
                 for (String key : this.taskInfo.customFields.keySet()) {
-                    String rawValue = this.taskInfo.customFields.get(key);
-                    JiraService.JiraProjectIssueField field = allProjectCustomFields.get(key);
-                    Object transformedValue = JiraService.getService(this.logger).transformCustomFieldValue(rawValue, field, this.logger);
-                    ((Map<String, Object>)(this.bodyRequest.get('fields'))).put(key, transformedValue);
+                    ((Map<String, Object>)(this.bodyRequest.get('fields'))).put(key, this.taskInfo.customFields.get(key));
                 }
             }
         }
