@@ -6,7 +6,7 @@
     <apex:stylesheet value="{!URLFOR($Resource.libs, '/libs/Fonts_Lato.css')}"/>
     <apex:stylesheet value="{!URLFOR($Resource.libs, '/libs/material_design_icons.css')}"/>
     <apex:stylesheet value="{!URLFOR($Resource.libs, '/libs/syncfusion-material.css')}"/>
-    <apex:slds />
+    <apex:stylesheet value="{!URLFOR($Resource.pharos_ds, '/pharos_ds/styles/slds252.min.css')}"/>
     <style>
         .korpus > div, .korpus > input {
             display: none;
