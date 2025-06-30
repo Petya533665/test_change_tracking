@@ -2649,10 +2649,6 @@ public with sharing class NotificationService {
                 this.config.markActionCompleted(actionId);
             }
         }
-        
-
-        
-
     }
 
     // Action iteration delegation methods

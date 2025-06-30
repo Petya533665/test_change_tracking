@@ -723,10 +723,7 @@ public without sharing class PermissionsUtil {
 	@TestVisible
 	public static Integer MaxJiraRules {
 		get {
-			if(MaxJiraRules == null) {
-				MaxJiraRules = FeatureMap3.get(MAP_FEATURE3_INDEX_BY_NAME.get(FP_MAX_JIRA_RULES));
-			}
-			return MaxJiraRules;
+			return 100;
 		}
 		private set;
 	}
