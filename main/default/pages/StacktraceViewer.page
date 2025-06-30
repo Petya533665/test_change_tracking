@@ -1,7 +1,7 @@
 <apex:page showHeader="true" sidebar="false" standardController="Log__c" extensions="StacktraceViewerController"
            lightningStyleSheets="true">
     <base href="/apex/StacktraceViewer"/>
-    <apex:slds />
+    <apex:stylesheet value="{!URLFOR($Resource.pharos_ds, '/pharos_ds/styles/slds252.min.css')}"/>
     <style>
         html,
         body {
