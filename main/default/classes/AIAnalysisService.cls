@@ -71,7 +71,7 @@ public with sharing class AIAnalysisService {
 	public static final String PENDING_STATUS = 'Pending';
 
 	public static final String AWS_ERROR_STATUS = 'error';
-	public static final Integer ANALYSIS_TIMEOUT_MIN = 2;
+	public static final Integer ANALYSIS_TIMEOUT_MIN = 30;
 
 	private static final Set<String>  CODE_ANALYSIS_CATEGORIES = new Set<String> {APEX_CATEGORY, ERROR_CATEGORY, INTEGRATION_CATEGORY};
 	private static final Set<String>  FLOW_ANALYSIS_CATEGORIES = new Set<String> {FLOW_CATEGORY, PROCESS_BUILDER_CATEGORY};
@@ -228,24 +228,9 @@ public with sharing class AIAnalysisService {
 			}
 		}
 		public virtual void analysis() {
-			System.debug('++++AIAnalysisService.AIAnalysisServiceAbstract.analysis called');
-			System.debug('++++AIAnalysisService.AIAnalysisServiceAbstract.analysis status: ' + analysisStatusDetails.status);
-			System.debug('++++AIAnalysisService.AIAnalysisServiceAbstract.analysis analysis type: ' + analysisStatusDetails.analysis);
-			System.debug('++++AIAnalysisService.AIAnalysisServiceAbstract.analysis issue ID: ' + issue.Id);
-			
 			if (analysisStatusDetails.status == IN_PROGRESS_STATUS) {
-				System.debug('++++AIAnalysisService.AIAnalysisServiceAbstract.analysis status is IN_PROGRESS, calling getRequestInterface');
 				RequestInterface requestInterface = getRequestInterface(analysis, issue);
-				System.debug('++++AIAnalysisService.AIAnalysisServiceAbstract.analysis got request interface: ' + (requestInterface != null));
-				
-				if (requestInterface != null) {
-					System.debug('++++AIAnalysisService.AIAnalysisServiceAbstract.analysis calling requestInterface.startAnalysis()');
-					requestInterface.startAnalysis();
-				} else {
-					System.debug('++++AIAnalysisService.AIAnalysisServiceAbstract.analysis ERROR: requestInterface is null!');
-				}
-			} else {
-				System.debug('++++AIAnalysisService.AIAnalysisServiceAbstract.analysis status is not IN_PROGRESS, skipping analysis');
+				requestInterface.startAnalysis();
 			}
 		}
 		public virtual Boolean isTimeoutOver() {
@@ -425,25 +410,15 @@ public with sharing class AIAnalysisService {
 			this.logDate = issue.First_Occurred_On__c;
 		}
 		public virtual void startAnalysis() {
-			System.debug('++++AIAnalysisService.RequestAbstract.startAnalysis called');
-			System.debug('++++AIAnalysisService.RequestAbstract.startAnalysis endpoint: ' + AI_ANALYSIS_ENDPOINT);
-			System.debug('++++AIAnalysisService.RequestAbstract.startAnalysis method: ' + this.method);
-			System.debug('++++AIAnalysisService.RequestAbstract.startAnalysis recordId: ' + this.recordId);
-			System.debug('++++AIAnalysisService.RequestAbstract.startAnalysis request payload: ' + JSON.serialize(this));
-			
 			try {
-				System.debug('++++AIAnalysisService.RequestAbstract.startAnalysis making HTTP POST call');
 				HttpUtils.post(
 						AI_ANALYSIS_ENDPOINT,
 						JSON.serialize(this),
 						HttpUtils.getHeadersContentTypeJSON(),
 						200
 				);
-				System.debug('++++AIAnalysisService.RequestAbstract.startAnalysis HTTP POST call completed successfully');
 			}
 			catch(Exception e) {
-				System.debug('++++AIAnalysisService.RequestAbstract.startAnalysis HTTP POST call failed: ' + e.getMessage());
-				System.debug('++++AIAnalysisService.RequestAbstract.startAnalysis error stack trace: ' + e.getStackTraceString());
 				Logger.getInstance().addInternalError(e, AIAnalysis.class.getName(), 'startAnalysis');
 			}
 		}
@@ -623,7 +598,7 @@ public with sharing class AIAnalysisService {
 		}
 
 		public virtual String replaceHTMLTags(String text) {
-			return text.replaceAll('<br>', '\n')
+			return text.replaceAll('<br>', '')
 					.replaceAll('<p>', '').replaceAll('</p>', '')
 					.replaceAll('<strong>', '*').replaceAll('</strong>', '*')
 					.replaceAll('<b>', '*').replaceAll('</b>', '*')
@@ -737,7 +712,6 @@ public with sharing class AIAnalysisService {
 
 		public override String formatText(String text) {
 			return replaceHTMLTags(text)
-					.replaceAll('\n', '  \n')
 					.replaceAll('<code>', '`').replaceAll('</code>', '`')
 					.replaceAll('<li>', '\n - ').replaceAll('</li>', '') + '\n';
 		}

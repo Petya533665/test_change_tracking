@@ -7,16 +7,7 @@ public with sharing class AIAnalysis {
 	private String errorMessage;
 
 	public static AIAnalysis getInstance(Object input) {
-		System.debug('++++AIAnalysis.getInstance input: ' + JSON.serialize(input));
-		System.debug('++++AIAnalysis instance already exists: ' + (instance != null));
-		
-		if (instance != null) {
-			System.debug('++++AIAnalysis rxeturning existing instance with issues: ' + instance.issues.keySet());
-			System.debug('++++AIAnalysis existing instance events count: ' + (instance.events != null ? instance.events.size() : 0));
-		}
-		
 		if (instance == null) {
-			System.debug('++++AIAnalysis creating new instance');
 			if (input instanceof Set<Id> || input instanceof Set<String>) {
 				instance = new AIAnalysis((Set<String>)input);
 			} else if (input instanceof List<AI_Event__e>) {
@@ -24,7 +15,6 @@ public with sharing class AIAnalysis {
 			} else {
 				throw new AIAnalysisException('Unsupported input type: ' + JSON.serialize(input));
 			}
-			System.debug('++++AIAnalysis new instance created with issues: ' + instance.issues.keySet());
 		}
 		return instance;
 	}
@@ -36,42 +26,25 @@ public with sharing class AIAnalysis {
 	}
 
 	private AIAnalysis(List<AI_Event__e> events) {
-		System.debug('++++AIAnalysis constructor called with events: ' + events.size());
 		this.events = events;
 		Set<String> issueIds = new Set<String>();
 		for (AI_Event__e event : events) {
-			System.debug('++++AIAnalysis processing event - Record_Id__c: ' + event.Record_Id__c + ', Analysis__c: ' + event.Analysis__c + ', Status__c: ' + event.Status__c);
 			issueIds.add(event.Record_Id__c);
 		}
-		System.debug('++++AIAnalysis extracted issue IDs: ' + issueIds);
 		this.issues = getIssues(issueIds);
-		System.debug('++++AIAnalysis loaded issues: ' + this.issues.keySet());
 	}
 
 	public void init() {
-		System.debug('++++AIAnalysis.init called');
-		System.debug('++++AIAnalysis.init issues count: ' + issues.size());
-		System.debug('++++AIAnalysis.init events count: ' + (events != null ? events.size() : 0));
-		
 		errorMessage = checkAnalysisPermission();
-		System.debug('++++AIAnalysis.init permission check result: ' + errorMessage);
-		
 		if (String.isBlank(errorMessage)) {
-			System.debug('++++AIAnalysis.init creating analysis services for issues: ' + issues.keySet());
 			for (Issue__c issue : this.issues.values()) {
 				this.analysisServiceByIssueId.put(issue.Id, new AIAnalysisService(issue));
 			}
-			System.debug('++++AIAnalysis.init created analysis services for: ' + analysisServiceByIssueId.keySet());
-			
 			if (events != null && !events.isEmpty()) {
-				System.debug('++++AIAnalysis.init calling setContentDocumentId and setResult');
 				setContentDocumentId();
 				setResult();
-			} else {
-				System.debug('++++AIAnalysis.init no events to process');
 			}
 		} else {
-			System.debug('++++AIAnalysis.init calling internalError due to permission issue');
 			internalError();
 		}
 	}
@@ -193,25 +166,8 @@ public with sharing class AIAnalysis {
 	}
 
 	private void setResult() {
-		System.debug('++++AIAnalysis.setResult called with events count: ' + events.size());
-		System.debug('++++AIAnalysis.setResult available analysis services for issues: ' + analysisServiceByIssueId.keySet());
-		
 		for (AI_Event__e event : events) {
-			System.debug('++++AIAnalysis.setResult processing event - Record_Id__c: ' + event.Record_Id__c + ', Analysis__c: ' + event.Analysis__c + ', Status__c: ' + event.Status__c);
-			System.debug('++++AIAnalysis.setResult checking if issue exists in analysis services: ' + analysisServiceByIssueId.containsKey(event.Record_Id__c));
-			
-			if (analysisServiceByIssueId.containsKey(event.Record_Id__c)) {
-				try {
-					analysisServiceByIssueId.get(event.Record_Id__c).setResult(event.Analysis__c, event.Status__c, event.Result__c);
-					System.debug('++++AIAnalysis.setResult successfully set result for event');
-				} catch (Exception e) {
-					System.debug('++++AIAnalysis.setResult error setting result: ' + e.getMessage());
-					System.debug('++++AIAnalysis.setResult error stack trace: ' + e.getStackTraceString());
-				}
-			} else {
-				System.debug('++++AIAnalysis.setResult ERROR: Issue ' + event.Record_Id__c + ' not found in analysis services!');
-				System.debug('++++AIAnalysis.setResult available issues: ' + analysisServiceByIssueId.keySet());
-			}
+			analysisServiceByIssueId.get(event.Record_Id__c).setResult(event.Analysis__c, event.Status__c, event.Result__c);
 		}
 	}
 
