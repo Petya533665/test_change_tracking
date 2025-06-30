@@ -12,33 +12,15 @@ public with sharing class OpenAIController {
 	}
 
 	public static String startAnalysis(Set<String> recordIds) {
-		System.debug('++++OpenAIController.startAnalysis called with record IDs: ' + recordIds);
-		System.debug('++++OpenAIController.startAnalysis record IDs count: ' + recordIds.size());
-		
-		System.debug('++++OpenAIController.startAnalysis calling AIAnalysis.getInstance');
 		AIAnalysis analysis = AIAnalysis.getInstance(recordIds);
-		System.debug('++++OpenAIController.startAnalysis got AIAnalysis instance: ' + (analysis != null));
-		
 		if (analysis != null) {
-			System.debug('++++OpenAIController.startAnalysis calling analysis.init()');
 			analysis.init();
-			System.debug('++++OpenAIController.startAnalysis calling analysis.inProgress()');
 			analysis.inProgress();
-			System.debug('++++OpenAIController.startAnalysis calling analysis.flush()');
 			analysis.flush();
-		} else {
-			System.debug('++++OpenAIController.startAnalysis ERROR: AIAnalysis instance is null!');
 		}
-		
-		System.debug('++++OpenAIController.startAnalysis calling AIAnalysisBatch.getInstance');
 		AIAnalysisBatch instance = AIAnalysisBatch.getInstance(recordIds);
-		System.debug('++++OpenAIController.startAnalysis got AIAnalysisBatch instance: ' + (instance != null));
-		
-		System.debug('++++OpenAIController.startAnalysis calling instance.startBatch()');
 		instance.startBatch();
-		String jobId = instance.getJobId();
-		System.debug('++++OpenAIController.startAnalysis batch job ID: ' + jobId);
-		return jobId;
+		return instance.getJobId();
 	}
 
 	@AuraEnabled

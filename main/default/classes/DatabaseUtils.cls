@@ -339,50 +339,23 @@ public with sharing class DatabaseUtils {
 	}
 
     public static List<AsyncApexJob> getCurrentJobs(List<String> apexClassNames) {
-        System.debug('++++DatabaseUtils.getCurrentJobs called with apexClassNames: ' + apexClassNames);
-        try {
-            List<AsyncApexJob> results = [
-                SELECT Id
-                FROM AsyncApexJob
-                WHERE Status IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_STATUS
-                AND JobType NOT IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_TYPES
-                AND ApexClass.Name IN :apexClassNames
-                LIMIT 1
-            ];
-            System.debug('++++DatabaseUtils.getCurrentJobs query results: ' + results);
-            System.debug('++++DatabaseUtils.getCurrentJobs returning: ' + results);
-            return results;
-        } catch (Exception e) {
-            System.debug('++++DatabaseUtils.getCurrentJobs exception: ' + e.getMessage());
-            System.debug('++++DatabaseUtils.getCurrentJobs returning empty list due to exception');
-            return new List<AsyncApexJob>();
-        }
+        return [
+            SELECT Id
+            FROM AsyncApexJob
+            WHERE Status IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_STATUS
+            AND JobType NOT IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_TYPES
+            AND ApexClass.Name IN :apexClassNames
+            LIMIT 1
+        ];
     }
 
     public static Integer getSumTotalJobItems() {
-        System.debug('++++DatabaseUtils.getSumTotalJobItems called');
-        try {
-            List<AggregateResult> results = [
-                SELECT SUM(TotalJobItems) sumTotalJobItems
-                FROM AsyncApexJob
-                WHERE JobType = 'BatchApex'
-                AND Status IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_STATUS
-            ];
-            System.debug('++++DatabaseUtils.getSumTotalJobItems query results: ' + results);
-            
-            if (results != null && !results.isEmpty() && results[0].get('sumTotalJobItems') != null) {
-                Integer result = Integer.valueOf(results[0].get('sumTotalJobItems'));
-                System.debug('++++DatabaseUtils.getSumTotalJobItems returning: ' + result);
-                return result;
-            } else {
-                System.debug('++++DatabaseUtils.getSumTotalJobItems returning 0 (no results or null value)');
-                return 0;
-            }
-        } catch (Exception e) {
-            System.debug('++++DatabaseUtils.getSumTotalJobItems exception: ' + e.getMessage());
-            System.debug('++++DatabaseUtils.getSumTotalJobItems returning 0 due to exception');
-            return 0;
-        }
+        return Integer.valueOf([
+            SELECT SUM(TotalJobItems) sumTotalJobItems
+            FROM AsyncApexJob
+            WHERE JobType = 'BatchApex'
+            AND Status IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_STATUS
+        ][0].get('sumTotalJobItems'));
     }
 
 	public static Boolean TEST_MODE = false;
@@ -393,84 +366,39 @@ public with sharing class DatabaseUtils {
 	}
 
 	public static Boolean executeBatchWithLimitCheck(List<String> jobNames, Object batchInstance) {
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck called with jobNames: ' + jobNames);
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck batchInstance: ' + batchInstance);
-		
-		if (jobNames == null || jobNames.isEmpty()) {
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck returning false: jobNames is null or empty');
-			return false;
-		}
+		if (jobNames == null || jobNames.isEmpty()) return false;
 
 		PharosBatchImpl pharosBatch = (PharosBatchImpl)batchInstance;
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck pharosBatch: ' + pharosBatch);
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck pharosBatch.isForceStart: ' + pharosBatch.isForceStart);
 
 		if (TEST_MODE) startJobs.add(jobNames[0]);
 
-		if (!pharosBatch.isForceStart && !pharosBatch.isExecutionTime(jobNames[0])) {
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck returning false: not force start and not execution time');
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck isExecutionTime result: ' + pharosBatch.isExecutionTime(jobNames[0]));
-			return false;
-		}
-		
-		if (!pharosBatch.initialValidation()) {
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck returning false: initial validation failed');
-			return false;
-		}
+		if (!pharosBatch.isForceStart && !pharosBatch.isExecutionTime(jobNames[0])) return false;
+		if (!pharosBatch.initialValidation()) return false;
 
 		// check duplicate jobs
-		List<AsyncApexJob> currentJobs = getCurrentJobs(jobNames);
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck current jobs: ' + currentJobs);
-		if (currentJobs.size() >= 3) {
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck returning false: duplicate jobs found');
-			return false;
-		}
+		if (!getCurrentJobs(jobNames).isEmpty()) return false;
 
 		// check AsyncApexExecutions limits
 		Integer sumTotalJobItems = getSumTotalJobItems();
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck sumTotalJobItems: ' + sumTotalJobItems);
 		Integer availableQuantityAsyncApexExecutionsOnOrg = Integer.valueOf(LimitsService.getAvailableQuantityAsyncApexExecutions() * percentAsyncApexJobsFreeOnOrg);
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck availableQuantityAsyncApexExecutionsOnOrg: ' + availableQuantityAsyncApexExecutionsOnOrg);
 		Integer availableQuantityAsyncApexExecutions = availableQuantityAsyncApexExecutionsOnOrg - (sumTotalJobItems != null ? sumTotalJobItems : 0);
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck availableQuantityAsyncApexExecutions: ' + availableQuantityAsyncApexExecutions);
 
 		Integer batchIterations = Integer.valueOf(Math.ceil(pharosBatch.getIterationsCount() / Decimal.valueOf(pharosBatch.BATCH_SCOPE)));
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck batchIterations: ' + batchIterations);
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck pharosBatch.getIterationsCount(): ' + pharosBatch.getIterationsCount());
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck pharosBatch.BATCH_SCOPE: ' + pharosBatch.BATCH_SCOPE);
-		
 		// "-2" - Decreasing count by 2 to reserve slots for batch start and finish in async apex executions.
 		Decimal neededAsyncApexExecutionsRuns = (availableQuantityAsyncApexExecutions - batchIterations - 2);
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck neededAsyncApexExecutionsRuns: ' + neededAsyncApexExecutionsRuns);
 
-		if (batchIterations <= 0 || neededAsyncApexExecutionsRuns <= 0) {
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck returning false: batchIterations <= 0 or neededAsyncApexExecutionsRuns <= 0');
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck batchIterations <= 0: ' + (batchIterations <= 0));
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck neededAsyncApexExecutionsRuns <= 0: ' + (neededAsyncApexExecutionsRuns <= 0));
-			return false;
-		}
+		if (batchIterations <= 0 || neededAsyncApexExecutionsRuns <= 0) return false;
 
 		// check You've exceeded the limit of 100 jobs in the flex queue
-		Boolean isFlexQueueSlotAvailable = LimitsService.isFlexQueueSlotAvailable();
-		System.debug('++++DatabaseUtils.executeBatchWithLimitCheck isFlexQueueSlotAvailable: ' + isFlexQueueSlotAvailable);
-		if (!isFlexQueueSlotAvailable) {
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck returning false: flex queue slot not available');
-			return false;
-		}
+		if (!LimitsService.isFlexQueueSlotAvailable()) return false;
 
 		try {
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck calling Database.executeBatch');
 			pharosBatch.jobId = Database.executeBatch((Database.Batchable<PharosBatchInterface>)pharosBatch, pharosBatch.BATCH_SCOPE);
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck Database.executeBatch returned jobId: ' + pharosBatch.jobId);
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck returning true');
 			return true;
 		}
 		catch(Exception e) {
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck Database.executeBatch threw exception: ' + e.getMessage());
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck exception stack trace: ' + e.getStackTraceString());
 			String className = String.valueOf(batchInstance).split(':')[0];
 			Logger.getInstance().internalError(e, null, true, className, className);
-			System.debug('++++DatabaseUtils.executeBatchWithLimitCheck returning false due to exception');
 			return false;
 		}
 	}
