@@ -8,7 +8,7 @@
         window.APP_CONFIG = {
             remoteActionHandlerName: '{!$RemoteAction.IssueJiraTaskController.remoteActionHandler}',
             packageNamespace: JSON.stringify('{!packageNamespace}'),
-            assetsPath: "{!URLFOR($Resource.ticketapp, 'assets')}",
+            assetsPath: "{!URLFOR($Resource.adminapp, 'assets')}",
             issueId: '{!issue.Id}',
             isBlurMode: '{!isBlurMode}',
             blurModeUrlParameter: `/fp-03?q=${blurModeUrlParameter}`,
