@@ -72,7 +72,9 @@ public with sharing class AdminController {
             String method = (String)request.get('method');
             methodName = method;
             Object data = request.get('data');
-            if (method == 'getEmailServiceData') {
+            if (method.equals('validateEmailServiceData')) {
+                response.data = AdminService.validateEmailServiceData();
+            } else if (method == 'getEmailServiceData') {
                 response.data = AdminService.getEmailServiceData();
             } else if (method == 'createEmailService') {
                 response.data = AdminService.createEmailService(data);
@@ -176,8 +178,6 @@ public with sharing class AdminController {
                 response.data = AdminService.setEventMonitoringSetting(data);
             } else if (method == 'setBatchErrorTrackingSetting') {
                 response.data = AdminService.setBatchErrorTrackingSetting(data);
-            } else if (method == 'getBatchErrorTrackingSetting') {
-                response.data = AdminService.getBatchErrorTrackingSetting(data);
             } else if (method == 'setErrorReportingOptOut') {
                 response.data = AdminService.setErrorReportingOptOut(data);
             } else if (method == 'getErrorReportingOptOut') {

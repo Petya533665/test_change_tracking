@@ -299,12 +299,6 @@ public class Test_AdminController {
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
-            'method' => 'getBatchErrorTrackingSetting',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
             'method' => 'getDefaultSlackActionTemplate',
             'data' => ''
         };
@@ -1842,7 +1836,7 @@ public class Test_AdminController {
 
     @IsTest
     private static void testGetEmailServiceData() {
-        system.assertNotEquals(null, AdminService.getEmailServiceData(true, true, 'emailToCaseErrorTrackingType', true));
+        system.assertNotEquals(null, AdminService.getEmailServiceData(true, true, 'emailToCaseErrorTrackingType', true, true));
     }
 
     @IsTest
@@ -1851,7 +1845,7 @@ public class Test_AdminController {
         Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
         mocks.putAll(getRemoteSiteSettingsMock());
 
-        List<EmailServicesFunction> activeFunctions = AdminService.getPackageEmailServicesFunctions();
+        List<EmailServicesFunction> activeFunctions = new EmailServicesFunctionSelector().getPackageEmailServicesFunctions();
         if(!activeFunctions.isEmpty()) {
             List<EmailServicesAddress> activeAddresses = [SELECT Id FROM EmailServicesAddress WHERE FunctionId =:activeFunctions.get(0).Id LIMIT 1];
 
