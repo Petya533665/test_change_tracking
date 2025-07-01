@@ -178,6 +178,8 @@ public with sharing class AdminController {
                 response.data = AdminService.setEventMonitoringSetting(data);
             } else if (method == 'setBatchErrorTrackingSetting') {
                 response.data = AdminService.setBatchErrorTrackingSetting(data);
+            } else if (method == 'getBatchErrorTrackingSetting') {
+                response.data = AdminService.getBatchErrorTrackingSetting(data);
             } else if (method == 'setErrorReportingOptOut') {
                 response.data = AdminService.setErrorReportingOptOut(data);
             } else if (method == 'getErrorReportingOptOut') {
