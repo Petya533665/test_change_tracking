@@ -299,6 +299,12 @@ public class Test_AdminController {
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
+            'method' => 'getBatchErrorTrackingSetting',
+            'data' => ''
+        };
+        AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        payload = new Map<String, Object>{
             'method' => 'getDefaultSlackActionTemplate',
             'data' => ''
         };

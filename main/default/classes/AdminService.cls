@@ -901,27 +901,23 @@ public without sharing class AdminService {
         return availableAddress != null;
     }
 
-    public static Map<String, Object> validateEmailServiceData() {
-        Boolean isEmailServicesAvailable = isEmailServicesAvailable();
-        Boolean isDataUpdatingNeeded = false;
-
-        if (!isEmailServicesAvailable) {
-            if (getScheduleBulkAPIBatch().get('cronParameter') != null) {
-                abortScheduleBulkAPIBatchFuture();
-                isDataUpdatingNeeded = true;
-            }
-            if (Boolean.valueOf(getBatchErrorTrackingSetting().get(ConfigUtil.BATCH_ERROR_TRACKING_ENABLED)) || ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) {
-                disableBatchErrorTrackingAndEmailToCaseErrorTracking();
-                isDataUpdatingNeeded = true;
-            }
+    public static Object validateEmailServiceData() {
+        Boolean result = false;
+        if (!isEmailServicesAvailable()) {
             if (getAutomatedFlowErrorTracking()) {
                 setAutomatedFlowErrorTracking(false);
             }
+            if (getScheduleBulkAPIBatch().get('cronParameter') != null) {
+                abortScheduleBulkAPIBatch();
+            }
+            if (Boolean.valueOf(getBatchErrorTrackingSetting(null).get(ConfigUtil.BATCH_ERROR_TRACKING_ENABLED)) || ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) {
+                disableBatchErrorTrackingAndEmailToCaseErrorTracking();
+            }
         }
+        
+        result = true;
 
-        return new Map<String, Object>{
-            'isDataUpdatingNeeded' => isDataUpdatingNeeded
-        };
+        return result;
     }
 
     public static Map<String, Object> getEmailServiceData() {
@@ -939,7 +935,6 @@ public without sharing class AdminService {
             'emailToCaseErrorTrackingType' => emailToCaseErrorTrackingType,
             'emailServicesFunctionIsActive' => isEmailServicesAvailable
         };
-        output.putAll(getBatchErrorTrackingSetting());
         return output;
     }
 
@@ -2905,10 +2900,9 @@ public without sharing class AdminService {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         ConfigUtil.SETTINGS.Batch_Error_Tracking_Enabled__c = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
         DatabaseUtils.getInstance().performUpsertDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c, true);
-        return getBatchErrorTrackingSetting();
+        return getBatchErrorTrackingSetting(null);
     }
 
-    @future
     public static void disableBatchErrorTrackingAndEmailToCaseErrorTracking() {
         PermissionsUtil.putSObjectField(ConfigUtil.SETTINGS, Schema.SObjectType.Logger_Settings__c.fields.Enable_Email_To_Case_Error_Tracking__c, ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_DISABLED);
         PermissionsUtil.putSObjectField(ConfigUtil.SETTINGS, Schema.SObjectType.Logger_Settings__c.fields.Batch_Error_Tracking_Enabled__c, false);
@@ -2916,10 +2910,9 @@ public without sharing class AdminService {
         
     }
 
-    public static Map<String, Object> getBatchErrorTrackingSetting() {
-        Map<String, Object> ret = new Map<String, Object>{
-            ConfigUtil.BATCH_ERROR_TRACKING_ENABLED => ConfigUtil.SETTINGS.Batch_Error_Tracking_Enabled__c
-        };
+    public static Map<String, Object> getBatchErrorTrackingSetting(Object data) {
+        Map<String, Object> ret = new Map<String, Object>();
+        ret.put(ConfigUtil.BATCH_ERROR_TRACKING_ENABLED, ConfigUtil.SETTINGS.Batch_Error_Tracking_Enabled__c);
         return ret;
     }
 
@@ -3403,11 +3396,6 @@ public without sharing class AdminService {
         ConfigUtil.PHAROS_SETTINGS.Archival_Scheduler_Cron_Exp__c = null;
         upsert ConfigUtil.PHAROS_SETTINGS;
         return new Map<String, Object>{'abort' => true};
-    }
-
-    @future
-    public static void abortScheduleBulkAPIBatchFuture() {
-        abortScheduleBulkAPIBatch();
     }
 
     private static final String DEFAULT_BULK_FREQUENCY_HOURS = '4';
