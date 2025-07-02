@@ -266,8 +266,6 @@ public with sharing class AdminController {
                 response.data = AdminService.getUserInfo();
             } else if (method == 'connectedAppSendMeAnEmail') {
                 response.data = TestDataGenerator.connectedAppSendMeAnEmail();
-            } else if (method == 'getApexEmailNotification') {
-                response.data = AdminService.getApexEmailNotification();
             } else if (method == 'getPackageEmailServiceFunctionEmailAddress') {
                 response.data = AdminService.getPackageEmailServiceFunctionEmailAddress();
             } else if (method == 'getQSAnotherConnectedOrg') {
