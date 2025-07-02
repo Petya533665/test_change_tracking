@@ -908,7 +908,7 @@ private class RuleUtilTest {
 			action.getAction(RuleUtil.ACTION_RT_MONITORING);
 			System.assert(false, 'Should have thrown RuleUtilException for type incompatibility');
 		} catch (RuleUtil.RuleUtilException e) {
-			System.assert(e.getMessage().contains('not compatible with JIRA field type'), 'Should indicate type incompatibility: ' + e.getMessage());
+			System.assert(e.getMessage().contains('Invalid number format for field "customfield_10300"'), 'Should indicate type incompatibility: ' + e.getMessage());
 		}
 		
 		Test.stopTest();
@@ -1663,7 +1663,7 @@ private class RuleUtilTest {
 		Test.stopTest();
 	}
 
-		@IsTest
+	@IsTest
 	public static void test_setActions_string_to_datepicker_incompatible() {
 		Test.startTest();
 		

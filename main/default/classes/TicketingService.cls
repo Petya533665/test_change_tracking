@@ -372,7 +372,8 @@ public with sharing class TicketingService {
             this.taskInfo.customFields = new Map<String, String>();
             try {
                 if (String.isNotBlank(this.taskInfo.additionalMetadata)) {
-                    Map<String, String> customFields = (Map<String, String>)JSON.deserialize(this.taskInfo.additionalMetadata, Map<String, String>.class);
+                    // Use the helper method to parse both old and new formats
+                    Map<String, String> customFields = TicketingTaskInfo.parseAdditionalMetadataForMergeFields(this.taskInfo.additionalMetadata);
                     for (String key : customFields.keySet()) {
                         if (projectCustomFields.contains(key)) {
                             this.taskInfo.customFields.put(key, customFields.get(key));
@@ -901,6 +902,51 @@ public with sharing class TicketingService {
         }
     };
 
+    /**
+     * Parses additionalMetadata supporting both old and new formats
+     * Returns Map<String, String> with field values for merge field processing
+     */
+    private static Map<String, String> parseAdditionalMetadataForMergeFields(String additionalMetadataJSON) {
+        Map<String, String> result = new Map<String, String>();
+        
+        if (String.isBlank(additionalMetadataJSON)) {
+            return result;
+        }
+        
+        try {
+            // Try new format first: {"fieldKey": {"value": "...", "schema": {...}}}
+            Map<String, Object> parsedData = (Map<String, Object>)JSON.deserializeUntyped(additionalMetadataJSON);
+            
+            for (String fieldKey : parsedData.keySet()) {
+                Object fieldData = parsedData.get(fieldKey);
+                
+                // Check if it's new format (object with value property)
+                if (fieldData instanceof Map<String, Object>) {
+                    Map<String, Object> fieldMap = (Map<String, Object>)fieldData;
+                    if (fieldMap.containsKey('value')) {
+                        // New format - extract value
+                        String fieldValue = (String)fieldMap.get('value');
+                        result.put(fieldKey, fieldValue != null ? fieldValue : '');
+                        continue;
+                    }
+                }
+                
+                // Old format - use value directly
+                result.put(fieldKey, String.valueOf(fieldData));
+            }
+        } catch (Exception e) {
+            // If parsing fails completely, try old format
+            try {
+                Map<String, String> oldFormat = (Map<String, String>)JSON.deserialize(additionalMetadataJSON, Map<String, String>.class);
+                result.putAll(oldFormat);
+            } catch (Exception e2) {
+                // If both parsing attempts fail, return empty map
+            }
+        }
+        
+        return result;
+    }
+
     public class TicketingSObjectWrapper {
         public String id;
         public String hash1;
@@ -1044,7 +1090,8 @@ public with sharing class TicketingService {
         }
 
         public String getAdditionalMetadata(String whoId, String whatId, String additionalMetadataJSON, NotificationService.MergeFieldSettings settings) {
-            Map<String, String> additionalMetadata = (Map<String, String>)JSON.deserialize(additionalMetadataJSON, Map<String, String>.class);
+            // Parse additional metadata supporting both old and new formats
+            Map<String, String> additionalMetadata = TicketingTaskInfo.parseAdditionalMetadataForMergeFields(additionalMetadataJSON);
             Map<String, List<String>> contentsMap = new Map<String, List<String>>();
             contentsMap.put(whatId, additionalMetadata.values());
             Map<String, NotificationService.MergeFieldSettings> mergeFieldSettingsMap = new Map<String, NotificationService.MergeFieldSettings>{
@@ -1057,7 +1104,6 @@ public with sharing class TicketingService {
             }
             return JSON.serialize(additionalMetadata);
         }
-
     }
 
     public static List<Log__c> getOtherLogsWithHash1AndEmptyBugTrackerLink(Log__c log, Boolean createUniqueTicketsByOrg) {
