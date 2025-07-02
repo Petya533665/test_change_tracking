@@ -193,7 +193,6 @@ public with sharing class ConfigUtil {
     public static final String OVERRIDE_HTTP_METHOD_PATCH = '?_HttpMethod=PATCH';
     public static final String EMAIL_SERVICES_FUNCTION_ENDPOINT = BASE_URL + '/services/data/'+API_VERSION+'/sobjects/EmailServicesFunction';
     public static final String EMAIL_SERVICES_ADDRESS_ENDPOINT = BASE_URL + '/services/data/'+API_VERSION+'/sobjects/EmailServicesAddress';
-    public static final String EMAIL_SERVICES_ADDRESS_DEVELOPER_NAME = 'ErrorEmailHandlerAddress';
     public static final String FAILED_NO_ERRORS_MESSAGE = 'Request failed with no specified error.';
     public static final String MANY_EMAIL_SERVICE_FOUND_MESSAGE = 'There are many Email Services. Please remove all except one.';
     public static final String APEXUTILSOURCE_NOT_FOUND_MESSAGE = 'Static Resource with name ApexUtilSource not found';
@@ -793,13 +792,6 @@ public with sharing class ConfigUtil {
     public static final String LOGGER_WRAPPER_INFO_KEY_CODE = 'code';
     public static final String LOGGER_WRAPPER_INFO_KEY_TEST_CODE = 'testCode';
 
-    public static Map<String, String> getToolingHeaders() {
-        return new Map<String, String> {
-            'Authorization' => 'Bearer ' + ConnectedOrgService.getSelfConnectedOrgAccessToken(),
-            'Content-Type' => 'application/json'
-        };
-    }
-
     public static String getRequestBodyCreateEmailServiceFunction(String ehClassId) {
         return '{'+
             '  "IsActive": true,'+
@@ -819,14 +811,13 @@ public with sharing class ConfigUtil {
     }
 
     public static String getRequestBodyCreateEmailService(String responseId) {
-        return JSON.serialize(new Map<String, Object>{
-            'DeveloperName' => EMAIL_SERVICES_ADDRESS_DEVELOPER_NAME,
-            'IsActive' => true,
-            'LocalPart' => EMAIL_SERVICES_ADDRESS_DEVELOPER_NAME,
-            'FunctionId' => responseId,
-            'RunAsUserId' => UserInfo.getUserId(),
-            'AuthorizedSenders' => ''
-        });
+        return '{'+
+            '  "IsActive": true,'+
+            '  "LocalPart": "ErrorEmailHandlerAddress",'+
+            '  "FunctionId": "'+responseId+'",'+
+            '  "RunAsUserId": "'+UserInfo.getUserId()+'",'+
+            '  "AuthorizedSenders": ""'+
+        '}';
     }
 
     public static final String USER_SESSION_ID {

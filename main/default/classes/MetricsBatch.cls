@@ -98,7 +98,7 @@ public with sharing class MetricsBatch extends DatabaseUtils.PharosBatchImpl imp
                 PlatformEventSubscriberConfigService.PlatformEventSubscriberConfigWrapper pescw = 
                     new PlatformEventSubscriberConfigService(Log_Event__e.SObjectType).getPlatformEventSubscriberConfig(true);
                 this.platformEventConfigured = pescw != null && pescw.Id != null;
-                List<EmailServicesFunction> availableEmailServices = new EmailServicesFunctionSelector().getPackageEmailServicesFunctions();
+                List<EmailServicesFunction> availableEmailServices = AdminService.getPackageEmailServicesFunctions();
                 this.isApexTrackingEnabled = (!availableEmailServices.isEmpty() && availableEmailServices.get(0).IsActive);
                 this.emailToCaseEnabled = AdminService.getEmailToCaseErrorTracking();
                 this.automatedFlowTrackingEnabled = AdminService.getAutomatedFlowErrorTracking();
