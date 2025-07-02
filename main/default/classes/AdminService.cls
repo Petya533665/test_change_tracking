@@ -4,6 +4,12 @@ public without sharing class AdminService {
      * Email Services Address records query class
      */
     @TestVisible
+    private static ApexEmailNotificationSelector apexEmailNotificationSelector = new ApexEmailNotificationSelector();
+
+    /**
+     * Email Services Address records query class
+     */
+    @TestVisible
     private static EmailServicesFunctionSelector emailServicesFunctionSelector = new EmailServicesFunctionSelector();
 
     /**
@@ -882,7 +888,7 @@ public without sharing class AdminService {
     }
 
     private static Boolean isEmailServicesAvailable() {
-        ApexEmailNotificationService.ApexEmailNotificationWrapper apexEmailNotification = getApexEmailNotification();
+        ApexEmailNotification apexEmailNotification = apexEmailNotificationSelector.getApexEmailNotification();
         List<EmailServicesFunction> availableEmailServices = emailServicesFunctionSelector.getPackageEmailServicesFunctions();
         List<EmailServicesAddress> availableEmailServicesAddresses = emailServicesAddressSelector.getPackageAllAddresses();
 
@@ -969,7 +975,7 @@ public without sharing class AdminService {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         Boolean incomingValue = Boolean.valueOf(input.get(ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE));
 
-        ApexEmailNotificationService.ApexEmailNotificationWrapper apexEmailNotification = getApexEmailNotification();
+        ApexEmailNotification apexEmailNotification = apexEmailNotificationSelector.getApexEmailNotification();
         List<EmailServicesFunction> availableEmailServices = emailServicesFunctionSelector.getPackageEmailServicesFunctions();
 
         Id functionId;
@@ -1041,7 +1047,7 @@ public without sharing class AdminService {
         return getEmailServiceData();
     }
 
-    public static void upsertApexEmailNotification(String errorEmailServiceAddress, ApexEmailNotificationService.ApexEmailNotificationWrapper apexEmailNotification) {
+    public static void upsertApexEmailNotification(String errorEmailServiceAddress, ApexEmailNotification apexEmailNotification) {
         Map<String, Object> apexEmailNotificationData = new Map<String, Object>{
             'Email' => errorEmailServiceAddress
         };
@@ -1055,16 +1061,6 @@ public without sharing class AdminService {
         } catch (HttpUtils.HttpUtilsException e) {
             debugSession(e, 'upsertApexEmailNotification');
         }
-    }
-
-    public static ApexEmailNotificationService.ApexEmailNotificationWrapper getApexEmailNotification() {
-        ApexEmailNotificationService.ApexEmailNotificationWrapper result;
-        try {
-            result = ApexEmailNotificationService.getApexEmailNotificationResult();
-        } catch (HttpUtils.HttpUtilsException e) {
-            debugSession(e, 'getApexEmailNotification');
-        }
-        return result;
     }
 
     @future(Callout=true)
@@ -4032,7 +4028,7 @@ public without sharing class AdminService {
             return true;
         }
 
-        ApexEmailNotificationService.ApexEmailNotificationWrapper apexEmailNotification = getApexEmailNotification();
+        ApexEmailNotification apexEmailNotification = apexEmailNotificationSelector.getApexEmailNotification();
 
         List<EmailServicesAddress> addressesToDelete = new List<EmailServicesAddress>();
         EmailServicesAddress addressToUpdate;
@@ -4096,7 +4092,7 @@ public without sharing class AdminService {
             List<PharosRunningUserEmailServiceInfoWrapper> emailServiceInfoWrappers =
                 new List<PharosRunningUserEmailServiceInfoWrapper>();
 
-            ApexEmailNotificationService.ApexEmailNotificationWrapper apexEmailNotification = getApexEmailNotification();
+            ApexEmailNotification apexEmailNotification = apexEmailNotificationSelector.getApexEmailNotification();
             List<EmailServicesAddress> addresses = emailServicesAddressSelector.getPackageAllActiveAddresses();
             Map<Id, User> userNameByUserIdMap = new Map<Id, User>(getUsersByUserIds(getEmailServicesAddressRunAsUserIds(addresses)));
             for (EmailServicesAddress currentEmailServicesAddress : addresses) {
