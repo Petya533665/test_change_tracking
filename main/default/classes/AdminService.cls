@@ -1,23 +1,5 @@
 public without sharing class AdminService {
 
-    /**
-     * Email Services Address records query class
-     */
-    @TestVisible
-    private static ApexEmailNotificationSelector apexEmailNotificationSelector = new ApexEmailNotificationSelector();
-
-    /**
-     * Email Services Address records query class
-     */
-    @TestVisible
-    private static EmailServicesFunctionSelector emailServicesFunctionSelector = new EmailServicesFunctionSelector();
-
-    /**
-     * Email Services Address records query class
-     */
-    @TestVisible
-    private static EmailServicesAddressSelector emailServicesAddressSelector = new EmailServicesAddressSelector();
-
     public static User getUserInfo() {
         User user = new User();
         user.FirstName = UserInfo.getFirstName();
@@ -873,74 +855,79 @@ public without sharing class AdminService {
         return data;
     }
 
+    public static Map<String, Object> getEmailServiceData() {
+        return getEmailServiceData(getAutomatedFlowErrorTracking(), getEmailToCaseErrorTracking(), getEmailToCaseErrorTrackingType(), getEmailToCaseErrorTrackingAvailable());
+    }
+
+    public static List<EmailServicesFunction> getPackageEmailServicesFunctions() {
+        Id ehId = getEmailHandlerApexClassId();
+        List<EmailServicesFunction> availableEmailServices = [
+            SELECT Id, IsActive, FunctionName, ErrorRoutingAddress, AuthorizedSenders, ApexClassId
+            FROM EmailServicesFunction
+            WHERE ApexClassId = :ehId AND FunctionName = :ConfigUtil.EMAIL_SERVICE_HANDLER_NAME
+            LIMIT 1
+        ];
+        return availableEmailServices;
+    }
+
     public static String getPackageEmailServiceFunctionEmailAddress() {
         List<EmailServicesAddress> addresses = getEmailServicesAddresses();
-        return !addresses.isEmpty() ? EmailServicesAddressService.getEmailFromEmailServiceAddress(addresses.get(0)) : null;
+        return !addresses.isEmpty() ? getEmailFromEmailServiceAddress(addresses.get(0)) : null;
     }
 
     public static List<EmailServicesAddress> getEmailServicesAddresses() {
         List<EmailServicesAddress> addresses = new List<EmailServicesAddress>();
-        List<EmailServicesFunction> packageFunctions = emailServicesFunctionSelector.getPackageEmailServicesFunctions();
+        List<EmailServicesFunction> packageFunctions = getPackageEmailServicesFunctions();
         if (!packageFunctions.isEmpty()) {
-            addresses = emailServicesAddressSelector.getActiveEmailServicesAddressesByFunctionIdsOrderingByCreatedDate(new Set<Id>{ packageFunctions.get(0).Id });
+            addresses = [
+                SELECT DeveloperName, RunAsUserId, LocalPart, EmailDomainName, IsActive
+                FROM EmailServicesAddress
+                WHERE FunctionId = :packageFunctions.get(0).Id AND IsActive = true
+                ORDER BY CreatedDate ASC
+            ];
         }
         return addresses;
     }
 
-    private static Boolean isEmailServicesAvailable() {
-        ApexEmailNotification apexEmailNotification = apexEmailNotificationSelector.getApexEmailNotification();
-        List<EmailServicesFunction> availableEmailServices = emailServicesFunctionSelector.getPackageEmailServicesFunctions();
-        List<EmailServicesAddress> availableEmailServicesAddresses = emailServicesAddressSelector.getPackageAllAddresses();
-
-        if (apexEmailNotification == null || availableEmailServices.isEmpty() || availableEmailServicesAddresses.isEmpty() || !availableEmailServices.get(0).IsActive) {
-            return false;
-        }
-
-        EmailServicesAddress availableAddress;
-        for (EmailServicesAddress currentAddress : availableEmailServicesAddresses) {
-            if (EmailServicesAddressService.getEmailFromEmailServiceAddress(currentAddress).equals(apexEmailNotification.Email) && currentAddress.isActive) {
-                availableAddress = currentAddress;
-                break;
-            }
-        }
-
-        return availableAddress != null;
+    public static String getEmailFromEmailServiceAddress(EmailServicesAddress address) {
+        return address.LocalPart.toLowerCase() + ConfigUtil.EMAIL_SERVICE_DATA_KEY_EMAIL_SYMBOL + address.EmailDomainName;
     }
 
-    public static Object validateEmailServiceData() {
-        Boolean result = false;
-        if (!isEmailServicesAvailable()) {
-            if (getAutomatedFlowErrorTracking()) {
-                setAutomatedFlowErrorTracking(false);
-            }
-            if (getScheduleBulkAPIBatch().get('cronParameter') != null) {
-                abortScheduleBulkAPIBatch();
-            }
-            if (Boolean.valueOf(getBatchErrorTrackingSetting(null).get(ConfigUtil.BATCH_ERROR_TRACKING_ENABLED)) || ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) {
-                disableBatchErrorTrackingAndEmailToCaseErrorTracking();
-            }
-        }
-        
-        result = true;
 
-        return result;
-    }
-
-    public static Map<String, Object> getEmailServiceData() {
-        return getEmailServiceData(getAutomatedFlowErrorTracking(), getEmailToCaseErrorTracking(), getEmailToCaseErrorTrackingType(), getEmailToCaseErrorTrackingAvailable(), isEmailServicesAvailable());
-    }
-
-    public static Map<String, Object> getEmailServiceData(Boolean flowErrorTracking, Boolean emailToCaseErrorTracking, String emailToCaseErrorTrackingType, Boolean emailToCaseErrorTrackingAvailable, Boolean isEmailServicesAvailable) {
+    public static Map<String, Object> getEmailServiceData(Boolean flowErrorTracking, Boolean emailToCaseErrorTracking, String emailToCaseErrorTrackingType, Boolean emailToCaseErrorTrackingAvailable) {
         Map<String, Object> output = new Map<String, Object>{
-            ConfigUtil.EMAIL_SERVICE_DATA_KEY_CONFIRMED => ConfigUtil.SETTINGS.Email_Service_Confirmed__c,
-            ConfigUtil.CONFIRM_AUTOMATED_FLOW_ERROR_TRACKING_KEY => flowErrorTracking,
-            ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_KEY => ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c,
-            ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_KEY => ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED,
-            ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_ENABLED_KEY => emailToCaseErrorTracking,
-            'emailToCaseErrorTrackingAvailable' => emailToCaseErrorTrackingAvailable,
-            'emailToCaseErrorTrackingType' => emailToCaseErrorTrackingType,
-            'emailServicesFunctionIsActive' => isEmailServicesAvailable
+            ConfigUtil.EMAIL_SERVICE_DATA_KEY_EMAIL => null,
+            ConfigUtil.EMAIL_SERVICE_DATA_KEY_ERROR_CODE => 0,
+            ConfigUtil.EMAIL_SERVICE_DATA_KEY_CONFIRMED => false,
+            ConfigUtil.CONFIRM_AUTOMATED_FLOW_ERROR_TRACKING_KEY => false
         };
+        output.put(ConfigUtil.EMAIL_SERVICE_DATA_KEY_CONFIRMED, ConfigUtil.SETTINGS.Email_Service_Confirmed__c);
+        output.put(ConfigUtil.CONFIRM_AUTOMATED_FLOW_ERROR_TRACKING_KEY, flowErrorTracking);
+        output.put(ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_KEY, ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c);
+        output.put(ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_KEY, ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED);
+        output.put(ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_ENABLED_KEY, emailToCaseErrorTracking);
+        output.put('emailToCaseErrorTrackingAvailable', emailToCaseErrorTrackingAvailable);
+        output.put('emailToCaseErrorTrackingType', emailToCaseErrorTrackingType);
+        List<EmailServicesFunction> availableEmailServices = getPackageEmailServicesFunctions();
+        if (availableEmailServices.size() == 0) {
+            // throw new AdminServiceException('Email Service not found');
+            output.put(ConfigUtil.EMAIL_SERVICE_DATA_KEY_ERROR_CODE, 1001);
+            return output;
+        } else if (availableEmailServices.size() > 1) {
+            throw new AdminServiceException(ConfigUtil.MANY_EMAIL_SERVICE_FOUND_MESSAGE);
+        }
+        output.put('emailServicesFunctionIsActive', availableEmailServices.get(0).IsActive);
+        List<EmailServicesAddress> adresses = [
+            SELECT LocalPart, EmailDomainName, IsActive
+            FROM EmailServicesAddress
+            WHERE FunctionId = :availableEmailServices
+        ];
+        if (adresses.size() == 0) {
+            output.put(ConfigUtil.EMAIL_SERVICE_DATA_KEY_ERROR_CODE, 1002);
+            return output;
+        }
+        output.put(ConfigUtil.EMAIL_SERVICE_DATA_KEY_EMAIL, getEmailFromEmailServiceAddress(adresses.get(0)));
+        output.put('emailServicesFunctionIsActive', availableEmailServices.get(0).IsActive);
         return output;
     }
 
@@ -963,9 +950,20 @@ public without sharing class AdminService {
         return output;
     }
 
-    public static void updateEmailServicesFunction(EmailServicesFunction emailServicesFunction, Boolean isActive) {
+    public class EmailServicesFunctionWrapper {
+        public Boolean IsActive;
+    }
+
+    public static void updateEmailServicesFunction(String emailServicesFunctionId, Boolean isActive) {
+        EmailServicesFunctionWrapper data = new EmailServicesFunctionWrapper();
+        data.IsActive = isActive;
         try {
-            EmailServicesFunctionService.updateEmailServicesFunction(emailServicesFunction, isActive);
+            String b = HttpUtils.post(
+                    ConfigUtil.EMAIL_SERVICES_FUNCTION_ENDPOINT + '/' + emailServicesFunctionId + ConfigUtil.OVERRIDE_HTTP_METHOD_PATCH,
+                    JSON.serialize(data),
+                    getToolingHeaders(),
+                    204
+            );
         } catch (HttpUtils.HttpUtilsException e) {
             debugSession(e, 'updateEmailServicesFunction');
         }
@@ -974,22 +972,31 @@ public without sharing class AdminService {
     public static Map<String, Object> createEmailService(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         Boolean incomingValue = Boolean.valueOf(input.get(ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE));
-
-        ApexEmailNotification apexEmailNotification = apexEmailNotificationSelector.getApexEmailNotification();
-        List<EmailServicesFunction> availableEmailServices = emailServicesFunctionSelector.getPackageEmailServicesFunctions();
-
-        Id functionId;
-        SObjectsCreateResponse response;
-        String b;
-
-        if (!availableEmailServices.isEmpty()) {
-            updateEmailServicesFunction(availableEmailServices.get(0), incomingValue);
-            functionId = availableEmailServices.get(0).Id;
+        Id ehClassId = getEmailHandlerApexClassId();
+        List<EmailServicesFunction> availableEmailServices = [
+            SELECT Id, IsActive, FunctionName, ApexClassId
+            FROM EmailServicesFunction
+            WHERE ApexClassId = :ehClassId AND FunctionName = :ConfigUtil.EMAIL_SERVICE_HANDLER_NAME
+        ];
+        if(!incomingValue && !availableEmailServices.isEmpty()) {
+            updateEmailServicesFunction(availableEmailServices.get(0).Id, incomingValue);
         }
-        
-        if (incomingValue) {
-            if (availableEmailServices.isEmpty()) {
-                b = EmailServicesFunctionService.createEmailServicesFunction();
+        else if(incomingValue) {
+            Id functionId;
+            SObjectsCreateResponse response;
+            String b;
+
+            if(!availableEmailServices.isEmpty()) {
+                updateEmailServicesFunction(availableEmailServices.get(0).Id, incomingValue);
+                functionId = availableEmailServices.get(0).Id;
+            }
+            if(availableEmailServices.isEmpty()) {
+                b = HttpUtils.post(
+                    ConfigUtil.EMAIL_SERVICES_FUNCTION_ENDPOINT,
+                    ConfigUtil.getRequestBodyCreateEmailServiceFunction(ehClassId),
+                    ConfigUtil.SF_REST_API_HEADERS,
+                    201
+                );
 
                 try {
                     response = (SObjectsCreateResponse)JSON.deserialize(b, SObjectsCreateResponse.class);
@@ -999,44 +1006,25 @@ public without sharing class AdminService {
                     throw new AdminServiceException(b);
                 }
             }
-            
-            List<EmailServicesAddress> emailServicesAddresses = emailServicesAddressSelector.getPackageAllAddresses();
-            if (emailServicesAddresses.isEmpty()) {
-                b = EmailServicesAddressService.createEmailServicesAddress(functionId);
+
+            List<EmailServicesAddress> addresses = getEmailServicesAddresses();
+            if (addresses.isEmpty()) {
+                b = HttpUtils.post(
+                    ConfigUtil.EMAIL_SERVICES_ADDRESS_ENDPOINT,
+                    ConfigUtil.getRequestBodyCreateEmailService(functionId),
+                    ConfigUtil.SF_REST_API_HEADERS,
+                    201
+                );
                 try {
                     response = (SObjectsCreateResponse)JSON.deserialize(b, SObjectsCreateResponse.class);
                 }
                 catch(Exception e) {
                     throw new AdminServiceException(b);
                 }
-            } else {
-                List<EmailServicesAddress> addressesToDelete = new List<EmailServicesAddress>();
-                EmailServicesAddress addressToUpdate;
-
-                if (apexEmailNotification == null) {
-                    addressToUpdate = emailServicesAddresses.get(0);
-                    emailServicesAddresses.remove(0);
-                    addressesToDelete.addAll(emailServicesAddresses);
-                } else {
-                    for (EmailServicesAddress currentEmailServicesAddress : emailServicesAddresses) {
-                        if (apexEmailNotification.Email.equals(EmailServicesAddressService.getEmailFromEmailServiceAddress(currentEmailServicesAddress))) {
-                            if (!currentEmailServicesAddress.IsActive) {
-                                addressToUpdate = currentEmailServicesAddress;
-                            }
-                        } else {
-                            addressesToDelete.add(currentEmailServicesAddress);
-                        }
-                    }
-                }
-
-                EmailServicesAddressService.deleteEmailServicesAddresses(addressesToDelete);
-
-                if (addressToUpdate != null) {
-                    EmailServicesAddressService.updateEmailServicesAddress(addressToUpdate);
-                }
             }
 
             try {
+                ApexEmailNotificationWrapper apexEmailNotification = getApexEmailNotification();
                 String errorEmailServiceAddress = getPackageEmailServiceFunctionEmailAddress();
                 upsertApexEmailNotification(errorEmailServiceAddress, apexEmailNotification);
             }
@@ -1047,20 +1035,65 @@ public without sharing class AdminService {
         return getEmailServiceData();
     }
 
-    public static void upsertApexEmailNotification(String errorEmailServiceAddress, ApexEmailNotification apexEmailNotification) {
-        Map<String, Object> apexEmailNotificationData = new Map<String, Object>{
+    public static void upsertApexEmailNotification(String errorEmailServiceAddress, ApexEmailNotificationWrapper apexEmailNotification) {
+        Map<String, Object> ApexEmailNotificationData = new Map<String, Object>{
             'Email' => errorEmailServiceAddress
         };
-
         try {
-            if (apexEmailNotification == null) {
-                ApexEmailNotificationService.createApexEmailNotification(apexEmailNotificationData);
-            } else {
-                ApexEmailNotificationService.updateApexEmailNotification(apexEmailNotification, apexEmailNotificationData);
+            if(apexEmailNotification == null) {
+                ApexEmailNotificationData.put('UserId', '');
+                String b = HttpUtils.post(
+                        ConfigUtil.TOOLING_API_CREATE_APEX_EMAIL_NOTIFICATION,
+                        JSON.serialize(ApexEmailNotificationData),
+                        getToolingHeaders(),
+                        201
+                );
+            }
+            else {
+                String b = HttpUtils.post(
+                        ConfigUtil.TOOLING_API_UPDATE_APEX_EMAIL_NOTIFICATION + apexEmailNotification.Id + ConfigUtil.OVERRIDE_HTTP_METHOD_PATCH,
+                        JSON.serialize(ApexEmailNotificationData),
+                        getToolingHeaders(),
+                        204
+                );
             }
         } catch (HttpUtils.HttpUtilsException e) {
             debugSession(e, 'upsertApexEmailNotification');
         }
+    }
+
+    public static ApexEmailNotificationWrapper getApexEmailNotification() {
+        ApexEmailNotificationWrapper result;
+        try {
+            String b = HttpUtils.get(
+                    ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.TOOLING_QUERY_GET_EMAIL_APEX_EMAIL_NOTIFICATION,
+                    getToolingHeaders(),
+                    200
+            );
+            Map<String, Object> respResults = (Map<String, Object>)JSON.deserializeUntyped(b);
+            if (respResults.get(ConfigUtil.REMOTE_SITE_SETTINGS_KEY_RECORDS) != null) {
+                List<ApexEmailNotificationWrapper> apexEmailNotificationWrappers =
+                        (List<ApexEmailNotificationWrapper>)JSON.deserialize(JSON.serialize(respResults.get(ConfigUtil.REMOTE_SITE_SETTINGS_KEY_RECORDS)), List<ApexEmailNotificationWrapper>.class);
+                if(!apexEmailNotificationWrappers.isEmpty()) {
+                    result = apexEmailNotificationWrappers.get(0);
+                }
+            }
+        } catch (HttpUtils.HttpUtilsException e) {
+            debugSession(e, 'getApexEmailNotification');
+        }
+        return result;
+    }
+
+    public class ApexEmailNotificationWrapper {
+        public String Id;
+        public String Email;
+    }
+
+    public static Map<String, String> getToolingHeaders() {
+        return new Map<String, String> {
+            'Authorization' => 'Bearer ' + ConnectedOrgService.getSelfConnectedOrgAccessToken(),
+            'Content-Type' => 'application/json'
+        };
     }
 
     @future(Callout=true)
@@ -1308,11 +1341,10 @@ public without sharing class AdminService {
         Boolean flowErrorTracking = getAutomatedFlowErrorTracking();
         String emailToCaseErrorTrackingType = getEmailToCaseErrorTrackingType();
         Boolean emailToCaseErrorTrackingAvailable = getEmailToCaseErrorTrackingAvailable();
-        Boolean isEmailServicesAvailable = isEmailServicesAvailable();
         Boolean emailToCaseErrorTracking = setEmailToCaseTracking(incomingValue);
 
 
-        return getEmailServiceData(flowErrorTracking, emailToCaseErrorTracking, emailToCaseErrorTrackingType, emailToCaseErrorTrackingAvailable, isEmailServicesAvailable);
+        return getEmailServiceData(flowErrorTracking, emailToCaseErrorTracking, emailToCaseErrorTrackingType, emailToCaseErrorTrackingAvailable);
     }
 
     public static Map<String, Object> flowErrorTracking(Object data) {
@@ -1320,6 +1352,17 @@ public without sharing class AdminService {
         setAutomatedFlowErrorTracking(Boolean.valueOf(input.get(ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE)));
 
         return getEmailServiceData();
+    }
+
+    private static Id getEmailHandlerApexClassId() {
+        List<ApexClass> availableClasses = [
+            SELECT Id
+            FROM ApexClass
+            WHERE Name = :ConfigUtil.EMAIL_SERVICE_HANDLER_NAME AND NamespacePrefix = :ConfigUtil.NS];
+        if (availableClasses.size() != 1) {
+            throw new AdminServiceException('' + ConfigUtil.NS + ConfigUtil.EXCEPTION_ERROR_EMAIL_HANDLER_NOT_FOUND);
+        }
+        return availableClasses[0].Id;
     }
 
     public class QuickStartStateWrapper {
@@ -1372,13 +1415,22 @@ public without sharing class AdminService {
 
     public static Object resetAllSettingsForRefreshSandbox() {
         // deactivate active emailServiceFunctions / address
-        List<EmailServicesFunction> activeFunctions = emailServicesFunctionSelector.getPackageEmailServicesFunctions();
+        List<EmailServicesFunction> activeFunctions = getPackageEmailServicesFunctions();
         if(!activeFunctions.isEmpty()) {
-            List<EmailServicesAddress> activeAddresses = emailServicesAddressSelector.getEmailServicesAddressByFunctionId(activeFunctions.get(0).Id);
+            List<EmailServicesAddress> activeAddresses = [
+                SELECT Id, IsActive
+                FROM EmailServicesAddress
+                WHERE FunctionId = :activeFunctions.get(0).Id
+                LIMIT 1
+            ];
             if(!activeAddresses.isEmpty()) {
-                String b = EmailServicesAddressService.deleteEmailServicesAddress(activeAddresses.get(0));
+                String b = HttpUtils.del(
+                    ConfigUtil.EMAIL_SERVICES_ADDRESS_ENDPOINT + '/' + activeAddresses.get(0).Id,
+                    ConfigUtil.SF_REST_API_HEADERS,
+                    204
+                );
             }
-            updateEmailServicesFunction(activeFunctions.get(0), false);
+            updateEmailServicesFunction(activeFunctions.get(0).Id, false);
         }
 
         Set<String> setRemoteSiteSettingsNames = new Set<String>();
@@ -1495,7 +1547,7 @@ public without sharing class AdminService {
 
     public static Boolean isEmailServiceFunctionSetupCompleted() {
         // Email Service
-        List<EmailServicesFunction> availableEmailServices = emailServicesFunctionSelector.getPackageEmailServicesFunctions();
+        List<EmailServicesFunction> availableEmailServices = getPackageEmailServicesFunctions();
         String emailServiceAddress = getPackageEmailServiceFunctionEmailAddress();
 
         return !availableEmailServices.isEmpty()
@@ -2899,13 +2951,6 @@ public without sharing class AdminService {
         return getBatchErrorTrackingSetting(null);
     }
 
-    public static void disableBatchErrorTrackingAndEmailToCaseErrorTracking() {
-        PermissionsUtil.putSObjectField(ConfigUtil.SETTINGS, Schema.SObjectType.Logger_Settings__c.fields.Enable_Email_To_Case_Error_Tracking__c, ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_DISABLED);
-        PermissionsUtil.putSObjectField(ConfigUtil.SETTINGS, Schema.SObjectType.Logger_Settings__c.fields.Batch_Error_Tracking_Enabled__c, false);
-        DatabaseUtils.getInstance().performUpsertDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c, true);
-        
-    }
-
     public static Map<String, Object> getBatchErrorTrackingSetting(Object data) {
         Map<String, Object> ret = new Map<String, Object>();
         ret.put(ConfigUtil.BATCH_ERROR_TRACKING_ENABLED, ConfigUtil.SETTINGS.Batch_Error_Tracking_Enabled__c);
@@ -4023,47 +4068,54 @@ public without sharing class AdminService {
     public static Boolean resetEmailAddressContextUser() {
         Boolean result = false;
 
-        List<EmailServicesAddress> addresses = emailServicesAddressSelector.getPackageAllAddresses();
+        List<EmailServicesAddress> addresses = getEmailServicesAddresses();
         if (addresses.isEmpty()) {
             return true;
         }
 
-        ApexEmailNotification apexEmailNotification = apexEmailNotificationSelector.getApexEmailNotification();
-
         List<EmailServicesAddress> addressesToDelete = new List<EmailServicesAddress>();
-        EmailServicesAddress addressToUpdate;
-
-        for (EmailServicesAddress currentEmailServicesAddress : addresses) {
-            Boolean isEmailNotificationEqualsEmailFromEmailServiceAddress =
-                apexEmailNotification != null
-                && apexEmailNotification.Email.equals(EmailServicesAddressService.getEmailFromEmailServiceAddress(currentEmailServicesAddress));
-
-            if (isEmailNotificationEqualsEmailFromEmailServiceAddress) {
-                if (isEmailServicesAddressResetNeeded(currentEmailServicesAddress)) {
-                    addressToUpdate = currentEmailServicesAddress;
+        if (addresses.size() > 1) {
+            for (Integer i = addresses.size() - 1; i >= 0; i--) {
+                if (i != 0) {
+                    addressesToDelete.add(addresses.get(i));
+                    addresses.remove(i);
                 }
-            } else {
-                addressesToDelete.add(currentEmailServicesAddress);
             }
         }
         
-        EmailServicesAddressService.deleteEmailServicesAddresses(addressesToDelete);
-
-        if (addressToUpdate != null) {
-            EmailServicesAddressService.updateEmailServicesAddress(addressToUpdate);
-        }
+        updateEmailServicesAddress(addresses.get(0));
+        deleteEmailServicesAddresses(addressesToDelete);
 
         result = true;
 
         return result;
     }
 
-    private static Boolean isEmailServicesAddressResetNeeded(EmailServicesAddress emailServicesAddress) {
-        return emailServicesAddress.isActive
-            && (
-                !emailServicesAddress.RunAsUserId.equals(UserInfo.getUserId())
-                || !emailServicesAddress.DeveloperName.equals(ConfigUtil.EMAIL_SERVICES_ADDRESS_DEVELOPER_NAME)
+    private static void deleteEmailServicesAddresses(List<EmailServicesAddress> addressesToDelete) {
+        for (EmailServicesAddress currentEmailServicesAddress : addressesToDelete) {
+            HttpUtils.del(
+                ConfigUtil.EMAIL_SERVICES_ADDRESS_ENDPOINT + '/' + currentEmailServicesAddress.Id,
+                ConfigUtil.SF_REST_API_HEADERS,
+                204
             );
+        }
+    }
+
+    private static void updateEmailServicesAddress(EmailServicesAddress emailServicesAddress) {
+        Id currentUserId = UserInfo.getUserId();
+        if (!emailServicesAddress.RunAsUserId.equals(currentUserId)) {
+            String requestBody = '{'+
+                '  "RunAsUserId": "' + currentUserId + '"' +
+            '}';
+
+            HttpUtils.patch(
+                ConfigUtil.EMAIL_SERVICES_ADDRESS_ENDPOINT + '/' + emailServicesAddress.Id,
+                requestBody,
+                ConfigUtil.SF_REST_API_HEADERS,
+                204
+            );
+        }
+        
     }
 
     public class PharosRunningUserWrapper {
@@ -4092,16 +4144,13 @@ public without sharing class AdminService {
             List<PharosRunningUserEmailServiceInfoWrapper> emailServiceInfoWrappers =
                 new List<PharosRunningUserEmailServiceInfoWrapper>();
 
-            ApexEmailNotification apexEmailNotification = apexEmailNotificationSelector.getApexEmailNotification();
-            List<EmailServicesAddress> addresses = emailServicesAddressSelector.getPackageAllActiveAddresses();
+            List<EmailServicesAddress> addresses = getEmailServicesAddresses();
             Map<Id, User> userNameByUserIdMap = new Map<Id, User>(getUsersByUserIds(getEmailServicesAddressRunAsUserIds(addresses)));
             for (EmailServicesAddress currentEmailServicesAddress : addresses) {
-                if (apexEmailNotification != null && apexEmailNotification.Email.equals(EmailServicesAddressService.getEmailFromEmailServiceAddress(currentEmailServicesAddress))) {
-                    emailServiceInfoWrappers.add(new PharosRunningUserEmailServiceInfoWrapper(
-                        currentEmailServicesAddress,
-                        userNameByUserIdMap.get(currentEmailServicesAddress.RunAsUserId)
-                    ));
-                }
+                emailServiceInfoWrappers.add(new PharosRunningUserEmailServiceInfoWrapper(
+                    currentEmailServicesAddress,
+                    userNameByUserIdMap.get(currentEmailServicesAddress.RunAsUserId)
+                ));
             }
 
             return emailServiceInfoWrappers;
@@ -4141,7 +4190,7 @@ public without sharing class AdminService {
         public PharosRunningUserEmailServiceInfoWrapper(EmailServicesAddress emailServicesAddress, User user) {
             this.emailServiceName = emailServicesAddress.DeveloperName;
             this.contextUser = user.Name;
-            this.emailAddress = EmailServicesAddressService.getEmailFromEmailServiceAddress(emailServicesAddress);
+            this.emailAddress = getEmailFromEmailServiceAddress(emailServicesAddress);
         }
     }
 

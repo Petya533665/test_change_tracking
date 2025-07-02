@@ -1,5 +1,39 @@
 public with sharing class RuleUtil {
 
+	public class RuleUtilException extends Exception {}
+
+	// Error message templates
+	public static final String ERROR_RUNTIME_TYPE_INCOMPATIBLE_WITH_MERGE_FIELD = 'Runtime field ({0}) with type "{1}" is not compatible with JIRA field type "{2}" for field {3}.';
+	public static final String ERROR_RUNTIME_TYPE_INCOMPATIBLE_WITHOUT_MERGE_FIELD = 'Runtime field with type "{0}" is not compatible with JIRA field type "{1}" for field {2}.';
+	
+	// Field validation error messages
+	public static final String ERROR_REQUIRED_FIELD_BLANK = 'Required field {0} cannot be blank.';
+	public static final String ERROR_INVALID_JSON_FORMAT = 'Invalid JSON format in Additional Metadata: {0}';
+	public static final String ERROR_VALIDATING_METADATA = 'Error validating Additional Metadata: {0}';
+	public static final String ERROR_UNABLE_TO_PARSE_METADATA = 'Unable to parse Additional Metadata format';
+	public static final String ERROR_FIELD_TYPE_NOT_SUPPORTED = 'Field type "{0}" for field {1} is not supported.';
+	public static final String ERROR_VALIDATING_FIELD = 'Error validating field {0}: {1}';
+	
+	// Allowed values validation error messages
+	public static final String ERROR_VALUE_NOT_ALLOWED_MULTI = 'Value "{0}" is not allowed for field {1}.';
+	public static final String ERROR_VALUE_NOT_ALLOWED_SINGLE = 'Value "{0}" is not allowed for field {1}.';
+	
+	// Field type specific validation error messages
+	public static final String ERROR_URL_INVALID_FORMAT = 'URL field {0} must start with http:// or https://';
+	public static final String ERROR_INVALID_NUMBER_FORMAT = 'Invalid number format for field {0}: {1}';
+	public static final String ERROR_INVALID_DATE_FORMAT = 'Invalid date format for field {0}. Expected: YYYY-MM-DD, YYYY-MM-DD HH:mm:ss, or ISO format';
+	public static final String ERROR_INVALID_DATETIME_FORMAT = 'Invalid datetime format for field {0}. Expected: YYYY-MM-DD HH:mm:ss, YYYY-MM-DD, or ISO format';
+	
+	// Merge field validation error messages
+	public static final String ERROR_INVALID_MERGE_FIELD_SYNTAX = 'Field {0} contains invalid merge field syntax.';
+	public static final String ERROR_MERGE_FIELD_VALIDATION = 'Field {0} contains {1}';
+	public static final String ERROR_VALIDATING_MERGE_FIELDS = 'Error validating merge fields for field {0}: {1}';
+	public static final String ERROR_MERGE_FIELD_OBJECT_NOT_EXISTS = 'Invalid merge field in field {0}: Object "{1}" does not exist.';
+	public static final String ERROR_MERGE_FIELD_FIELD_NOT_EXISTS = 'Invalid merge field in field {0}: Field "{1}" does not exist on object "{2}".';
+	public static final String ERROR_MERGE_FIELD_NOT_ACCESSIBLE = 'Invalid merge field in field {0}: Field "{1}" on object "{2}" is not accessible.';
+	public static final String ERROR_VALIDATING_MERGE_FIELD = 'Error validating merge field {{!{0}.{1}}} in field {2}: {3}';
+	public static final String ERROR_MERGE_FIELD_SYNTAX_INVALID = 'Contains invalid merge field syntax.';
+
 	public static final String KEY_RULE = 'rule';
 	public static final String KEY_RULES = 'rules';
 	public static final String KEY_RULE_ID = 'ruleId';
@@ -1403,6 +1437,11 @@ public with sharing class RuleUtil {
 		}
 
 		public Action__c getAction(String recordTypeName) {
+			// Validate additionalMetadata if present and action is JIRA-related
+			if (String.isNotBlank(additionalMetadata) && isJiraAction()) {
+				validateAdditionalMetadata();
+			}
+			
 			Schema.RecordTypeInfo recordTypeInfo = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(recordTypeName);
 			return new Action__c(
 					Id = id,
@@ -1436,6 +1475,700 @@ public with sharing class RuleUtil {
 					Is_Update__c = isUpdate != null ? isUpdate : false
 			);
 		}
+		
+		/**
+		 * Validates additionalMetadata for JIRA custom fields
+		 * Expects metadata in format: {"fieldKey": {"value": "...", "schema": {...}, "required": true, "allowedValues": [...]}}
+		 * Throws an exception if validation fails
+		 */
+		private void validateAdditionalMetadata() {
+			try {
+				// Try to parse as new schema-included format first
+				Map<String, Object> customFieldsWithSchema = parseAdditionalMetadata();
+				
+				if (!customFieldsWithSchema.isEmpty()) {
+					// Validate each custom field using stored schema
+					for (String fieldKey : customFieldsWithSchema.keySet()) {
+						Map<String, Object> fieldData = (Map<String, Object>)customFieldsWithSchema.get(fieldKey);
+						
+						// Extract field information from stored schema
+						String fieldValue = (String)fieldData.get('value');
+						Map<String, Object> schemaData = (Map<String, Object>)fieldData.get('schema');
+						Boolean fieldRequired = (Boolean)fieldData.get('required');
+						List<Object> allowedValuesData = (List<Object>)fieldData.get('allowedValues');
+						
+						// Skip validation for blank values
+						if (String.isBlank(fieldValue)) {
+							// Check if field is required
+							if (fieldRequired == true) {
+								String fieldRef = getFieldReference(fieldKey, fieldData);
+								throw new RuleUtilException(String.format(ERROR_REQUIRED_FIELD_BLANK, new List<String>{fieldRef}));
+							}
+							continue;
+						}
+						
+						// Validate field using stored schema (pass full fieldData for error messages)
+						validateFieldWithStoredSchema(fieldKey, fieldValue, schemaData, fieldRequired, allowedValuesData, fieldData);
+					}
+				}
+			} catch (JSONException e) {
+				throw new RuleUtilException(String.format(ERROR_INVALID_JSON_FORMAT, new List<String>{e.getMessage()}));
+			} catch (Exception e) {
+				// Re-throw RuleUtilException as-is, wrap others
+				if (e instanceof RuleUtilException) {
+					throw e;
+				}
+				throw new RuleUtilException(String.format(ERROR_VALIDATING_METADATA, new List<String>{e.getMessage()}));
+			}
+		}
+		
+		/**
+		 * Parses additionalMetadata supporting both old and new formats
+		 * Returns unified format for validation
+		 */
+		private Map<String, Object> parseAdditionalMetadata() {
+			Map<String, Object> result = new Map<String, Object>();
+			
+			if (String.isBlank(additionalMetadata)) {
+				return result;
+			}
+			
+			try {
+				// Try new format first: {"fieldKey": {"value": "...", "schema": {...}}}
+				Map<String, Object> parsedData = (Map<String, Object>)JSON.deserializeUntyped(additionalMetadata);
+				
+				for (String fieldKey : parsedData.keySet()) {
+					Object fieldData = parsedData.get(fieldKey);
+					
+					// Check if it's new format (object with value property)
+					if (fieldData instanceof Map<String, Object>) {
+						Map<String, Object> fieldMap = (Map<String, Object>)fieldData;
+						if (fieldMap.containsKey('value')) {
+							// New format - use as-is
+							result.put(fieldKey, fieldData);
+							continue;
+						}
+					}
+					
+					// Old format - convert to new format for backward compatibility
+					result.put(fieldKey, new Map<String, Object>{
+						'value' => String.valueOf(fieldData),
+						'schema' => null,
+						'required' => false,
+						'allowedValues' => null
+					});
+				}
+			} catch (Exception e) {
+				// If parsing fails completely, try old format
+				try {
+					Map<String, String> oldFormat = (Map<String, String>)JSON.deserialize(additionalMetadata, Map<String, String>.class);
+					for (String fieldKey : oldFormat.keySet()) {
+						result.put(fieldKey, new Map<String, Object>{
+							'value' => oldFormat.get(fieldKey),
+							'schema' => null,
+							'required' => false,
+							'allowedValues' => null
+						});
+					}
+				} catch (Exception e2) {
+					throw new RuleUtilException(ERROR_UNABLE_TO_PARSE_METADATA);
+				}
+			}
+			
+			return result;
+		}
+		
+		/**
+		 * Helper method to get user-friendly field reference for error messages
+		 */
+		private String getFieldReference(String fieldKey, Map<String, Object> fieldData) {
+			if (fieldData != null && fieldData.get('name') != null) {
+				String fieldName = String.valueOf(fieldData.get('name'));
+				return String.format('"{0}" ({1})', new List<String>{fieldName, fieldKey});
+			}
+			return String.format('"{0}"', new List<String>{fieldKey});
+		}
+		
+		/**
+		 * Helper method to get user-friendly JIRA field type for error messages
+		 */
+		private String getFriendlyJiraFieldType(String jiraFieldType) {
+			if (String.isBlank(jiraFieldType)) {
+				return jiraFieldType;
+			}
+			
+			// Convert long JIRA field types to user-friendly names
+			Map<String, String> friendlyTypeMap = new Map<String, String>{
+				'com.atlassian.jira.plugin.system.customfieldtypes:textfield' => 'text field',
+				'com.atlassian.jira.plugin.system.customfieldtypes:textarea' => 'text area',
+				'com.atlassian.jira.plugin.system.customfieldtypes:select' => 'select list',
+				'com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons' => 'radio buttons',
+				'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes' => 'multi-checkbox',
+				'com.atlassian.jira.plugin.system.customfieldtypes:multiselect' => 'multi-select',
+				'com.atlassian.jira.plugin.system.customfieldtypes:datepicker' => 'date picker',
+				'com.atlassian.jira.plugin.system.customfieldtypes:datetime' => 'date/time',
+				'com.atlassian.jira.plugin.system.customfieldtypes:float' => 'number',
+				'com.atlassian.jira.plugin.system.customfieldtypes:url' => 'URL'
+			};
+			
+			return friendlyTypeMap.containsKey(jiraFieldType) ? friendlyTypeMap.get(jiraFieldType) : jiraFieldType;
+		}
+		
+		/**
+		 * Helper method to get user-friendly field label information from merge fields
+		 */
+		private String getMergeFieldLabelInfo(String fieldValue) {
+			if (!containsMergeFields(fieldValue)) {
+				return null;
+			}
+			
+			try {
+				Set<MergeFieldInfo> mergeFields = parseMergeFields(fieldValue);
+				
+				if (mergeFields.isEmpty()) {
+					return null;
+				}
+				
+				List<String> fieldLabels = new List<String>();
+				for (MergeFieldInfo mergeField : mergeFields) {
+					String fieldLabel = getSalesforceFieldLabel(mergeField.objectName, mergeField.fieldName);
+					if (String.isNotBlank(fieldLabel)) {
+						fieldLabels.add(fieldLabel);
+					}
+				}
+				
+				if (!fieldLabels.isEmpty()) {
+					return String.join(fieldLabels, ', ');
+				}
+				
+			} catch (Exception e) {
+				// If parsing fails, return null
+			}
+			
+			return null;
+		}
+		
+		/**
+		 * Gets the user-friendly field label for a Salesforce field
+		 */
+		private String getSalesforceFieldLabel(String objectName, String fieldName) {
+			try {
+				// Get the object describe
+				Schema.SObjectType objectType = ConfigUtil.MAP_GD.get(objectName);
+				if (objectType == null) {
+					return objectName + '.' + fieldName;
+				}
+
+				Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
+				Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
+				
+				Schema.SObjectField field = fieldMap.get(fieldName);
+				if (field == null) {
+					return objectName + '.' + fieldName;
+				}
+
+				Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+				String objectLabel = objectDescribe.getLabel();
+				String fieldLabel = fieldDescribe.getLabel();
+				
+				// Return in format: "Object Label > Field Label"
+				return objectLabel + ' > ' + fieldLabel;
+				
+			} catch (Exception e) {
+				// If field lookup fails, return API name format
+				return objectName + '.' + fieldName;
+			}
+		}
+
+		/**
+		 * Validates field using stored schema information
+		 */
+		private void validateFieldWithStoredSchema(String fieldKey, String fieldValue, Map<String, Object> schemaData, Boolean fieldRequired, List<Object> allowedValuesData, Map<String, Object> fieldData) {
+			try {
+				String fieldRef = getFieldReference(fieldKey, fieldData);
+				
+				// Always validate merge field syntax if present
+				Boolean isFieldValueRenderedAtRuntime = containsMergeFields(fieldValue);
+				if (isFieldValueRenderedAtRuntime) {
+					validateMergeFields(fieldKey, fieldValue, fieldData);
+				}
+				
+				// If no schema data available, skip detailed validation (backward compatibility)
+				if (schemaData == null) {
+						return;
+					}
+					
+				// Perform schema validation for both runtime and design-time values
+				String fieldType = (String)schemaData.get('custom');
+				if (String.isBlank(fieldType)) {
+					fieldType = (String)schemaData.get('type');
+				}
+				
+				// Validate field type is supported
+				if (String.isNotBlank(fieldType) && !getSupportedFieldTypes().contains(fieldType)) {
+					String friendlyType = getFriendlyJiraFieldType(fieldType);
+					throw new RuleUtilException(String.format(ERROR_FIELD_TYPE_NOT_SUPPORTED, new List<String>{friendlyType, fieldRef}));
+				}
+				
+				// Validate runtime field type compatibility
+				if (String.isNotBlank(fieldType)) {
+					String detectedRuntimeType = detectRuntimeFieldType(fieldValue);
+					if (!isRuntimeTypeCompatibleWithJiraType(detectedRuntimeType, fieldType)) {
+						String friendlyType = getFriendlyJiraFieldType(fieldType);
+						String mergeFieldInfo = getMergeFieldLabelInfo(fieldValue);
+						String errorMessage;
+						
+						if (String.isNotBlank(mergeFieldInfo)) {
+							errorMessage = String.format(ERROR_RUNTIME_TYPE_INCOMPATIBLE_WITH_MERGE_FIELD, 
+								new List<String>{mergeFieldInfo, detectedRuntimeType, friendlyType, fieldRef});
+						} else {
+							errorMessage = String.format(ERROR_RUNTIME_TYPE_INCOMPATIBLE_WITHOUT_MERGE_FIELD, 
+								new List<String>{detectedRuntimeType, friendlyType, fieldRef});
+						}
+						
+						throw new RuleUtilException(errorMessage);
+					}
+				}
+				
+				// For non-runtime values, also validate allowed values and field-specific rules
+				if (!isFieldValueRenderedAtRuntime) {
+					// Validate against allowed values if provided
+					if (allowedValuesData != null && !allowedValuesData.isEmpty()) {
+						validateAllowedValuesWithStoredSchema(fieldKey, fieldValue, fieldType, allowedValuesData, fieldData);
+					}
+					
+					// Field-specific validations
+					if (String.isNotBlank(fieldType)) {
+						validateFieldTypeSpecificRulesWithStoredSchema(fieldKey, fieldValue, fieldType, fieldData);
+					}
+				}
+			} catch (RuleUtilException e) {
+				throw e;
+			} catch (Exception e) {
+				String fieldRef = getFieldReference(fieldKey, fieldData);
+				throw new RuleUtilException(String.format(ERROR_VALIDATING_FIELD, new List<String>{fieldRef, e.getMessage()}));
+			}
+		}
+		
+		/**
+		 * Validates allowed values using stored schema
+		 */
+		private void validateAllowedValuesWithStoredSchema(String fieldKey, String fieldValue, String fieldType, List<Object> allowedValuesData, Map<String, Object> fieldData) {
+			String fieldRef = getFieldReference(fieldKey, fieldData);
+			Set<String> allowedIds = new Set<String>();
+			Set<String> allowedValues = new Set<String>();
+			
+			for (Object allowedValueObj : allowedValuesData) {
+				if (allowedValueObj instanceof Map<String, Object>) {
+					Map<String, Object> allowedValue = (Map<String, Object>)allowedValueObj;
+					if (allowedValue.get('id') != null) {
+						allowedIds.add(String.valueOf(allowedValue.get('id')));
+					}
+					if (allowedValue.get('value') != null) {
+						allowedValues.add(String.valueOf(allowedValue.get('value')));
+					}
+				}
+			}
+			
+			// For multi-value fields, validate each value
+			if (isMultiValueFieldType(fieldType)) {
+				List<String> inputValues = fieldValue.split(',');
+				for (String inputValue : inputValues) {
+					String trimmedValue = inputValue?.trim();
+					if (String.isNotBlank(trimmedValue) && 
+						!allowedIds.contains(trimmedValue) && 
+						!allowedValues.contains(trimmedValue)) {
+						throw new RuleUtilException(String.format(ERROR_VALUE_NOT_ALLOWED_MULTI, new List<String>{trimmedValue, fieldRef}));
+					}
+				}
+			} else {
+				// Single value field
+				if (!allowedIds.contains(fieldValue) && !allowedValues.contains(fieldValue)) {
+					throw new RuleUtilException(String.format(ERROR_VALUE_NOT_ALLOWED_SINGLE, new List<String>{fieldValue, fieldRef}));
+				}
+			}
+		}
+		
+		/**
+		 * Field-specific validations using stored schema
+		 */
+		private void validateFieldTypeSpecificRulesWithStoredSchema(String fieldKey, String fieldValue, String fieldType, Map<String, Object> fieldData) {
+			String fieldRef = getFieldReference(fieldKey, fieldData);
+			
+			switch on fieldType {
+				when 'com.atlassian.jira.plugin.system.customfieldtypes:url' {
+					if (!fieldValue.startsWith('http://') && !fieldValue.startsWith('https://')) {
+						throw new RuleUtilException(String.format(ERROR_URL_INVALID_FORMAT, new List<String>{fieldRef}));
+					}
+				}
+				when 'com.atlassian.jira.plugin.system.customfieldtypes:float' {
+					try {
+						Decimal.valueOf(fieldValue);
+					} catch (Exception e) {
+						throw new RuleUtilException(String.format(ERROR_INVALID_NUMBER_FORMAT, new List<String>{fieldRef, fieldValue}));
+					}
+				}
+				when 'com.atlassian.jira.plugin.system.customfieldtypes:datepicker' {
+					if (!Pattern.matches('\\d{4}-\\d{2}-\\d{2}', fieldValue) && 
+						!fieldValue.contains('T') && 
+						!fieldValue.contains(' ')) {
+						throw new RuleUtilException(String.format(ERROR_INVALID_DATE_FORMAT, new List<String>{fieldRef}));
+					}
+				}
+				when 'com.atlassian.jira.plugin.system.customfieldtypes:datetime' {
+					if (!fieldValue.contains('T') && 
+						!fieldValue.contains(' ') && 
+						!Pattern.matches('\\d{4}-\\d{2}-\\d{2}', fieldValue)) {
+						throw new RuleUtilException(String.format(ERROR_INVALID_DATETIME_FORMAT, new List<String>{fieldRef}));
+					}
+				}
+			}
+		}
+		
+		/**
+		 * Checks if field type supports multiple values
+		 */
+		private Boolean isMultiValueFieldType(String fieldType) {
+			return fieldType == 'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes' ||
+				   fieldType == 'com.atlassian.jira.plugin.system.customfieldtypes:multiselect';
+		}
+		
+		/**
+		 * Gets supported field types
+		 */
+		private Set<String> getSupportedFieldTypes() {
+			return new Set<String>{
+				'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes',
+				'com.atlassian.jira.plugin.system.customfieldtypes:multiselect',
+				'com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons',
+				'com.atlassian.jira.plugin.system.customfieldtypes:select',
+				'com.atlassian.jira.plugin.system.customfieldtypes:datepicker',
+				'com.atlassian.jira.plugin.system.customfieldtypes:datetime',
+				'com.atlassian.jira.plugin.system.customfieldtypes:float',
+				'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
+				'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+				'com.atlassian.jira.plugin.system.customfieldtypes:url',
+				'string',
+				'number',
+				'date',
+				'datetime',
+				'url',
+				'array',
+				'boolean'
+			};
+		}
+		
+
+
+		/**
+		 * Validates merge fields structure and references
+		 */
+		private void validateMergeFields(String fieldKey, String fieldValue, Map<String, Object> fieldData) {
+			try {
+				String fieldRef = getFieldReference(fieldKey, fieldData);
+				Set<MergeFieldInfo> mergeFields = parseMergeFields(fieldValue);
+				
+				if (mergeFields.isEmpty()) {
+					throw new RuleUtilException(String.format(ERROR_INVALID_MERGE_FIELD_SYNTAX, new List<String>{fieldRef}));
+				}
+
+				// Validate each merge field
+				for (MergeFieldInfo mergeField : mergeFields) {
+					validateMergeField(fieldKey, mergeField, fieldData);
+				}
+
+			} catch (RuleUtilException e) {
+				// Re-throw with field context if not already included
+				String fieldRef = getFieldReference(fieldKey, fieldData);
+				if (e.getMessage().contains('invalid merge field syntax') && !e.getMessage().contains('Field ')) {
+					throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_VALIDATION, new List<String>{fieldRef, e.getMessage().toLowerCase()}));
+				}
+				throw e;
+			} catch (Exception e) {
+				String fieldRef = getFieldReference(fieldKey, fieldData);
+				throw new RuleUtilException(String.format(ERROR_VALIDATING_MERGE_FIELDS, new List<String>{fieldRef, e.getMessage()}));
+			}
+		}
+
+		/**
+		 * Validates a single merge field
+		 */
+		private void validateMergeField(String fieldKey, MergeFieldInfo mergeField, Map<String, Object> fieldData) {
+			String fieldRef = getFieldReference(fieldKey, fieldData);
+			
+			// Validate object exists
+			Schema.SObjectType objectType = ConfigUtil.MAP_GD.get(mergeField.objectName);
+			if (objectType == null) {
+				throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_OBJECT_NOT_EXISTS, new List<String>{fieldRef, mergeField.objectName}));
+			}
+
+			// Validate field exists on object
+			try {
+				Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
+				Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
+				
+				Schema.SObjectField field = fieldMap.get(mergeField.fieldName);
+				if (field == null) {
+					throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_FIELD_NOT_EXISTS, new List<String>{fieldRef, mergeField.fieldName, mergeField.objectName}));
+				}
+
+				// Validate field is accessible
+				Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+				if (!fieldDescribe.isAccessible()) {
+					throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_NOT_ACCESSIBLE, new List<String>{fieldRef, mergeField.fieldName, mergeField.objectName}));
+				}
+
+			} catch (RuleUtilException e) {
+				throw e;
+			} catch (Exception e) {
+				throw new RuleUtilException(String.format(ERROR_VALIDATING_MERGE_FIELD, new List<String>{mergeField.objectName, mergeField.fieldName, fieldRef, e.getMessage()}));
+			}
+		}
+
+		/**
+		 * Detects the runtime field type based on the field value
+		 */
+		private String detectRuntimeFieldType(String fieldValue) {
+			if (String.isBlank(fieldValue)) {
+				return 'string';
+			}
+
+			// Check for merge fields first
+			if (containsMergeFields(fieldValue)) {
+				return detectMergeFieldType(fieldValue);
+			}
+
+			// Check for numeric values
+			try {
+				Decimal.valueOf(fieldValue);
+				if (fieldValue.contains('.')) {
+					return 'decimal';
+				}
+				return 'integer';
+			} catch (Exception e) {
+				// Not a number, continue checking
+			}
+
+			// Check for date patterns
+			if (Pattern.matches('\\d{4}-\\d{2}-\\d{2}', fieldValue)) {
+				return 'date';
+			}
+
+			// Check for datetime patterns
+			if (fieldValue.contains('T') || (fieldValue.contains(' ') && fieldValue.split(' ').size() == 2)) {
+				return 'datetime';
+			}
+
+			// Check for URL patterns
+			if (fieldValue.startsWith('http://') || fieldValue.startsWith('https://')) {
+				return 'url';
+			}
+
+			// Check for multi-value patterns (comma-separated)
+			if (fieldValue.contains(',') && fieldValue.split(',').size() > 1) {
+				return 'multivalue';
+			}
+
+			// Check for boolean patterns
+			if (fieldValue.toLowerCase() == 'true' || fieldValue.toLowerCase() == 'false') {
+				return 'boolean';
+			}
+
+			// Default to string
+			return 'string';
+		}
+
+		/**
+		 * Checks if the field value contains merge fields
+		 */
+		private Boolean containsMergeFields(String fieldValue) {
+			return fieldValue != null && fieldValue.contains('{!') && fieldValue.contains('}');
+		}
+
+		/**
+		 * Detects the runtime field type for merge fields
+		 */
+		private String detectMergeFieldType(String fieldValue) {
+			try {
+				Set<MergeFieldInfo> mergeFields = parseMergeFields(fieldValue);
+				
+				if (mergeFields.isEmpty()) {
+					return 'string';
+				}
+
+				// If there are multiple merge fields, consider it as a string concatenation
+				if (mergeFields.size() > 1) {
+					return 'string';
+				}
+
+				// Single merge field - determine its Salesforce field type
+				MergeFieldInfo mergeField = new List<MergeFieldInfo>(mergeFields)[0];
+				return getSalesforceFieldType(mergeField.objectName, mergeField.fieldName);
+
+			} catch (Exception e) {
+				// If parsing fails, default to string
+				return 'string';
+			}
+		}
+
+		/**
+		 * Parses merge fields from a field value
+		 */
+		private Set<MergeFieldInfo> parseMergeFields(String fieldValue) {
+			Set<MergeFieldInfo> mergeFields = new Set<MergeFieldInfo>();
+			
+			String markerStart = '{!';
+			String markerEnd = '}';
+			Integer startIndex = fieldValue.indexOf(markerStart);
+
+			while (startIndex != -1) {
+				Integer endIndex = fieldValue.indexOf(markerEnd, startIndex + markerStart.length());
+				if (endIndex != -1) {
+					String mergeFieldContent = fieldValue.substring(startIndex + markerStart.length(), endIndex);
+					
+					// Parse object.field pattern
+					if (mergeFieldContent.contains('.')) {
+						String objectName = mergeFieldContent.substringBefore('.');
+						String fieldName = mergeFieldContent.substringAfter('.');
+						
+						// Validate that both object and field names are present
+						if (String.isBlank(objectName) || String.isBlank(fieldName)) {
+							throw new RuleUtilException(ERROR_MERGE_FIELD_SYNTAX_INVALID);
+						}
+						
+						mergeFields.add(new MergeFieldInfo(objectName, fieldName));
+					} else {
+						// Missing field name (e.g., {!Log__c})
+						throw new RuleUtilException(ERROR_MERGE_FIELD_SYNTAX_INVALID);
+					}
+					
+					startIndex = fieldValue.indexOf(markerStart, endIndex + markerEnd.length());
+				} else {
+					break;
+				}
+			}
+
+			return mergeFields;
+		}
+
+		/**
+		 * Gets the Salesforce field type for a given object and field
+		 */
+		private String getSalesforceFieldType(String objectName, String fieldName) {
+			try {
+				// Get the object describe
+				Schema.SObjectType objectType = ConfigUtil.MAP_GD.get(objectName);
+				if (objectType == null) {
+					return 'string';
+				}
+
+				Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
+				Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
+				
+				Schema.SObjectField field = fieldMap.get(fieldName);
+				if (field == null) {
+					return 'string';
+				}
+
+				Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+				Schema.DisplayType displayType = fieldDescribe.getType();
+
+				// Map Salesforce field types to our runtime types
+				switch on displayType {
+					when INTEGER, LONG {
+						return 'integer';
+					}
+					when DOUBLE, CURRENCY, PERCENT {
+						return 'decimal';
+					}
+					when DATE {
+						return 'date';
+					}
+					when DATETIME {
+						return 'datetime';
+					}
+					when BOOLEAN {
+						return 'boolean';
+					}
+					when URL {
+						return 'url';
+					}
+					when MULTIPICKLIST {
+						return 'multivalue';
+					}
+					when else {
+						return 'string';
+					}
+				}
+			} catch (Exception e) {
+				// If field lookup fails, default to string
+				return 'string';
+			}
+		}
+
+
+
+		/**
+		 * Checks if runtime type is compatible with JIRA field type
+		 */
+		private Boolean isRuntimeTypeCompatibleWithJiraType(String runtimeType, String jiraType) {
+			// Define compatibility mappings
+			Map<String, Set<String>> compatibilityMap = new Map<String, Set<String>>{
+				'string' => new Set<String>{
+					'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
+					'com.atlassian.jira.plugin.system.customfieldtypes:select',
+					'com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons',
+					'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes',
+					'com.atlassian.jira.plugin.system.customfieldtypes:multiselect',
+					'string'
+				},
+				'decimal' => new Set<String>{
+					'com.atlassian.jira.plugin.system.customfieldtypes:float',
+					'number'
+				},
+				'integer' => new Set<String>{
+					'com.atlassian.jira.plugin.system.customfieldtypes:float',
+					'number'
+				},
+				'date' => new Set<String>{
+					'com.atlassian.jira.plugin.system.customfieldtypes:datepicker',
+					'date'
+				},
+				'datetime' => new Set<String>{
+					'com.atlassian.jira.plugin.system.customfieldtypes:datetime',
+					'com.atlassian.jira.plugin.system.customfieldtypes:datepicker',
+					'datetime'
+				},
+				'url' => new Set<String>{
+					'com.atlassian.jira.plugin.system.customfieldtypes:url',
+					'url'
+				},
+				'multivalue' => new Set<String>{
+					'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes',
+					'com.atlassian.jira.plugin.system.customfieldtypes:multiselect',
+					'array'
+				},
+				'boolean' => new Set<String>{
+					'com.atlassian.jira.plugin.system.customfieldtypes:select',
+					'com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons',
+					'boolean'
+				}
+			};
+
+			Set<String> compatibleJiraTypes = compatibilityMap.get(runtimeType);
+			return compatibleJiraTypes != null && compatibleJiraTypes.contains(jiraType);
+		}
+
+
+		
+		/**
+		 * Checks if this action is JIRA-related
+		 */
+		private Boolean isJiraAction() {
+			return type == ACTION_TYPE_JIRA_NOTIFICATION || 
+				   type == ACTION_TYPE_JIRA_TICKET_COMMENT;
+		}
 
 	}
 
@@ -1456,6 +2189,31 @@ public with sharing class RuleUtil {
 		public SelectOptionWrapper(String value, String label) {
 			this.value = value;
 			this.label = label;
+		}
+	}
+
+	/**
+	 * Helper class to store merge field information
+	 */
+	public class MergeFieldInfo {
+		public String objectName;
+		public String fieldName;
+
+		public MergeFieldInfo(String objectName, String fieldName) {
+			this.objectName = objectName;
+			this.fieldName = fieldName;
+		}
+
+		public Boolean equals(Object other) {
+			if (other instanceof MergeFieldInfo) {
+				MergeFieldInfo otherInfo = (MergeFieldInfo) other;
+				return this.objectName == otherInfo.objectName && this.fieldName == otherInfo.fieldName;
+			}
+			return false;
+		}
+
+		public Integer hashCode() {
+			return (this.objectName + '.' + this.fieldName).hashCode();
 		}
 	}
 

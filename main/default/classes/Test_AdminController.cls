@@ -1842,7 +1842,7 @@ public class Test_AdminController {
 
     @IsTest
     private static void testGetEmailServiceData() {
-        system.assertNotEquals(null, AdminService.getEmailServiceData(true, true, 'emailToCaseErrorTrackingType', true, true));
+        system.assertNotEquals(null, AdminService.getEmailServiceData(true, true, 'emailToCaseErrorTrackingType', true));
     }
 
     @IsTest
@@ -1851,7 +1851,7 @@ public class Test_AdminController {
         Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
         mocks.putAll(getRemoteSiteSettingsMock());
 
-        List<EmailServicesFunction> activeFunctions = new EmailServicesFunctionSelector().getPackageEmailServicesFunctions();
+        List<EmailServicesFunction> activeFunctions = AdminService.getPackageEmailServicesFunctions();
         if(!activeFunctions.isEmpty()) {
             List<EmailServicesAddress> activeAddresses = [SELECT Id FROM EmailServicesAddress WHERE FunctionId =:activeFunctions.get(0).Id LIMIT 1];
 
