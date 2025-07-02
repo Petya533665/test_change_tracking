@@ -1711,7 +1711,7 @@ public with sharing class RuleUtil {
 				}
 				
 				// Validate runtime field type compatibility
-				if (String.isNotBlank(fieldType)) {
+				if (isFieldValueRenderedAtRuntime && String.isNotBlank(fieldType)) {
 					String detectedRuntimeType = detectRuntimeFieldType(fieldValue);
 					if (!isRuntimeTypeCompatibleWithJiraType(detectedRuntimeType, fieldType)) {
 						String friendlyType = getFriendlyJiraFieldType(fieldType);
