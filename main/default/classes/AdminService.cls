@@ -3305,10 +3305,10 @@ public without sharing class AdminService {
     }
 
     public static void validateJiraActions(RuleUtil.Rule ruleWrapper, String actionsJSON) {
-        List<RuleUtil.Action> actions = (List<RuleUtil.Action>)JSON.deserialize(actionsJSON, List<RuleUtil.Action>.class);
-        for(RuleUtil.Action actionWrapper : actions) {
-            // getAction start validation of jira custom fields
-            Action__c action = actionWrapper.getAction(RuleUtil.ACTION_RT_MONITORING);
+            List<RuleUtil.Action> actions = (List<RuleUtil.Action>)JSON.deserialize(actionsJSON, List<RuleUtil.Action>.class);
+            for(RuleUtil.Action actionWrapper : actions) {
+                // getAction start validation of jira custom fields
+                Action__c action = actionWrapper.getAction(RuleUtil.ACTION_RT_MONITORING);
         }
     }
 
