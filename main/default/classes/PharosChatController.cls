@@ -31,14 +31,9 @@ public with sharing class PharosChatController {
                 return new InitChatResponse(errorMessages);
             }
 
-            String namespace = ConfigUtil.nameSpacePrefix;
-            String instance = System.Url.getOrgDomainUrl().toExternalForm();
-            String session = EncodingUtil.base64Encode(Blob.valueOf(ConnectedOrgService.getSelfConnectedOrgAccessToken()));
             String body = JSON.serialize(new Map<String, Object> {
                 'session_id' => orgId,
-                'sf_namespace' => namespace,
-                'sf_instance' => instance,
-                'sf_session' => session
+                'openai_key' => openAiKey
             });
             HttpUtils.post(
                     CHAT_INIT_ENDPOINT,
