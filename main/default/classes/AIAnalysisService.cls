@@ -598,7 +598,7 @@ public with sharing class AIAnalysisService {
 		}
 
 		public virtual String replaceHTMLTags(String text) {
-			return text.replaceAll('<br>', '')
+			return text.replaceAll('<br>', '\n')
 					.replaceAll('<p>', '').replaceAll('</p>', '')
 					.replaceAll('<strong>', '*').replaceAll('</strong>', '*')
 					.replaceAll('<b>', '*').replaceAll('</b>', '*')
@@ -712,6 +712,7 @@ public with sharing class AIAnalysisService {
 
 		public override String formatText(String text) {
 			return replaceHTMLTags(text)
+					.replaceAll('\n', '  \n')
 					.replaceAll('<code>', '`').replaceAll('</code>', '`')
 					.replaceAll('<li>', '\n - ').replaceAll('</li>', '') + '\n';
 		}

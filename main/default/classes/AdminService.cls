@@ -3289,7 +3289,6 @@ public without sharing class AdminService {
 
         Rule__c rule = ruleWrapper.getRule();
         validateMaxActiveRules(rule?.Type__c, rule?.Id, rule?.Active__c);
-        validateJiraActions(ruleWrapper, JSON.serialize(input.get(RuleUtil.KEY_ACTIONS)));
         
         RuleUtil.setRuleIndex(rule);
         DatabaseUtils.getInstance().performUpsertDML(new List<Rule__c>{rule}, Schema.SObjectType.Rule__c, true);
@@ -3302,14 +3301,6 @@ public without sharing class AdminService {
             }
         }
         return getRuleSettings(rule.Type__c);
-    }
-
-    public static void validateJiraActions(RuleUtil.Rule ruleWrapper, String actionsJSON) {
-            List<RuleUtil.Action> actions = (List<RuleUtil.Action>)JSON.deserialize(actionsJSON, List<RuleUtil.Action>.class);
-            for(RuleUtil.Action actionWrapper : actions) {
-                // getAction start validation of jira custom fields
-                Action__c action = actionWrapper.getAction(RuleUtil.ACTION_RT_MONITORING);
-        }
     }
 
     public static List<Action__c> setActions(Object data) {
