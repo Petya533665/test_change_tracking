@@ -3,8 +3,6 @@ public with sharing class PharosChatController {
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
 
-    public static final String OPEN_AI_SECRET = 'OpenAISecret';
-
     public static final String ERROR_OPENAI_NOT_READY = 'OpenAI token is not configured or is invalid. Please set up OpenAI integration first.';
     public static final String ERROR_GIT_NOT_INTEGRATED = 'Git integration is not configured. Please set up Git integration first.';
     public static final String ERROR_CODE_NOT_INDEXED = 'Codebase is not indexed. Please wait for indexing to complete.';
@@ -31,14 +29,9 @@ public with sharing class PharosChatController {
                 return new InitChatResponse(errorMessages);
             }
 
-            String namespace = ConfigUtil.nameSpacePrefix;
-            String instance = System.Url.getOrgDomainUrl().toExternalForm();
-            String session = EncodingUtil.base64Encode(Blob.valueOf(ConnectedOrgService.getSelfConnectedOrgAccessToken()));
             String body = JSON.serialize(new Map<String, Object> {
                 'session_id' => orgId,
-                'sf_namespace' => namespace,
-                'sf_instance' => instance,
-                'sf_session' => session
+                'openai_key' => openAiKey
             });
             HttpUtils.post(
                     CHAT_INIT_ENDPOINT,

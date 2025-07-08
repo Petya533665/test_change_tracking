@@ -528,10 +528,7 @@ public with sharing class LogPostProcessingService {
 			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Deploy_Results__c, JSON.serialize(deployments));
 			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Deploy_results_available__c, (deployments != null && !deployments.isEmpty()));
 		}
-		catch (Exception e) {
-			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Deploy_Results__c, ERROR_SYSTEM_INFO_LOG_RETRIEVE);
-			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getDeployResults');
-		}
+		catch (Exception e) {}
 	}
 
 	public static void fillAuditTrail(Log__c log, Logger logger) {
