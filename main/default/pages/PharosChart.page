@@ -15,6 +15,7 @@
         const OBJECT_AUTOMATIONS_CHART_NAME = 'Object Automations';
         const USERS_INFO_DETAILS_CHART_NAME = 'Users Info Details';
         const SENSITIVE_PERMISSIONS_CHART_NAME = 'Sensitive Permissions';
+        const UNUSED_FIELDS_CHART_NAME = 'Unused Fields';
 
         const chartName = '{!chart}';
 
@@ -62,12 +63,14 @@
         const filterField = {
             [ORG_LIMITS_CHART_NAME]: 'value',
             [LICENSES_CHART_NAME]: 'value',
+            [UNUSED_FIELDS_CHART_NAME]: 'value',
             [RECORD_COUNT_BY_OBJECT_CHART_NAME]: 'recordCount',
             [OBJECT_AUTOMATIONS_CHART_NAME]: 'name',
         };
         const sortField = {
             [ORG_LIMITS_CHART_NAME]: 'percentage',
             [LICENSES_CHART_NAME]: 'percentage',
+            [UNUSED_FIELDS_CHART_NAME]: 'percentage',
             [RECORD_COUNT_BY_OBJECT_CHART_NAME]: 'recordCount',
             [OBJECT_AUTOMATIONS_CHART_NAME]: 'name',
         };
@@ -247,6 +250,7 @@
                 if (
                     chartName === LICENSES_CHART_NAME
                     || chartName === ORG_LIMITS_CHART_NAME
+                    || chartName === UNUSED_FIELDS_CHART_NAME
                 ) {
                     chart.primaryYAxis = {
                         valueType: 'Double',
@@ -325,12 +329,12 @@
                     };
                 });
             }
-            else if (chartName === LICENSES_CHART_NAME || chartName === ORG_LIMITS_CHART_NAME) {
+            else if (chartName === LICENSES_CHART_NAME || chartName === ORG_LIMITS_CHART_NAME || chartName === UNUSED_FIELDS_CHART_NAME) {
                 return [{
                     dataSource: getChartData()
                         .map(item => ({
                             name: item.name,
-                            label: item.name,
+                            label: item.label,
                             percentage: item.percentage,
                             value: item.value,
                             max: item.max,
