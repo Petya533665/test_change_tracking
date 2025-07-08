@@ -56,6 +56,13 @@ public with sharing class AIAnalysis {
 		}
 	}
 
+	public void Pending() {
+		if (String.isNotBlank(errorMessage)) return;
+		for (AIAnalysisService analysisService : analysisServiceByIssueId.values()) {
+			analysisService.Pending();
+		}
+	}
+
 	public void analysis() {
 		if (String.isNotBlank(errorMessage)) return;
 		for (AIAnalysisService analysisService : analysisServiceByIssueId.values()) {

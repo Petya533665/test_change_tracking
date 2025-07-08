@@ -56,31 +56,6 @@ public class AIAnalysisTest {
 		testStartAnalysis(true);
 	}
 
-	@IsTest
-	private static void testStartAnalysis_Pending() {
-		testStartAnalysis(false);
-		List<Issue__c> issues = [SELECT Id FROM Issue__c];
-		AIAnalysis analysis = AIAnalysis.getInstance(new Set<String>{issues[0].Id});
-		if (analysis != null) {
-			analysis.init();
-			analysis.inProgress();
-			analysis.flush();
-		}
-		issues = [SELECT Id, Analysis_Statuses_Details__c FROM Issue__c WHERE Id = :issues[0].Id];
-		List<AIAnalysisService.AnalysisStatusDetails> analysisStatusesDetails = (List<AIAnalysisService.AnalysisStatusDetails>)JSON.deserialize(issues[0].Analysis_Statuses_Details__c, List<AIAnalysisService.AnalysisStatusDetails>.class);
-		for (AIAnalysisService.AnalysisStatusDetails asd : analysisStatusesDetails) {
-			if (asd.analysis == AIAnalysisService.BASIC_ANALYSIS) {
-				System.assertEquals(AIAnalysisService.PENDING_STATUS, asd.status);
-			} else if (asd.analysis == AIAnalysisService.FLOW_ANALYSIS) {
-				System.assertEquals(AIAnalysisService.NOT_APPLICABLE_STATUS, asd.status);
-			} else if (asd.analysis == AIAnalysisService.FLOW_EXPLAIN_ANALYSIS) {
-				System.assertEquals(AIAnalysisService.NOT_APPLICABLE_STATUS, asd.status);
-			} else if (asd.analysis == AIAnalysisService.AUDIT_TRAIL_ANALYSIS) {
-				System.assertEquals(AIAnalysisService.CONFIGURATION_REQUIRED_STATUS, asd.status);
-			}
-		}
-	}
-
 	private static void testStartAnalysis(Boolean invocable) {
 		enableIssuePermissions();
 		createPharosLog();
@@ -97,7 +72,7 @@ public class AIAnalysisTest {
 		List<AIAnalysisService.AnalysisStatusDetails> analysisStatusesDetails = (List<AIAnalysisService.AnalysisStatusDetails>)JSON.deserialize(issues[0].Analysis_Statuses_Details__c, List<AIAnalysisService.AnalysisStatusDetails>.class);
 		for (AIAnalysisService.AnalysisStatusDetails asd : analysisStatusesDetails) {
 			if (asd.analysis == AIAnalysisService.BASIC_ANALYSIS) {
-				System.assertEquals(AIAnalysisService.IN_PROGRESS_STATUS, asd.status);
+				System.assertEquals(AIAnalysisService.PENDING_STATUS, asd.status);
 			} else if (asd.analysis == AIAnalysisService.FLOW_ANALYSIS) {
 				System.assertEquals(AIAnalysisService.NOT_APPLICABLE_STATUS, asd.status);
 			} else if (asd.analysis == AIAnalysisService.FLOW_EXPLAIN_ANALYSIS) {
@@ -107,6 +82,40 @@ public class AIAnalysisTest {
 			}
 		}
 	}
+
+	@IsTest
+	private static void testAnalysisStatusTransition() {
+		enableIssuePermissions();
+		createPharosLog();
+		List<Issue__c> issues = [SELECT Id FROM Issue__c];
+
+		Test.startTest();
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.put(ConfigUtil.OPEN_AI_COMPLETIONS_ENDPOINT, basicAnalysisMock());
+		endpoint2TestResp.put(AIAnalysisService.AI_ANALYSIS_ENDPOINT, auditTrailAnalysisMock());
+		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		startAnalysis(issues[0].Id, false);
+		Test.stopTest();
+
+		issues = [SELECT Id, Analysis_Statuses_Details__c FROM Issue__c WHERE Id = :issues[0].Id];
+		List<AIAnalysisService.AnalysisStatusDetails> analysisStatusesDetails =
+				(List<AIAnalysisService.AnalysisStatusDetails>)JSON.deserialize(
+						issues[0].Analysis_Statuses_Details__c,
+						List<AIAnalysisService.AnalysisStatusDetails>.class
+				);
+
+		String basicAnalysisStatus = null;
+		for (AIAnalysisService.AnalysisStatusDetails asd : analysisStatusesDetails) {
+			if (asd.analysis == AIAnalysisService.BASIC_ANALYSIS) {
+				basicAnalysisStatus = asd.status;
+				break;
+			}
+		}
+		System.assertEquals(AIAnalysisService.PENDING_STATUS, basicAnalysisStatus);
+	}
+
 
 	@IsTest
 	private static void testStartAnalysis_invocable_negative() {

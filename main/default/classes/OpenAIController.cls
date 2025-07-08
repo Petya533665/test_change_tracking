@@ -18,7 +18,7 @@ public with sharing class OpenAIController {
 			analysis.inProgress();
 			analysis.flush();
 		}
-		AIAnalysisBatch instance = AIAnalysisBatch.getInstance(recordIds);
+		AIAnalysisBatch instance = AIAnalysisBatch.getInstance();
 		instance.startBatch();
 		return instance.getJobId();
 	}

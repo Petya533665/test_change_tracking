@@ -60,6 +60,6 @@ public with sharing class JiraNotificationBatch extends DatabaseUtils.PharosBatc
 
     public void finish(Database.BatchableContext info) {
         NotificationService.putNotificationTimeStamp(null);
-        this.notificationServiceImpl.finish(info);
+        this.notificationServiceImpl.finish(info, this.contextManager);
     }
 }

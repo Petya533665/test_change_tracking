@@ -287,7 +287,9 @@ public with sharing class SystemOverviewController {
 
 	private static void fillObjectInfoRecordCount(List<ObjectInfo> objectInfos) {
 		for (ObjectInfo objectInfo : objectInfos) {
-			String query = 'SELECT COUNT() FROM ' + objectInfo.name;
+			String query = new QBuilder(objectInfo.name)
+					.selectFields(new Set<String>{'COUNT()'})
+					.build();
 			try {
 				Integer count = Database.countQuery(query);
 				objectInfo.recordCount = count;
@@ -412,7 +414,9 @@ public with sharing class SystemOverviewController {
 	public static List<RecordCount> getRecordCounts(List<String> objectAPINames) {
 		List<RecordCount> recordCounts = new List<RecordCount>();
 		for (String objectAPIName : objectAPINames) {
-			String query = 'SELECT COUNT() FROM ' + objectAPIName;
+			String query = new QBuilder(objectAPIName)
+					.selectFields(new Set<String>{'COUNT()'})
+					.build();
 			try {
 				Integer count = Database.countQuery(query);
 				recordCounts.add(new RecordCount(objectAPIName, count));
@@ -514,6 +518,113 @@ public with sharing class SystemOverviewController {
 		return chartDataPercentages;
 	}
 
+	@AuraEnabled
+	public static List<SObjectOption> getSObjectOptions() {
+		List<SObjectOption> sObjectOptions = new List<SObjectOption>();
+		Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
+		for (String objectName : globalDescribe.keySet()) {
+			Schema.DescribeSObjectResult describeSObjectResult = globalDescribe.get(objectName).getDescribe();
+			String objectType = getObjectType(describeSObjectResult);
+			if (objectType == STANDARD_OBJECTS_TYPE || objectType == CUSTOM_OBJECTS_TYPE) {
+				sObjectOptions.add(new SObjectOption(describeSObjectResult));
+			}
+		}
+		return sObjectOptions;
+	}
+
+	@AuraEnabled
+	public static List<SObjectOption> getFilteredSObjectOptions(List<SObjectOption> sObjectOptions) {
+		List<SObjectOption> filteredSObjectOptions = new List<SObjectOption>();
+		for (SObjectOption option : sObjectOptions) {
+			String query = new QBuilder(option.value)
+					.selectFields(new Set<String>{'COUNT()'})
+					.build();
+			try {
+				if (Database.countQuery(query) > 0) {
+					filteredSObjectOptions.add(option);
+				}
+			} catch (Exception e) {}
+		}
+		return filteredSObjectOptions;
+	}
+
+	@AuraEnabled
+	public static List<ChartDataPercentage> getSObjectFields(String sObjectName) {
+		List<ChartDataPercentage> chartDataPercentages = new List<ChartDataPercentage>();
+		String query = new QBuilder(sObjectName)
+				.selectFields(new Set<String>{'COUNT()'})
+				.build();
+		Integer max;
+		try {
+			max = Database.countQuery(query);
+		} catch (Exception e) {}
+		if (max != null) {
+			Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(sObjectName);
+			if (sObjectType != null) {
+				Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
+				for (String fieldName : fieldMap.keySet()) {
+					Schema.DescribeFieldResult describeFieldResult = fieldMap.get(fieldName).getDescribe();
+					if (describeFieldResult.isAccessible()
+							&& describeFieldResult.isFilterable()
+							&& describeFieldResult.getType() != Schema.DisplayType.BOOLEAN
+							&& !describeFieldResult.isCalculated()
+							&& !describeFieldResult.isAutoNumber()
+							&& !fieldName.toLowerCase().contains('id')
+							&& !fieldName.toLowerCase().endsWith('date')
+							&& !fieldName.toLowerCase().endsWith('time')
+							&& !fieldName.toLowerCase().startsWith('system')
+							&& !fieldName.toLowerCase().startsWith('last')) {
+						chartDataPercentages.add(new ChartDataPercentage(describeFieldResult, max));
+					}
+				}
+			}
+		}
+		return chartDataPercentages;
+	}
+
+	@AuraEnabled
+	public static List<ChartDataPercentage> getFilledSObjectFields(String sObjectName, List<ChartDataPercentage> chartDataPercentages) {
+		for (ChartDataPercentage chartDataPercentage : chartDataPercentages) {
+			chartDataPercentage.value = getCountRecordsWithEmptyField(sObjectName, chartDataPercentage.name);
+			chartDataPercentage.setPercentage();
+			chartDataPercentage.setColor();
+		}
+		return chartDataPercentages;
+	}
+
+	private static Integer getCountRecordsWithEmptyField(String sObjectName, String fieldName) {
+		Integer count = 0;
+		String query = new QBuilder(sObjectName)
+				.selectFields(new Set<String>{'COUNT()'})
+				.add(QBuilder.condition(fieldName).isNotNull())
+				.build();
+		try {
+			count = Database.countQuery(query);
+		} catch (Exception e) {}
+		return count;
+	}
+
+	public class SObjectOption {
+		@AuraEnabled
+		public String label { get; set; }
+		@AuraEnabled
+		public String value { get; set; }
+		public SObjectOption() {}
+		public SObjectOption(Schema.DescribeSObjectResult describeSObjectResult) {
+			this.label = describeSObjectResult.label;
+			this.value = describeSObjectResult.name;
+		}
+	}
+
+	public class SObjectEmptyFields {
+		@AuraEnabled
+		public String label;
+		@AuraEnabled
+		public String name;
+		@AuraEnabled
+		public List<ChartDataPercentage> chartDataPercentages;
+	}
+
 	public class UsersInfo {
 		@AuraEnabled
 		public Integer numberOfActiveUsers;
@@ -551,16 +662,25 @@ public with sharing class SystemOverviewController {
 
 	public class ChartDataPercentage {
 		@AuraEnabled
-		public String name;
+		public String label { get; set; }
 		@AuraEnabled
-		public Integer max;
+		public String name { get; set; }
 		@AuraEnabled
-		public Integer value;
+		public Integer max { get; set; }
 		@AuraEnabled
-		public Decimal percentage;
+		public Integer value { get; set; }
 		@AuraEnabled
-		public String color;
+		public Decimal percentage { get; set; }
+		@AuraEnabled
+		public String color { get; set; }
+		public ChartDataPercentage() {}
+		public ChartDataPercentage(Schema.DescribeFieldResult describeFieldResult, Integer max) {
+			this.label = describeFieldResult.label;
+			this.name = describeFieldResult.name;
+			this.max = max;
+		}
 		public ChartDataPercentage(OrgLimit orgLimit) {
+			this.label = orgLimit.getName();
 			this.name = orgLimit.getName();
 			this.max = orgLimit.getLimit();
 			this.value = orgLimit.getValue();
@@ -568,6 +688,7 @@ public with sharing class SystemOverviewController {
 			setColor();
 		}
 		public ChartDataPercentage(UserLicense license) {
+			this.label = license.Name;
 			this.name = license.Name;
 			this.max = license.TotalLicenses;
 			this.value = license.UsedLicenses;
@@ -629,7 +750,7 @@ public with sharing class SystemOverviewController {
 		public ChartDataCount(PermissionSetAssignment psa) {
 			this.id = psa.AssigneeId.to15();
 			this.name = psa.Assignee.Name;
-			this.label = psa.Assignee.Name;
+			this.label = psa.PermissionSet.Name;
 			this.subName = psa.Assignee.Profile.Name;
 			this.stackingCounts = new List<ChartDataStackingCount>();
 		}

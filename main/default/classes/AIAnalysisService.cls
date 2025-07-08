@@ -71,7 +71,7 @@ public with sharing class AIAnalysisService {
 	public static final String PENDING_STATUS = 'Pending';
 
 	public static final String AWS_ERROR_STATUS = 'error';
-	public static final Integer ANALYSIS_TIMEOUT_MIN = 30;
+	public static final Integer ANALYSIS_TIMEOUT_MIN = 2;
 
 	private static final Set<String>  CODE_ANALYSIS_CATEGORIES = new Set<String> {APEX_CATEGORY, ERROR_CATEGORY, INTEGRATION_CATEGORY};
 	private static final Set<String>  FLOW_ANALYSIS_CATEGORIES = new Set<String> {FLOW_CATEGORY, PROCESS_BUILDER_CATEGORY};
@@ -105,6 +105,12 @@ public with sharing class AIAnalysisService {
 	public void inProgress() {
 		for (AIAnalysisServiceInterface strategy : this.strategies.values()) {
 			strategy.inProgress();
+		}
+	}
+
+	public void Pending() {
+		for (AIAnalysisServiceInterface strategy : this.strategies.values()) {
+			strategy.Pending();
 		}
 	}
 
@@ -152,6 +158,7 @@ public with sharing class AIAnalysisService {
 
 	public interface AIAnalysisServiceInterface {
 		void inProgress();
+		void Pending();
 		void analysis();
 		void changeStatus(String status, String message);
 		void setContentDocumentId(String contentDocumentId);
@@ -215,9 +222,7 @@ public with sharing class AIAnalysisService {
 			analysisStatusDetails.lastAnalysisTimestamp = System.now().getTime();
 		}
 		public virtual void inProgress() {
-			if (analysisStatusDetails.status == IN_PROGRESS_STATUS && !isTimeoutOver()) {
-				changeStatus(PENDING_STATUS);
-			} else if (analysisStatusDetails.status == NOT_STARTED_STATUS
+			if (analysisStatusDetails.status == NOT_STARTED_STATUS
 					|| analysisStatusDetails.status == COMPLETED_STATUS
 					|| analysisStatusDetails.status == FAILED_STATUS
 					|| (analysisStatusDetails.status == IN_PROGRESS_STATUS && isTimeoutOver())
@@ -225,6 +230,11 @@ public with sharing class AIAnalysisService {
 			) {
 				changeStatus(IN_PROGRESS_STATUS);
 				setLastAnalysisTimestamp();
+			}
+		}
+		public virtual void Pending() {
+			if (analysisStatusDetails.status == IN_PROGRESS_STATUS) {
+				changeStatus(PENDING_STATUS);
 			}
 		}
 		public virtual void analysis() {

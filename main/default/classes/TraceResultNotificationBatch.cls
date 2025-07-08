@@ -57,6 +57,6 @@ public with sharing class TraceResultNotificationBatch extends DatabaseUtils.Pha
     }
 
     public void finish(Database.BatchableContext info) {
-        this.notificationServiceImpl.finish(info);
+        this.notificationServiceImpl.finish(info, this.contextManager);
     }
 }
