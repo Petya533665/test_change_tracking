@@ -1705,7 +1705,7 @@ public with sharing class RuleUtil {
 				}
 				
 				// Validate field type is supported
-				if (String.isNotBlank(fieldType) && !getSupportedFieldTypes().contains(fieldType)) {
+				if (String.isNotBlank(fieldType)) {
 					String friendlyType = getFriendlyJiraFieldType(fieldType);
 					throw new RuleUtilException(String.format(ERROR_FIELD_TYPE_NOT_SUPPORTED, new List<String>{friendlyType, fieldRef}));
 				}
@@ -1840,6 +1840,8 @@ public with sharing class RuleUtil {
 			return new Set<String>{
 				'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes',
 				'com.atlassian.jira.plugin.system.customfieldtypes:multiselect',
+				'com.atlassian.jira.plugin.system.customfieldtypes:select',
+				'com.atlassian.jira.plugin.system.customfieldtypes:cascadingselect',
 				'com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons',
 				'com.atlassian.jira.plugin.system.customfieldtypes:select',
 				'com.atlassian.jira.plugin.system.customfieldtypes:datepicker',
