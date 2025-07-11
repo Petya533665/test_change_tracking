@@ -4216,7 +4216,8 @@ public without sharing class AdminService {
         csp.description = description;
         csp.endpointUrl = url;
         csp.isActive = true;
-        // csp.isApplicableToConnectSrc = true;
+        csp.context = 'All';
+        csp.isApplicableToConnectSrc = true;
         return csp;
     }
 
@@ -4227,6 +4228,7 @@ public without sharing class AdminService {
     public static void upsertCspTrustedSiteMetadata(MetadataService.CspTrustedSite csp, String accessToken) {
         System.debug('++++upsertCspTrustedSiteMetadata creating metadata port: ' + csp);
         MetadataService.MetadataPort service = createMetadataPort(accessToken);
+        service.setMetadataAPIVersion('63.0');
         System.debug('++++upsertCspTrustedSiteMetadata metadata port created: ' + service);
 
         List<MetadataService.UpsertResult> results =
