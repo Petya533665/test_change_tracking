@@ -4175,7 +4175,6 @@ public without sharing class AdminService {
                 ConfigUtil.getCspTrustedSitesHeadersMap(accessToken),
                 200
             );
-            System.debug('++++successful response: ' + b);
             Map<String, Object> respResults = (Map<String, Object>)JSON.deserializeUntyped(b);
             if (respResults.get(ConfigUtil.CSP_TRUSTED_SITES_KEY_RECORDS) != null) {
                 cspTrustedSitesList = (List<CspTrustedSiteWrapper>)JSON.deserialize(JSON.serialize(respResults.get(ConfigUtil.CSP_TRUSTED_SITES_KEY_RECORDS)), List<CspTrustedSiteWrapper>.class);
@@ -4183,7 +4182,6 @@ public without sharing class AdminService {
             }
         }
         catch (HttpUtils.HttpUtilsException e) {
-            System.debug('++++error response: ' + e);
             debugSession(e, 'getCspTrustedSites');
         }
         return cspTrustedSitesList;
@@ -4200,13 +4198,10 @@ public without sharing class AdminService {
     public static void upsertCspTrustedSite(String name, String url, String description) {
         Map<String, CspTrustedSiteWrapper> createdCspTrustedSites = getCspTrustedSitesMap();
         if (createdCspTrustedSites.containsKey(url) && createdCspTrustedSites.get(url).DeveloperName == name) {
-            System.debug('++++csp trusted site already exists: ' + url);
             return;
         }
 
-        System.debug('++++upsertCspTrustedSite creating csp: ' + name + ' ' + url + ' ' + description);
         MetadataService.CspTrustedSite csp = createCspTrustedSiteInstance(name, url, description);
-        System.debug('++++csp trusted site to upsert: ' + csp);
         upsertCspTrustedSiteMetadata(csp);
     }
 
@@ -4226,15 +4221,12 @@ public without sharing class AdminService {
     }
 
     public static void upsertCspTrustedSiteMetadata(MetadataService.CspTrustedSite csp, String accessToken) {
-        System.debug('++++upsertCspTrustedSiteMetadata creating metadata port: ' + csp);
         MetadataService.MetadataPort service = createMetadataPort(accessToken);
         service.setMetadataAPIVersion('63.0');
-        System.debug('++++upsertCspTrustedSiteMetadata metadata port created: ' + service);
-
+        
         List<MetadataService.UpsertResult> results =
             service.upsertMetadata(
                 new MetadataService.Metadata[] {csp});
-        System.debug('++++upsertCspTrustedSiteMetadata results: ' + results);
         handleUpsertResults(results[0]);
     }
 }
