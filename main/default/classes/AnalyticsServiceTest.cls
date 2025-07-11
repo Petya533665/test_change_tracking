@@ -5,12 +5,12 @@ private class AnalyticsServiceTest {
     static void testCalculateMetrics() {
         // Given
         AnalyticsService service = AnalyticsService.getInstance();
-        Id user1 = getFakeIds(User.SObjectType, 2).get(0);
-        Id user2 = getFakeIds(User.SObjectType, 2).get(1);
+        Id user1 = TestDataFactory.getFakeIds(User.SObjectType, 2).get(0);
+        Id user2 = TestDataFactory.getFakeIds(User.SObjectType, 2).get(1);
 
-        List<Id> mockLogIds = getFakeIds(Account.SObjectType, 5);
-        List<Id> mockIssueIds = getFakeIds(Case.SObjectType, 4);
-        List<Id> mockAdminIds = getFakeIds(User.SObjectType, 3);
+        List<Id> mockLogIds = TestDataFactory.getFakeIds(Account.SObjectType, 5);
+        List<Id> mockIssueIds = TestDataFactory.getFakeIds(Case.SObjectType, 4);
+        List<Id> mockAdminIds = TestDataFactory.getFakeIds(User.SObjectType, 3);
         
         Test.startTest();
         
@@ -64,9 +64,9 @@ private class AnalyticsServiceTest {
         // Given
         AnalyticsService service = AnalyticsService.getInstance();
         Id userId = UserInfo.getUserId();
-        List<Id> mockLogIds = getFakeIds(Account.SObjectType, 200);
-        List<Id> mockIssueIds = getFakeIds(Case.SObjectType, 200);
-        List<Id> mockAdminIds = getFakeIds(User.SObjectType, 200);
+        List<Id> mockLogIds = TestDataFactory.getFakeIds(Account.SObjectType, 200);
+        List<Id> mockIssueIds = TestDataFactory.getFakeIds(Case.SObjectType, 200);
+        List<Id> mockAdminIds = TestDataFactory.getFakeIds(User.SObjectType, 200);
         
         // When - Create more views than our bit limits allow
         Test.startTest();
@@ -95,8 +95,8 @@ private class AnalyticsServiceTest {
     static void testTrackPageView() {
         // Given
         AnalyticsService service = AnalyticsService.getInstance();
-        Id mockUserId = getFakeIds(User.SObjectType, 1).get(0);
-        Id mockRecordId = getFakeIds(Account.SObjectType, 1).get(0);
+        Id mockUserId = TestDataFactory.getFakeIds(User.SObjectType, 1).get(0);
+        Id mockRecordId = TestDataFactory.getFakeIds(Account.SObjectType, 1).get(0);
         
         // When
         Test.startTest();
@@ -114,9 +114,9 @@ private class AnalyticsServiceTest {
     static void testMultiplePageViews() {
         // Given
         AnalyticsService service = AnalyticsService.getInstance();
-        Id mockUserId = getFakeIds(User.SObjectType, 1).get(0);
-        Id mockLogId = getFakeIds(Account.SObjectType, 1).get(0);
-        Id mockIssueId = getFakeIds(Case.SObjectType, 1).get(0);
+        Id mockUserId = TestDataFactory.getFakeIds(User.SObjectType, 1).get(0);
+        Id mockLogId = TestDataFactory.getFakeIds(Account.SObjectType, 1).get(0);
+        Id mockIssueId = TestDataFactory.getFakeIds(Case.SObjectType, 1).get(0);
         
         // When
         Test.startTest();
@@ -138,11 +138,11 @@ private class AnalyticsServiceTest {
     static void testAggregatedPageViews() {
         // Given
         AnalyticsService service = AnalyticsService.getInstance();
-        Id mockUserId1 = getFakeIds(User.SObjectType, 2).get(0);
-        Id mockUserId2 = getFakeIds(User.SObjectType, 2).get(1);
-        Id mockLogId1 = getFakeIds(Account.SObjectType, 2).get(0);
-        Id mockLogId2 = getFakeIds(Account.SObjectType, 2).get(1);
-        Id mockIssueId = getFakeIds(Case.SObjectType, 1).get(0);
+        Id mockUserId1 = TestDataFactory.getFakeIds(User.SObjectType, 2).get(0);
+        Id mockUserId2 = TestDataFactory.getFakeIds(User.SObjectType, 2).get(1);
+        Id mockLogId1 = TestDataFactory.getFakeIds(Account.SObjectType, 2).get(0);
+        Id mockLogId2 = TestDataFactory.getFakeIds(Account.SObjectType, 2).get(1);
+        Id mockIssueId = TestDataFactory.getFakeIds(Case.SObjectType, 1).get(0);
         
         Test.startTest();
         
@@ -162,23 +162,12 @@ private class AnalyticsServiceTest {
         System.assertEquals(0, allViews.get(mockUserId1).get('admin').size(), 'Should have no admin records viewed');
     }
 
-    private static List<Id> getFakeIds(Schema.SObjectType sot, Integer count) {
-        String keyPrefix = sot.getDescribe().getKeyPrefix();
-        List<Id> fakeIds = new List<Id>();
-        for(Integer i = 1; i <= count; i++) {
-            String uniqueNumber = String.valueOf(i).leftPad(12, '0');
-            Id mockId = Id.valueOf(keyPrefix + uniqueNumber);
-            fakeIds.add(mockId);
-        }
-        return fakeIds;
-    }
-
     @IsTest
     static void testMaxViewLimit() {
         // Given
         AnalyticsService service = AnalyticsService.getInstance();
         Id mockUserId = UserInfo.getUserId();
-        List<Id> mockLogIds = getFakeIds(Account.SObjectType, 150);
+        List<Id> mockLogIds = TestDataFactory.getFakeIds(Account.SObjectType, 150);
         
         // When
         Test.startTest();
@@ -207,10 +196,10 @@ private class AnalyticsServiceTest {
     static void testTrackPageView_LimitPerType() {
         // Given
         AnalyticsService service = AnalyticsService.getInstance();
-        Id mockUserId = getFakeIds(User.SObjectType, 1).get(0);
-        List<Id> mockLogIds = getFakeIds(Account.SObjectType, 101);
-        List<Id> mockIssueIds = getFakeIds(Case.SObjectType, 101);
-        List<Id> mockAdminIds = getFakeIds(User.SObjectType, 101);
+        Id mockUserId = TestDataFactory.getFakeIds(User.SObjectType, 1).get(0);
+        List<Id> mockLogIds = TestDataFactory.getFakeIds(Account.SObjectType, 101);
+        List<Id> mockIssueIds = TestDataFactory.getFakeIds(Case.SObjectType, 101);
+        List<Id> mockAdminIds = TestDataFactory.getFakeIds(User.SObjectType, 101);
 
         Set<Id> mockLogIdsSet = new Set<Id>(mockLogIds);
         system.assertEquals(101, mockLogIdsSet.size());
@@ -247,8 +236,8 @@ private class AnalyticsServiceTest {
     static void test_metrics_batch_feature_parameters() {
         // Given
         AnalyticsService service = AnalyticsService.getInstance();
-        Id user1 = getFakeIds(User.SObjectType, 2).get(0);
-        Id user2 = getFakeIds(User.SObjectType, 2).get(1);
+        Id user1 = TestDataFactory.getFakeIds(User.SObjectType, 2).get(0);
+        Id user2 = TestDataFactory.getFakeIds(User.SObjectType, 2).get(1);
         
         // Create test data
         setupTestMetricsData(service, user1, user2);
@@ -277,9 +266,9 @@ private class AnalyticsServiceTest {
     }
     
     private static void setupTestMetricsData(AnalyticsService service, Id user1, Id user2) {
-        List<Id> mockLogIds = getFakeIds(Account.SObjectType, 5);
-        List<Id> mockIssueIds = getFakeIds(Case.SObjectType, 4);
-        List<Id> mockAdminIds = getFakeIds(User.SObjectType, 3);
+        List<Id> mockLogIds = TestDataFactory.getFakeIds(Account.SObjectType, 5);
+        List<Id> mockIssueIds = TestDataFactory.getFakeIds(Case.SObjectType, 4);
+        List<Id> mockAdminIds = TestDataFactory.getFakeIds(User.SObjectType, 3);
         // LOG views (5 unique records, 8 total views)
         for(Integer i = 1; i <= 5; i++) {
             Id recordId = mockLogIds.get(i - 1);

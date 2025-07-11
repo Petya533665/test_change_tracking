@@ -353,6 +353,8 @@ public with sharing class LogPostProcessingService {
 		return doLogPostProcessing(new List<Log__c>{log}, logger).get(0);
 	}
 
+	public static final String ERROR_MESSAGE_FLOW_NOT_FOUND = 'WebService returned a SOAP Fault: type and fullNames must be specified for items to read';
+
 	public static void fillStackTrace(Log__c log, Log__c orchestratorLogUpdate, Logger logger) {
 		if (String.isBlank(log.Stacktrace__c)) {
 			PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Stacktrace_Parse_Result__c, null);
@@ -367,7 +369,22 @@ public with sharing class LogPostProcessingService {
 				PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Stack_trace_parse_result_available__c, String.isNotBlank(log.Stacktrace_Parse_Result__c));
 			}
 			else if (log.Category__c == FlowExceptionParser.FLOW_CATEGORY) {
-				FlowService.Flow stackTrace = FlowService.parseFlowStackTrace(log.Stacktrace__c);
+				
+				FlowService.Flow stackTrace = null;
+				try {
+					stackTrace = FlowService.parseFlowStackTrace(log.Stacktrace__c);
+				}
+				catch (Exception e) {
+					// if flow not found or not available, set stacktrace parse result to null
+					if (e.getMessage().contains(ERROR_MESSAGE_FLOW_NOT_FOUND)) {
+						PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Stacktrace_Parse_Result__c, null);
+						PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Stack_trace_parse_result_available__c, false);
+						return;
+					}
+					// if other error, throw it
+					throw e;
+				}
+
 				if (log.Type__c == FlowService.FLOW_TYPE_ORCHESTRATOR) {
 					// if orchestrator flow has related autolanched flow error log
 					if (String.isNotBlank(stackTrace.orchestratorFailedFlowApiName)) {
@@ -406,8 +423,17 @@ public with sharing class LogPostProcessingService {
 						}
 					}
 				}
-				PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Stacktrace_Parse_Result__c, JSON.serialize(stackTrace));
-				PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Stack_trace_parse_result_available__c, String.isNotBlank(log.Stacktrace_Parse_Result__c));
+
+				// if stacktrace dosen't have any elements, set stacktrace parse result to null and stack_trace_parse_result_available__c to false
+				// this happens for Flows that are not available or not found
+				if (stackTrace == null || stackTrace?.elements?.isEmpty() || stackTrace?.edges?.isEmpty()) {
+					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Stacktrace_Parse_Result__c, null);
+					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Stack_trace_parse_result_available__c, false);
+				}
+				else {
+					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Stacktrace_Parse_Result__c, JSON.serialize(stackTrace));
+					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Stack_trace_parse_result_available__c, String.isNotBlank(log.Stacktrace_Parse_Result__c));
+				}
 			}
 			else if (log.Category__c == CATEGORY_INTEGRATION) {
 				List<StackTraceParser.StackTraceParseResult> stackTrace = StackTraceParser.parseStackTrace(log.Stacktrace__c);

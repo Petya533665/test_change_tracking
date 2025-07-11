@@ -2,12 +2,6 @@ public with sharing class NotificationService {
 
     public ENUM NOTIFICATION_SERVICE_TYPE {LOG, ISSUE, TRACE_RESULT, EVENT_ACTION}
     
-    public enum ActionStatus {
-        PENDING,
-        COMPLETED,
-        RATE_LIMITED,
-        FAILED
-    }
     private Logger logger;
     @TestVisible
     private NotificationServiceInterface strategy;
@@ -59,6 +53,8 @@ public with sharing class NotificationService {
         void setIterationContext(String recordId, ActionIteration iteration);
         ActionIteration getIterationContext(String recordId);
         void clearIterationContext(String recordId);
+        void addRecordNotificationAttempt(String recordId);
+        Set<String> getRecordsWithNotificationAttempts();
     }
     
     // Base implementation of BatchContextManager to eliminate duplicate code across batch classes
@@ -66,9 +62,19 @@ public with sharing class NotificationService {
         // Instance variables to store iteration contexts between batch executions
         protected Map<String, List<ActionIteration>> recordIterationQueues = new Map<String, List<ActionIteration>>();
         protected Map<String, ActionIteration> recordCurrentIterations = new Map<String, ActionIteration>();
+
+        protected Set<String> recordWithNotificationAttempts = new Set<String>();
         
         // Batch execution statistics for rate limit tracking
         protected BatchExecutionStats batchStats = new BatchExecutionStats();
+
+        public virtual Set<String> getRecordsWithNotificationAttempts() {
+            return this.recordWithNotificationAttempts;
+        }
+
+        public virtual void addRecordNotificationAttempt(String recordId) {
+            this.recordWithNotificationAttempts.add(recordId);
+        }
         
         public void setIterationContext(String recordId, ActionIteration iteration) {
             // Add to the queue for this record
@@ -474,6 +480,10 @@ public with sharing class NotificationService {
             // Apply MAX_NOTIFICATION_ATTEMPTS check to ALL iterations
             Integer countIterations = getCountIterations(info);
             if (countIterations <= MAX_NOTIFICATION_ATTEMPTS) {
+                
+                // track records with notification attempts
+                batchContextManager?.addRecordNotificationAttempt(this.recordId);
+
                 if (currentIteration == null || currentIteration.iterationNumber == 1) {
                     // First iteration or no context: process actions (include Slack in tests)
                     executeIteration(currentIteration, batchContextManager);
@@ -519,6 +529,14 @@ public with sharing class NotificationService {
             // Check for rate limit events and log summary
             if (batchContextManager != null && batchContextManager instanceof BaseBatchContextManager) {
                 BaseBatchContextManager batchManager = (BaseBatchContextManager) batchContextManager;
+
+                // increment attempts for records with notification, save to cache
+                if(!batchManager?.getRecordsWithNotificationAttempts()?.isEmpty()) {
+                    for (String recordId : batchManager.getRecordsWithNotificationAttempts()) {
+                        incrementNotificationAttempts(recordId);
+                    }
+                }
+
                 BatchExecutionStats stats = batchManager.getBatchStats();
                 
                 if (stats.hasRateLimitEvents()) {
@@ -602,7 +620,7 @@ public with sharing class NotificationService {
                 }
             }
             
-            return String.join(detailLines, '\n');
+            return String.join(detailLines, '\n').abbreviate(ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD);
         }
 
         public virtual void populateRules() {
@@ -711,7 +729,6 @@ public with sharing class NotificationService {
                             catch (Exception e) {
                                 this.logErrors.ticketingExceptions.put(this.recordId, e);
                                 logger?.add(logger.getInternalError(e, this.recordId, NotificationService.class.getName(), 'ticketingExceptions'));
-                                incrementFailedIterations(this.recordId);
                             }
                         }
                         when JIRA_TICKET_COMMENT, AZURE_DEV_OPS_WORK_ITEM_COMMENT {
@@ -724,7 +741,6 @@ public with sharing class NotificationService {
                             catch(Exception e) {
                                 this.logErrors.ticketingExceptions.put(this.recordId, e);
                                 logger?.add(logger.getInternalError(e, this.recordId, NotificationService.class.getName(), 'ticketingExceptions'));
-                                incrementFailedIterations(this.recordId);
                             }
                         }
                     }
@@ -1766,7 +1782,7 @@ public with sharing class NotificationService {
         }
     }
 
-    public static void incrementFailedIterations(String recordId) {
+    public static void incrementNotificationAttempts(String recordId) {
         String recordKey = CacheUtils.KEY_NOTIFICATION_OBJECT_TRACKING + ':' + recordId;
         CacheUtils cacheUtil = new CacheUtils(UserInfo.getOrganizationId());
 
@@ -1864,6 +1880,10 @@ public with sharing class NotificationService {
             }
             if(slackExceptionsList != null && !slackExceptionsList.isEmpty()) {
                 for(System.Exception e : slackExceptionsList) {
+                    // do not log rate limit errors, they are handled in the batch class and will be logged by the batch class
+                    if(e.getMessage().contains('rate limit')) {
+                        continue;
+                    }
                     logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'slackExceptions'));
                 }
             }
@@ -1911,8 +1931,6 @@ public with sharing class NotificationService {
                     PermissionsUtil.putSObjectField(failedRecord, dfrTeamsIntegrationStatus, teamsExceptionValue);
                 }
                 PermissionsUtil.putSObjectField(failedRecord, dfrNotificationIntegrationStatus, MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_FAILED);
-
-                incrementFailedIterations(recordId);
             }
             toUpdateRecordsMap.put(recordId, failedRecord);
         }
@@ -3036,6 +3054,10 @@ public with sharing class NotificationService {
             this.batchContextManager = batchContextManager;
             this.slackRateLimited = slackRateLimited != null ? slackRateLimited : false;
             this.expandedRecords = buildExpandedRecordListBulk(notificationServiceImpl);
+        }
+
+        public Integer count() {
+            return expandedRecords?.size() ?? 0;
         }
         
         public Boolean hasNext() {

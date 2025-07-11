@@ -990,6 +990,67 @@ public class Test_StackTraceParser {
     }
 
     @IsTest
+    private static void testFlowParserFromManagedPackageWithWrongFlowApiName() {
+
+        Test_LogService.initSettings();
+
+        Messaging.InboundEmail email = new Messaging.InboundEmail() ;
+        Messaging.InboundEnvelope env = new Messaging.InboundEnvelope();
+
+        List<string> emails = new List<string>{'testemail1@gmail.com','testemail1@gmail.com'};
+
+        email.subject = 'An error occurred with your "Tackle Sync" flow';
+        email.fromAddress = 'system@salesforce.com';
+        email.toAddresses = emails;
+        email.htmlBody = String.valueOf(Test_LogService.getTestStub('FLOW_MANAGED_PACKAGE_STACKTRACE_WRONG_API_NAME'));
+
+        Test.startTest();
+        // run post processing batch in test context
+        LogTriggerHelper.runPostProcessingBatchInTest = true;
+
+        StackTraceParser.corg = ConnectedOrgService.getConnectedOrgById(Test_LogService.CONNECETED_ORG_NAME);
+        Test.setMock(WebServiceMock.class, new FailedWebServiceMockImpl());
+
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.putAll(Test_StackTraceParser.createPostProcessingMock('Tackle_Sync', '', 1));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);		
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        ErrorEmailHandler testInbound = new ErrorEmailHandler();
+        testInbound.handleInboundEmail(email, env);
+        Test.stopTest();
+
+        Log__c log = [SELECT Post_Processing_Status__c,Salesforce_Error_Id__c, Flow_API_Name__c, Flow_Version__c, Area__c, Type__c , Hash_1__c, Stacktrace_Parse_Result__c, Namespace__c FROM Log__c LIMIT 1];
+        System.assertEquals(null, log.Stacktrace_Parse_Result__c);
+        System.assertEquals('Tackle_Sync', log.Flow_API_Name__c);
+        System.assertEquals('1', log.Flow_Version__c);
+        System.assertEquals('Flow', log.Area__c);
+        System.assertEquals('Autolaunched Flow', log.Type__c);
+        System.assertNotEquals(null, log.Hash_1__c);
+        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, log.Post_Processing_Status__c);
+        System.assertEquals(LogService.NAMESPACE_UNKNOWN, log.Namespace__c);
+    }
+
+    @TestVisible 
+    public class FailedWebServiceMockImpl implements WebServiceMock {
+        public void doInvoke(
+            Object stub,
+            Object request,
+            Map<String, Object> response,
+            String endpoint,
+            String soapAction,
+            String requestName,
+            String responseNs,
+            String responseName,
+            String responseType
+        ) {
+            CalloutException e = new CalloutException();
+            e.setMessage('Web service callout failed: WebService returned a SOAP Fault: type and fullNames must be specified for items to read faultcode=sf:UNKNOWN_EXCEPTION faultactor=');
+            throw e;
+        }
+    }
+
+    @IsTest
     private static void testFlowParserFromConvertedProcessBuilder() {
 
         String testStub = String.valueOf(Test_LogService.getTestStub('flowConvertedFromProcessBuilderMetadata'));
@@ -1157,7 +1218,7 @@ public class Test_StackTraceParser {
         String query1 = new QBuilder('FlowDefinition')
 			.selectFields(new Set<String>{'Id'})
 			.add(QBuilder.condition('DeveloperName').equalsTo(flowFullName))
-			.add(flowNamespace != null ? QBuilder.condition('NamespacePrefix').equalsTo(flowNamespace) : null)
+			.add(String.isNotBlank(flowNamespace) ? QBuilder.condition('NamespacePrefix').equalsTo(flowNamespace) : null)
 			.addLimit(1)
 			.build();
 

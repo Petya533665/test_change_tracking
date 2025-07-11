@@ -9,6 +9,7 @@ global with sharing class LogService {
     public static final String CUSTOM_SKIP = 'customSkip';
     public static final String FIELD_TYPE_BOOLEAN = 'BOOLEAN';
     public static final String FIELD_TYPE_DOUBLE = 'DOUBLE';
+    public static final String NAMESPACE_UNKNOWN = 'unknown';
 
     private static Map<String, Id> getMapRecordTypes() {
         Map<String, Id> result = new Map<String, Id>();
@@ -219,6 +220,11 @@ global with sharing class LogService {
                 PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Flow_Version__c, processor.getFlowVersion());
                 PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Salesforce_Error_Id__c, processor.getSalesforceErrorId());
                 PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Namespace__c, processor.getNamespace());
+
+                // populate default as unknown if not found
+                if(String.isBlank(log.Namespace__c)) {
+                    PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Namespace__c, NAMESPACE_UNKNOWN);
+                }
 
                 if (processor.getStackTrace()?.containsIgnoreCase(PHAROS_CODE_TOKEN) || processor.getStackTrace()?.containsIgnoreCase(PHAROS_HIDE_TOKEN)) {
                     PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Category__c, Logger.CATEGORY_PHAROS_ERROR);

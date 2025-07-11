@@ -4832,6 +4832,14 @@ public class JiraNotificationBatchTest {
 		public void clearIterationContext(String recordId) {
 			contexts.remove(recordId);
 		}
+
+		public Set<String> getRecordsWithNotificationAttempts() {
+			return new Set<String>();
+		}
+
+		public void addRecordNotificationAttempt(String recordId) {
+			// do nothing
+		}
 	}
 
 	// Mock BatchableContext class for testing

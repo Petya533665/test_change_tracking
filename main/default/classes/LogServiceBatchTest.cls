@@ -122,7 +122,7 @@ private class LogServiceBatchTest {
 
         log = [SELECT Post_Processing_Status__c, Stacktrace_Parse_Result__c FROM Log__c WHERE Id = :log.Id LIMIT 1];
         System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, log.Post_Processing_Status__c);
-        System.assertEquals(JSON.serialize(null), log.Stacktrace_Parse_Result__c);
+        System.assertEquals(null, log.Stacktrace_Parse_Result__c);
     }
 
     @IsTest

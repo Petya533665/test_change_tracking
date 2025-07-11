@@ -4,9 +4,7 @@ public with sharing class TraceResultNotificationBatch extends DatabaseUtils.Pha
     private NotificationService.BaseBatchContextManager contextManager = new BaseBatchContextManagerImpl();
     
     // Concrete implementation of the abstract base class
-    private class BaseBatchContextManagerImpl extends NotificationService.BaseBatchContextManager {
-        // No additional implementation needed - inherits all methods from base class
-    }
+    private class BaseBatchContextManagerImpl extends NotificationService.BaseBatchContextManager {}
 
     private static TraceResultNotificationBatch instance = null;
 
@@ -31,7 +29,10 @@ public with sharing class TraceResultNotificationBatch extends DatabaseUtils.Pha
     }
 
     public override Integer getIterationsCount() {
-        return notificationServiceImpl.getSObjectRecordsCount();
+        Boolean slackRateLimited = SlackService.isCurrentlyRateLimited();
+        NotificationService.ActionIterationIterable iterable = (NotificationService.ActionIterationIterable) this.notificationServiceImpl.getIterableForBatch(this, slackRateLimited);
+        NotificationService.ActionIterationIterator iterator = (NotificationService.ActionIterationIterator) iterable.iterator();
+        return iterator.count();
     }
 
     public Iterable<SObject> start(Database.BatchableContext bc) {
@@ -40,7 +41,7 @@ public with sharing class TraceResultNotificationBatch extends DatabaseUtils.Pha
     }
 
     public void execute(Database.BatchableContext info, List<SObject> scope) {
-        this.notificationServiceImpl.batchExecuteIteration(info, scope, this);
+        this.notificationServiceImpl.batchExecuteIteration(info, scope, this.contextManager);
     }
     
     // BatchContextManager interface implementation - delegate to contextManager
@@ -54,6 +55,14 @@ public with sharing class TraceResultNotificationBatch extends DatabaseUtils.Pha
     
     public void clearIterationContext(String recordId) {
         contextManager.clearIterationContext(recordId);
+    }
+
+    public Set<String> getRecordsWithNotificationAttempts() {
+        return contextManager.getRecordsWithNotificationAttempts();
+    }
+
+    public void addRecordNotificationAttempt(String recordId) {
+        contextManager.addRecordNotificationAttempt(recordId);
     }
 
     public void finish(Database.BatchableContext info) {

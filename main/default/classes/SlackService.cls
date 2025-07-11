@@ -167,7 +167,7 @@ public without sharing class SlackService {
      */
     public static RateLimitInfo parseRateLimitResponse(HttpResponse response) {
         RateLimitInfo info = new RateLimitInfo();
-        
+
         if (response == null) {
             info.isRateLimited = false;
             return info;
@@ -208,7 +208,7 @@ public without sharing class SlackService {
         if (!canMakeSlackRequest()) {
             DateTime retryTime = getRateLimitExpiryTime();
             String retryMessage = retryTime != null ? 
-                'Slack API is currently rate limited. Retry after: ' + retryTime :
+                'Slack API is currently rate limited. Retry after: ' + retryTime.format() :
                 'Slack API is currently rate limited';
             throw new CalloutException(retryMessage);
         }
