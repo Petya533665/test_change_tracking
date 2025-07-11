@@ -706,7 +706,7 @@ public with sharing class ConfigUtil {
     // AdminService
 
     public static final String REST_REMOTE_SITE_SETTINGS_QUERY = 'SELECT+Id,IsActive,SiteName,EndpointUrl+FROM+RemoteProxy+WHERE+IsActive+=+TRUE';
-    public static final String REST_CSP_TRUSTED_SITES_QUERY = 'SELECT+Id,IsActive,SiteName,EndpointUrl,Context,Description+FROM+CspTrustedSite+WHERE+IsActive+=+TRUE';
+    public static final String REST_CSP_TRUSTED_SITES_QUERY = 'SELECT+Id,IsActive,DeveloperName,EndpointUrl+FROM+CspTrustedSite+WHERE+IsActive+=+TRUE';
 
     public static Map<String, String> getRemoteSiteSettingsHeadersMap(String accessToken) {
         return new Map<String, String> {
