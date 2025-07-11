@@ -596,7 +596,7 @@ public with sharing class SystemOverviewController {
 		Integer count = 0;
 		String query = new QBuilder(sObjectName)
 				.selectFields(new Set<String>{'COUNT()'})
-				.add(QBuilder.condition(fieldName).isNotNull())
+				.add(QBuilder.condition(fieldName).isNull())
 				.build();
 		try {
 			count = Database.countQuery(query);

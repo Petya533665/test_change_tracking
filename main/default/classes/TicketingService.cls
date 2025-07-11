@@ -153,7 +153,6 @@ public with sharing class TicketingService {
                         .handleError(TicketingService.class.getName(), '.saveCreatedTicketCommentInfo', logger);
             }
             catch(Exception e) {
-                NotificationService.incrementFailedIterations(this.sObjectWrapper.id);
                 this.logger?.add(logger.getInternalError(e, null, TicketingService.class.getName(), 'createTicketComment'));
             }
         }
@@ -212,7 +211,6 @@ public with sharing class TicketingService {
             PermissionsUtil.putSObjectField(sObjectRecord, 'Id', this.sObjectWrapper.id);
             PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrBugTracker, null);
             PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrJiraIntegrationStatus, ConfigUtil.TICKET_CREATE_ERROR_STATUS);
-            NotificationService.incrementFailedIterations(this.sObjectWrapper.id);
             DatabaseUtils.getInstance().performUpdateDML(new List<SObject>{sObjectRecord}, this.sObjectWrapper.describeSObjectResult)
                     .handleError(TicketingService.class.getName(), '.handleCreateTicketError', logger);
         }

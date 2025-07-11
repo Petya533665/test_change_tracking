@@ -1842,7 +1842,7 @@ public class Test_AdminController {
 
     @IsTest
     private static void testGetEmailServiceData() {
-        system.assertNotEquals(null, AdminService.getEmailServiceData(true, true, 'emailToCaseErrorTrackingType', true));
+        system.assertNotEquals(null, AdminService.getEmailServiceData(true, true, 'emailToCaseErrorTrackingType', true, true));
     }
 
     @IsTest
@@ -1851,7 +1851,7 @@ public class Test_AdminController {
         Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
         mocks.putAll(getRemoteSiteSettingsMock());
 
-        List<EmailServicesFunction> activeFunctions = AdminService.getPackageEmailServicesFunctions();
+        List<EmailServicesFunction> activeFunctions = new EmailServicesSelector().getPackageEmailServicesFunctions();
         if(!activeFunctions.isEmpty()) {
             List<EmailServicesAddress> activeAddresses = [SELECT Id FROM EmailServicesAddress WHERE FunctionId =:activeFunctions.get(0).Id LIMIT 1];
 
@@ -3248,6 +3248,154 @@ public class Test_AdminController {
         Assert.areEqual(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME, newWrapper.scheduleInfoWrappers.get(1).jobName, 'Job Name does not match');
         Assert.areNotEqual(oldWrapper.scheduleInfoWrappers.get(0).jobId, newWrapper.scheduleInfoWrappers.get(0).jobId, 'Job IDs should not match');
         Assert.areNotEqual(oldWrapper.scheduleInfoWrappers.get(1).jobId, newWrapper.scheduleInfoWrappers.get(1).jobId, 'Job IDs should not match');
+    }
+
+    @IsTest
+    static void test_RemoteAction_resetEmailAddressContextUser() {
+        List<Id> emailServicesAddressFakeIds = TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 2);
+        EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
+            TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 1),
+            TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1),
+            emailServicesAddressFakeIds
+        );
+
+        emailServicesSelectorMock.setEmailServicesAddressDeveloperName('Test123');
+
+        AdminService.emailServicesSelector = (EmailServicesSelector) Test.createStub(
+            EmailServicesSelector.class,
+            emailServicesSelectorMock
+        );
+
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesAddressServiceMock.getUpdateEmailServicesAddressMocks(new List<Id>{ emailServicesAddressFakeIds.get(0) }));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesAddressServiceMock.getDeleteEmailServicesAddressMocks(new List<Id>{ emailServicesAddressFakeIds.get(1) }));
+
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'resetEmailAddressContextUser',
+                'data' => ''
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+
+        Assert.isTrue((Boolean) response.get('data'));
+    }
+
+    @IsTest
+    static void test_RemoteAction_validateEmailServiceDataWithEmailServices() {
+        EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
+            TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 1),
+            TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1),
+            TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 1)
+        );
+
+        AdminService.emailServicesSelector = (EmailServicesSelector) Test.createStub(
+            EmailServicesSelector.class,
+            emailServicesSelectorMock
+        );
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'validateEmailServiceData',
+                'data' => ''
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+
+        Assert.isTrue((Boolean) response.get('data'));
+    }
+
+    @IsTest
+    static void test_RemoteAction_validateEmailServiceDataWithEmailServicesAndChangedApexEmailNotification() {
+        Logger_Settings__c loggerSettings = Logger_Settings__c.getOrgDefaults();
+        loggerSettings.Enable_Email_To_Case_Error_Tracking__c = AdminService.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED;
+        loggerSettings.Batch_Error_Tracking_Enabled__c = true;
+        upsert loggerSettings;
+
+        Pharos_Settings__c pharosSettings = Pharos_Settings__c.getOrgDefaults();
+        pharosSettings.Archival_Scheduler_Cron_Exp__c = '1';
+        upsert pharosSettings;
+
+        EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
+            TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 1),
+            TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1),
+            TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 1)
+        );
+
+        emailServicesSelectorMock.setApexEmailNotificationsEmail('test@test.test');
+
+        AdminService.emailServicesSelector = (EmailServicesSelector) Test.createStub(
+            EmailServicesSelector.class,
+            emailServicesSelectorMock
+        );
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'validateEmailServiceData',
+                'data' => ''
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+        
+        Assert.isTrue((Boolean) response.get('data'));
+        Assert.areEqual(AdminService.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_DISABLED, ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c);
+        Assert.isFalse(ConfigUtil.SETTINGS.Batch_Error_Tracking_Enabled__c);
+        Assert.areEqual(null, ConfigUtil.PHAROS_SETTINGS.Archival_Scheduler_Cron_Exp__c);
+    }
+
+    @IsTest
+    static void test_RemoteAction_validateEmailServiceDataWithEmptyEmailServices() {
+        EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
+            null,
+            null,
+            null
+        );
+
+        AdminService.emailServicesSelector = (EmailServicesSelector) Test.createStub(
+            EmailServicesSelector.class,
+            emailServicesSelectorMock
+        );
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'validateEmailServiceData',
+                'data' => ''
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+
+        Assert.isTrue((Boolean) response.get('data'));
     }
 
     @IsTest

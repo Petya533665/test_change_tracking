@@ -54,6 +54,17 @@ public class TestDataFactory {
 
     public static final String LOGS_QUERY_ALL_JSON = '{"records":[{"attributes":{"type":"Log__c"},"Id":"a095X000000XXXXXXX","Async_Job_Id__c":"707KK00000KKK00KKK","Details__c":"details","Hash__c":"hash"}]}';
 
+    public static List<Id> getFakeIds(Schema.SObjectType sot, Integer count) {
+        String keyPrefix = sot.getDescribe().getKeyPrefix();
+        List<Id> fakeIds = new List<Id>();
+        for(Integer i = 1; i <= count; i++) {
+            String uniqueNumber = String.valueOf(i).leftPad(12, '0');
+            Id mockId = Id.valueOf(keyPrefix + uniqueNumber);
+            fakeIds.add(mockId);
+        }
+        return fakeIds;
+    }
+    
     public static void createConnectedOrg() {
         createConnectedOrg(UserInfo.getOrganizationId().left(15));
     }

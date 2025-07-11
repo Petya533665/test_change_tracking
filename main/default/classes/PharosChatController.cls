@@ -35,6 +35,7 @@ public with sharing class PharosChatController {
                 return new InitChatResponse(errors);
             }
 
+            AdminService.upsertCspTrustedSite('Pharos Chat', 'wss://chat.pharos.ai', 'Pharos chat websocket connection');
             sendInitChatRequest(orgId, openAiKey);
             return new InitChatResponse(orgId);
         } catch (Exception e) {
