@@ -8,85 +8,319 @@ public with sharing class PharosChatController {
     public static final String ERROR_CODE_NOT_INDEXED = 'Codebase is not indexed. Please wait for indexing to complete.';
     public static final String ERROR_INIT_FAILED = 'Chat initialization has failed.';
 
-    public class InitChatResponse {
-        @AuraEnabled public Boolean success;
-        @AuraEnabled public List<String> errorMessages;
-        @AuraEnabled public String sessionId;
-
-        public InitChatResponse(List<String> errorMessages) {
-            this.success = false;
-            this.errorMessages = errorMessages;
-        }
-
-        public InitChatResponse(String sessionId) {
-            this.success = true;
-            this.sessionId = sessionId;
-        }
-    }
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfads
+    //fafdfsaf
+    //fsadfadsvv//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads//fafdfsaf
+    //fsadfads
 
     @AuraEnabled
     public static InitChatResponse initChat() {
+        List<String> errorMessages = new List<String>();
         try {
             String orgId = UserInfo.getOrganizationId();
             String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
 
-            List<String> errors = validatePreconditions(orgId, openAiKey);
-            if (!errors.isEmpty()) {
-                return new InitChatResponse(errors);
+            if (!ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c || String.isBlank(openAiKey)|| !OpenAI.validateToken(openAiKey)) {
+                errorMessages.add(ERROR_OPENAI_NOT_READY);
+            }
+            if (!GitHubUtils.validateGitHubConnectionForChat()) {
+                errorMessages.add(ERROR_GIT_NOT_INTEGRATED);
+            }
+            if (!isCodeIndexed(orgId)) {
+                errorMessages.add(ERROR_CODE_NOT_INDEXED);
             }
 
-            //TODO: move
-            //AdminService.upsertCspTrustedSite(ConfigUtil.TRUSTED_SITE_PHAROS_CHAT_NAME, ConfigUtil.TRUSTED_SITE_PHAROS_CHAT_URL, ConfigUtil.TRUSTED_SITE_PHAROS_CHAT_DESCRIPTION);
+            if (errorMessages.size() > 0) {
+                return new InitChatResponse(errorMessages);
+            }
 
-            sendInitChatRequest(orgId, openAiKey);
-            return new InitChatResponse(orgId);
-        } catch (Exception e) {
-            Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'initChat');
-            return new InitChatResponse(new List<String>{ERROR_INIT_FAILED});
-        }
-    }
-
-    private static boolean isCodeIndexed(String logOrgId) {
-        try {
-            String response = HttpUtils.get(
-                    CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + logOrgId,
+            String body = JSON.serialize(new Map<String, Object> {
+                'session_id' => orgId,
+                'openai_key' => openAiKey
+            });
+            HttpUtils.post(
+                    CHAT_INIT_ENDPOINT,
+                    body,
                     HttpUtils.getHeadersContentTypeJSON(),
                     200
             );
-            Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(response);
-            return (Boolean) body.get('empty') == false;
+            return new InitChatResponse(orgId);
         } catch (Exception e) {
-            Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'isCodeIndexed');
-            return false;
+            Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'initChat');
+            errorMessages.add(ERROR_INIT_FAILED);
+            return new InitChatResponse(errorMessages);
         }
-    }
-
-    private static List<String> validatePreconditions(String orgId, String openAiKey) {
-        List<String> errors = new List<String>();
-
-        if (!ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c || String.isBlank(openAiKey) || !OpenAI.validateToken(openAiKey)) {
-            errors.add(ERROR_OPENAI_NOT_READY);
-        }
-        if (!GitHubUtils.validateGitHubConnectionForChat()) {
-            errors.add(ERROR_GIT_NOT_INTEGRATED);
-        }
-        if (!isCodeIndexed(orgId)) {
-            errors.add(ERROR_CODE_NOT_INDEXED);
-        }
-        return errors;
-    }
-
-    private static void sendInitChatRequest(String orgId, String openAiKey) {
-        String body = JSON.serialize(new Map<String, Object> {
-            'session_id' => orgId,
-            'openai_key' => openAiKey
-        });
-        HttpUtils.post(
-            CHAT_INIT_ENDPOINT,
-            body,
-            HttpUtils.getHeadersContentTypeJSON(),
-            200
-        );
     }
 
     @AuraEnabled
@@ -142,6 +376,37 @@ public with sharing class PharosChatController {
             when else {
                 return null;
             }
+        }
+    }
+
+    public static boolean isCodeIndexed(String logOrgId) {
+        try {
+            String response = HttpUtils.get(
+                    CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + logOrgId,
+                    HttpUtils.getHeadersContentTypeJSON(),
+                    200
+            );
+            Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(response);
+            return (Boolean) body.get('empty') == false;
+        } catch (Exception e) {
+            Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'isCodeIndexed');
+            return false;
+        }
+    }
+
+    public class InitChatResponse {
+        @AuraEnabled public Boolean success;
+        @AuraEnabled public List<String> errorMessages;
+        @AuraEnabled public String sessionId;
+
+        public InitChatResponse(List<String> errorMessages) {
+            this.success = false;
+            this.errorMessages = errorMessages;
+        }
+
+        public InitChatResponse(String sessionId) {
+            this.success = true;
+            this.sessionId = sessionId;
         }
     }
 }

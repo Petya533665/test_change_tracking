@@ -794,6 +794,10 @@ public with sharing class ConfigUtil {
     public static final String REMOTE_SITE_SETTINGS_AI_DESCRIPTION = 'Pharos.ai - AI integration API login URL';
     public static final String REMOTE_SITE_SETTINGS_AI_URL = 'https://ai.pharos.ai';
 
+    public static final String TRUSTED_SITE_PHAROS_CHAT_NAME = 'Pharos_Chat_Websocket';
+    public static final String TRUSTED_SITE_PHAROS_CHAT_DESCRIPTION = 'Pharos chat websocket connection';
+    public static final String TRUSTED_SITE_PHAROS_CHAT_URL = 'wss://chat.pharos.ai';
+
     public static final String EMAIL_SERVICE_DATA_KEY_EMAIL  = 'email';
     public static final String EMAIL_SERVICE_DATA_KEY_ERROR_CODE  = 'errorCode';
     public static final String EMAIL_SERVICE_DATA_KEY_CONFIRMED  = 'confirmed';
