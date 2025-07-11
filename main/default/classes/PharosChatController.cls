@@ -35,11 +35,12 @@ public with sharing class PharosChatController {
                 return new InitChatResponse(errors);
             }
 
-            AdminService.upsertCspTrustedSite('Pharos_Chat_Websocket', 'wss://chat.pharos.ai', 'Pharos chat websocket connection');
+            //TODO: move
+            //AdminService.upsertCspTrustedSite(ConfigUtil.TRUSTED_SITE_PHAROS_CHAT_NAME, ConfigUtil.TRUSTED_SITE_PHAROS_CHAT_URL, ConfigUtil.TRUSTED_SITE_PHAROS_CHAT_DESCRIPTION);
+
             sendInitChatRequest(orgId, openAiKey);
             return new InitChatResponse(orgId);
         } catch (Exception e) {
-            System.debug('++++init chat error: ' + e);
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'initChat');
             return new InitChatResponse(new List<String>{ERROR_INIT_FAILED});
         }
