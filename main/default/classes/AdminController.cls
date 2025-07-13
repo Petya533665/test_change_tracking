@@ -336,6 +336,8 @@ public with sharing class AdminController {
                 response.data = AdminService.setChangeTrackingSettings(data);
             } else if (method == 'getChangeTrackingSettings') {
                 response.data = AdminService.getChangeTrackingSettings();
+            } else if (method == 'runChangeTracking') {
+                response.data = AdminService.runChangeTracking();
             } else if (method == 'getDefaultTeamsActionTemplate') {
                 response.data = AdminService.getDefaultTeamsActionTemplate();
             } else if (method == 'getIssueDefaultTeamsActionTemplate') {
