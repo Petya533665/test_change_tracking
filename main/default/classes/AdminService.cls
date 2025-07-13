@@ -70,70 +70,19 @@ public without sharing class AdminService {
     }
 
     public static Map<String, String> getDefaultAzureDevOpsActionTemplate() {
-        return DEFAULT_JIRA_ACTION_TEMPLATE;
+        return TemplateUtil.LOG_SOBJECT.DEFAULT_JIRA_ACTION;
     }
 
     public static Map<String, String> getDefaultJiraActionTemplate() {
-        return DEFAULT_JIRA_ACTION_TEMPLATE;
-    }
-
-    public static final Map<String, String> DEFAULT_JIRA_ACTION_TEMPLATE {
-        get {
-            if (DEFAULT_JIRA_ACTION_TEMPLATE == null) {
-                String subjectTemplate = 'New Error in  \'{!\'{0}.{1}\'}\' : \'{!\'{0}.{2}\'}\'';
-                String bodyTemplate = '\'{\'!{0}.Link\'}\'\nCategory: \'{\'!{0}.{1}\'}\'\nType: \'{\'!{0}.{2}\'}\'\nArea: \'{\'!{0}.{3}\'}\' \'{\'!{0}.{4}\'}\'';
-                DEFAULT_JIRA_ACTION_TEMPLATE = new Map<String, String>{
-                        'subject' => String.format(subjectTemplate,
-                                new List<String> {
-                                        Schema.SObjectType.Log__c.getName(),
-                                        Schema.SObjectType.Log__c.fields.Organization_Name__c.getName(),
-                                        Schema.SObjectType.Log__c.fields.Summary__c.getName()
-                                }),
-                        'body' => String.format(bodyTemplate,
-                                new List<String> {
-                                        Schema.SObjectType.Log__c.getName(),
-                                        Schema.SObjectType.Log__c.fields.Category__c.getName(),
-                                        Schema.SObjectType.Log__c.fields.Type__c.getName(),
-                                        Schema.SObjectType.Log__c.fields.Area__c.getName(),
-                                        Schema.SObjectType.Log__c.fields.Details__c.getName()
-                                })
-                };
-            }
-            return DEFAULT_JIRA_ACTION_TEMPLATE;
-        }
-        private set;
+        return TemplateUtil.LOG_SOBJECT.DEFAULT_JIRA_ACTION;
     }
 
     public static Map<String, String> getIssueDefaultAzureDevOpsActionTemplate() {
-        return ISSUE_DEFAULT_JIRA_ACTION_TEMPLATE;
+        return TemplateUtil.ISSUE_SOBJECT.DEFAULT_JIRA_ACTION;
     }
 
     public static Map<String, String> getIssueDefaultJiraActionTemplate() {
-        return ISSUE_DEFAULT_JIRA_ACTION_TEMPLATE;
-    }
-
-    public static final Map<String, String> ISSUE_DEFAULT_JIRA_ACTION_TEMPLATE {
-        get {
-            if (ISSUE_DEFAULT_JIRA_ACTION_TEMPLATE == null) {
-                String subjectTemplate = 'New Issue in  \'{!\'{0}.{1}\'}\' : \'{!\'{0}.{2}\'}\'';
-                String bodyTemplate = '\'{\'!{0}.Link\'}\'\nDetails: \'{\'!{0}.{1}\'}\'\n';
-                ISSUE_DEFAULT_JIRA_ACTION_TEMPLATE = new Map<String, String>{
-                        'subject' => String.format(subjectTemplate,
-                                new List<String> {
-                                        Schema.SObjectType.Issue__c.getName(),
-                                        Schema.SObjectType.Issue__c.fields.Organization_Name__c.getName(),
-                                        Schema.SObjectType.Issue__c.fields.Summary__c.getName()
-                                }),
-                        'body' => String.format(bodyTemplate,
-                                new List<String> {
-                                        Schema.SObjectType.Issue__c.getName(),
-                                        Schema.SObjectType.Issue__c.fields.Description__c.getName()
-                                })
-                };
-            }
-            return ISSUE_DEFAULT_JIRA_ACTION_TEMPLATE;
-        }
-        private set;
+        return TemplateUtil.ISSUE_SOBJECT.DEFAULT_JIRA_ACTION;
     }
 
     public static Map<String, String> getDefaultSlackActionTemplate() {
@@ -145,82 +94,15 @@ public without sharing class AdminService {
     }
 
     public static Map<String, String> getDefaultNotificationsTemplate() {
-        return DEFAULT_NOTIFICATION_TEMPLATE;
-    }
-
-    /*
-    [Subject]
-    New {!pharos__Log__c.pharos__Category__c} Log in {!pharos__Log__c.pharos__Organization_Name__c}: {!pharos__Log__c.pharos__Summary__c}
-    
-    [Body]
-    {!pharos__Log__c.Link}
-    Functional Area: {!pharos__Log__c.pharos__Area__c} 
-    Type: {!pharos__Log__c.pharos__Type__c}
-    {!pharos__Log__c.pharos__Details__c}
-     */
-    public static final Map<String, String> DEFAULT_NOTIFICATION_TEMPLATE {
-        get {
-            if (DEFAULT_NOTIFICATION_TEMPLATE == null) {
-                String subjectTemplate = 'New \'{!\'{0}.{1}\'}\' Log in \'{!\'{0}.{2}\'}\': \'{!\'{0}.{3}\'}\'';
-                String bodyTemplate = '\'{\'!{0}.Link\'}\'\n' +
-                'Functional Area: \'{\'!{0}.{1}\'}\'\n' +
-                'Type: \'{\'!{0}.{2}\'}\'\n' +
-                '\'{\'!{0}.{3}\'}\'\n';
-                DEFAULT_NOTIFICATION_TEMPLATE = new Map<String, String>{
-                    'subject' => String.format(subjectTemplate,
-                        new List<String> {
-                            Schema.SObjectType.Log__c.getName(),
-                            Schema.SObjectType.Log__c.fields.Category__c.getName(),
-                            Schema.SObjectType.Log__c.fields.Organization_Name__c.getName(),
-                            Schema.SObjectType.Log__c.fields.Summary__c.getName()
-                        }),
-                    'body' => String.format(bodyTemplate,
-                        new List<String> {
-                            Schema.SObjectType.Log__c.getName(),
-                            Schema.SObjectType.Log__c.fields.Area__c.getName(),
-                            Schema.SObjectType.Log__c.fields.Type__c.getName(),
-                            Schema.SObjectType.Log__c.fields.Details__c.getName()
-                        })
-                };
-            }
-            return DEFAULT_NOTIFICATION_TEMPLATE;
-        }
-        private set;
+        return TemplateUtil.LOG_SOBJECT.DEFAULT_NOTIFICATION;
     }
 
     public static Map<String, String> getTraceResultDefaultSlackActionTemplate() {
-        return TRACE_RESULT_DEFAULT_NOTIFICATION_TEMPLATE;
+        return TemplateUtil.TRACE_RESULT_SOBJECT.DEFAULT_NOTIFICATION;
     }
 
     public static Map<String, String> getTraceResultDefaultTeamsActionTemplate() {
-        return TRACE_RESULT_DEFAULT_NOTIFICATION_TEMPLATE;
-    }
-
-    public static final Map<String, String> TRACE_RESULT_DEFAULT_NOTIFICATION_TEMPLATE {
-        get {
-            if (TRACE_RESULT_DEFAULT_NOTIFICATION_TEMPLATE == null) {
-                String subjectTemplate = 'New Trace Result available for Issue \'{!\'{0}.{1}.{2}\'}\' : \'{!\'{0}.{1}.{3}\'}\'';
-                String bodyTemplate = 'Access the Trace Result here: \'{!\'{0}.Link\'}\'\nCategory: \'{\'!{0}.{1}.{2}\'}\'\n Functional Area: \'{\'!{0}.{1}.{3}\'}\'';
-                TRACE_RESULT_DEFAULT_NOTIFICATION_TEMPLATE = new Map<String, String>{
-                        'subject' => String.format(subjectTemplate,
-                                new List<String> {
-                                        Schema.SObjectType.Trace_Result__c.getName(),
-                                        Schema.SObjectType.Trace_Result__c.fields.Issue__c.getRelationshipName(),
-                                        Schema.SObjectType.Issue__c.fields.Name.getName(),
-                                        Schema.SObjectType.Issue__c.fields.Summary__c.getName()
-                                }),
-                        'body' => String.format(bodyTemplate,
-                                new List<String> {
-                                        Schema.SObjectType.Trace_Result__c.getName(),
-                                        Schema.SObjectType.Trace_Result__c.fields.Issue__c.getRelationshipName(),
-                                        Schema.SObjectType.Issue__c.fields.Category__c.getName(),
-                                        Schema.SObjectType.Issue__c.fields.Functional_Area__c.getName()
-                                })
-                };
-            }
-            return TRACE_RESULT_DEFAULT_NOTIFICATION_TEMPLATE;
-        }
-        private set;
+        return TemplateUtil.TRACE_RESULT_SOBJECT.DEFAULT_NOTIFICATION;
     }
 
     public static Map<String, String> getIssueDefaultSlackActionTemplate() {
@@ -232,94 +114,15 @@ public without sharing class AdminService {
     }
 
     public static Map<String, String> getIssueDefaultNotificationsTemplate() {
-        return ISSUE_DEFAULT_NOTIFICATION_TEMPLATE;
-    }
-
-    /*
-    [Subject]
-    New {!pharos__Issue__c.pharos__Category__c} Issue in {!pharos__Issue__c.pharos__Organization_Name__c}: {!pharos__Issue__c.pharos__Summary__c}
-
-    [Body]
-    {!pharos__Issue__c.Link}
-    Functional Area: {!pharos__Issue__c.pharos__Functional_Area__c}
-    {!pharos__Issue__c.pharos__Description__c}
-     */
-    public static final Map<String, String> ISSUE_DEFAULT_NOTIFICATION_TEMPLATE {
-        get {
-            if (ISSUE_DEFAULT_NOTIFICATION_TEMPLATE == null) {
-                String subjectTemplate = 'New \'{!\'{0}.{1}\'}\' Issue in \'{!\'{0}.{2}\'}\':  \'{!\'{0}.{3}\'}\'';
-                String bodyTemplate = '\'{\'!{0}.Link\'}\'\n' +
-                'Functional Area: \'{\'!{0}.{1}\'}\'\n' +
-                '\'{\'!{0}.{2}\'}\'\n';
-                ISSUE_DEFAULT_NOTIFICATION_TEMPLATE = new Map<String, String>{
-                    'subject' => String.format(subjectTemplate,
-                        new List<String> {
-                            Schema.SObjectType.Issue__c.getName(),
-                            Schema.SObjectType.Issue__c.fields.Category__c.getName(),
-                            Schema.SObjectType.Issue__c.fields.Organization_Name__c.getName(),
-                            Schema.SObjectType.Issue__c.fields.Summary__c.getName()
-                        }),
-                    'body' => String.format(bodyTemplate,
-                        new List<String> {
-                            Schema.SObjectType.Issue__c.getName(),
-                            Schema.SObjectType.Issue__c.fields.Functional_Area__c.getName(),
-                            Schema.SObjectType.Issue__c.fields.Description__c.getName()
-                        })
-                };
-            }
-            return ISSUE_DEFAULT_NOTIFICATION_TEMPLATE;
-        }
-        private set;
+        return TemplateUtil.ISSUE_SOBJECT.DEFAULT_NOTIFICATION;
     }
 
     public static Map<String, String> getDefaultMonitoringActionTemplate() {
-        return DEFAULT_MONITORING_ACTION_TEMPLATE;
-    }
-
-    public static final Map<String, String> DEFAULT_MONITORING_ACTION_TEMPLATE {
-        get {
-            if (DEFAULT_MONITORING_ACTION_TEMPLATE == null) {
-                String subjectTemplate = 'New Critical Event: \'{!\'{0}.{1}\'}\'';
-                String bodyTemplate = '\'{\'!{0}.Link\'}\'\n\'{\'!{0}.{1}\'}\' records in the triggered event.\nDetails:\n \'{\'!{0}.{2}\'}\'\n';
-                DEFAULT_MONITORING_ACTION_TEMPLATE = new Map<String, String>{
-                    'subject' => String.format(subjectTemplate,
-                        new List<String> {
-                            Schema.SObjectType.Event__c.getName(),
-                            Schema.SObjectType.Event__c.fields.Rule_Description__c.getName()
-                        }),
-                    'body' => String.format(bodyTemplate,
-                        new List<String> {
-                            Schema.SObjectType.Event__c.getName(),
-                            Schema.SObjectType.Event__c.fields.RecordCount__c.getName(),
-                            Schema.SObjectType.Event__c.fields.Event_Details__c.getName()
-                        })
-                };
-            }
-            return DEFAULT_MONITORING_ACTION_TEMPLATE;
-        }
-        private set;
+        return TemplateUtil.EVENT_SOBJECT.DEFAULT_MONITORING_ACTION;
     }
 
     public static Map<String, String> getIssueTicketCommentActionTemplate() {
-        return ISSUE_DEFAULT_TICKET_COMMENT_ACTION_TEMPLATE;
-    }
-
-    public static final Map<String, String> ISSUE_DEFAULT_TICKET_COMMENT_ACTION_TEMPLATE {
-        get {
-            if (ISSUE_DEFAULT_TICKET_COMMENT_ACTION_TEMPLATE == null) {
-                String bodyTemplate = '\'{\'!{0}.Link\'}\'\nDetails: \'{\'!{0}.{1}\'}\'\n';
-                ISSUE_DEFAULT_TICKET_COMMENT_ACTION_TEMPLATE = new Map<String, String>{
-                    'subject' => null,
-                    'body' => String.format(bodyTemplate,
-                        new List<String> {
-                            Schema.SObjectType.Issue__c.getName(),
-                            Schema.SObjectType.Issue__c.fields.Description__c.getName()
-                    })
-                };
-            }
-            return ISSUE_DEFAULT_TICKET_COMMENT_ACTION_TEMPLATE;
-        }
-        private set;
+        return TemplateUtil.ISSUE_SOBJECT.DEFAULT_TICKET_COMMENT_ACTION;
     }
 
     public static List<MergeField> getSobjectFields(Schema.DescribeSObjectResult d, String dType, Schema.DescribeFieldResult parent, Schema.DescribeSObjectResult parentObject, Integer depth) {
@@ -1873,6 +1676,21 @@ public without sharing class AdminService {
             gitSettings.oAuthEndpoint = GitHubUtils.GIT_API_AUTHORIZE_ENDPOINT + bodyParams.toStringParameters('?');
         }
         return gitSettings;
+    }
+
+    public static Map<String, String> runChangeTracking() {
+        try {
+            GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+            batchInstance.startBatch();
+            return new Map<String, String>{
+                'success' => 'Change tracking started'
+            };
+        } catch (Exception e) {
+            return new Map<String, String>{
+                'error' => e.getMessage(),
+                'stackTrace' => e.getStackTraceString()
+            };
+        }
     }
 
     public static JiraSettings validateJiraSetting(Boolean throwError, JiraSettings jiraSettings) {
@@ -4154,79 +3972,5 @@ public without sharing class AdminService {
 
     private static List<User> getUsersByUserIds(Set<Id> userIds) {
         return [SELECT Name FROM User WHERE Id IN :userIds];
-    }
-
-    public class CspTrustedSiteWrapper {
-        public String Id;
-        public Boolean IsActive;
-        public String DeveloperName;
-        public String EndpointUrl;
-    }
-
-    public static List<CspTrustedSiteWrapper> getCspTrustedSites() {
-        return getCspTrustedSites(ConnectedOrgService.getSelfConnectedOrgAccessToken());
-    }
-
-    public static List<CspTrustedSiteWrapper> getCspTrustedSites(String accessToken) {
-        List<CspTrustedSiteWrapper> cspTrustedSitesList = new List<CspTrustedSiteWrapper>();
-        try {
-            String b = HttpUtils.get(
-                ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_CSP_TRUSTED_SITES_QUERY,
-                ConfigUtil.getCspTrustedSitesHeadersMap(accessToken),
-                200
-            );
-            Map<String, Object> respResults = (Map<String, Object>)JSON.deserializeUntyped(b);
-            if (respResults.get(ConfigUtil.CSP_TRUSTED_SITES_KEY_RECORDS) != null) {
-                cspTrustedSitesList = (List<CspTrustedSiteWrapper>)JSON.deserialize(JSON.serialize(respResults.get(ConfigUtil.CSP_TRUSTED_SITES_KEY_RECORDS)), List<CspTrustedSiteWrapper>.class);
-                return cspTrustedSitesList;
-            }
-        }
-        catch (HttpUtils.HttpUtilsException e) {
-            debugSession(e, 'getCspTrustedSites');
-        }
-        return cspTrustedSitesList;
-    }
-
-    public static Map<String, CspTrustedSiteWrapper> getCspTrustedSitesMap() {
-        Map<String, CspTrustedSiteWrapper> output = new Map<String, CspTrustedSiteWrapper>();
-        for (CspTrustedSiteWrapper csp : getCspTrustedSites()) {
-            output.put(csp.EndpointUrl, csp);
-        }
-        return output;
-    }
-
-    public static void upsertCspTrustedSite(String name, String url, String description) {
-        Map<String, CspTrustedSiteWrapper> createdCspTrustedSites = getCspTrustedSitesMap();
-        if (createdCspTrustedSites.containsKey(url) && createdCspTrustedSites.get(url).DeveloperName == name) {
-            return;
-        }
-
-        MetadataService.CspTrustedSite csp = createCspTrustedSiteInstance(name, url, description);
-        upsertCspTrustedSiteMetadata(csp);
-    }
-
-    public static MetadataService.CspTrustedSite createCspTrustedSiteInstance(String name, String url, String description) {
-        MetadataService.CspTrustedSite csp = new MetadataService.CspTrustedSite();
-        csp.fullName = name;
-        csp.description = description;
-        csp.endpointUrl = url;
-        csp.isActive = true;
-        csp.context = 'All';
-        csp.isApplicableToConnectSrc = true;
-        return csp;
-    }
-
-    public static void upsertCspTrustedSiteMetadata(MetadataService.CspTrustedSite csp) {
-        upsertCspTrustedSiteMetadata(csp, null);
-    }
-
-    public static void upsertCspTrustedSiteMetadata(MetadataService.CspTrustedSite csp, String accessToken) {
-        MetadataService.MetadataPort service = createMetadataPort(accessToken);
-        service.setMetadataAPIVersion('63.0');
-        
-        List<MetadataService.UpsertResult> results =
-            service.upsertMetadata(
-                new MetadataService.Metadata[] {csp});
-        handleUpsertResults(results[0]);
     }
 }
