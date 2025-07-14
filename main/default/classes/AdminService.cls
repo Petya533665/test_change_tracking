@@ -1565,6 +1565,14 @@ public without sharing class AdminService {
         return getChangeTrackingSettings();
     }
 
+    public static Map<String, Boolean> runChangeTracking() {
+        GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+        Boolean isBatchExecuted = DatabaseUtils.executeBatchWithLimitCheck('GitHubCommitBatch', batchInstance);
+        return new Map<String, Boolean>{
+            'changeTrackingRun' => isBatchExecuted
+        };
+    }
+
     public static GitHubSettings resetGitHubSettings() {
         ConfigUtil.GIT_API_SETTINGS.Token__c = null;
         ConfigUtil.GIT_API_SETTINGS.oAuth_Token__c = null;
@@ -1676,21 +1684,6 @@ public without sharing class AdminService {
             gitSettings.oAuthEndpoint = GitHubUtils.GIT_API_AUTHORIZE_ENDPOINT + bodyParams.toStringParameters('?');
         }
         return gitSettings;
-    }
-
-    public static Map<String, String> runChangeTracking() {
-        try {
-            GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-            batchInstance.startBatch();
-            return new Map<String, String>{
-                'success' => 'Change tracking started'
-            };
-        } catch (Exception e) {
-            return new Map<String, String>{
-                'error' => e.getMessage(),
-                'stackTrace' => e.getStackTraceString()
-            };
-        }
     }
 
     public static JiraSettings validateJiraSetting(Boolean throwError, JiraSettings jiraSettings) {
