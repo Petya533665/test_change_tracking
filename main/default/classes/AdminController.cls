@@ -386,6 +386,10 @@ public with sharing class AdminController {
                 );
             } else if (method.equals('importRules')) {
                 response.data = RuleExportImportService.importRules((String)request.get('data'));
+            } else if (method.equals('getMetadataChatSettings')) {
+                response.data = AdminService.getMetadataChatSettings();
+            } else if (method.equals('setMetadataChatSettings')) {
+                response.data = AdminService.setMetadataChatSettings(data);
             } else {
                 response.error = 'Action not found';
             }
@@ -394,7 +398,7 @@ public with sharing class AdminController {
             response.error = e.getMessage();
             response.stack = e.getStackTraceString();
             // don't log validation excpetions
-            if (!e?.getTypeName()?.contains('AdminServiceValidationException')) {
+            if (!e?.getTypeName()?.contains('AdminServiceValidationException') && !e?.getTypeName()?.contains('RuleUtilValidationException')) {
                 Logger.getInstance().addInternalError(e, AdminController.class.getName(), 'remoteActionHandler' + (String.isNotBlank(methodName) ? '.' + methodName : ''));
             }
         }
