@@ -184,7 +184,7 @@ public with sharing class HttpUtils {
             req.setEndpoint(res.getHeader('Location'));
             if(rssInstance != null) {
                 rssInstance.url = res.getHeader('Location');
-                AdminService.upsertRemoteSiteSettingsMetadata(rssInstance);
+                MetadataServiceUtil.upsertRemoteSiteSettingsMetadata(rssInstance);
             }
             res = new Http().send(req);
         }

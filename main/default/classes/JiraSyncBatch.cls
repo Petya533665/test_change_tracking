@@ -110,7 +110,7 @@ public with sharing class JiraSyncBatch extends DatabaseUtils.PharosBatchImpl im
 			.selectFields(new Set<String>{'Id'})
 			.add(QBuilder.condition('Active__c').equalsTo(true))
 			.add(QBuilder.condition('Is_Update__c').equalsTo(true))
-			.add(QBuilder.condition('SobjectType__c').equalsTo(ConfigUtil.ISSUE_SOBJECT_NAME))
+			.add(QBuilder.condition('SobjectType__c').equalsTo(Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME))
 			.build();
 		return !Database.query(query).isEmpty();
 	}

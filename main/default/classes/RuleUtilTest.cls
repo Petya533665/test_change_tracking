@@ -460,6 +460,11 @@ private class RuleUtilTest {
 	// ADDITIONAL METADATA VALIDATION TESTS
 	// ===============================================
 
+	private static void assertNoInternalErrors() {
+		List<Log__c> logs = [SELECT Id FROM Log__c WHERE Category__c = 'Pharos Error' AND Area__c = 'Pharos' LIMIT 1];
+		System.assertEquals(0, logs.size(), 'No internal errors should be logged');
+	}
+
 	/**
 	 * Test successful validation of additional metadata for JIRA actions
 	 */
@@ -499,10 +504,12 @@ private class RuleUtilTest {
 		
 		try {
 			action.getAction(RuleUtil.ACTION_RT_MONITORING);
-			System.assert(false, 'Should have thrown RuleUtilException for invalid JSON');
-		} catch (RuleUtil.RuleUtilException e) {
+			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid JSON');
+		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Invalid JSON format') || e.getMessage().contains('Unable to parse Additional Metadata format'), 'Should indicate JSON format error: ' + e.getMessage());
 		}
+
+		assertNoInternalErrors();
 		
 		Test.stopTest();
 	}
@@ -525,10 +532,12 @@ private class RuleUtilTest {
 		
 		try {
 			action.getAction(RuleUtil.ACTION_RT_MONITORING);
-			System.assert(false, 'Should have thrown RuleUtilException for invalid field value');
-		} catch (RuleUtil.RuleUtilException e) {
+			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid field value');
+		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('not compatible') || e.getMessage().contains('Invalid date format'), 'Should indicate field validation error: ' + e.getMessage());
 		}
+
+		assertNoInternalErrors();
 		
 		Test.stopTest();
 	}
@@ -697,10 +706,12 @@ private class RuleUtilTest {
 		
 		try {
 			action.getAction(RuleUtil.ACTION_RT_MONITORING);
-			System.assert(false, 'Should have thrown RuleUtilException for required field');
-		} catch (RuleUtil.RuleUtilException e) {
+			System.assert(false, 'Should have thrown RuleUtilValidationException for required field');
+		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Required field'), 'Should indicate required field error: ' + e.getMessage());
 		}
+
+		assertNoInternalErrors();
 		
 		Test.stopTest();
 	}
@@ -774,10 +785,12 @@ private class RuleUtilTest {
 		
 		try {
 			action.getAction(RuleUtil.ACTION_RT_MONITORING);
-			System.assert(false, 'Should have thrown RuleUtilException for invalid object');
-		} catch (RuleUtil.RuleUtilException e) {
+			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid object');
+		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Object "InvalidObject__c" does not exist'), 'Should indicate object does not exist');
 		}
+
+		assertNoInternalErrors();
 		
 		Test.stopTest();
 	}
@@ -802,12 +815,14 @@ private class RuleUtilTest {
 		
 		try {
 			action.getAction(RuleUtil.ACTION_RT_MONITORING);
-			System.assert(false, 'Should have thrown RuleUtilException for invalid field');
-		} catch (RuleUtil.RuleUtilException e) {
+			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid field');
+		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Field "InvalidField__c" does not exist'), 'Should indicate field does not exist');
 		}
 		
 		Test.stopTest();
+
+		assertNoInternalErrors();
 	}
 
 	/**
@@ -830,8 +845,8 @@ private class RuleUtilTest {
 		
 		try {
 			action.getAction(RuleUtil.ACTION_RT_MONITORING);
-			System.assert(false, 'Should have thrown RuleUtilException for malformed syntax');
-		} catch (RuleUtil.RuleUtilException e) {
+			System.assert(false, 'Should have thrown RuleUtilValidationException for malformed syntax');
+		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('invalid merge field syntax'), 'Should indicate invalid syntax');
 		}
 		
@@ -902,16 +917,16 @@ private class RuleUtilTest {
 		// Use date value with numeric JIRA field - should fail compatibility  
 		action.additionalMetadata = '{"customfield_10300":{"value":"2023-04-13","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:float"},"required":false}}';
 		
-		// No HTTP mocks needed - validation uses stored schema
-		
 		try {
 			action.getAction(RuleUtil.ACTION_RT_MONITORING);
-			System.assert(false, 'Should have thrown RuleUtilException for type incompatibility');
-		} catch (RuleUtil.RuleUtilException e) {
+			System.assert(false, 'Should have thrown RuleUtilValidationException for type incompatibility');
+		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Invalid number format for field "customfield_10300"'), 'Should indicate type incompatibility: ' + e.getMessage());
 		}
 		
 		Test.stopTest();
+
+		assertNoInternalErrors();
 	}
 
 	// ===============================================
@@ -1114,6 +1129,8 @@ private class RuleUtilTest {
 		System.assert(error.contains('does not exist') || error.contains('Invalid merge field'), 'Error should indicate object validation issue: ' + error);
 		
 		Test.stopTest();
+
+		assertNoInternalErrors();
 	}
 
 	/**
@@ -1146,6 +1163,8 @@ private class RuleUtilTest {
 		System.assert(error.contains('invalid merge field syntax') || error.contains('Invalid merge field'), 'Error should indicate syntax issue: ' + error);
 		
 		Test.stopTest();
+
+		assertNoInternalErrors();
 	}
 
 	/**

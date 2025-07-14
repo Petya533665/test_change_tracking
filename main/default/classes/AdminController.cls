@@ -20,7 +20,7 @@ public with sharing class AdminController {
 
     public static String remoteSiteSettingsPayload {
         get {
-            StaticResource sr = [SELECT Body FROM StaticResource WHERE Name = :ConfigUtil.METADATA_REMOTE_SITE_PAYLOAD_RESOURCE_NAME LIMIT 1];
+            StaticResource sr = [SELECT Body FROM StaticResource WHERE Name = :Constants.STATIC_RESOURCE_SOBJECT.RESOURCE_NAME_METADATA_REMOTE_SITE_PAYLOAD LIMIT 1];
             return sr.Body.toString();
         }
         set;
@@ -336,8 +336,6 @@ public with sharing class AdminController {
                 response.data = AdminService.setChangeTrackingSettings(data);
             } else if (method == 'getChangeTrackingSettings') {
                 response.data = AdminService.getChangeTrackingSettings();
-            } else if (method == 'runChangeTracking') {
-                response.data = AdminService.runChangeTracking();
             } else if (method == 'getDefaultTeamsActionTemplate') {
                 response.data = AdminService.getDefaultTeamsActionTemplate();
             } else if (method == 'getIssueDefaultTeamsActionTemplate') {
