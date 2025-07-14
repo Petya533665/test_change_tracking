@@ -1558,7 +1558,7 @@ public without sharing class AdminService {
 
     public static ChangeTrackingSettings setChangeTrackingSettings(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
-        if(input.get('gitChangeTracking') == null) {
+        if(input.get('gitChangeTracking') != null) {
             ConfigUtil.CHANGE_TRACKING_SETTINGS.Git_Change_Tracking__c = Boolean.valueOf(input.get('gitChangeTracking'));
         }
         DatabaseUtils.getInstance().performUpsertDML(new List<Change_Tracking__c>{ConfigUtil.CHANGE_TRACKING_SETTINGS}, Schema.SObjectType.Change_Tracking__c, true);
