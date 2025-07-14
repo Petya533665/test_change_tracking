@@ -119,7 +119,7 @@ public with sharing class TestDataGenerator {
 		message.setSaveAsActivity(false);
 
 		EmailTemplate emailTemplate = getEmailTemplateByDeveloperName(CONNECTED_APP_READY_EMAIL_TEMPLATE_NAME);
-		setSubjectBody(message, emailTemplate, ConfigUtil.BASE_URL + '/apex/' + ConfigUtil.NameSpacePrefix + 'Admin#/quick-start/connect-org', '');
+		setSubjectBody(message, emailTemplate, Constants.GLOBAL_VARIABLE.BASE_URL + '/apex/' + ConfigUtil.NameSpacePrefix + 'Admin#/quick-start/connect-org', '');
 
 		Messaging.SingleEmailMessage[] messages = new List<Messaging.SingleEmailMessage> {message};
 		Messaging.SendEmailResult[] results = Messaging.sendEmail(messages);

@@ -356,9 +356,9 @@ global with sharing virtual class FlowExceptionParser implements IErrorParser {
         }
 
         String summaryValue = stackTraceInfo?.errorMessage;
-        this.summary = (String.isNotBlank(summaryValue)) ? summaryValue.abbreviate(ConfigUtil.MAX_LENGTH_TEXT_FIELD) : this.emailSubject;
+        this.summary = (String.isNotBlank(summaryValue)) ? summaryValue.abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH) : this.emailSubject;
         if(this.emailSubject.startsWith(FlowService.FLOW_ERROR_MESSAGE_SEPARATOR)) {
-            this.summary = this.emailSubject?.removeStart(FlowService.FLOW_ERROR_MESSAGE_SEPARATOR)?.abbreviate(ConfigUtil.MAX_LENGTH_TEXT_FIELD);
+            this.summary = this.emailSubject?.removeStart(FlowService.FLOW_ERROR_MESSAGE_SEPARATOR)?.abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH);
         }
         this.userId = stackTraceInfo?.flowInterviewDetails?.currentUserId;
         this.interviewGUID = stackTraceInfo?.flowInterviewDetails?.interviewGUID;
@@ -389,7 +389,7 @@ global with sharing virtual class FlowExceptionParser implements IErrorParser {
         this.relatedObjectType = stackTraceInfo?.howTheInterviewStarted?.recordName;
 
         ConfigUtil.HTMLStringRowIterator rIterator = new ConfigUtil.HTMLStringRowIterator(String.isNotBlank(stackTraceInfo?.errorMessage) ? stackTraceInfo?.errorMessage : this.emailSubject);
-        Pattern p = ConfigUtil.SOBJECT_ID_PATTERN;
+        Pattern p = Constants.GLOBAL_VARIABLE.PATTERN_SOBJECT_ID;
         Set<String> relatedIds = new Set<String>();
 
         String stacktraceRow;

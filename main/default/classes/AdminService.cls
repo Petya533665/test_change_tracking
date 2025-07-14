@@ -16,7 +16,7 @@ public without sharing class AdminService {
 
     public static Map<String, Boolean> isMyDomainEnabled() {
         Map<String, Boolean> output = new Map<String, Boolean>();
-        Boolean enabled = URL.getOrgDomainUrl().getHost().endsWith(ConfigUtil.SALESFORCE_DOMAIN) || URL.getOrgDomainUrl().getHost().contains(ConfigUtil.CUSTOM_DOMAIN_SYMBOLS);
+        Boolean enabled = URL.getOrgDomainUrl().getHost().endsWith(Constants.GLOBAL_VARIABLE.SALESFORCE_DOMAIN) || URL.getOrgDomainUrl().getHost().contains(Constants.GLOBAL_VARIABLE.CUSTOM_DOMAIN_SYMBOLS);
         output.put('enabled', enabled);
         return output;
     }
@@ -70,19 +70,19 @@ public without sharing class AdminService {
     }
 
     public static Map<String, String> getDefaultAzureDevOpsActionTemplate() {
-        return TemplateUtil.LOG_SOBJECT.DEFAULT_JIRA_ACTION;
+        return Templates.LOG_SOBJECT.DEFAULT_JIRA_ACTION;
     }
 
     public static Map<String, String> getDefaultJiraActionTemplate() {
-        return TemplateUtil.LOG_SOBJECT.DEFAULT_JIRA_ACTION;
+        return Templates.LOG_SOBJECT.DEFAULT_JIRA_ACTION;
     }
 
     public static Map<String, String> getIssueDefaultAzureDevOpsActionTemplate() {
-        return TemplateUtil.ISSUE_SOBJECT.DEFAULT_JIRA_ACTION;
+        return Templates.ISSUE_SOBJECT.DEFAULT_JIRA_ACTION;
     }
 
     public static Map<String, String> getIssueDefaultJiraActionTemplate() {
-        return TemplateUtil.ISSUE_SOBJECT.DEFAULT_JIRA_ACTION;
+        return Templates.ISSUE_SOBJECT.DEFAULT_JIRA_ACTION;
     }
 
     public static Map<String, String> getDefaultSlackActionTemplate() {
@@ -94,15 +94,15 @@ public without sharing class AdminService {
     }
 
     public static Map<String, String> getDefaultNotificationsTemplate() {
-        return TemplateUtil.LOG_SOBJECT.DEFAULT_NOTIFICATION;
+        return Templates.LOG_SOBJECT.DEFAULT_NOTIFICATION;
     }
 
     public static Map<String, String> getTraceResultDefaultSlackActionTemplate() {
-        return TemplateUtil.TRACE_RESULT_SOBJECT.DEFAULT_NOTIFICATION;
+        return Templates.TRACE_RESULT_SOBJECT.DEFAULT_NOTIFICATION;
     }
 
     public static Map<String, String> getTraceResultDefaultTeamsActionTemplate() {
-        return TemplateUtil.TRACE_RESULT_SOBJECT.DEFAULT_NOTIFICATION;
+        return Templates.TRACE_RESULT_SOBJECT.DEFAULT_NOTIFICATION;
     }
 
     public static Map<String, String> getIssueDefaultSlackActionTemplate() {
@@ -114,15 +114,15 @@ public without sharing class AdminService {
     }
 
     public static Map<String, String> getIssueDefaultNotificationsTemplate() {
-        return TemplateUtil.ISSUE_SOBJECT.DEFAULT_NOTIFICATION;
+        return Templates.ISSUE_SOBJECT.DEFAULT_NOTIFICATION;
     }
 
     public static Map<String, String> getDefaultMonitoringActionTemplate() {
-        return TemplateUtil.EVENT_SOBJECT.DEFAULT_MONITORING_ACTION;
+        return Templates.EVENT_SOBJECT.DEFAULT_MONITORING_ACTION;
     }
 
     public static Map<String, String> getIssueTicketCommentActionTemplate() {
-        return TemplateUtil.ISSUE_SOBJECT.DEFAULT_TICKET_COMMENT_ACTION;
+        return Templates.ISSUE_SOBJECT.DEFAULT_TICKET_COMMENT_ACTION;
     }
 
     public static List<MergeField> getSobjectFields(Schema.DescribeSObjectResult d, String dType, Schema.DescribeFieldResult parent, Schema.DescribeSObjectResult parentObject, Integer depth) {
@@ -223,7 +223,8 @@ public without sharing class AdminService {
             'IssueAnalysisEnabled' => PermissionsUtil.IssueAnalysisEnabled,
             'MandatoryErrorReportingEnabled' => PermissionsUtil.MandatoryErrorReportingEnabled,
             'EventMonitoringEnabled' => PermissionsUtil.EventMonitoringEnabled,
-            'FlowLoggingEnabled' => PermissionsUtil.FlowLoggingEnabled
+            'FlowLoggingEnabled' => PermissionsUtil.FlowLoggingEnabled,
+            'IssueTrackingEnabled' => PermissionsUtil.IssueTrackingEnabled
         };
         return result;
     }
@@ -254,12 +255,13 @@ public without sharing class AdminService {
         return output;
     }
 
-    public static List<RemoteSiteSettingsWrapper> getRemoteSiteSettings() {
+    public static List<MetadataServiceUtil.RemoteSiteSettingsWrapper> getRemoteSiteSettings() {
         return getRemoteSiteSettings(ConnectedOrgService.getSelfConnectedOrgAccessToken());
     }
 
-    public static List<RemoteSiteSettingsWrapper> getRemoteSiteSettings(String accessToken) {
-        List<RemoteSiteSettingsWrapper> remoteSiteSettingsList = new List<RemoteSiteSettingsWrapper>();
+    public static List<MetadataServiceUtil.RemoteSiteSettingsWrapper> getRemoteSiteSettings(String accessToken) {
+        List<MetadataServiceUtil.RemoteSiteSettingsWrapper> remoteSiteSettingsList =
+            new List<MetadataServiceUtil.RemoteSiteSettingsWrapper>();
         try {
             String b = HttpUtils.get(
                 ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_REMOTE_SITE_SETTINGS_QUERY,
@@ -268,7 +270,10 @@ public without sharing class AdminService {
             );
             Map<String, Object> respResults = (Map<String, Object>)JSON.deserializeUntyped(b);
             if (respResults.get(ConfigUtil.REMOTE_SITE_SETTINGS_KEY_RECORDS) != null) {
-                remoteSiteSettingsList = (List<RemoteSiteSettingsWrapper>)JSON.deserialize(JSON.serialize(respResults.get(ConfigUtil.REMOTE_SITE_SETTINGS_KEY_RECORDS)), List<RemoteSiteSettingsWrapper>.class);
+                remoteSiteSettingsList = (List<MetadataServiceUtil.RemoteSiteSettingsWrapper>)JSON.deserialize(
+                    JSON.serialize(respResults.get(ConfigUtil.REMOTE_SITE_SETTINGS_KEY_RECORDS)),
+                    List<MetadataServiceUtil.RemoteSiteSettingsWrapper>.class
+                );
                 return remoteSiteSettingsList;
             }
         }
@@ -496,62 +501,30 @@ public without sharing class AdminService {
         return 'success';
     }
 
-    public static Map<String, RemoteSiteSettingsWrapper> getRemoteSiteSettingsMap() {
-        Map<String, RemoteSiteSettingsWrapper> output = new Map<String, RemoteSiteSettingsWrapper>();
-        for (RemoteSiteSettingsWrapper rss : getRemoteSiteSettings()) {
+    public static Map<String, MetadataServiceUtil.RemoteSiteSettingsWrapper> getRemoteSiteSettingsMap() {
+        Map<String, MetadataServiceUtil.RemoteSiteSettingsWrapper> output =
+            new Map<String, MetadataServiceUtil.RemoteSiteSettingsWrapper>();
+        for (MetadataServiceUtil.RemoteSiteSettingsWrapper rss : getRemoteSiteSettings()) {
             output.put(rss.EndpointUrl, rss);
         }
         return output;
     }
 
-    public static MetadataService.MetadataPort createMetadataPort() {
-        return createMetadataPort(null);
-    }
-
-    public static MetadataService.MetadataPort createMetadataPort(String accessToken) {
-        MetadataService.MetadataPort service = new MetadataService.MetadataPort();
-        service.SessionHeader = new MetadataService.SessionHeader_element();
-        service.SessionHeader.sessionId = String.isNotBlank(accessToken) ? accessToken : ConnectedOrgService.getSelfConnectedOrgAccessToken();
-        return service;
-    }
-
-    public static void upsertRemoteSiteSettingsMetadata(MetadataService.RemoteSiteSetting rss) {
-        upsertRemoteSiteSettingsMetadata(rss, null);
-    }
-
-    public static void upsertRemoteSiteSettingsMetadata(MetadataService.RemoteSiteSetting rss, String accessToken) {
-        MetadataService.MetadataPort service = createMetadataPort(accessToken);
-
-        List<MetadataService.UpsertResult> results =
-            service.upsertMetadata(
-                new MetadataService.Metadata[] {rss});
-        handleUpsertResults(results[0]);
-    }
-
     public static void upsertRemoteSiteSetting(String name, String url, String description) {
-        Map<String, RemoteSiteSettingsWrapper> createdRemoteSiteSettings = getRemoteSiteSettingsMap();
+        Map<String, MetadataServiceUtil.RemoteSiteSettingsWrapper> createdRemoteSiteSettings = getRemoteSiteSettingsMap();
         if (createdRemoteSiteSettings.containsKey(url) && createdRemoteSiteSettings.get(url).SiteName == name) {
             return;
         }
 
-        MetadataService.RemoteSiteSetting rss = createRemoteSiteSettingInstance(name, url, description);
-        upsertRemoteSiteSettingsMetadata(rss);
-    }
-
-    public static MetadataService.RemoteSiteSetting createRemoteSiteSettingInstance(String name, String url, String description) {
-        MetadataService.RemoteSiteSetting rss = new MetadataService.RemoteSiteSetting();
-        rss.fullName = name;
-        rss.description = description;
-        rss.disableProtocolSecurity = false;
-        rss.isActive = true;
-        rss.url = url;
-        return rss;
+        MetadataServiceUtil.upsertRemoteSiteSettingsMetadata(
+            MetadataServiceUtil.createRemoteSiteSettingInstance(name, url, description)
+        );
     }
 
     public static Boolean checkRemoteSiteSettings() {
         Boolean result = true;
         try {
-            Map<String, RemoteSiteSettingsWrapper> createdRemoteSiteSettings = getRemoteSiteSettingsMap();
+            Map<String, MetadataServiceUtil.RemoteSiteSettingsWrapper> createdRemoteSiteSettings = getRemoteSiteSettingsMap();
             for(DefaultRemoteSiteSetting drss : defaultRemoteSiteSettings) {
                 result = (result && createdRemoteSiteSettings.containsKey(drss.url) && createdRemoteSiteSettings.get(drss.url).SiteName == drss.name);
             }
@@ -611,10 +584,10 @@ public without sharing class AdminService {
         if (String.isNotBlank(slackSettings.slackToken) && slackSettings.slackToken != ConfigUtil.SLACK_SETTINGS.Slack_API_Token__c) {
             ConfigUtil.SLACK_SETTINGS.Slack_API_Token__c = slackSettings.slackToken;
         }
-        upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_SLACK_API_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_SLACK_API_URL, ConfigUtil.REMOTE_SITE_SETTINGS_SLACK_DESCRIPTION);
+        upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.SLACK_API_NAME, Constants.REMOTE_SITE_SETTINGS.SLACK_API_URL, Constants.REMOTE_SITE_SETTINGS.SLACK_DESCRIPTION);
         DatabaseUtils.getInstance().performUpsertDML(new List<Slack_Settings__c>{ConfigUtil.SLACK_SETTINGS}, Schema.SObjectType.Slack_Settings__c, true);
 
-        return ConfigUtil.SAVE_SLACK_SETTINGS_SUCCESS;
+        return Constants.UI.RESULT_SUCCESS;
     }
 
     public static PagerDutySettings getPagerDutySettings() {
@@ -644,10 +617,10 @@ public without sharing class AdminService {
         ConfigUtil.PAGER_DUTY_SETTINGS.PagerDuty_Service_ID__c = pdSettings.serviceId;
         ConfigUtil.PAGER_DUTY_SETTINGS.PagerDuty_Service_Integration_Key__c = pdSettings.serviceIntegrationKey;
         ConfigUtil.PAGER_DUTY_SETTINGS.PagerDuty_User_Email__c = pdSettings.userEmail;
-        upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_PAGER_DUTY_API_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_PAGER_DUTY_URL, ConfigUtil.REMOTE_SITE_SETTINGS_PAGER_DUTY_DESCRIPTION);
-        upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_PAGER_DUTY_EVENT_API_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_PAGER_DUTY_EVENT_URL, ConfigUtil.REMOTE_SITE_SETTINGS_PAGER_DUTY_EVENT_DESCRIPTION);
+        upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.PAGER_DUTY_API_NAME, Constants.REMOTE_SITE_SETTINGS.PAGER_DUTY_URL, Constants.REMOTE_SITE_SETTINGS.PAGER_DUTY_DESCRIPTION);
+        upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.PAGER_DUTY_EVENT_API_NAME, Constants.REMOTE_SITE_SETTINGS.PAGER_DUTY_EVENT_URL, Constants.REMOTE_SITE_SETTINGS.PAGER_DUTY_EVENT_DESCRIPTION);
         DatabaseUtils.getInstance().performUpsertDML(new List<Pager_Duty_Settings__c>{ConfigUtil.PAGER_DUTY_SETTINGS}, Schema.SObjectType.Pager_Duty_Settings__c, true);
-        return ConfigUtil.SAVE_PAGER_DUTY_SETTINGS_SUCCESS;
+        return Constants.UI.RESULT_SUCCESS;
     }
 
     public static Boolean getIsAvailableSingleEmail() {
@@ -701,12 +674,12 @@ public without sharing class AdminService {
         Boolean result = false;
         if (!isEmailServicesAvailable()) {
             if (getAutomatedFlowErrorTracking()) {
-                setAutomatedFlowErrorTracking(false);
+                MetadataServiceUtil.setAutomatedFlowErrorTracking(false);
             }
             if (getScheduleBulkAPIBatch().get('cronParameter') != null) {
                 abortScheduleBulkAPIBatch();
             }
-            if (Boolean.valueOf(getBatchErrorTrackingSetting(null).get(ConfigUtil.BATCH_ERROR_TRACKING_ENABLED)) || ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) {
+            if (Boolean.valueOf(getBatchErrorTrackingSetting(null).get(ConfigUtil.BATCH_ERROR_TRACKING_ENABLED)) || ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) {
                 disableBatchErrorTrackingAndEmailToCaseErrorTracking();
             }
         }
@@ -725,7 +698,7 @@ public without sharing class AdminService {
             ConfigUtil.EMAIL_SERVICE_DATA_KEY_CONFIRMED => ConfigUtil.SETTINGS.Email_Service_Confirmed__c,
             ConfigUtil.CONFIRM_AUTOMATED_FLOW_ERROR_TRACKING_KEY => flowErrorTracking,
             ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_KEY => ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c,
-            ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_KEY => ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED,
+            ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_KEY => ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED,
             ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_ENABLED_KEY => emailToCaseErrorTracking,
             'emailToCaseErrorTrackingAvailable' => emailToCaseErrorTrackingAvailable,
             'emailToCaseErrorTrackingType' => emailToCaseErrorTrackingType,
@@ -736,8 +709,8 @@ public without sharing class AdminService {
 
     public static Map<String, Object> getLoggerWrapperInfo() {
         Map<String, String> output = new Map<String, String>{};
-        StaticResource sr = [SELECT Body FROM StaticResource WHERE Name = :ConfigUtil.APEX_UTIL_RESOURCE_NAME LIMIT 1];
-        StaticResource srTest = [SELECT Body FROM StaticResource WHERE Name = :ConfigUtil.APEX_UTIL_TEST_RESOURCE_NAME LIMIT 1];
+        StaticResource sr = [SELECT Body FROM StaticResource WHERE Name = :Constants.STATIC_RESOURCE_SOBJECT.RESOURCE_NAME_APEX_UTIL LIMIT 1];
+        StaticResource srTest = [SELECT Body FROM StaticResource WHERE Name = :Constants.STATIC_RESOURCE_SOBJECT.RESOURCE_NAME_APEX_UTIL_TEST LIMIT 1];
         if (sr == null) {
             throw new AdminServiceException(ConfigUtil.APEXUTILSOURCE_NOT_FOUND_MESSAGE);
         }
@@ -860,7 +833,7 @@ public without sharing class AdminService {
         Integer sumTotalJobItems = DatabaseUtils.getSumTotalJobItems();
         Integer availableQuantityAsyncApexExecutions = LimitsService.getAvailableQuantityAsyncApexExecutions() - (sumTotalJobItems != null ? (sumTotalJobItems - 1) : 1);
 
-        if(availableQuantityAsyncApexExecutions > 0 && ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) {
+        if(availableQuantityAsyncApexExecutions > 0 && ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) {
             boolean emailToCaseErrorTracking = getEmailToCaseErrorTracking();
             if(!emailToCaseErrorTracking) {
                 setEmailToCaseTracking(true);
@@ -874,7 +847,7 @@ public without sharing class AdminService {
         String errorHandlerAddress = getPackageEmailServiceFunctionEmailAddress();
         if(String.isNotBlank(errorHandlerAddress)) {
             try {
-                MetadataService.CaseSettings caseSettings = CASE_SETTINGS;
+                MetadataService.CaseSettings caseSettings = MetadataServiceUtil.CASE_SETTINGS;
                 if(caseSettings != null && caseSettings.emailToCase != null && caseSettings.emailToCase.enableEmailToCase) {
                     result = true;
                 }
@@ -890,7 +863,7 @@ public without sharing class AdminService {
         String errorHandlerAddress = getPackageEmailServiceFunctionEmailAddress();
         if(String.isNotBlank(errorHandlerAddress)) {
             try {
-                MetadataService.CaseSettings caseSettings = CASE_SETTINGS;
+                MetadataService.CaseSettings caseSettings = MetadataServiceUtil.CASE_SETTINGS;
                 if(caseSettings != null && caseSettings.emailToCase != null && caseSettings.emailToCase.enableEmailToCase) {
                     // User
                     if(String.isNotBlank(caseSettings.defaultCaseUser)) {
@@ -911,7 +884,7 @@ public without sharing class AdminService {
         Boolean result = false;
 
         if (String.isNotBlank(getPackageEmailServiceFunctionEmailAddress())) {
-            MetadataService.CaseSettings caseSettings = CASE_SETTINGS;
+            MetadataService.CaseSettings caseSettings = MetadataServiceUtil.CASE_SETTINGS;
             if (caseSettings != null) {
                 // User
                 if (String.isNotBlank(caseSettings.defaultCaseUser)) {
@@ -934,7 +907,7 @@ public without sharing class AdminService {
     public static User getEmailToCaseDefaultCaseUserData() {
         User user = new User();
         if (String.isNotBlank(getPackageEmailServiceFunctionEmailAddress())) {
-            MetadataService.CaseSettings caseSettings = CASE_SETTINGS;
+            MetadataService.CaseSettings caseSettings = MetadataServiceUtil.CASE_SETTINGS;
             if (caseSettings != null) {
                 // User
                 if (String.isNotBlank(caseSettings.defaultCaseUser)) {
@@ -954,71 +927,21 @@ public without sharing class AdminService {
     public static Boolean getAutomatedFlowErrorTracking() {
         Boolean result = false;
         try {
-            MetadataService.FlowSettings flowSettings = getFlowSettings();
+            MetadataService.FlowSettings flowSettings = MetadataServiceUtil.getFlowSettings();
             result = flowSettings.enableFlowUseApexExceptionEmail;
         }
         catch(Exception e){}
         return result;
     }
 
-    public static MetadataService.FlowSettings getFlowSettings() {
-        MetadataService.MetadataPort service = createMetadataPort();
-        service.setMetadataAPIVersion('63.0');
-
-        MetadataService.FlowSettings flowSettings =
-            (MetadataService.FlowSettings) service.readMetadata('FlowSettings',
-                new String[] { 'Flow' }).getRecords()[0];
-
-        return flowSettings;
-    }
-
-    public static MetadataService.MetadataPort getCaseSettingsService() {
-        MetadataService.MetadataPort service = createMetadataPort();
-        service.setMetadataAPIVersion('50.0');
-        return service;
-    }
-
-    public static final MetadataService.CaseSettings CASE_SETTINGS {
-        get {
-            if (CASE_SETTINGS == null) {
-                CASE_SETTINGS = getCaseSettings();
-            }
-            return CASE_SETTINGS;
-        }
-        private set;
-    }
-
-    public static MetadataService.CaseSettings getCaseSettings() {
-        MetadataService.MetadataPort service = getCaseSettingsService();
-
-        List<MetadataService.CaseSettings> caseSettingsList =
-            (List<MetadataService.CaseSettings>) service.readMetadata('CaseSettings',
-                new String[] { 'Case' }).getRecords();
-        MetadataService.CaseSettings caseSettings = (!caseSettingsList.isEmpty()) ? caseSettingsList.get(0): null;
-        return caseSettings;
-    }
-
-    public static void setAutomatedFlowErrorTracking(Boolean value) {
-        MetadataService.MetadataPort service = createMetadataPort();
-        service.setMetadataAPIVersion('63.0');
-
-        MetadataService.FlowSettings flowSettings = getFlowSettings();
-        flowSettings.enableFlowUseApexExceptionEmail = value;
-
-        List<MetadataService.SaveResult> results =
-            service.updateMetadata(
-                new MetadataService.Metadata[] {flowSettings});
-        handleSaveResults(results[0]);
-    }
-
     public static Boolean setEmailToCaseTracking(Boolean value) {
         String errorHandlerAddress = getPackageEmailServiceFunctionEmailAddress();
         if(value && String.isNotBlank(errorHandlerAddress)) {
-            MetadataService.CaseSettings caseSettings = CASE_SETTINGS;
+            MetadataService.CaseSettings caseSettings = MetadataServiceUtil.CASE_SETTINGS;
             if(caseSettings != null && caseSettings.emailToCase != null && caseSettings.emailToCase.enableEmailToCase) {
                 // User
                 if(String.isNotBlank(caseSettings.defaultCaseUser)) {
-                    setEmailToCaseErrorTrackingStatus(ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED);
+                    setEmailToCaseErrorTrackingStatus(Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED);
                     
                     return true;
                 }
@@ -1026,20 +949,20 @@ public without sharing class AdminService {
                 else if (String.isNotBlank(caseSettings.systemUserEmail)) {
                     caseSettings.systemUserEmail = errorHandlerAddress;
                     List<MetadataService.SaveResult> results =
-                        getCaseSettingsService().updateMetadata(
+                        MetadataServiceUtil.getCaseSettingsService().updateMetadata(
                             new MetadataService.Metadata[] {caseSettings});
-                    handleSaveResults(results[0]);
+                    MetadataServiceUtil.handleSaveResults(results[0]);
 
-                    setEmailToCaseErrorTrackingStatus(ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED);
+                    setEmailToCaseErrorTrackingStatus(Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED);
                     return true;
                 }
             }
             else {
-                setEmailToCaseErrorTrackingStatus(ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ERROR);
+                setEmailToCaseErrorTrackingStatus(Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ERROR);
             }
         }
         else {
-            PermissionsUtil.putSObjectField(ConfigUtil.SETTINGS, Schema.SObjectType.Logger_Settings__c.fields.Enable_Email_To_Case_Error_Tracking__c, ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_DISABLED);
+            PermissionsUtil.putSObjectField(ConfigUtil.SETTINGS, Schema.SObjectType.Logger_Settings__c.fields.Enable_Email_To_Case_Error_Tracking__c, Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_DISABLED);
             DatabaseUtils.getInstance().performUpdateDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c, true);
         }
         return false;
@@ -1056,10 +979,10 @@ public without sharing class AdminService {
 
             try {
                 HttpUtils.get(changeEmailLink, null, 200);
-                setEmailToCaseErrorTrackingStatus(ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED);
+                setEmailToCaseErrorTrackingStatus(Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED);
             }
             catch(Exception e) {
-                setEmailToCaseErrorTrackingStatus(ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ERROR);
+                setEmailToCaseErrorTrackingStatus(Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ERROR);
             }
 
         }
@@ -1086,11 +1009,6 @@ public without sharing class AdminService {
         return result;
     }
 
-    public static final String ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_PENDING = 'Pending';
-    public static final String ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED = 'Enabled';
-    public static final String ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ERROR = 'Error';
-    public static final String ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_DISABLED = null;
-
     public static Map<String, Object> emailToCaseTracking(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         Boolean incomingValue = Boolean.valueOf(input.get(ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE));
@@ -1107,7 +1025,7 @@ public without sharing class AdminService {
 
     public static Map<String, Object> flowErrorTracking(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
-        setAutomatedFlowErrorTracking(Boolean.valueOf(input.get(ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE)));
+        MetadataServiceUtil.setAutomatedFlowErrorTracking(Boolean.valueOf(input.get(ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE)));
 
         return getEmailServiceData();
     }
@@ -1172,7 +1090,7 @@ public without sharing class AdminService {
         }
 
         Set<String> setRemoteSiteSettingsNames = new Set<String>();
-        for (RemoteSiteSettingsWrapper rss : getRemoteSiteSettings()) {
+        for (MetadataServiceUtil.RemoteSiteSettingsWrapper rss : getRemoteSiteSettings()) {
             setRemoteSiteSettingsNames.add(rss.SiteName);
         }
         List<String> lstRemoteSiteSettingsToDelete = new List<String>();
@@ -1195,7 +1113,7 @@ public without sharing class AdminService {
         if(!lstRemoteSiteSettingsToDelete.isEmpty()) {
             List<List<String>> chunks = doListPartition(lstRemoteSiteSettingsToDelete, 9);
             for(List<String> chunk : chunks) {
-                deleteRemoteSiteSettingsMetadata(chunk);
+                MetadataServiceUtil.deleteRemoteSiteSettingsMetadata(chunk);
             }
         }
 
@@ -1263,20 +1181,12 @@ public without sharing class AdminService {
     }
 
     public static void deleteRemoteSiteSettingsMetadata(String name) {
-        for (RemoteSiteSettingsWrapper rss : getRemoteSiteSettings()) {
+        for (MetadataServiceUtil.RemoteSiteSettingsWrapper rss : getRemoteSiteSettings()) {
             if (rss.SiteName == (CONNECTED_ORG_REMOTE_SITE_SETTINGS_NAME + name.left(15))) {
-                deleteRemoteSiteSettingsMetadata(new List<String>{ConfigUtil.prefixCurrentOrgNamespace(rss.SiteName)});
+                MetadataServiceUtil.deleteRemoteSiteSettingsMetadata(new List<String>{ConfigUtil.prefixCurrentOrgNamespace(rss.SiteName)});
                 break;
             }
         }
-    }
-
-    public static void deleteRemoteSiteSettingsMetadata(List<String> rssList) {
-        MetadataService.MetadataPort service = createMetadataPort();
-
-        List<MetadataService.DeleteResult> results = service.deleteMetadata(
-            'RemoteSiteSetting', rssList);
-        handleDeleteResults(results[0]);
     }
 
     public static Boolean isRemoteSiteSettingsSetupCompleted() {
@@ -1328,7 +1238,7 @@ public without sharing class AdminService {
         if(emailToCaseErrorTrackingAvailable) {
             percentComplete += (String.isNotBlank(emailServiceAddress)) ? 33.33 : 0;
             percentComplete += (flowErrorTracking) ? 33.33 : 0;
-            percentComplete += (ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) ? 33.33 : 0;
+            percentComplete += (ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) ? 33.33 : 0;
         }
         else {
             percentComplete += (String.isNotBlank(emailServiceAddress)) ? 50 : 0;
@@ -1354,81 +1264,70 @@ public without sharing class AdminService {
     }
 
     public static Map<String, Object> getConfigurationOverviewData() {
-        Map<String, Object> data = new Map<String, Object>{
-            ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG0 => false,
-            ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG1 => false,
-            ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG2 => false,
-            ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG3 => false,
-            ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG4 => false,
-            ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG5 => false,
-            ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG6 => false,
-            ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG7 => false,
-            ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8 => false,
-            ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS => 0
-        };
+        Map<String, Object> data = Constants.UI.CONFIGURATION_OVERVIEW_DATA;
 
 
         if (isRemoteSiteSettingsSetupCompleted()) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG0, true);
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
+            data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG0, true);
+            data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
 
         if (isEmailServiceFunctionSetupCompleted()) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG1, true);
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
+            data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG1, true);
+            data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
 
         if (isConnectionOrgsSetupCompleted()) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG2, true);
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PASSTHROUGHT_MODE_ENABLED, ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c);
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
+            data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG2, true);
+            data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PASSTHROUGHT_MODE_ENABLED, ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c);
+            data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
 
         // Add percents for Integrations
         Integer integrationsPercentCompleted = getIntegrationsPercentCompleted();
         if (integrationsPercentCompleted > 0) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG3, true);
+            data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG3, true);
         }
 
         // Sensitive Data Masking
         Integer availableMasks = SensitiveDataMask__c.getAll().size();
         if (availableMasks > 0 && PermissionsUtil.SensitiveDataMaskingEnabled) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG4, true);
+            data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG4, true);
         }
 
         // Monitoring
         if (ConfigUtil.SETTINGS.Monitoring_Enabled__c) {
             if (isMonitoringRulesSetupCompleted()) {
-                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG5, true);
-                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
+                data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG5, true);
+                data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
             }
         }
         // Log Retention
         if (ConfigUtil.SETTINGS.Archival_Enabled__c) {
             if (isArchivalRulesSetupCompleted()) {
-                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG6, true);
-                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
+                data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG6, true);
+                data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
             }
         }
 
         if (new PlatformEventSubscriberConfigService(Log_Event__e.SobjectType).isPlatformEventConfigSetupCompleted()) {
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG7, true);
-            data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
+            data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG7, true);
+            data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
 
         // Notifications section
         if (PermissionsUtil.NotificationIntegrationEnabled) {
             if (isNotificationsSetupCompleted()) {
-                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8, true);
-                data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
+                data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8, true);
+                data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
             }
         }
 
         // FLAG0 FLAG2 FLAG3 FLAG4 FLAG6 FLAG7 FLAG8 FLAG9
         Integer flagsQuantity = 8;
-        Decimal progress = 100*Decimal.valueOf(String.valueOf(data.get(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)))/flagsQuantity + (Decimal.valueOf(100)/flagsQuantity)*(Decimal.valueOf(integrationsPercentCompleted)/100);
-        data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, progress <= 100 ? Integer.valueOf(progress) : 100);
-        data.put(ConfigUtil.CONFIGURATION_OVERVIEW_DATA_KEY_INTEGRATION_PROGRESS, integrationsPercentCompleted);
+        Decimal progress = 100*Decimal.valueOf(String.valueOf(data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)))/flagsQuantity + (Decimal.valueOf(100)/flagsQuantity)*(Decimal.valueOf(integrationsPercentCompleted)/100);
+        data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, progress <= 100 ? Integer.valueOf(progress) : 100);
+        data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_INTEGRATION_PROGRESS, integrationsPercentCompleted);
         data.put('emailServicePercentComplete', getErrorTrackingPercentCompleted().round(System.RoundingMode.CEILING));
 
         LogServiceScheduler.rescheduleCronTriggers();
@@ -1563,14 +1462,6 @@ public without sharing class AdminService {
         }
         DatabaseUtils.getInstance().performUpsertDML(new List<Change_Tracking__c>{ConfigUtil.CHANGE_TRACKING_SETTINGS}, Schema.SObjectType.Change_Tracking__c, true);
         return getChangeTrackingSettings();
-    }
-
-    public static Map<String, Boolean> runChangeTracking() {
-        GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-        Boolean isBatchExecuted = DatabaseUtils.executeBatchWithLimitCheck('GitHubCommitBatch', batchInstance);
-        return new Map<String, Boolean>{
-            'changeTrackingRun' => isBatchExecuted
-        };
     }
 
     public static GitHubSettings resetGitHubSettings() {
@@ -1709,7 +1600,7 @@ public without sharing class AdminService {
             catch(Exception e) {
                 if(throwError) {
                     Log__c errorLog = Logger.getInstance().getInternalError(e, null, AdminService.class.getName(), 'validateJiraSetting');
-                    errorLog.Summary__c = ('Failed Jira Authentication: ' + errorLog.Summary__c).abbreviate(ConfigUtil.MAX_LENGTH_TEXT_FIELD);
+                    errorLog.Summary__c = ('Failed Jira Authentication: ' + errorLog.Summary__c).abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH);
                     Logger.getInstance().internalError(errorLog, true);
                     throw new AdminServiceValidationException('Jira connection could not be established, please check the Logs tab for more details. Or add a custom priority mapping via custom settings.');
                 }
@@ -2087,7 +1978,7 @@ public without sharing class AdminService {
                         ? jiraSettings.baseUrl.removeEnd('/')
                         : jiraSettings.baseUrl;
                     ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c = jiraSettings.baseUrl;
-                    upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_JIRA_NAME, jiraSettings.baseUrl, ConfigUtil.REMOTE_SITE_SETTINGS_JIRA_DESCRIPTION);
+                    upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.JIRA_NAME, jiraSettings.baseUrl, Constants.REMOTE_SITE_SETTINGS.JIRA_DESCRIPTION);
                 }
             }
             when SETTINGS {
@@ -2123,7 +2014,7 @@ public without sharing class AdminService {
 
         DatabaseUtils.getInstance().performUpsertDML(new List<Jira_Settings__c>{ConfigUtil.JIRA_SETTINGS}, Schema.SObjectType.Jira_Settings__c, true);
 
-        return ConfigUtil.SAVE_JIRA_SETTINGS_SUCCESS;
+        return Constants.UI.RESULT_SUCCESS;
     }
 
     public static String saveAzureDevOpsSettings(Object azureSettingsObject) {
@@ -2156,7 +2047,7 @@ public without sharing class AdminService {
 
         DatabaseUtils.getInstance().performUpsertDML(new List<Azure_Dev_Ops_API_Settings__c>{ConfigUtil.AZURE_DEV_OPS_API_SETTINGS}, Schema.SObjectType.Azure_Dev_Ops_API_Settings__c, true);
 
-        return ConfigUtil.SAVE_JIRA_SETTINGS_SUCCESS;
+        return Constants.UI.RESULT_SUCCESS;
     }
 
     public static String resetAzureDevOpsSettings() {
@@ -2176,7 +2067,7 @@ public without sharing class AdminService {
         GraphAPIService.upsertGraphAPITokenRecords(GraphAPIService.AZURE_DEVOPS_API_TOKEN_TYPE_API_TOKEN, '', false, Logger.getInstance());
         GraphAPIService.upsertGraphAPITokenRecords(GraphAPIService.AZURE_DEVOPS_API_TOKEN_TYPE_REFRESH_TOKEN, '', true, Logger.getInstance());
 
-        return ConfigUtil.SAVE_JIRA_SETTINGS_SUCCESS;
+        return Constants.UI.RESULT_SUCCESS;
     }
 
     public static String resetJiraSettings() {
@@ -2198,7 +2089,7 @@ public without sharing class AdminService {
         GraphAPIService.upsertGraphAPITokenRecords(JiraService.JIRA_API_TOKEN_TYPE_API_TOKEN, '', false, Logger.getInstance());
         GraphAPIService.upsertGraphAPITokenRecords(JiraService.JIRA_API_TOKEN_TYPE_REFRESH_TOKEN, '', true, Logger.getInstance());
 
-        return ConfigUtil.SAVE_JIRA_SETTINGS_SUCCESS;
+        return Constants.UI.RESULT_SUCCESS;
     }
 
     public static SplunkSettings getSplunkSettings() {
@@ -2228,9 +2119,9 @@ public without sharing class AdminService {
 
     public static SplunkSettings saveSplunkSettings(Object splunkSettingsObject) {
         SplunkSettings indata = (SplunkSettings)JSON.deserialize(JSON.serialize(splunkSettingsObject), SplunkSettings.class);
-        upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_SPLUNK_WEB_NAME, indata.url, ConfigUtil.REMOTE_SITE_SETTINGS_SPLUNK_WEB_DESCRIPTION);
-        upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_SPLUNK_API_NAME, indata.url + ConfigUtil.REMOTE_SITE_SETTINGS_SPLUNK_API_PORT, ConfigUtil.REMOTE_SITE_SETTINGS_SPLUNK_API_DESCRIPTION);
-        upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_SPLUNK_EVENT_COLLECTOR_NAME, indata.url + ConfigUtil.REMOTE_SITE_SETTINGS_SPLUNK_EVENT_COLLECTOR_PORT, ConfigUtil.REMOTE_SITE_SETTINGS_SPLUNK_EVENT_COLLECTOR_DESCRIPTION);
+        upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.SPLUNK_WEB_NAME, indata.url, Constants.REMOTE_SITE_SETTINGS.SPLUNK_WEB_DESCRIPTION);
+        upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.SPLUNK_API_NAME, indata.url + Constants.REMOTE_SITE_SETTINGS.SPLUNK_API_PORT, Constants.REMOTE_SITE_SETTINGS.SPLUNK_API_DESCRIPTION);
+        upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.SPLUNK_EVENT_COLLECTOR_NAME, indata.url + Constants.REMOTE_SITE_SETTINGS.SPLUNK_EVENT_COLLECTOR_PORT, Constants.REMOTE_SITE_SETTINGS.SPLUNK_EVENT_COLLECTOR_DESCRIPTION);
         ConfigUtil.SPLUNK_SETTINGS.Splunk_Enabled__c = indata.enabled;
         ConfigUtil.SPLUNK_SETTINGS.Splunk_Url__c = indata.url;
         ConfigUtil.SPLUNK_SETTINGS.Splunk_Token__c= indata.token;
@@ -2261,8 +2152,8 @@ public without sharing class AdminService {
         ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c = input.enabled;
         ConfigUtil.OPEN_AI_SETTINGS.Token__c = input.token;
         if (ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c) {
-            upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_AI_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_AI_URL, ConfigUtil.REMOTE_SITE_SETTINGS_AI_DESCRIPTION);
-            upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_URL, ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_DESCRIPTION);
+            upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.AI_NAME, Constants.REMOTE_SITE_SETTINGS.AI_URL, Constants.REMOTE_SITE_SETTINGS.AI_DESCRIPTION);
+            upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.OPEN_AI_NAME, Constants.REMOTE_SITE_SETTINGS.OPEN_AI_URL, Constants.REMOTE_SITE_SETTINGS.OPEN_AI_DESCRIPTION);
         }
         DatabaseUtils.getInstance().performUpsertDML(new List<OpenAI_Settings__c>{ConfigUtil.OPEN_AI_SETTINGS}, Schema.SObjectType.OpenAI_Settings__c, true);
         return getOpenAISettings();
@@ -2301,16 +2192,12 @@ public without sharing class AdminService {
         Boolean useManagedApp = (Boolean)input.get('useManagedApp');
 
         if(!useManagedApp) {
-            MetadataService.MetadataPort service = createMetadataPort();
-
             if(String.isNotBlank(ConfigUtil.CONNECTED_ORGS_SETTINGS.Connected_App_Name__c)) {
                 String oldConnectedAppApiName = ConfigUtil.CONNECTED_ORGS_SETTINGS.Connected_App_Name__c;
 
-                MetadataService.ConnectedApp currentConnectedApp =
-                    (MetadataService.ConnectedApp)service.readMetadata('ConnectedApp', new String[] {oldConnectedAppApiName}).getRecords()[0];
+                MetadataService.ConnectedApp currentConnectedApp = MetadataServiceUtil.getConnectedAppMetadataByApiName(oldConnectedAppApiName);
                 if(currentConnectedApp.fullName != null) {
-                    handleDeleteResults(
-                        service.deleteMetadata('ConnectedApp', new String[] {oldConnectedAppApiName})[0]);
+                    MetadataServiceUtil.deleteConnectedAppMetadata(oldConnectedAppApiName);
                 }
             }
 
@@ -2321,11 +2208,7 @@ public without sharing class AdminService {
             String secret = generateRandomStringOfNumbers(32);
             String payload = getConnectedAppPayload(secret, key, AdminController.salesforceBaseUrl + ConfigUtil.CONNECTED_APP_CALLBACK_PAGE_URL, newConnectedAppName, newConnectedAppApiName);
 
-            MetadataService.ConnectedApp app = (MetadataService.ConnectedApp)JSON.deserialize(payload, MetadataService.ConnectedApp.class);
-            List<MetadataService.SaveResult> results =
-                service.createMetadata(
-                    new MetadataService.Metadata[] { app });
-            handleSaveResults(results[0]);
+            MetadataServiceUtil.createConnectedAppMetadata(payload);
 
             ConfigUtil.CONNECTED_ORGS_SETTINGS.Client_Key__c = key;
             ConfigUtil.CONNECTED_ORGS_SETTINGS.Client_Secret__c = secret;
@@ -2349,7 +2232,7 @@ public without sharing class AdminService {
     }
 
     public static String getConnectedAppPayload(String secret, String key, String callBackUrl, String name, String apiName) {
-        StaticResource sr = [SELECT Body FROM StaticResource WHERE Name = :ConfigUtil.METADATA_CONNECTED_APP_PAYLOAD_RESOURCE_NAME LIMIT 1];
+        StaticResource sr = [SELECT Body FROM StaticResource WHERE Name = :Constants.STATIC_RESOURCE_SOBJECT.RESOURCE_NAME_METADATA_CONNECTED_APP_PAYLOAD LIMIT 1];
         String payload = sr.Body.toString();
         payload = payload.replace('XXXXX1', secret);
         payload = payload.replace('XXXXX2', key);
@@ -2357,80 +2240,6 @@ public without sharing class AdminService {
         payload = payload.replace('XXXXX4', name);
         payload = payload.replace('XXXXX5', apiName);
         return payload;
-    }
-
-    public static void handleDeleteResults(MetadataService.DeleteResult deleteResult) {
-        // Nothing to see?
-        if(deleteResult==null || deleteResult.success)
-            return;
-        // Construct error message and throw an exception
-        if(deleteResult.errors!=null) {
-            List<String> messages = new List<String>();
-            messages.add(
-                (deleteResult.errors.size()==1 ? 'Error ' : 'Errors ') +
-                    'occured processing component ' + deleteResult.fullName + '.');
-            for(MetadataService.Error error : deleteResult.errors)
-                messages.add(
-                    error.message + ' (' + error.statusCode + ').' +
-                        ( error.fields!=null && error.fields.size()>0 ?
-                            ' Fields ' + String.join(error.fields, ',') + '.' : '' ) );
-            if(messages.size()>0)
-                throw new AdminServiceException(String.join(messages, ' '));
-        }
-        if(!deleteResult.success)
-            throw new AdminServiceException('Request failed with no specified error.');
-    }
-
-    public static void handleSaveResults(MetadataService.SaveResult saveResult) {
-        // Nothing to see?
-        if(saveResult==null || saveResult.success) {
-            return;
-        }
-        // Construct error message and throw an exception
-        if(saveResult.errors!=null) {
-            List<String> messages = new List<String>();
-            messages.add((saveResult.errors.size() == 1 ? ConfigUtil.HANDLE_SAVE_RESULT_KEY_ERROR : ConfigUtil.HANDLE_SAVE_RESULT_KEY_ERRORS) +
-                ConfigUtil.HANDLE_SAVE_RESULT_KEY_COMPONENTS + saveResult.fullName + '.'
-            );
-            for(MetadataService.Error error : saveResult.errors) {
-                messages.add(
-                    error.message + ' (' + error.statusCode + ').' +
-                    (error.fields != null && error.fields.size() > 0 ?
-                        ConfigUtil.HANDLE_SAVE_RESULT_KEY_FIELDS + String.join(error.fields, ',') + '.' : '' ) );
-            }
-            if(messages.size() > 0) {
-                throw new AdminServiceException(String.join(messages, ' '));
-            }
-        }
-        if(!saveResult.success) {
-            throw new AdminServiceException(ConfigUtil.FAILED_NO_ERRORS_MESSAGE);
-        }
-    }
-
-    public static void handleUpsertResults(MetadataService.UpsertResult upsertResult) {
-        // Nothing to see?
-        if(upsertResult == null || upsertResult.success) {
-            return;
-        }
-        // Construct error message and throw an exception
-        if(upsertResult.errors != null) {
-            List<String> messages = new List<String>();
-            messages.add((upsertResult.errors.size() == 1 ? ConfigUtil.HANDLE_SAVE_RESULT_KEY_ERROR : ConfigUtil.HANDLE_SAVE_RESULT_KEY_ERRORS) +
-                    ConfigUtil.HANDLE_SAVE_RESULT_KEY_COMPONENTS + upsertResult.fullName + '.'
-            );
-            for(MetadataService.Error error : upsertResult.errors) {
-                messages.add(
-                    error.message + ' (' + error.statusCode + ').' +
-                        (error.fields != null && error.fields.size() > 0 ?
-                            ConfigUtil.HANDLE_SAVE_RESULT_KEY_FIELDS + String.join(error.fields, ',') + '.' : '' ) );
-            }
-            if(messages.size() > 0) {
-                throw new AdminServiceException(String.join(messages, ' '));
-            }
-        }
-        if(!upsertResult.success) {
-            throw new AdminServiceException(ConfigUtil.FAILED_NO_ERRORS_MESSAGE);
-        }
     }
 
     public static String generateRandomString(Integer len) {
@@ -2589,7 +2398,7 @@ public without sharing class AdminService {
         DatabaseUtils.getInstance().performInsertDML(toInsert, true);
         DatabaseUtils.getInstance().performDeleteDML(toDelete, true);
 
-        return ConfigUtil.SAVE_LOG_CATEGORIES_SUCCESS;
+        return Constants.UI.RESULT_SUCCESS;
     }
 
     private static List<LogRecordTypeMapping> getLogRecordTypeMappings() {
@@ -2698,7 +2507,7 @@ public without sharing class AdminService {
     }
 
     public static void disableBatchErrorTrackingAndEmailToCaseErrorTracking() {
-        PermissionsUtil.putSObjectField(ConfigUtil.SETTINGS, Schema.SObjectType.Logger_Settings__c.fields.Enable_Email_To_Case_Error_Tracking__c, ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_DISABLED);
+        PermissionsUtil.putSObjectField(ConfigUtil.SETTINGS, Schema.SObjectType.Logger_Settings__c.fields.Enable_Email_To_Case_Error_Tracking__c, Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_DISABLED);
         PermissionsUtil.putSObjectField(ConfigUtil.SETTINGS, Schema.SObjectType.Logger_Settings__c.fields.Batch_Error_Tracking_Enabled__c, false);
         DatabaseUtils.getInstance().performUpsertDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c, true);
         
@@ -3016,7 +2825,7 @@ public without sharing class AdminService {
                 // validate rule filter values
                 try {
                     List<SObject> testData = generateSObjectsForEvaluateRuleFilters(mRuleWrapper);
-                    Schema.SObjectField ruleSubType = (mRuleWrapper.ruleSubType == ConfigUtil.ISSUE_SOBJECT_NAME) 
+                    Schema.SObjectField ruleSubType = (mRuleWrapper.ruleSubType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME) 
                         ? Trace_Result__c.Issue__c.getDescribe().getSObjectField()
                         : null;
                     mRuleWrapper.applyNotificationRules(testData, ruleSubType);
@@ -3131,7 +2940,7 @@ public without sharing class AdminService {
     public static List<SObject> generateSObjectsForEvaluateRuleFilters(MonitoringUtil.MonitoringRule rule) {
         List<SObject> result = new List<SObject>();
 
-        Schema.SObjectField ruleSubType = (rule.ruleSubType == ConfigUtil.ISSUE_SOBJECT_NAME) 
+        Schema.SObjectField ruleSubType = (rule.ruleSubType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME) 
             ? Trace_Result__c.Issue__c.getDescribe().getSObjectField()
             : null;
         String sobjectType = rule.sobjectType == null ? Schema.SObjectType.Log__c.getName() : rule.sobjectType;
@@ -3522,13 +3331,6 @@ public without sharing class AdminService {
         }
     }
 
-    public class RemoteSiteSettingsWrapper {
-        public String Id;
-        public Boolean IsActive;
-        public String SiteName;
-        public String EndpointUrl;
-    }
-
     public class SObjectsCreateResponse {
         public String id;
         public Boolean success;
@@ -3567,7 +3369,7 @@ public without sharing class AdminService {
 
         DatabaseUtils.getInstance().performUpsertDML(new List<Debug_Log_Service_Flag__c>{ConfigUtil.DEBUG_LOG_SERVICE_SETTINGS}, Schema.SObjectType.Debug_Log_Service_Flag__c, true);
 
-        return ConfigUtil.SAVE_JIRA_SETTINGS_SUCCESS;
+        return Constants.UI.RESULT_SUCCESS;
     }
 
 
@@ -3958,7 +3760,7 @@ public without sharing class AdminService {
         return [
             SELECT Id, CronJobDetail.Name, NextFireTime, StartTime, OwnerId, LastModifiedBy.Name 
             FROM CronTrigger 
-            WHERE CronJobDetail.Name IN :ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_NAMES
+            WHERE CronJobDetail.Name IN :Constants.JOBS.PHAROS_LOG_SERVICE_SCHEDULER_MODE_JOB_NAMES
             ORDER BY CronJobDetail.Name ASC
         ];
     }

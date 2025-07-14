@@ -12,8 +12,8 @@ private class LogServiceSchedulerTest {
 	private static void test_LogServiceScheduler() {
 		LogServiceScheduler.rescheduleCronTriggers();
 
-		System.assertEquals(1, [SELECT COUNT() FROM CronTrigger WHERE CronJobDetail.Name = :ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME]);
-		System.assertEquals(1, [SELECT COUNT() FROM CronTrigger WHERE CronJobDetail.Name = :ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME]);
+		System.assertEquals(1, [SELECT COUNT() FROM CronTrigger WHERE CronJobDetail.Name = :Constants.JOBS.JOB_NAME_PHAROS_LOG_SERVICE_SCHEDULER_MODE_1]);
+		System.assertEquals(1, [SELECT COUNT() FROM CronTrigger WHERE CronJobDetail.Name = :Constants.JOBS.JOB_NAME_PHAROS_LOG_SERVICE_SCHEDULER_MODE_2]);
 	}
 
 	@IsTest
