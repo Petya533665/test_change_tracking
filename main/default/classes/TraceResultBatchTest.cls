@@ -474,7 +474,8 @@ private class TraceResultBatchTest {
         );
         insert traceResult;
         
-        Integer contentVersionCount = 200; 
+        // increase this number from 200 to 2 to avoid "System.UnexpectedException: ContentPublication Limit exceeded." in packaging org
+        Integer contentVersionCount = 2;
         
         // Create ContentVersion records in bulk
         List<ContentVersion> versions = new List<ContentVersion>();

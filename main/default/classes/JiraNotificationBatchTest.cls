@@ -2280,8 +2280,8 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_render_merge_fields() {
 		List<String> mergedMessages;
-		String subject = AdminService.DEFAULT_JIRA_ACTION_TEMPLATE.get('subject');
-		String body = AdminService.DEFAULT_JIRA_ACTION_TEMPLATE.get('body');
+		String subject = TemplateUtil.LOG_SOBJECT.DEFAULT_JIRA_ACTION.get('subject');
+		String body = TemplateUtil.LOG_SOBJECT.DEFAULT_JIRA_ACTION.get('body');
 
 		String relationsBody = String.format(
 			'Issue: \'{!\'{0}.{1}.{2}\'}\'',
