@@ -648,6 +648,7 @@ public with sharing class ConfigUtil {
     // AdminService
 
     public static final String REST_REMOTE_SITE_SETTINGS_QUERY = 'SELECT+Id,IsActive,SiteName,EndpointUrl+FROM+RemoteProxy+WHERE+IsActive+=+TRUE';
+    public static final String REST_CSP_TRUSTED_SITES_QUERY = 'SELECT+Id,IsActive,DeveloperName,EndpointUrl+FROM+CspTrustedSite+WHERE+IsActive+=+TRUE';
 
     public static Map<String, String> getRemoteSiteSettingsHeadersMap(String accessToken) {
         return new Map<String, String> {
@@ -656,7 +657,15 @@ public with sharing class ConfigUtil {
         };
     }
 
+    public static Map<String, String> getCspTrustedSitesHeadersMap(String accessToken) {
+        return new Map<String, String> {
+            'Authorization' => 'Bearer ' + accessToken,
+            'Content-Type' => 'application/json'
+        };
+    }
+
     public static final String REMOTE_SITE_SETTINGS_KEY_RECORDS = 'records';
+    public static final String CSP_TRUSTED_SITES_KEY_RECORDS = 'records';
     public static final String CONNECTED_ORGS_INFO_KEY_SETTINGS = 'settings';
     public static final String CONNECTED_ORGS_INFO_KEY_CONNECTED_ORGS = 'connectedOrgs';
     public static final String CONNECTION_ORG_KEY_CORG = 'corg';

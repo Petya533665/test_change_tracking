@@ -3767,4 +3767,39 @@ public without sharing class AdminService {
     private static List<User> getUsersByUserIds(Set<Id> userIds) {
         return [SELECT Name FROM User WHERE Id IN :userIds];
     }
+
+    public class MetadataChatSettings {
+        public Boolean openAiConfigured;
+        public Boolean gitConfigured;
+        public Boolean codebaseIndexed;
+        public Boolean trustedSiteReady;
+
+        public MetadataChatSettings(Boolean openAiConfigured, Boolean gitConfigured, Boolean codebaseIndexed, Boolean trustedSiteReady) {
+            this.openAiConfigured = openAiConfigured;
+            this.gitConfigured = gitConfigured;
+            this.codebaseIndexed = codebaseIndexed;
+            this.trustedSiteReady = trustedSiteReady;
+        }
+
+        public MetadataChatSettings(Boolean trustedSiteReady) {
+            this.trustedSiteReady = trustedSiteReady;
+        }
+    }
+
+    public static MetadataChatSettings getMetadataChatSettings() {
+        Map<String, MetadataServiceUtil.CspTrustedSiteWrapper> trustedSites = MetadataServiceUtil.getCspTrustedSitesMap();
+        Boolean trustedSiteReady = trustedSites.containsKey('wss://chat.pharos.ai');
+        
+        String orgId = UserInfo.getOrganizationId();
+        String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
+        Boolean openAiConfigured = ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c && String.isNotBlank(openAiKey) && OpenAI.validateToken(openAiKey);
+        Boolean gitConfigured = GitHubUtils.validateGitHubConnectionForChat();
+        Boolean codebaseIndexed = PharosChatController.isCodeIndexed(orgId);
+        return new MetadataChatSettings(openAiConfigured, gitConfigured, codebaseIndexed, trustedSiteReady);
+    }
+
+    public static MetadataChatSettings setupMetadataChatTrustedSite() {
+        MetadataServiceUtil.upsertCspTrustedSite('Pharos_Chat_Websocket', 'wss://chat.pharos.ai', 'Pharos chat websocket connection');
+        return new MetadataChatSettings(true);
+    }
 }
