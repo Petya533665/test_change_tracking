@@ -151,9 +151,9 @@ global with sharing class Logger {
     }
 
     public Log__c getInternalError(Exception e, String relatedObjectId, String area, String apexName) {
-        String details = String.valueOf(e) + Constants.GLOBAL_VARIABLE.NEWLINE_CHARACTERS + e.getStackTraceString();
+        String details = String.valueOf(e) + ConfigUtil.NEW_LINE_CARRIAGE_RETURN + e.getStackTraceString();
         details = (HttpUtils.enableHttpDebug)
-           ? details + Constants.GLOBAL_VARIABLE.NEWLINE_CHARACTERS + HttpUtils.getHttpDebugInfo()
+           ? details + ConfigUtil.NEW_LINE_CARRIAGE_RETURN + HttpUtils.getHttpDebugInfo()
            : details;
         Log__c log = LogBuilder.getInstance()
                 .category(CATEGORY_PHAROS_ERROR)

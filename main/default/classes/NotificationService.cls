@@ -1600,7 +1600,7 @@ public with sharing class NotificationService {
         public override void sendTicketing() {}
 
         public override Schema.SObjectField getRuleSubTypeSObjectField(MonitoringUtil.MonitoringRule rule) {
-            if(rule.ruleSubType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME) {
+            if(rule.ruleSubType == ConfigUtil.ISSUE_SOBJECT_NAME) {
                 return Trace_Result__c.Issue__c.getDescribe().getSObjectField();
             }
             return null;
@@ -1907,16 +1907,16 @@ public with sharing class NotificationService {
             }
             else {
                 String emailExceptionValue = (emailExceptionsList != null && !emailExceptionsList.isEmpty())
-                    ? emailExceptionsList.get(0).getMessage().abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH)
+                    ? emailExceptionsList.get(0).getMessage().abbreviate(ConfigUtil.MAX_LENGTH_TEXT_FIELD)
                     : null;
                 String pagerDutyExceptionValue = (pagerDutyExceptionsList != null && !pagerDutyExceptionsList.isEmpty())
-                    ? pagerDutyExceptionsList.get(0).getMessage().abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH)
+                    ? pagerDutyExceptionsList.get(0).getMessage().abbreviate(ConfigUtil.MAX_LENGTH_TEXT_FIELD)
                     : null;
                 String slackExceptionValue = (slackExceptionsList != null && !slackExceptionsList.isEmpty())
-                    ? slackExceptionsList.get(0).getMessage().abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH)
+                    ? slackExceptionsList.get(0).getMessage().abbreviate(ConfigUtil.MAX_LENGTH_TEXT_FIELD)
                     : null;
                 String teamsExceptionValue = (teamsExceptionsList != null && !teamsExceptionsList.isEmpty())
-                    ? teamsExceptionsList.get(0).getMessage().abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH)
+                    ? teamsExceptionsList.get(0).getMessage().abbreviate(ConfigUtil.MAX_LENGTH_TEXT_FIELD)
                     : null;
                 if(dfrEmailIntegrationStatus != null) {
                     PermissionsUtil.putSObjectField(failedRecord, dfrEmailIntegrationStatus, emailExceptionValue);
@@ -1980,7 +1980,7 @@ public with sharing class NotificationService {
         List<String> mergedMessages = renderMergeFields(recordId, new List<String>{action.Subject__c, action.Body__c}, new NotificationService.MergeFieldSettings(action.Action_Type__c));
         String subject = mergedMessages.get(0);
         String body = mergedMessages.get(1);
-        String message = subject + Constants.GLOBAL_VARIABLE.NEWLINE_CHARACTERS + body;
+        String message = subject + ConfigUtil.NEW_LINE_CARRIAGE_RETURN + body;
         SlackService.sendMessageToSlack(message, action.SlackChannels__c);
     }
 
@@ -2239,7 +2239,7 @@ public with sharing class NotificationService {
 
         private String formatLinkField(String objId) {
             if(String.isNotBlank(objId)) {
-                String link = Constants.GLOBAL_VARIABLE.BASE_URL + '/' + objId;
+                String link = ConfigUtil.BASE_URL + '/' + objId;
                 if (this.mergeFieldSettingsMap?.containsKey(objId)
                         && this.mergeFieldSettingsMap.get(objId).notificationContext == NotificationContext.AZURE_DEV_OPS) {
                     link = String.format(ADO_LINK_FORMAT, new List<String>{link});

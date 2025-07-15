@@ -254,7 +254,7 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
         String jobExtendedStatus = getJobExtendedStatus(asyncApexJob.ExtendedStatus);
         String area = BACKGROUND_JOB_TYPES.contains(asyncApexJob.JobType) ? AREA_BACKGROUND_JOB : AREA_ASYNC_APEX;
         if (String.isNotBlank(jobExtendedStatus)) {
-            Matcher matcher = Constants.GLOBAL_VARIABLE.PATTERN_SOBJECT_ID.matcher(jobExtendedStatus);
+            Matcher matcher = ConfigUtil.SOBJECT_ID_PATTERN.matcher(jobExtendedStatus);
             while (matcher.find()) {
                 try {
                     Id temporaryId = Id.valueOf(matcher.group());

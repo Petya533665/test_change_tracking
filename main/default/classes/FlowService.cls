@@ -1001,7 +1001,7 @@ public with sharing class FlowService {
 	public static String getRelatedId(String message) {
 		if (String.isBlank(message)) return null;
 		Set<String> relatedIds = new Set<String>();
-		Pattern p = Constants.GLOBAL_VARIABLE.PATTERN_SOBJECT_ID;
+		Pattern p = ConfigUtil.SOBJECT_ID_PATTERN;
 		Matcher pm = p.matcher(message);
 		while (pm.find()) {
 			relatedIds.add(pm.group(1));

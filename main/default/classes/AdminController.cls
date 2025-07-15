@@ -20,7 +20,7 @@ public with sharing class AdminController {
 
     public static String remoteSiteSettingsPayload {
         get {
-            StaticResource sr = [SELECT Body FROM StaticResource WHERE Name = :Constants.STATIC_RESOURCE_SOBJECT.RESOURCE_NAME_METADATA_REMOTE_SITE_PAYLOAD LIMIT 1];
+            StaticResource sr = [SELECT Body FROM StaticResource WHERE Name = :ConfigUtil.METADATA_REMOTE_SITE_PAYLOAD_RESOURCE_NAME LIMIT 1];
             return sr.Body.toString();
         }
         set;
@@ -336,6 +336,8 @@ public with sharing class AdminController {
                 response.data = AdminService.setChangeTrackingSettings(data);
             } else if (method == 'getChangeTrackingSettings') {
                 response.data = AdminService.getChangeTrackingSettings();
+            } else if (method == 'runChangeTracking') {
+                response.data = AdminService.runChangeTracking();
             } else if (method == 'getDefaultTeamsActionTemplate') {
                 response.data = AdminService.getDefaultTeamsActionTemplate();
             } else if (method == 'getIssueDefaultTeamsActionTemplate') {
@@ -386,8 +388,6 @@ public with sharing class AdminController {
                 );
             } else if (method.equals('importRules')) {
                 response.data = RuleExportImportService.importRules((String)request.get('data'));
-            } else if (method.equals('setupMetadataChatTrustedSite')) {
-                response.data = AdminService.setupMetadataChatTrustedSite();
             } else {
                 response.error = 'Action not found';
             }
@@ -396,7 +396,7 @@ public with sharing class AdminController {
             response.error = e.getMessage();
             response.stack = e.getStackTraceString();
             // don't log validation excpetions
-            if (!e?.getTypeName()?.contains('AdminServiceValidationException') && !e?.getTypeName()?.contains('RuleUtilValidationException')) {
+            if (!e?.getTypeName()?.contains('AdminServiceValidationException')) {
                 Logger.getInstance().addInternalError(e, AdminController.class.getName(), 'remoteActionHandler' + (String.isNotBlank(methodName) ? '.' + methodName : ''));
             }
         }

@@ -307,25 +307,25 @@ private class GraphAPIServiceTest {
         Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
         Map<String, Object> data = new Map<String, Object>();
 
-        MetadataServiceUtil.RemoteSiteSettingsWrapper wrapper1 = new MetadataServiceUtil.RemoteSiteSettingsWrapper();
+        AdminService.RemoteSiteSettingsWrapper wrapper1 = new AdminService.RemoteSiteSettingsWrapper();
         wrapper1.Id = 'siteid1';
         wrapper1.IsActive = true;
-        wrapper1.SiteName = Constants.REMOTE_SITE_SETTINGS.GIT_HUB_API_NAME;
-        wrapper1.EndpointUrl = Constants.REMOTE_SITE_SETTINGS.GIT_HUB_API_URL;
+        wrapper1.SiteName = ConfigUtil.REMOTE_SITE_SETTINGS_GIT_HUB_API_NAME;
+        wrapper1.EndpointUrl = ConfigUtil.REMOTE_SITE_SETTINGS_GIT_HUB_API_URL;
 
-		MetadataServiceUtil.RemoteSiteSettingsWrapper wrapper2 = new MetadataServiceUtil.RemoteSiteSettingsWrapper();
+		AdminService.RemoteSiteSettingsWrapper wrapper2 = new AdminService.RemoteSiteSettingsWrapper();
         wrapper2.Id = 'siteid2';
         wrapper2.IsActive = true;
-        wrapper2.SiteName = Constants.REMOTE_SITE_SETTINGS.GIT_HUB_NAME;
-        wrapper2.EndpointUrl = Constants.REMOTE_SITE_SETTINGS.GIT_HUB_URL;
+        wrapper2.SiteName = ConfigUtil.REMOTE_SITE_SETTINGS_GIT_HUB_NAME;
+        wrapper2.EndpointUrl = ConfigUtil.REMOTE_SITE_SETTINGS_GIT_HUB_URL;
 
-		MetadataServiceUtil.RemoteSiteSettingsWrapper wrapper3 = new MetadataServiceUtil.RemoteSiteSettingsWrapper();
+		AdminService.RemoteSiteSettingsWrapper wrapper3 = new AdminService.RemoteSiteSettingsWrapper();
         wrapper3.Id = 'siteid3';
         wrapper3.IsActive = true;
-        wrapper3.SiteName = Constants.REMOTE_SITE_SETTINGS.GIT_SFDX_API_NAME;
-        wrapper3.EndpointUrl = Constants.REMOTE_SITE_SETTINGS.GIT_SFDX_API_URL;
+        wrapper3.SiteName = ConfigUtil.REMOTE_SITE_SETTINGS_GIT_SFDX_API_NAME;
+        wrapper3.EndpointUrl = ConfigUtil.REMOTE_SITE_SETTINGS_GIT_SFDX_API_URL;
 
-        data.put(ConfigUtil.REMOTE_SITE_SETTINGS_KEY_RECORDS, new List<MetadataServiceUtil.RemoteSiteSettingsWrapper>{
+        data.put(ConfigUtil.REMOTE_SITE_SETTINGS_KEY_RECORDS, new List<AdminService.RemoteSiteSettingsWrapper>{
 			wrapper1,
 			wrapper2,
 			wrapper3

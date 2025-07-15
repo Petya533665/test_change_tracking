@@ -773,7 +773,7 @@ public with sharing class LogPostProcessingService {
 
 	public static Set<String> getRelatedIds(String errorMessage) {
 		Set<String> relatedIds = new Set<String>();
-		Pattern p = Constants.GLOBAL_VARIABLE.PATTERN_SOBJECT_ID;
+		Pattern p = ConfigUtil.SOBJECT_ID_PATTERN;
 		Matcher pm = p.matcher(errorMessage);
 		while (pm.find()) {
 			try {

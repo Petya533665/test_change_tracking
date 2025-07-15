@@ -747,7 +747,6 @@ public without sharing class JiraService {
         private final Map<String, JiraFieldTransformer> FIELD_TRANSFORMERS = new Map<String, JiraFieldTransformer>{
             'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes' => new MultiCheckboxTransformer(),
             'com.atlassian.jira.plugin.system.customfieldtypes:multiselect' => new MultiSelectTransformer(),
-            'com.atlassian.jira.plugin.system.customfieldtypes:select' => new SelectTransformer(),
             'com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons' => new RadioButtonTransformer(),
             'com.atlassian.jira.plugin.system.customfieldtypes:datepicker' => new DatePickerTransformer(),
             'com.atlassian.jira.plugin.system.customfieldtypes:datetime' => new DateTimeTransformer(),
@@ -825,7 +824,7 @@ public without sharing class JiraService {
         public virtual void putJiraTaskProperties(String issueKey, Id recordId) {
             Map<String, Object> bodyObject = new Map<String, Object>{
                 'id' => recordId,
-                'instance' => Constants.GLOBAL_VARIABLE.BASE_URL,
+                'instance' => ConfigUtil.BASE_URL,
                 'org_id' => UserInfo.getOrganizationId(),
                 'is_sandbox' => ConfigUtil.currentOrgIsSandbox,
                 'is_enabled' => true
@@ -1796,20 +1795,6 @@ public without sharing class JiraService {
                 if (String.isBlank(value?.trim())) {
                     return new JiraFieldValidationResult(false, 'Multi-select contains empty values');
                 }
-            }
-            return new JiraFieldValidationResult(true);
-        }
-    }
-
-    // Select transformer
-    public class SelectTransformer extends BaseJiraFieldTransformer {
-        public override Object transform(String rawValue) {
-            return new Map<String, String>{'id' => rawValue};
-        }
-
-        public override JiraFieldValidationResult validateInput(String rawValue) {
-            if (String.isBlank(rawValue)) {
-                return new JiraFieldValidationResult(false, 'Select value cannot be blank');
             }
             return new JiraFieldValidationResult(true);
         }
