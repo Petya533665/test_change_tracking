@@ -186,7 +186,7 @@ public with sharing class ConfigUtil {
 
     public static final String EMAIL_SERVICE_HANDLER_NAME = 'ErrorEmailHandler';
 
-
+    
 
     public static final Map<String, String> SF_REST_API_HEADERS {
         get {
