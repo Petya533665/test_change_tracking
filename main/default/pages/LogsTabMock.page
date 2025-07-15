@@ -1,0 +1,5 @@
+<apex:page showHeader="true" sidebar="false" controller="LogsTabMockController" lightningStyleSheets="true">
+    <p class="slds-text-body_regular">
+        This is a mock page for the Logs Charts tab. The tab configuration is working correctly!
+    </p>
+</apex:page>
