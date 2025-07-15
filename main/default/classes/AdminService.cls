@@ -1565,11 +1565,11 @@ public without sharing class AdminService {
         return getChangeTrackingSettings();
     }
 
-    public static Map<String, Boolean> runChangeTracking() {
+    public static Map<String, Boolean> pushGitChanges() {
         GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-        Boolean isBatchExecuted = DatabaseUtils.executeBatchWithLimitCheck('GitHubCommitBatch', batchInstance);
+        Boolean isExecuted = DatabaseUtils.executeBatchWithLimitCheck('GitHubCommitBatch', batchInstance);
         return new Map<String, Boolean>{
-            'changeTrackingRun' => isBatchExecuted
+            'changesPushed' => isExecuted
         };
     }
 
