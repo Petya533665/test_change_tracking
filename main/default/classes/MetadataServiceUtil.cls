@@ -276,7 +276,9 @@ public with sharing class MetadataServiceUtil {
     }
 
     public static void removeCspTrustedSite(String name) {
+        String prefixedName = ConfigUtil.prefixCurrentOrgNamespace(name);
         MetadataService.MetadataPort service = createMetadataPort();
-        service.deleteMetadata('CspTrustedSite', new List<String> {name});
+        List<MetadataService.DeleteResult> results = service.deleteMetadata('CspTrustedSite', new List<String>{prefixedName});
+        handleDeleteResults(results[0]);
     }
 }
