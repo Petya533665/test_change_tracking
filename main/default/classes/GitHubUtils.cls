@@ -54,7 +54,7 @@ public with sharing class GitHubUtils {
     }
 
     public static Boolean validateGitHubConnectionForChat() {
-        if (String.isBlank(GIT_USERNAME) || String.isBlank(GIT_REPONAME) || String.isBlank(ConfigUtil.GIT_API_SETTINGS.Branch_Name__c)) {
+        if (!ConfigUtil.GIT_API_SETTINGS.Enabled__c || String.isBlank(GIT_USERNAME) || String.isBlank(GIT_REPONAME) || String.isBlank(ConfigUtil.GIT_API_SETTINGS.Branch_Name__c)) {
             return false;
         }
 
