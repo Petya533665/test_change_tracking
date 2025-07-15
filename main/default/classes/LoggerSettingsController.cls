@@ -44,7 +44,7 @@ public with sharing class LoggerSettingsController {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(inputJson);
         Map<String, Object> output = new Map<String, Object>();
         try {
-            AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_SLACK_API_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_SLACK_API_URL, ConfigUtil.REMOTE_SITE_SETTINGS_SLACK_DESCRIPTION);
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.SLACK_API_NAME, Constants.REMOTE_SITE_SETTINGS.SLACK_API_URL, Constants.REMOTE_SITE_SETTINGS.SLACK_DESCRIPTION);
 
             OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(SLACK_SETTINGS_NAME);
             String clientId = (String.isNotBlank(ConfigUtil.PHAROS_SETTINGS.Slack_App_Client_Id__c))
@@ -82,8 +82,8 @@ public with sharing class LoggerSettingsController {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(inputJson);
         Map<String, Object> output = new Map<String, Object>();
         try {
-            AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_GRAPH_API_TOKEN_REQUEST_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_GRAPH_API_TOKEN_REQUEST_URL, ConfigUtil.REMOTE_SITE_SETTINGS_GRAPH_API_TOKEN_REQUEST_DESCRIPTION);
-            AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_GRAPH_API_REQUEST_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_GRAPH_API_REQUEST_URL, ConfigUtil.REMOTE_SITE_SETTINGS_GRAPH_API_REQUEST_DESCRIPTION);
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.GRAPH_API_TOKEN_REQUEST_NAME, Constants.REMOTE_SITE_SETTINGS.GRAPH_API_TOKEN_REQUEST_URL, Constants.REMOTE_SITE_SETTINGS.GRAPH_API_TOKEN_REQUEST_DESCRIPTION);
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.GRAPH_API_REQUEST_NAME, Constants.REMOTE_SITE_SETTINGS.GRAPH_API_REQUEST_URL, Constants.REMOTE_SITE_SETTINGS.GRAPH_API_REQUEST_DESCRIPTION);
 
             OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(GraphAPIService.GRAPH_API_SETTINGS_NAME);
             String endpoint = GraphAPIService.GRAPH_API_GET_TOKEN_ENDPOINT;
@@ -127,8 +127,8 @@ public with sharing class LoggerSettingsController {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(inputJson);
         Map<String, Object> output = new Map<String, Object>();
         try {
-            AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_AZURE_DO_API_TOKEN_REQUEST_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_AZURE_DO_API_TOKEN_REQUEST_URL, ConfigUtil.REMOTE_SITE_SETTINGS_AZURE_DO_API_TOKEN_REQUEST_DESCRIPTION);
-            AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_AZURE_DO_REST_API_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_AZURE_DO_REST_API_URL, ConfigUtil.REMOTE_SITE_SETTINGS_AZURE_DO_REST_API_DESCRIPTION);
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.AZURE_DO_API_TOKEN_REQUEST_NAME, Constants.REMOTE_SITE_SETTINGS.AZURE_DO_API_TOKEN_REQUEST_URL, Constants.REMOTE_SITE_SETTINGS.AZURE_DO_API_TOKEN_REQUEST_DESCRIPTION);
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.AZURE_DO_REST_API_NAME, Constants.REMOTE_SITE_SETTINGS.AZURE_DO_REST_API_URL, Constants.REMOTE_SITE_SETTINGS.AZURE_DO_REST_API_DESCRIPTION);
 
             OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(AzureService.AZURE_DEVOPS_API_SETTINGS_NAME);
             String extendedClientSecret = [SELECT Extended_Client_Secret__c FROM OAuthSettings__mdt WHERE DeveloperName =:AzureService.AZURE_DEVOPS_API_SETTINGS_NAME LIMIT 1].Extended_Client_Secret__c;
@@ -179,9 +179,9 @@ public with sharing class LoggerSettingsController {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(inputJson);
         Map<String, Object> output = new Map<String, Object>();
         try {
-            AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_GIT_HUB_API_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_GIT_HUB_API_URL, ConfigUtil.REMOTE_SITE_SETTINGS_GIT_HUB_API_DESCRIPTION);
-            AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_GIT_HUB_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_GIT_HUB_URL, ConfigUtil.REMOTE_SITE_SETTINGS_GIT_HUB_DESCRIPTION);
-            AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_GIT_SFDX_API_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_GIT_SFDX_API_URL, ConfigUtil.REMOTE_SITE_SETTINGS_GIT_SFDX_API_DESCRIPTION);
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.GIT_HUB_API_NAME, Constants.REMOTE_SITE_SETTINGS.GIT_HUB_API_URL, Constants.REMOTE_SITE_SETTINGS.GIT_HUB_API_DESCRIPTION);
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.GIT_HUB_NAME, Constants.REMOTE_SITE_SETTINGS.GIT_HUB_URL, Constants.REMOTE_SITE_SETTINGS.GIT_HUB_DESCRIPTION);
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.GIT_SFDX_API_NAME, Constants.REMOTE_SITE_SETTINGS.GIT_SFDX_API_URL, Constants.REMOTE_SITE_SETTINGS.GIT_SFDX_API_DESCRIPTION);
 
             OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(GitHubUtils.GIT_API_SETTINGS_NAME);
             String endpoint = GitHubUtils.GIT_API_TOKEN_ENDPOINT;
@@ -234,7 +234,7 @@ public with sharing class LoggerSettingsController {
     public static Object setSettingsForJiraSite (Object inputJson) {
         JiraService.JiraResourceWrapper jiraSite = (JiraService.JiraResourceWrapper)JSON.deserialize(JSON.serialize(inputJson), JiraService.JiraResourceWrapper.class);
         // remote site settings for cloud site url
-        AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_JIRA_NAME, jiraSite.url, ConfigUtil.REMOTE_SITE_SETTINGS_JIRA_DESCRIPTION);
+        AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.JIRA_NAME, jiraSite.url, Constants.REMOTE_SITE_SETTINGS.JIRA_DESCRIPTION);
         ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c = jiraSite.url;
         ConfigUtil.JIRA_SETTINGS.Jira_API_Url__c = ConfigUtil.JIRA_CLOUD_API_PREFIX + jiraSite.id;
         DatabaseUtils.getInstance().performUpsertDML(new List<Jira_Settings__c>{ConfigUtil.JIRA_SETTINGS}, Schema.SObjectType.Jira_Settings__c, true);
@@ -252,8 +252,8 @@ public with sharing class LoggerSettingsController {
         Map<String, Object> output = new Map<String, Object>();
         try {
             // remote site settings for cloud api / oauth endpoint
-            AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_JIRA_CLOUD_API_NAME, ConfigUtil.REMOTE_SITE_SETTINGS_JIRA_CLOUD_API_URL, ConfigUtil.REMOTE_SITE_SETTINGS_JIRA_CLOUD_API_DESCRIPTION);
-            AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_JIRA_CLOUD_OAUTH_NAME, JiraService.JIRA_CLOUD_OAUTH_ENDPOINT, ConfigUtil.REMOTE_SITE_SETTINGS_JIRA_CLOUD_OAUTH_DESCRIPTION);
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.JIRA_CLOUD_API_NAME, Constants.REMOTE_SITE_SETTINGS.JIRA_CLOUD_API_URL, Constants.REMOTE_SITE_SETTINGS.JIRA_CLOUD_API_DESCRIPTION);
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.JIRA_CLOUD_OAUTH_NAME, JiraService.JIRA_CLOUD_OAUTH_ENDPOINT, Constants.REMOTE_SITE_SETTINGS.JIRA_CLOUD_OAUTH_DESCRIPTION);
 
             OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(JiraService.JIRA_CLOUD_SETTINGS_NAME);
             String clientId = mdtSettings.Client_Id__c;
@@ -269,7 +269,7 @@ public with sharing class LoggerSettingsController {
             if(jiraSites.size() == 1) {
                 JiraService.JiraResourceWrapper jiraSite = jiraSites.get(0);
                 // remote site settings for cloud site url
-                AdminService.upsertRemoteSiteSetting(ConfigUtil.REMOTE_SITE_SETTINGS_JIRA_NAME, jiraSite.url, ConfigUtil.REMOTE_SITE_SETTINGS_JIRA_DESCRIPTION);
+                AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.JIRA_NAME, jiraSite.url, Constants.REMOTE_SITE_SETTINGS.JIRA_DESCRIPTION);
                 ConfigUtil.JIRA_SETTINGS.Jira_API_Url__c = ConfigUtil.JIRA_CLOUD_API_PREFIX + jiraSite.id;
                 ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c = jiraSite.url;
                 output.put('jiraSites', jiraSites);

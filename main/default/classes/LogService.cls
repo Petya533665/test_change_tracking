@@ -111,7 +111,7 @@ global with sharing class LogService {
         if (ConfigUtil.SETTINGS.Web_2_Lead_Parser_Enabled__c) {
             availableParsers.add('Web2LeadParser');
         }
-        if (ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == AdminService.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) {
+        if (ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) {
             availableParsers.add('Email2CaseParser');
         }
 
