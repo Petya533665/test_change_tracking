@@ -31,17 +31,17 @@ public with sharing class LogServiceScheduler implements Schedulable, Database.A
     }
 
     private static final Set<String> CRON_TRIGGER_NAMES = new Set<String>{
-            ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_NAME,
-            ConfigUtil.LOG_POST_PROCESSING_BATCH_SCHEDULER_NAME,
-            ConfigUtil.ERROR_EMAIL_REPORT_SCHEDULER_NAME,
-            ConfigUtil.MONITORING_SERVICE_SCHEDULER_NAME,
-            ConfigUtil.JIRA_RESOLUTION_SCHEDULER_NAME,
-            ConfigUtil.ARCHIVAL_SCHEDULER_NAME,
-            ConfigUtil.MANAGE_TOKENS_SERVICE_SCHEDULER1_NAME,
-            ConfigUtil.MANAGE_TOKENS_SERVICE_SCHEDULER2_NAME,
-            ConfigUtil.TRACE_BATCH_SERVICE_SCHEDULER_NAME,
-            ConfigUtil.DEBUG_LOG_SERVICE_SCHEDULER_CRON_EXP1,
-            ConfigUtil.DEBUG_LOG_SERVICE_SCHEDULER_CRON_EXP2
+            Constants.JOBS.JOB_NAME_PHAROS_LOG_SERVICE_SCHEDULER,
+            Constants.JOBS.JOB_NAME_LOG_POST_PROCESSING_BATCH_SCHEDULER,
+            Constants.JOBS.JOB_NAME_ERROR_EMAIL_REPORT_SCHEDULER,
+            Constants.JOBS.JOB_NAME_MONITORING_SERVICE_SCHEDULER,
+            Constants.JOBS.JOB_NAME_JIRA_RESOLUTION_SCHEDULER,
+            Constants.JOBS.JOB_NAME_ARCHIVAL_SCHEDULER,
+            Constants.JOBS.JOB_NAME_MANAGE_TOKENS_SERVICE_SCHEDULER1,
+            Constants.JOBS.JOB_NAME_MANAGE_TOKENS_SERVICE_SCHEDULER2,
+            Constants.JOBS.JOB_NAME_TRACE_BATCH_SERVICE_SCHEDULER,
+            Constants.JOBS.CRON_EXP_DEBUG_LOG_SERVICE_SCHEDULER_1,
+            Constants.JOBS.CRON_EXP_DEBUG_LOG_SERVICE_SCHEDULER_2
     };
 
     private static final Integer LOG_SERVICE_SCHEDULER_FREQUENCY_START_TIME = 15;
@@ -54,7 +54,7 @@ public with sharing class LogServiceScheduler implements Schedulable, Database.A
                 System.abortJob(cronTrigger.Id);
             } catch (StringException e) {}
         }
-        cronTriggers = [SELECT Id, CronExpression FROM CronTrigger WHERE CronJobDetail.Name = :ConfigUtil.PHAROS_BULK_API_SCHEDULER_NAME];
+        cronTriggers = [SELECT Id, CronExpression FROM CronTrigger WHERE CronJobDetail.Name = :Constants.JOBS.JOB_NAME_PHAROS_BULK_API_SCHEDULER];
         if (!cronTriggers.isEmpty() && MAP_EXPRESSIONS.containsKey(cronTriggers[0].CronExpression)) {
             ConfigUtil.PHAROS_SETTINGS.Archival_Scheduler_Cron_Exp__c = MAP_EXPRESSIONS.get(cronTriggers[0].CronExpression);
             upsert ConfigUtil.PHAROS_SETTINGS;
@@ -66,8 +66,8 @@ public with sharing class LogServiceScheduler implements Schedulable, Database.A
         if ([
                 SELECT COUNT()
                 FROM CronTrigger
-                WHERE CronJobDetail.Name = :ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME
-                OR CronJobDetail.Name = :ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME
+                WHERE CronJobDetail.Name = :Constants.JOBS.JOB_NAME_PHAROS_LOG_SERVICE_SCHEDULER_MODE_1
+                OR CronJobDetail.Name = :Constants.JOBS.JOB_NAME_PHAROS_LOG_SERVICE_SCHEDULER_MODE_2
         ] == 0) {
             runLogServiceSchedulerModes();
         }
@@ -81,15 +81,15 @@ public with sharing class LogServiceScheduler implements Schedulable, Database.A
         } catch (Exception e) {}
         if (frequency == null) frequency = LOG_SERVICE_SCHEDULER_FREQUENCY_START_TIME;
         AdminService.runScheduler(
-                ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME,
-                String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency)}),
-                String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency)}),
+                Constants.JOBS.JOB_NAME_PHAROS_LOG_SERVICE_SCHEDULER_MODE_1,
+                String.format(Constants.JOBS.CRON_EXP_PHAROS_LOG_SERVICE_SCHEDULER_MODE, new List<Object>{String.valueOf(frequency)}),
+                String.format(Constants.JOBS.CRON_EXP_PHAROS_LOG_SERVICE_SCHEDULER_MODE, new List<Object>{String.valueOf(frequency)}),
                 new LogServiceScheduler(LogServiceScheduler.SCHEDULER_MODE.SCHEDULER_MODE_1)
         );
         AdminService.runScheduler(
-                ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME,
-                String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency + 30)}),
-                String.format(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP, new List<Object>{String.valueOf(frequency + 30)}),
+                Constants.JOBS.JOB_NAME_PHAROS_LOG_SERVICE_SCHEDULER_MODE_2,
+                String.format(Constants.JOBS.CRON_EXP_PHAROS_LOG_SERVICE_SCHEDULER_MODE, new List<Object>{String.valueOf(frequency + 30)}),
+                String.format(Constants.JOBS.CRON_EXP_PHAROS_LOG_SERVICE_SCHEDULER_MODE, new List<Object>{String.valueOf(frequency + 30)}),
                 new LogServiceScheduler(LogServiceScheduler.SCHEDULER_MODE.SCHEDULER_MODE_2)
         );
     }

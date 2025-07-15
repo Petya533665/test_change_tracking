@@ -342,8 +342,8 @@ public with sharing class DatabaseUtils {
         return [
             SELECT Id
             FROM AsyncApexJob
-            WHERE Status IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_STATUS
-            AND JobType NOT IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_TYPES
+            WHERE Status IN :Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUSES
+            AND JobType NOT IN :Constants.JOBS.ASYNC_APEX_JOB_PROCESS_TYPES
             AND ApexClass.Name IN :apexClassNames
             LIMIT 1
         ];
@@ -354,7 +354,7 @@ public with sharing class DatabaseUtils {
             SELECT SUM(TotalJobItems) sumTotalJobItems
             FROM AsyncApexJob
             WHERE JobType = 'BatchApex'
-            AND Status IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_STATUS
+            AND Status IN :Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUSES
         ][0].get('sumTotalJobItems'));
     }
 

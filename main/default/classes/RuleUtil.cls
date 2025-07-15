@@ -1,6 +1,7 @@
 public with sharing class RuleUtil {
 
 	public class RuleUtilException extends Exception {}
+	public class RuleUtilValidationException extends Exception {}
 
 	// Error message templates
 	public static final String ERROR_RUNTIME_TYPE_INCOMPATIBLE_WITH_MERGE_FIELD = 'Runtime field ({0}) with type "{1}" is not compatible with JIRA field type "{2}" for field {3}.';
@@ -1502,7 +1503,7 @@ public with sharing class RuleUtil {
 							// Check if field is required
 							if (fieldRequired == true) {
 								String fieldRef = getFieldReference(fieldKey, fieldData);
-								throw new RuleUtilException(String.format(ERROR_REQUIRED_FIELD_BLANK, new List<String>{fieldRef}));
+								throw new RuleUtilValidationException(String.format(ERROR_REQUIRED_FIELD_BLANK, new List<String>{fieldRef}));
 							}
 							continue;
 						}
@@ -1512,13 +1513,13 @@ public with sharing class RuleUtil {
 					}
 				}
 			} catch (JSONException e) {
-				throw new RuleUtilException(String.format(ERROR_INVALID_JSON_FORMAT, new List<String>{e.getMessage()}));
+				throw new RuleUtilValidationException(String.format(ERROR_INVALID_JSON_FORMAT, new List<String>{e.getMessage()}));
 			} catch (Exception e) {
 				// Re-throw RuleUtilException as-is, wrap others
-				if (e instanceof RuleUtilException) {
+				if (e instanceof RuleUtilValidationException) {
 					throw e;
 				}
-				throw new RuleUtilException(String.format(ERROR_VALIDATING_METADATA, new List<String>{e.getMessage()}));
+				throw new RuleUtilValidationException(String.format(ERROR_VALIDATING_METADATA, new List<String>{e.getMessage()}));
 			}
 		}
 		

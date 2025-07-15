@@ -714,7 +714,7 @@ public class JiraNotificationBatchTest {
 
 	private static void assertRequestBodyHasWrappedLink(String endpoint, TestDataFactory.MultiRequestMock mockInstance, String recordId) {
 		String linkFormat = '<a href=\"{0}\" target=\"_blank\">{0}</a>';
-		String link = ConfigUtil.BASE_URL + '/' + recordId;
+		String link = Constants.GLOBAL_VARIABLE.BASE_URL + '/' + recordId;
 		String expectedValueLink = String.format(linkFormat, new List<String>{link}).escapeJava();
 		HttpRequest sendRequest = mockInstance.getRequest(endpoint);
 		String body = sendRequest.getBody();
@@ -1020,7 +1020,7 @@ public class JiraNotificationBatchTest {
 		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
 		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
 
-		Rule__c testRule = createTicketingCommentRule(isJira, ConfigUtil.ISSUE_SOBJECT_NAME);
+		Rule__c testRule = createTicketingCommentRule(isJira, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 
 		createRuleFilterOnUpdate(testRule);
 
@@ -1062,11 +1062,11 @@ public class JiraNotificationBatchTest {
 	}
 
 	private static void createTraceResultTeamsNotificationRule() {
-		TestDataFactory.createNotificationRule(TestDataFactory.createTeamsAction(ConfigUtil.TRACE_RESULT_SOBJECT_NAME),ConfigUtil.TRACE_RESULT_SOBJECT_NAME, ConfigUtil.ISSUE_SOBJECT_NAME);
+		TestDataFactory.createNotificationRule(TestDataFactory.createTeamsAction(Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME),Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 	}
 
 	private static Rule__c createIssueTeamsNotificationRule() {
-		return TestDataFactory.createNotificationRule(TestDataFactory.createTeamsAction(ConfigUtil.ISSUE_SOBJECT_NAME), ConfigUtil.ISSUE_SOBJECT_NAME);
+		return TestDataFactory.createNotificationRule(TestDataFactory.createTeamsAction(Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME), Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 	}
 
 	private static void createTeamsNotificationRule() {
@@ -1074,15 +1074,15 @@ public class JiraNotificationBatchTest {
 	}
 
 	private static Rule__c createIssueSlackNotificationRule(Boolean isUpdateCase) {
-		return TestDataFactory.createNotificationRule(TestDataFactory.createSlackAction(ConfigUtil.ISSUE_SOBJECT_NAME), ConfigUtil.ISSUE_SOBJECT_NAME, null, isUpdateCase);
+		return TestDataFactory.createNotificationRule(TestDataFactory.createSlackAction(Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME), Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME, null, isUpdateCase);
 	}
 
 	private static Rule__c createTraceResultSlackNotificationRule() {
-		return TestDataFactory.createNotificationRule(TestDataFactory.createSlackAction(ConfigUtil.TRACE_RESULT_SOBJECT_NAME),ConfigUtil.TRACE_RESULT_SOBJECT_NAME, ConfigUtil.ISSUE_SOBJECT_NAME);
+		return TestDataFactory.createNotificationRule(TestDataFactory.createSlackAction(Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME),Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 	}
 
 	private static Rule__c createTraceResultSlackNotificationRuleOnUpdate() {
-		return TestDataFactory.createNotificationRule(TestDataFactory.createSlackAction(ConfigUtil.TRACE_RESULT_SOBJECT_NAME),ConfigUtil.TRACE_RESULT_SOBJECT_NAME, null);
+		return TestDataFactory.createNotificationRule(TestDataFactory.createSlackAction(Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME),Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME, null);
 	}
 
 	private static Rule__c createSlackNotificationRule() {
@@ -1090,7 +1090,7 @@ public class JiraNotificationBatchTest {
 	}
 
 	private static Rule__c createIssueEmailNotificationRule() {
-		return TestDataFactory.createNotificationRule(TestDataFactory.createEmailAction(ConfigUtil.ISSUE_SOBJECT_NAME), ConfigUtil.ISSUE_SOBJECT_NAME);
+		return TestDataFactory.createNotificationRule(TestDataFactory.createEmailAction(Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME), Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 	}
 
 	private static void createEmailNotificationRule() {
@@ -1098,7 +1098,7 @@ public class JiraNotificationBatchTest {
 	}
 
 	private static Rule__c createIssuePagerDutyNotificationRule(String pagerDutyType) {
-		return TestDataFactory.createNotificationRule(TestDataFactory.createPagerDutyAction(pagerDutyType, ConfigUtil.ISSUE_SOBJECT_NAME), ConfigUtil.ISSUE_SOBJECT_NAME);
+		return TestDataFactory.createNotificationRule(TestDataFactory.createPagerDutyAction(pagerDutyType, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME), Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 	}
 
 	private static Rule__c createPagerDutyNotificationRule(String pagerDutyType) {
@@ -1319,7 +1319,7 @@ public class JiraNotificationBatchTest {
 		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
 		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
 
-		Action__c testAction = getTicketingAction(isJira, ConfigUtil.ISSUE_SOBJECT_NAME);
+		Action__c testAction = getTicketingAction(isJira, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 
 		if(isCustomJiraUiEndpoint) {
 			List<JiraService.JiraSettingsSObjectWrapper> records = new List<JiraService.JiraSettingsSObjectWrapper>{
@@ -1371,7 +1371,7 @@ public class JiraNotificationBatchTest {
 		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
 		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
 
-		createTicketingRule(isJira, ConfigUtil.ISSUE_SOBJECT_NAME);
+		createTicketingRule(isJira, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 
 		Test.startTest();
 
@@ -1431,7 +1431,7 @@ public class JiraNotificationBatchTest {
 		System.assertEquals(null, issue.Bug_Tracker__c);
 		System.assertEquals(null, issue.Jira_Integration_Status__c);
 
-		createTicketingRule(true, ConfigUtil.ISSUE_SOBJECT_NAME);
+		createTicketingRule(true, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 
 		Test.startTest();
 
@@ -1459,7 +1459,7 @@ public class JiraNotificationBatchTest {
 
 		TestDataFactory.enableIssueTracking();
 		TestDataFactory.enableMaxJiraRules();
-		createTicketingRule(true, ConfigUtil.ISSUE_SOBJECT_NAME);
+		createTicketingRule(true, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 
 		Log__c log = IssueTriggerHandlerTest.createPharosLog('hash1', 'hash2', 'hash3');
 		insert log;
@@ -1505,7 +1505,7 @@ public class JiraNotificationBatchTest {
 
 		Issue__c issue = [SELECT Id, Bug_Tracker__c, Status__c, Jira_Integration_Status__c, Executable_Rules__c FROM Issue__c WHERE Log__c = :log.Id];
 
-		Rule__c rule = createTicketingRule(true, ConfigUtil.ISSUE_SOBJECT_NAME);
+		Rule__c rule = createTicketingRule(true, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 		MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
 
 		NotificationService.ExecutableRulesConfig config = NotificationService.getExecutableRuleConfig(issue);
@@ -1553,7 +1553,7 @@ public class JiraNotificationBatchTest {
 		multiCalloutMock.setEndpointError(newTicketEndpoint, TicketingService.AZURE_DEV_OPS_ERROR_CREATE_TAGS);
 		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
 		
-		createTicketingRule(false, ConfigUtil.ISSUE_SOBJECT_NAME);
+		createTicketingRule(false, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 
 		Test.startTest();
 
@@ -2280,8 +2280,8 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_render_merge_fields() {
 		List<String> mergedMessages;
-		String subject = TemplateUtil.LOG_SOBJECT.DEFAULT_JIRA_ACTION.get('subject');
-		String body = TemplateUtil.LOG_SOBJECT.DEFAULT_JIRA_ACTION.get('body');
+		String subject = Templates.LOG_SOBJECT.DEFAULT_JIRA_ACTION.get('subject');
+		String body = Templates.LOG_SOBJECT.DEFAULT_JIRA_ACTION.get('body');
 
 		String relationsBody = String.format(
 			'Issue: \'{!\'{0}.{1}.{2}\'}\'',
@@ -8849,7 +8849,7 @@ public class JiraNotificationBatchTest {
 		TestDataFactory.createSlackSettings();
 		TestDataFactory.enableMaxJiraRules();
 		Rule__c slackRule = createTestSlackRule();
-		Rule__c jiraRule = createTicketingCommentRule(true, ConfigUtil.ISSUE_SOBJECT_NAME);
+		Rule__c jiraRule = createTicketingCommentRule(true, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 
 		// Create direct Issue__c processing record with PENDING status to trigger batch
 		Issue__c testIssue = new Issue__c();
@@ -8900,7 +8900,7 @@ public class JiraNotificationBatchTest {
 		TestDataFactory.createSlackSettings();
 		TestDataFactory.enableMaxJiraRules();
 		Rule__c slackRule = createTestSlackRule();
-		Rule__c jiraRule = createTicketingCommentRule(true, ConfigUtil.TRACE_RESULT_SOBJECT_NAME);
+		Rule__c jiraRule = createTicketingCommentRule(true, Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME);
 
 		// Create Issue first (required for Trace_Result__c)
 		Issue__c parentIssue = new Issue__c();
@@ -9004,7 +9004,7 @@ public class JiraNotificationBatchTest {
 		TestDataFactory.createSlackSettings();
 		TestDataFactory.enableMaxJiraRules();
 		Rule__c slackRule = createTestSlackRule();
-		Rule__c jiraRule = createTicketingCommentRule(true, ConfigUtil.ISSUE_SOBJECT_NAME);
+		Rule__c jiraRule = createTicketingCommentRule(true, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 
 		// Create direct Issue__c processing record
 		Issue__c testIssue = new Issue__c();
@@ -9055,7 +9055,7 @@ public class JiraNotificationBatchTest {
 		TestDataFactory.createSlackSettings();
 		TestDataFactory.enableMaxJiraRules();
 		Rule__c slackRule = createTestSlackRule();
-		Rule__c jiraRule = createTicketingCommentRule(true, ConfigUtil.TRACE_RESULT_SOBJECT_NAME);
+		Rule__c jiraRule = createTicketingCommentRule(true, Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME);
 
 		// Create Issue first (required for Trace_Result__c)
 		Issue__c parentIssue = new Issue__c();
@@ -9703,7 +9703,7 @@ public class JiraNotificationBatchTest {
 		Test.startTest();
 
 		Rule__c testRule = TestDataFactory.createNotificationRule(
-			TestDataFactory.createEmailAction(ConfigUtil.ISSUE_SOBJECT_NAME), ConfigUtil.ISSUE_SOBJECT_NAME, null, false);
+			TestDataFactory.createEmailAction(Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME), Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME, null, false);
 	
 		Id emailActionId = [SELECT Id, Action__c FROM RuleAction__c WHERE Rule__c = :testRule.Id AND Action__r.Action_Type__c = :MonitoringUtil.ACTION_TYPE_EMAIL_NOTIFICATION LIMIT 1].Action__c;
 		

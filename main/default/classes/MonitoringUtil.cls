@@ -1,5 +1,6 @@
 public with sharing class MonitoringUtil {
 
+    public static final Integer EVENT_CHART_MAX_RECORDS = 9000;
     public static final String EVENT_RT_MONITORING = 'Monitoring';
     public static final String EVENT_RT_ARCHIVAL = 'Archival';
 
@@ -1896,10 +1897,10 @@ public with sharing class MonitoringUtil {
             Boolean isLogField = sobjectType == null
                 && String.isNotBlank(this.fieldName)
                 && ConfigUtil.MAP_LOG_FIELDS.get(this.fieldName.toLowerCase()) != null;
-            Boolean isIssueField = (sobjectType == ConfigUtil.ISSUE_SOBJECT_NAME || sobjectType == ConfigUtil.TRACE_RESULT_SOBJECT_NAME)
+            Boolean isIssueField = (sobjectType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME || sobjectType == Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME)
                 && String.isNotBlank(this.fieldName)
                 && ConfigUtil.MAP_ISSUE_FIELDS.get(this.fieldName.toLowerCase()) != null;
-            Boolean isTraceResultField = sobjectType == ConfigUtil.TRACE_RESULT_SOBJECT_NAME
+            Boolean isTraceResultField = sobjectType == Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME
                 && String.isNotBlank(this.fieldName)
                 && ConfigUtil.MAP_TRACE_RESULT_FIELDS.get(this.fieldName.toLowerCase()) != null;
 
@@ -2242,7 +2243,7 @@ public with sharing class MonitoringUtil {
                 .add(QBuilder.condition('Created_At__c').isGreaterOrEquals(':startTime'))
                 .add(QBuilder.condition('Created_At__c').isLessOrEquals(':endTime'))
                 .add(QBuilder.orderBy('Created_At__c').ascending())
-                .addLimit(ConfigUtil.EVENT_CHART_MAX_RECORDS)
+                .addLimit(EVENT_CHART_MAX_RECORDS)
                 .build();
             ChartData resultData = new ChartData();
             for(Log__c log : rules.get(0).applyRuleFilters(Database.query(eventLogsQuery))) {
@@ -2268,8 +2269,8 @@ public with sharing class MonitoringUtil {
         DateTime eventEndDate = event.CreatedDate;
         DateTime eventStartDate = eventEndDate.addMinutes(-eventInterval);
 
-        List<Log__c> logsBeforeEvent = getLogs(rules, startTime, eventStartDate, ConfigUtil.EVENT_CHART_MAX_RECORDS/2);
-        List<Log__c> logsAfterEvent = getLogs(rules, eventEndDate, endTime, ConfigUtil.EVENT_CHART_MAX_RECORDS/2);
+        List<Log__c> logsBeforeEvent = getLogs(rules, startTime, eventStartDate, EVENT_CHART_MAX_RECORDS/2);
+        List<Log__c> logsAfterEvent = getLogs(rules, eventEndDate, endTime, EVENT_CHART_MAX_RECORDS/2);
         Map<Long, List<Log__c>> logsBefore = (stdInterval) ? splitLogsBySeconds(logsBeforeEvent) : splitLogsByInterval(eventInterval, logsBeforeEvent);
         Map<Long, List<Log__c>> logsAfter = (stdInterval) ? splitLogsBySeconds(logsAfterEvent) : splitLogsByInterval(eventInterval, logsAfterEvent);
 
@@ -2278,7 +2279,7 @@ public with sharing class MonitoringUtil {
         String eventLogsQuery = new QBuilder(Log__c.SObjectType)
             .selectFields(new Set<String>(logFields))
             .add(QBuilder.condition('Id').isIn(':eventRecordIds'))
-            .addLimit(ConfigUtil.EVENT_CHART_MAX_RECORDS)
+            .addLimit(EVENT_CHART_MAX_RECORDS)
             .build();
         List<Log__c> eventLogs = Database.query(eventLogsQuery);
         Map<Long, List<Log__c>> logsEvent = new Map<Long, List<Log__c>>{eventEndDate.getTime() => eventLogs};
