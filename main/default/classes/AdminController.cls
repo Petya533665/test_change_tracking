@@ -386,10 +386,8 @@ public with sharing class AdminController {
                 );
             } else if (method.equals('importRules')) {
                 response.data = RuleExportImportService.importRules((String)request.get('data'));
-            } else if (method.equals('getMetadataChatSettings')) {
-                response.data = AdminService.getMetadataChatSettings();
-            } else if (method.equals('setMetadataChatSettings')) {
-                response.data = AdminService.setMetadataChatSettings(data);
+            } else if (method.equals('setupMetadataChatTrustedSite')) {
+                response.data = AdminService.setupMetadataChatTrustedSite();
             } else {
                 response.error = 'Action not found';
             }

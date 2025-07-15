@@ -2824,7 +2824,7 @@ public without sharing class AdminService {
                 // validate rule filter values
                 try {
                     List<SObject> testData = generateSObjectsForEvaluateRuleFilters(mRuleWrapper);
-                    Schema.SObjectField ruleSubType = (mRuleWrapper.ruleSubType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME)
+                    Schema.SObjectField ruleSubType = (mRuleWrapper.ruleSubType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME) 
                         ? Trace_Result__c.Issue__c.getDescribe().getSObjectField()
                         : null;
                     mRuleWrapper.applyNotificationRules(testData, ruleSubType);
@@ -2939,7 +2939,7 @@ public without sharing class AdminService {
     public static List<SObject> generateSObjectsForEvaluateRuleFilters(MonitoringUtil.MonitoringRule rule) {
         List<SObject> result = new List<SObject>();
 
-        Schema.SObjectField ruleSubType = (rule.ruleSubType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME)
+        Schema.SObjectField ruleSubType = (rule.ruleSubType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME) 
             ? Trace_Result__c.Issue__c.getDescribe().getSObjectField()
             : null;
         String sobjectType = rule.sobjectType == null ? Schema.SObjectType.Log__c.getName() : rule.sobjectType;
@@ -3768,29 +3768,8 @@ public without sharing class AdminService {
         return [SELECT Name FROM User WHERE Id IN :userIds];
     }
 
-    public class MetadataChatSettings {
-        public Boolean trustedSiteReady;
-
-        public MetadataChatSettings(Boolean trustedSiteReady) {
-            this.trustedSiteReady = trustedSiteReady;
-        }
-    }
-
-    public static MetadataChatSettings getMetadataChatSettings() {
-        Map<String, MetadataServiceUtil.CspTrustedSiteWrapper> trustedSites = MetadataServiceUtil.getCspTrustedSitesMap();
-        Boolean trustedSiteReady = trustedSites.containsKey('wss://chat.pharos.ai');
-        return new MetadataChatSettings(trustedSiteReady);
-    }
-
-    public static MetadataChatSettings setMetadataChatSettings(Object data) {
-        Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
-        Boolean enable = (Boolean)input.get('enable');
-        if (enable) {
-            MetadataServiceUtil.upsertCspTrustedSite('Pharos_Chat_Websocket', 'wss://chat.pharos.ai', 'Pharos chat websocket connection');
-            return new MetadataChatSettings(true);
-        } else {
-            MetadataServiceUtil.removeCspTrustedSite('Pharos_Chat_Websocket');
-            return new MetadataChatSettings(false);
-        }
+    public static Map<String, Boolean> setupMetadataChatTrustedSite() {
+        MetadataServiceUtil.upsertCspTrustedSite('Pharos_Chat_Websocket', 'wss://chat.pharos.ai', 'Pharos chat websocket connection');
+        return new Map<String, Boolean>{'trustedSiteReady' => true};
     }
 }
