@@ -13177,33 +13177,4 @@ public with sharing class MetadataService {
             return response_x.result;
         }
     }
-
-    public class CspTrustedSite extends Metadata {
-        public String type = 'CspTrustedSite';
-        public String fullName;
-        public String context;
-        public String description;
-        public String endpointUrl;
-        public Boolean isActive;
-        public Boolean isApplicableToConnectSrc;
-        public Boolean isApplicableToFontSrc;
-        public Boolean isApplicableToFrameSrc;
-        public Boolean isApplicableToImgSrc;
-        public Boolean isApplicableToMediaSrc;
-        public Boolean isApplicableToStyleSrc;
-        private String[] fullName_type_info = new String[]{'fullName',SOAP_M_URI,null,'0','1','false'};
-        private String[] context_type_info = new String[]{'context',SOAP_M_URI,null,'0','1','false'};
-        private String[] description_type_info = new String[]{'description',SOAP_M_URI,null,'0','1','false'};
-        private String[] endpointUrl_type_info = new String[]{'endpointUrl',SOAP_M_URI,null,'1','1','false'};
-        private String[] isActive_type_info = new String[]{'isActive',SOAP_M_URI,null,'1','1','false'};
-        private String[] isApplicableToConnectSrc_type_info = new String[]{'isApplicableToConnectSrc',SOAP_M_URI,null,'0','1','false'};
-        private String[] isApplicableToFontSrc_type_info = new String[]{'isApplicableToFontSrc',SOAP_M_URI,null,'0','1','false'};
-        private String[] isApplicableToFrameSrc_type_info = new String[]{'isApplicableToFrameSrc',SOAP_M_URI,null,'0','1','false'};
-        private String[] isApplicableToImgSrc_type_info = new String[]{'isApplicableToImgSrc',SOAP_M_URI,null,'0','1','false'};
-        private String[] isApplicableToMediaSrc_type_info = new String[]{'isApplicableToMediaSrc',SOAP_M_URI,null,'0','1','false'};
-        private String[] isApplicableToStyleSrc_type_info = new String[]{'isApplicableToStyleSrc',SOAP_M_URI,null,'0','1','false'};
-        private String[] apex_schema_type_info = new String[]{SOAP_M_URI,'true','false'};
-        private String[] type_att_info = new String[]{'xsi:type'};
-        private String[] field_order_type_info = new String[]{'fullName','context','description','endpointUrl','isActive','isApplicableToConnectSrc','isApplicableToFontSrc','isApplicableToFrameSrc','isApplicableToImgSrc','isApplicableToMediaSrc','isApplicableToStyleSrc'};
-    }
 }

@@ -218,12 +218,12 @@ public with sharing class ConnectedOrgService {
     public static void createRemoteSiteSettingInstance(String organizationId15, String instanceUrl, String title, String accessToken) {
         MetadataService.RemoteSiteSetting rssInstance;
         try {
-            rssInstance = MetadataServiceUtil.createRemoteSiteSettingInstance(
+            rssInstance = AdminService.createRemoteSiteSettingInstance(
                     AdminService.CONNECTED_ORG_REMOTE_SITE_SETTINGS_NAME + organizationId15,
                     instanceUrl,
                     'Pharos.ai login URL for connected org ' + title + ' (' + organizationId15 + ')'
             );
-            MetadataServiceUtil.upsertRemoteSiteSettingsMetadata(rssInstance, accessToken);
+            AdminService.upsertRemoteSiteSettingsMetadata(rssInstance, accessToken);
         }
         catch (Exception e) {
             throw new ConnectedOrgServiceException('RemoteSiteSetting creation error: ' + e.getMessage());

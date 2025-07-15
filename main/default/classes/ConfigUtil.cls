@@ -1,8 +1,14 @@
 public with sharing class ConfigUtil {
 
     public static final String PHAROS_APP_SETTINGS_NAME = 'Pharos';
+    public static final Integer EVENT_CHART_MAX_RECORDS = 9000;
+    public static final Integer MAX_LENGTH_TEXT_FIELD = 255;
+    public static final String NEW_LINE_CARRIAGE_RETURN = '\r\n';
 
     public static Logger_Settings__c SETTINGS = Logger_Settings__c.getOrgDefaults();
+
+    public static String ISSUE_SOBJECT_NAME = Schema.SObjectType.Issue__c.getName();
+    public static String TRACE_RESULT_SOBJECT_NAME = Schema.SObjectType.Trace_Result__c.getName();
 
     public static Map<String, Schema.SObjectType> MAP_GD {
         get {
@@ -135,8 +141,14 @@ public with sharing class ConfigUtil {
 
     //From Logger
 
+    public static final String ERROR_EMAIL_SERVICE_ADDRESS_NOT_FOUND = 'Email Service Address not found';
     public static final String JIRA_CLOUD_API_PREFIX = 'https://api.atlassian.com/ex/jira/';
     public static final String JIRA_CLOUD_API_RESOURCES_ENDPOINT = 'https://api.atlassian.com/oauth/token/accessible-resources';
+    public static final String REMOTE_SITE_SETTINGS_JIRA_CLOUD_API_NAME = 'Pharos_ai_JIRA_CLOUD_API_URL';
+    public static final String REMOTE_SITE_SETTINGS_JIRA_CLOUD_API_DESCRIPTION = 'Pharos.ai - Jira integration API login URL';
+    public static final String REMOTE_SITE_SETTINGS_JIRA_CLOUD_API_URL = 'https://api.atlassian.com';
+    public static final String REMOTE_SITE_SETTINGS_JIRA_CLOUD_OAUTH_NAME = 'Pharos_ai_JIRA_CLOUD_OAUTH_URL';
+    public static final String REMOTE_SITE_SETTINGS_JIRA_CLOUD_OAUTH_DESCRIPTION = 'Pharos.ai - Jira integration OAuth URL';
 
     // From JiraService
     public static final String JIRA_TASK_URL = ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c + '/browse/';
@@ -146,13 +158,14 @@ public with sharing class ConfigUtil {
 
     // From AdminService
     public static final Set<String> MERGE_FIELDS_SKIP_FIELD_NAMES = new Set<String> {'isdeleted'};
+    public static final String BASE_URL = System.Url.getOrgDomainUrl().toExternalForm();
     public static final String SOAP_ENDPOINT_PREFIX = '/services/Soap/m/';
     public static final String REST_API_ITEMS_KEY_NEXT_RECORDS_URL = 'nextRecordsUrl';
     public static final String TOOLING_ITEMS_KEY_RECORDS = 'records';
     public static final String TOOLING_ITEMS_KEY_SOBJECTS = 'sobjects';
     public static final String API_VERSION = 'v56.0';
     public static final String REMOTE_TOOLING_API_ENDPOINT = '/services/data/'+API_VERSION+'/tooling';
-    public static final String TOOLING_API_ENDPOINT = Constants.GLOBAL_VARIABLE.BASE_URL + '/services/data/'+API_VERSION+'/tooling';
+    public static final String TOOLING_API_ENDPOINT = BASE_URL + '/services/data/'+API_VERSION+'/tooling';
     public static final String QUERY_REST_API_PATH = '/services/data/'+API_VERSION+'/query?q=';
     public static String getQueryRestApiPath(String version){
         return '/services/data/'+version+'/query?q=';
@@ -171,22 +184,46 @@ public with sharing class ConfigUtil {
 
     public static final String TOOLING_API_UPDATE_DEBUG_LOG_LEVEL = TOOLING_API_ENDPOINT + '/sobjects/DebugLevel';
     public static final String TOOLING_API_UPDATE_TRACE_FLAG = TOOLING_API_ENDPOINT + '/sobjects/TraceFlag';
-    public static final String REST_COMPOSITE_API_DELETE_RECORDS = Constants.GLOBAL_VARIABLE.BASE_URL + '/services/data/'+API_VERSION+'/composite/sobjects?ids=';
+    public static final String REST_COMPOSITE_API_DELETE_RECORDS = BASE_URL + '/services/data/'+API_VERSION+'/composite/sobjects?ids=';
     public static final String TOOLING_QUERY_GET_EMAIL_APEX_EMAIL_NOTIFICATION = 'SELECT+Id,+Email+FROM+ApexEmailNotification+WHERE+UserId=null';
     public static final String TOOLING_API_CREATE_APEX_EMAIL_NOTIFICATION = TOOLING_API_ENDPOINT + '/sobjects/ApexEmailNotification';
     public static final String TOOLING_API_UPDATE_APEX_EMAIL_NOTIFICATION = TOOLING_API_CREATE_APEX_EMAIL_NOTIFICATION + '/';
     public static final String TOOLING_API_UPDATE_PLATFORM_EVENT_SUBSCRIBER_CONFIG = '/services/data/'+API_VERSION+'/tooling/sobjects/PlatformEventSubscriberConfig';
     public static final String TOOLING_API_GET_FLOW = '/services/data/'+API_VERSION+'/tooling/sobjects/Flow/';
     public static final String OVERRIDE_HTTP_METHOD_PATCH = '?_HttpMethod=PATCH';
-    public static final String EMAIL_SERVICES_FUNCTION_ENDPOINT = Constants.GLOBAL_VARIABLE.BASE_URL + '/services/data/'+API_VERSION+'/sobjects/EmailServicesFunction';
-    public static final String EMAIL_SERVICES_ADDRESS_ENDPOINT = Constants.GLOBAL_VARIABLE.BASE_URL + '/services/data/'+API_VERSION+'/sobjects/EmailServicesAddress';
+    public static final String EMAIL_SERVICES_FUNCTION_ENDPOINT = BASE_URL + '/services/data/'+API_VERSION+'/sobjects/EmailServicesFunction';
+    public static final String EMAIL_SERVICES_ADDRESS_ENDPOINT = BASE_URL + '/services/data/'+API_VERSION+'/sobjects/EmailServicesAddress';
     public static final String EMAIL_SERVICES_ADDRESS_DEVELOPER_NAME = 'ErrorEmailHandlerAddress';
+    public static final String FAILED_NO_ERRORS_MESSAGE = 'Request failed with no specified error.';
+    public static final String MANY_EMAIL_SERVICE_FOUND_MESSAGE = 'There are many Email Services. Please remove all except one.';
     public static final String APEXUTILSOURCE_NOT_FOUND_MESSAGE = 'Static Resource with name ApexUtilSource not found';
     public static final String APEXUTILTESTSOURCE_NOT_FOUND_MESSAGE = 'Static Resource with name ApexUtilTestSource not found';
-
+    public static final String PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME = 'PharosLogServiceSchedulerMode1';
+    public static final String PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME = 'PharosLogServiceSchedulerMode2';
+    public static final String LOG_POST_PROCESSING_BATCH_SCHEDULER_NAME = 'LogPostProcessingBatchScheduler';
+    public static final String PHAROS_LOG_SERVICE_SCHEDULER_NAME = 'PharosLogServiceScheduler';
+    public static final String ERROR_EMAIL_REPORT_SCHEDULER_NAME = 'ErrorEmailReportScheduler';
+    public static final String PHAROS_LOG_SERVICE_SCHEDULER_ONCE_NAME = 'PharosLogServiceSchedulerOnce';
+    public static final String PHAROS_BULK_API_SCHEDULER_NAME = 'Pharos Bulk API';
+    public static final String MONITORING_SERVICE_SCHEDULER_NAME = 'MonitoringServiceScheduler';
+	public static final String JIRA_RESOLUTION_SCHEDULER_NAME = 'JiraResolutionServiceScheduler';
+    public static final String ARCHIVAL_SCHEDULER_NAME = 'ArchivalServiceScheduler';
+    public static final String MANAGE_TOKENS_SERVICE_SCHEDULER1_NAME = 'ManageTokensServiceScheduler1';
+    public static final String MANAGE_TOKENS_SERVICE_SCHEDULER2_NAME = 'ManageTokensServiceScheduler2';
+    public static final String APEX_UTIL_RESOURCE_NAME = 'ApexUtilSource';
+    public static final String APEX_UTIL_TEST_RESOURCE_NAME = 'ApexUtilTestSource';
+    public static final String METADATA_CONNECTED_APP_PAYLOAD_RESOURCE_NAME = 'ConnectedAppMetadataPayload';
+    public static final String METADATA_REMOTE_SITE_PAYLOAD_RESOURCE_NAME = 'RemoteSiteSettingsPayload';
     public static final String EMAIL_SERVICE_HANDLER_NAME = 'ErrorEmailHandler';
+    public static final String DEFAULT_ACTION_EMAIL_TEMPLATE_NAME = 'Default_Notification_Template';
+    public static final String DEBUG_LOG_SERVICE_SCHEDULER1_NAME = 'DebugLogServiceScheduler1';
+    public static final String DEBUG_LOG_SERVICE_SCHEDULER2_NAME = 'DebugLogServiceScheduler2';
+    public static final String TRACE_BATCH_SERVICE_SCHEDULER_NAME = 'TraceBatchServiceScheduler';
 
-    
+    public static final Set<String> PHAROS_LOG_SERVICE_SCHEDULER_MODE_NAMES = new Set<String>{
+        PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME,
+        PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME
+    };
 
     public static final Map<String, String> SF_REST_API_HEADERS {
         get {
@@ -198,6 +235,27 @@ public with sharing class ConfigUtil {
         }
         set;
     }
+
+    // From JIraTaskController
+    public static final String JIRA_TASK_NOT_FOUND_MESSAGE = 'JIRA Task not found. Do you want to create new one?';
+    public static final String JIRA_SETTINGS_NOT_FOUND_MESSAGE = 'JIRA Settings not found.';
+
+    // From LogDashboardController
+    public static final String DAYS_7_OPTION = 'last 7 days';
+    public static final String DAYS_30_OPTION = 'last 30 days';
+    public static final String DAYS_60_OPTION = 'last 60 days';
+    public static final String DAYS_180_OPTION = 'last 6 months';
+
+    public static final String CHART_SAME_STACKTRACE_OPTION = 'Same stack trace';
+    public static final String CHART_SIMILAR_STACKTRACE_OPTION = 'Similar stack trace and same method';
+    //===timing tab
+    public static final String STEP_1_OPTION = '1min';
+    public static final String STEP_5_OPTION = '5min';
+    public static final String STEP_10_OPTION = '10min';
+
+    public static final String RANGE_10_OPTION = '10min';
+    public static final String RANGE_30_OPTION = '30min';
+    public static final String RANGE_60_OPTION = '60min';
 
     // From PagerDutyService
     public static Map<String, String> PAGER_DUTY_HEADERS {
@@ -292,8 +350,8 @@ public with sharing class ConfigUtil {
     }
 
     //From OpenAI
-    public static final String OPEN_AI_COMPLETIONS_ENDPOINT = Constants.REMOTE_SITE_SETTINGS.OPEN_AI_URL + '/v1/chat/completions';
-    public static final String OPEN_AI_USAGE_ENDPOINT = Constants.REMOTE_SITE_SETTINGS.OPEN_AI_URL + '/v1/usage';
+    public static final String OPEN_AI_COMPLETIONS_ENDPOINT = ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_URL + '/v1/chat/completions';
+    public static final String OPEN_AI_USAGE_ENDPOINT = ConfigUtil.REMOTE_SITE_SETTINGS_OPEN_AI_URL + '/v1/usage';
     public static final Map<String, String> OPEN_AI_HEADERS {
         get {
             if(OPEN_AI_HEADERS == null) {
@@ -325,7 +383,6 @@ public with sharing class ConfigUtil {
     }
 
     // from ConnectedOrgService
-    // move to service or constant class?
     public static String INVALID_OAUTH_STATE_MESSAGE = 'Invalid OAuth State ';
     public static String CONNECTED_ORG_NOT_FOUND_MESSAGE = 'Connected Org not found ';
     public static String CONNECTED_ORG_NOT_SETTED = 'Environment information is not available. Org Id {0} not found. Please set up a connection to this org under Connected Orgs in Pharos Admin.';
@@ -352,6 +409,7 @@ public with sharing class ConfigUtil {
 
     // from PassthroughtModeService and DataDirectionService
     public static String CONNECTED_ORG_NOT_FOUND_PASSTHROUGHMODE = 'Connected Org not found (PassthroughMode)';
+    public static String CONNECTED_ORG_NOT_FOUND_BROADCAST = 'Connected Org not found (Broadcast)';
     public static String PARAMS_TYPE = 'type';
     public static String TYPE_PASSTHROUGH_MODE = 'passthroughMode';
     public static String TYPE_BROADCAST = 'broadcast';
@@ -648,7 +706,6 @@ public with sharing class ConfigUtil {
     // AdminService
 
     public static final String REST_REMOTE_SITE_SETTINGS_QUERY = 'SELECT+Id,IsActive,SiteName,EndpointUrl+FROM+RemoteProxy+WHERE+IsActive+=+TRUE';
-    public static final String REST_CSP_TRUSTED_SITES_QUERY = 'SELECT+Id,IsActive,DeveloperName,EndpointUrl+FROM+CspTrustedSite+WHERE+IsActive+=+TRUE';
 
     public static Map<String, String> getRemoteSiteSettingsHeadersMap(String accessToken) {
         return new Map<String, String> {
@@ -657,15 +714,7 @@ public with sharing class ConfigUtil {
         };
     }
 
-    public static Map<String, String> getCspTrustedSitesHeadersMap(String accessToken) {
-        return new Map<String, String> {
-            'Authorization' => 'Bearer ' + accessToken,
-            'Content-Type' => 'application/json'
-        };
-    }
-
     public static final String REMOTE_SITE_SETTINGS_KEY_RECORDS = 'records';
-    public static final String CSP_TRUSTED_SITES_KEY_RECORDS = 'records';
     public static final String CONNECTED_ORGS_INFO_KEY_SETTINGS = 'settings';
     public static final String CONNECTED_ORGS_INFO_KEY_CONNECTED_ORGS = 'connectedOrgs';
     public static final String CONNECTION_ORG_KEY_CORG = 'corg';
@@ -687,7 +736,59 @@ public with sharing class ConfigUtil {
         private set;
     }
 
+    public static final String REMOTE_SITE_SETTINGS_GIT_SFDX_API_NAME = 'Pharos_ai_SFDX_API_token_URL';
+    public static final String REMOTE_SITE_SETTINGS_GIT_SFDX_API_DESCRIPTION = 'Pharos.ai - SFDX integration URL';
+    public static final String REMOTE_SITE_SETTINGS_GIT_SFDX_API_URL = 'https://sfdx.pharos.ai';
+
+    public static final String REMOTE_SITE_SETTINGS_GIT_HUB_API_NAME = 'Pharos_ai_GitHub_API_token_URL';
+    public static final String REMOTE_SITE_SETTINGS_GIT_HUB_API_DESCRIPTION = 'Pharos.ai - GitHubAPI integration URL';
+    public static final String REMOTE_SITE_SETTINGS_GIT_HUB_API_URL = 'https://api.github.com';
+
+    public static final String REMOTE_SITE_SETTINGS_GIT_HUB_NAME = 'Pharos_ai_GitHub_token_URL';
+    public static final String REMOTE_SITE_SETTINGS_GIT_HUB_DESCRIPTION = 'Pharos.ai - GitHub integration URL';
+    public static final String REMOTE_SITE_SETTINGS_GIT_HUB_URL = 'https://github.com';
+
+    public static final String REMOTE_SITE_SETTINGS_AZURE_DO_REST_API_NAME = 'Pharos_ai_AzureDO_REST_API_URL';
+    public static final String REMOTE_SITE_SETTINGS_AZURE_DO_REST_API_DESCRIPTION = 'Pharos.ai - AzureDevOps integration REST API URL';
+    public static final String REMOTE_SITE_SETTINGS_AZURE_DO_REST_API_URL = 'https://dev.azure.com';
+
+    public static final String REMOTE_SITE_SETTINGS_AZURE_DO_API_TOKEN_REQUEST_NAME = 'Pharos_ai_AzureDO_API_token_URL';
+    public static final String REMOTE_SITE_SETTINGS_AZURE_DO_API_TOKEN_REQUEST_DESCRIPTION = 'Pharos.ai - AzureDevOps integration API token URL';
+    public static final String REMOTE_SITE_SETTINGS_AZURE_DO_API_TOKEN_REQUEST_URL = 'https://app.vssps.visualstudio.com/oauth2/authorize';
+
+    public static final String REMOTE_SITE_SETTINGS_GRAPH_API_TOKEN_REQUEST_NAME = 'Pharos_ai_Graph_API_token_URL';
+    public static final String REMOTE_SITE_SETTINGS_GRAPH_API_TOKEN_REQUEST_DESCRIPTION = 'Pharos.ai - Graph integration API token URL';
+    public static final String REMOTE_SITE_SETTINGS_GRAPH_API_TOKEN_REQUEST_URL = 'https://login.microsoftonline.com';
+
+    public static final String REMOTE_SITE_SETTINGS_GRAPH_API_REQUEST_NAME = 'Pharos_ai_Graph_API_URL';
+    public static final String REMOTE_SITE_SETTINGS_GRAPH_API_REQUEST_DESCRIPTION = 'Pharos.ai - Graph integration API URL';
+    public static final String REMOTE_SITE_SETTINGS_GRAPH_API_REQUEST_URL = 'https://graph.microsoft.com';
+
+    public static final String REMOTE_SITE_SETTINGS_SLACK_API_NAME = 'Pharos_ai_Slack_API_URL';
+    public static final String REMOTE_SITE_SETTINGS_SLACK_DESCRIPTION = 'Pharos.ai - Slack integration API login URL';
+    public static final String REMOTE_SITE_SETTINGS_SLACK_API_URL = 'https://slack.com';
+    public static final String SAVE_SLACK_SETTINGS_SUCCESS = 'success';
+
+    public static final String REMOTE_SITE_SETTINGS_PAGER_DUTY_API_NAME = 'Pharos_ai_PagerDuty_API_URL';
+    public static final String REMOTE_SITE_SETTINGS_PAGER_DUTY_DESCRIPTION = 'Pharos.ai - PagerDuty integration API login URL';
+    public static final String REMOTE_SITE_SETTINGS_PAGER_DUTY_URL = 'https://api.pagerduty.com';
+    public static final String REMOTE_SITE_SETTINGS_PAGER_DUTY_EVENT_API_NAME = 'Pharos_ai_PagerDutyEvent_API_URL';
+    public static final String REMOTE_SITE_SETTINGS_PAGER_DUTY_EVENT_DESCRIPTION = 'Pharos.ai - PagerDutyEvent integration API login URL';
+    public static final String REMOTE_SITE_SETTINGS_PAGER_DUTY_EVENT_URL = 'https://events.pagerduty.com';
+    public static final String SAVE_PAGER_DUTY_SETTINGS_SUCCESS = 'success';
+
+    public static final String REMOTE_SITE_SETTINGS_OPEN_AI_NAME = 'Pharos_ai_OpenAI_URL';
+    public static final String REMOTE_SITE_SETTINGS_OPEN_AI_DESCRIPTION = 'Pharos.ai - OpenAI integration API login URL';
+    public static final String REMOTE_SITE_SETTINGS_OPEN_AI_URL = 'https://api.openai.com';
+
+    public static final String REMOTE_SITE_SETTINGS_AI_NAME = 'Pharos_ai_AI';
+    public static final String REMOTE_SITE_SETTINGS_AI_DESCRIPTION = 'Pharos.ai - AI integration API login URL';
+    public static final String REMOTE_SITE_SETTINGS_AI_URL = 'https://ai.pharos.ai';
+
+    public static final String EMAIL_SERVICE_DATA_KEY_EMAIL  = 'email';
+    public static final String EMAIL_SERVICE_DATA_KEY_ERROR_CODE  = 'errorCode';
     public static final String EMAIL_SERVICE_DATA_KEY_CONFIRMED  = 'confirmed';
+    public static final String EMAIL_SERVICE_DATA_KEY_EMAIL_SYMBOL  = '@';
 
     public static final String LOGGER_WRAPPER_INFO_KEY_CODE = 'code';
     public static final String LOGGER_WRAPPER_INFO_KEY_TEST_CODE = 'testCode';
@@ -746,14 +847,40 @@ public with sharing class ConfigUtil {
     }
 
     public static final String CONFIRM_EMAIL_SERVICE_KEY_VALUE = 'value';
+    public static final String CONFIRM_EMAIL_SERVICE_KEY_EMAIL = 'email';
     public static final String CONFIRM_AUTOMATED_FLOW_ERROR_TRACKING_KEY = 'flowErrorTracking';
     public static final String CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_KEY = 'emailToCaseTracking';
     public static final String CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_KEY = 'emailToCaseTrackingStatus';
     public static final String CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_ENABLED_KEY = 'enabledEmailToCaseTracking';
+    public static final String EXCEPTION_ERROR_EMAIL_HANDLER_NOT_FOUND = '__ErrorEmailHandler not found';
 
     public static final String BATCH_ERROR_TRACKING_ENABLED = 'batchErrorTrackingEnabled';
     public static final String ERROR_REPORTING_OPT_OUT = 'errorReportingOptOut';
     public static final String USE_OAUTH_FOR_SELF_ORG = 'useOauthForSelfOrg';
+
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG0 = 'flag0';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG1 = 'flag1';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG2 = 'flag2';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG3 = 'flag3';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG4 = 'flag4';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG5 = 'flag5';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG6 = 'flag6';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG7 = 'flag7';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8 = 'flag8';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS = 'progress';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_PASSTHROUGHT_MODE_ENABLED = 'passthroughtModeEnabled';
+    public static final String CONFIGURATION_OVERVIEW_DATA_KEY_INTEGRATION_PROGRESS = 'integrationProgress';
+    public static final String LOG_POST_PROCESSING_BATCH_SCHEDULER_CRON_EXP = '0 30 * * * ?';
+    public static final String PHAROS_LOG_SERVICE_SCHEDULER_CRON_EXP = '0 17 * * * ?';
+    public static final String PHAROS_LOG_SERVICE_SCHEDULER_MODE_CRON_EXP = '0 {0} * * * ?';
+    public static final String ERROR_EMAIL_REPORT_BATCH_SCHEDULER_CRON_EXP = '0 0 6 ? * SUN';
+    public static final String JIRA_RESOLUTION_SCHEDULER_CRON_EXPR = '0 5 */8 * * ?';
+    public static final String ARCHIVAL_SCHEDULER_CRON_EXPR = '0 0 * * * ?';
+    public static final String MANAGE_TOKENS_SERVICE_SCHEDULER_CRON_EXP1 = '0 55 * * * ?';
+    public static final String MANAGE_TOKENS_SERVICE_SCHEDULER_CRON_EXP2 = '0 25 * * * ?';
+    public static final String DEBUG_LOG_SERVICE_SCHEDULER_CRON_EXP1 = '0 55 * * * ?';
+    public static final String DEBUG_LOG_SERVICE_SCHEDULER_CRON_EXP2 = '0 25 * * * ?';
+    public static final String TRACE_BATCH_SERVICE_SCHEDULER_CRON_EXP = '0 25 * * * ?';
 
     public static final String CREATE_META_REQUEST_DATA_KEY_PROJECT_ID = 'projectId';
     public static final String CREATE_META_REQUEST_DATA_KEY_ISSUE_TYPE_ID = 'issueTypeId';
@@ -766,11 +893,25 @@ public with sharing class ConfigUtil {
     public static final String CREATE_META_REQUEST_DATA_KEY_PRIORITIES = 'priorities';
     public static final String CREATE_META_REQUEST_DATA_KEY_FIELDS_MAPPING = 'fieldsMapping';
 
+    public static final String SAVE_JIRA_FIELDS_MAPPINGS_SUCCESS = 'Ok';
+    public static final String SAVE_JIRA_SETTINGS_SUCCESS = 'success';
     public static final String PICKLIST_KEY_NAME = 'name';
     public static final String PICKLIST_KEY_LABEL = 'label';
     public static final String PICKLIST_KEY_VALUE = 'value';
     public static final String PICKLIST_KEY_VALUES = 'values';
     public static final String PICKLIST_KEY_TYPE = 'type';
+
+    public static final String REMOTE_SITE_SETTINGS_JIRA_NAME = 'Pharos_ai_Jira_API_URL';
+    public static final String REMOTE_SITE_SETTINGS_JIRA_DESCRIPTION = 'Pharos.ai - Jira integration API login URL';
+    public static final String SEND_SPLUNK_MESSAGE_KEY_MESSAGE = 'message';
+    public static final String REMOTE_SITE_SETTINGS_SPLUNK_WEB_NAME = 'Pharos_ai_SplunkWeb_URL';
+    public static final String REMOTE_SITE_SETTINGS_SPLUNK_WEB_DESCRIPTION = 'Pharos.ai - SplunkWeb integration API login URL';
+    public static final String REMOTE_SITE_SETTINGS_SPLUNK_API_NAME = 'Pharos_ai_Splunk_API_URL';
+    public static final String REMOTE_SITE_SETTINGS_SPLUNK_API_DESCRIPTION = 'Pharos.ai - Splunk integration API login URL';
+    public static final String REMOTE_SITE_SETTINGS_SPLUNK_API_PORT = ':8089';
+    public static final String REMOTE_SITE_SETTINGS_SPLUNK_EVENT_COLLECTOR_NAME = 'Pharos_ai_SplunkEventCollector_API_URL';
+    public static final String REMOTE_SITE_SETTINGS_SPLUNK_EVENT_COLLECTOR_DESCRIPTION = 'Pharos.ai - SplunkEventCollector integration API login URL';
+    public static final String REMOTE_SITE_SETTINGS_SPLUNK_EVENT_COLLECTOR_PORT = ':8088';
 
     public static final String CONNECTED_APP_NAME = 'Pharos.ai';//'PharosApp';
     public static final String CONNECTED_APP_API_NAME = 'Pharos_ai';
@@ -778,6 +919,11 @@ public with sharing class ConfigUtil {
     public static final String PHAROS_PACKAGE_PUBLISHER_NAMESPACE = 'pharos';
     // https://loggertest1.ap4.visual.force.com/apex/Settings
     public static final String CONNECTED_APP_CALLBACK_PAGE_URL = '/apex/Settings';
+
+    public static final String HANDLE_SAVE_RESULT_KEY_ERROR = 'Error ';
+    public static final String HANDLE_SAVE_RESULT_KEY_ERRORS = 'Errors ';
+    public static final String HANDLE_SAVE_RESULT_KEY_COMPONENTS = 'occured processing component ';
+    public static final String HANDLE_SAVE_RESULT_KEY_FIELDS = ' Fields ';
 
     public static final String SENSETIVE_MASK_KEY_ID = 'id';
     public static final String SENSETIVE_MASK_KEY_TEXT = 'text';
@@ -791,10 +937,61 @@ public with sharing class ConfigUtil {
     public static final String LOG_CATEGORIES_KEY_CATEGORIES = 'categories';
     public static final String LOG_CATEGORIES_KEY_RECORDTYPES = 'recordtypes';
     public static final String LOG_CATEGORIES_KEY_MAPPINGS = 'mappings';
+    public static final String SAVE_LOG_CATEGORIES_SUCCESS = 'success';
 
+    public static final String MONITORING_APP_KEY_JIRA_RULES = 'jirarules';
+    public static final String MONITORING_APP_KEY_RULE_COMPARISON_OPERATORS = 'comparisonoperators';
+    public static final String MONITORING_APP_KEY_RULE_FILTER_COMPARISON_OPERATORS = 'rulefiltercomparisonoperators';
+    public static final String MONITORING_APP_KEY_FILTERS = 'filters';
+    public static final String MONITORING_APP_KEY_EVENTS = 'events';
+    public static final String MONITORING_APP_KEY_ACTIONS = 'notifications';
+    public static final String MONITORING_APP_KEY_RULE_ACTIONS = 'notificationsassignee';
+    public static final String MONITORING_APP_KEY_LOG_FIELDS = 'logfields';
+    public static final String MONITORING_APP_KEY_ISSUE_FIELDS = 'issuefields';
+    public static final String MONITORING_APP_KEY_SERVICE_ENABLE = 'servicesenable';
+    public static final String MONITORING_APP_KEY_ACTION_TYPES = 'actiontypesmap';
+    public static final String MONITORING_APP_KEY_RULE_SUB_TYPES = 'rulesubtypes';
+    public static final String MONITORING_APP_KEY_USER_TIMEZONE_OFFSET = 'usertimezoneoffset';
+
+    public static final String MONITORING_APP_KEY_NOTIFICATION_ENABLED = 'notificationEnabled';
+    public static final String MONITORING_APP_KEY_NOTIFICATION_RULES = 'notificationrules';
+
+    public static final String MONITORING_APP_KEY_ARCHIVAL_ENABLED = 'archivalEnabled';
+    public static final String MONITORING_APP_KEY_ARCHIVAL_RULES = 'archivalrules';
+    public static final String MONITORING_APP_KEY_MONITORING_ENABLED = 'monitoringEnabled';
+    public static final String MONITORING_APP_KEY_MONITORING_RULES = 'monitoringrules';
+
+    public static final String MONITORING_APP_KEY_BROADCAST_RULES = 'broadcastrules';
+
+    public static final String MONITORING_APP_KEY_ACTION_ID = 'actionid';
+    public static final String MONITORING_APP_KEY_ASSIGNED_RULES = 'assignedRules';
     public static final String MONITORING_APP_KEY_ENABLED = 'enabled';
 
+    public static final String MONITORING_APP_KEY_RULE_ID = 'ruleid';
+    public static final String MONITORING_APP_KEY_RULE_TYPE = 'ruleType';
+    public static final String MONITORING_APP_KEY_JIRA_RULE_ID = 'jirarule';
+    public static final String MONITORING_APP_KEY_ARCHIVAL_RULE_ID = 'archivalrule';
+    public static final String MONITORING_APP_KEY_MONITORING_RULE_ID = 'monitoringrule';
+    public static final String MONITORING_APP_KEY_NOTIFICATION_RULE_ID = 'notificationrule';
+    public static final String MONITORING_APP_KEY_BROADCAST_RULE_ID = 'broadcastrule';
+    public static final String MONITORING_APP_KEY_RULE_ACTION_ID = 'ruleactionid';
+    public static final String MONITORING_APP_KEY_RULE_INDEX = 'ruleindex';
+    public static final String DELETE_MONITORING_RULE_KEY_SUCCESS = 'success';
+    public static final String DELETE_MONITORING_RULE_KEY_MESSAGE = 'message';
+    public static final String DELETE_MONITORING_RULE_MESSAGE_BAD_PARAMS = 'bad Rule Id';
+    public static final String DELETE_MONITORING_RULE_ACTION_KEY_SUCCESS = 'success';
+    public static final String DELETE_MONITORING_RULE_ACTION_KEY_MESSAGE = 'message';
     public static final String DELETE_MONITORING_RULE_ACTION_KEY_ACTION_RESULT = 'actionResult';
+    public static final String DELETE_MONITORING_RULE_ACTION_KEY_RULE_ACTION_RESULT = 'ruleActionResult';
+
+    public static final String PLATFORM_EVENT_SUBSCRIBER_CONFIG_TRIGGER_NAME_AI_EVENT = 'AiEventTrigger';
+    public static final String PLATFORM_EVENT_SUBSCRIBER_CONFIG_TRIGGER_NAME_LOG_EVENT = 'LogEventTrigger';
+    public static final String PLATFORM_EVENT_SUBSCRIPTION_CONFIG_URL = System.Url.getOrgDomainUrl().toExternalForm() + '/setup/build/SharedSubscriptionsPage.apexp';
+
+    public static String PRODUCTION_LOGIN_URL = 'login.salesforce.com';
+    public static String SANDBOX_LOGIN_URL = 'test.salesforce.com';
+    public static String SALESFORCE_DOMAIN = 'my.salesforce.com';
+    public static String CUSTOM_DOMAIN_SYMBOLS = '--';
 
     public static final String EVENT_ACTION_DELIVERED_TO_SLACK = 'Slack Channels:';
     public static final String EVENT_ACTION_DELIVERED_TO_TEAMS = 'Teams Channels:';
@@ -815,6 +1012,10 @@ public with sharing class ConfigUtil {
             'Pharos', 'Apex', 'Flow', 'Process Builder', 'Async Apex', 'Background Job'
     };
 
+    public static final Pattern SOBJECT_ID_PATTERN = Pattern.compile('([a-zA-Z0-9]{15,18})');
+    public static final String REGEX_SOBJECT_ID = '([a-zA-Z0-9]{15,18})';
+    public static final String REGEX_DIGIT = '[0-9]';
+
     // Maximum number of related IDs based on JSON size calculation for Long Text Area field (32,768 chars)
     // JSON format: ["id1","id2","id3"] = 2 chars for brackets + (18 chars per ID + 3 chars for quotes and comma) * count - 1 comma
     // Approximately 21 chars per ID + 2 for brackets = ~21 chars per ID
@@ -823,7 +1024,7 @@ public with sharing class ConfigUtil {
 
     public static Set<String> getRelatedSObjectIds(String message, Boolean isInternalErrorLog) {
         Set<String> sObjectIds = new Set<String>();
-        Pattern p = Constants.GLOBAL_VARIABLE.PATTERN_SOBJECT_ID;
+        Pattern p = SOBJECT_ID_PATTERN;
         Matcher pm = p.matcher(message);
         while (pm.find()) {
             try {
@@ -836,6 +1037,38 @@ public with sharing class ConfigUtil {
             }
         }
         return sObjectIds;
+    }
+
+    public static final Set<String> ASYNC_APEX_JOB_PROCESS_STATUS = new Set<String> {
+            'Processing',
+            'Preparing',
+            'Queued',
+            'Holding'
+    };
+
+    public static final Set<String> ASYNC_APEX_JOB_PROCESS_TYPES = new Set<String> {
+            'ScheduledApex',
+            'BatchApexWorker'
+    };
+
+    public static List<AsyncApexJob> getCurrentJobs(List<String> apexClassNames) {
+        return [
+                SELECT Id
+                FROM AsyncApexJob
+                WHERE Status IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_STATUS
+                AND JobType NOT IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_TYPES
+                AND ApexClass.Name IN :apexClassNames
+                LIMIT 1
+        ];
+    }
+
+    public static Integer getSumTotalJobItems() {
+        return Integer.valueOf([
+                SELECT SUM(TotalJobItems) sumTotalJobItems
+                FROM AsyncApexJob
+                WHERE JobType = 'BatchApex'
+                AND Status IN :ConfigUtil.ASYNC_APEX_JOB_PROCESS_STATUS
+        ][0].get('sumTotalJobItems'));
     }
 
     public static void updateTimeZone(List<SObject> sObjects, String fieldName) {
@@ -1172,7 +1405,7 @@ public with sharing class ConfigUtil {
 
     public static final Integer LOG_INDEX_MAX_SIZE_KEY_HASH = 45;
     public static final Integer LOG_INDEX_MAX_SIZE_KEY_ORG_ID = 15;
-    // public static final Integer LOG_INDEX_MAX_SIZE_KEY_TYPE = 1;
+    public static final Integer LOG_INDEX_MAX_SIZE_KEY_TYPE = 1;
     // default Type - A
     public static final String LOG_INDEX_TYPE_HASH1 = 'A'; //A-Z
 
@@ -1310,12 +1543,27 @@ public with sharing class ConfigUtil {
         }
     }
 
+    private static final Map<String, String> RFC2822_MONTHS = new Map<String, String> {
+        'Jan' => '01',
+        'Feb' => '02',
+        'Mar' => '03',
+        'Apr' => '04',
+        'May' => '05',
+        'Jun' => '06',
+        'Jul' => '07',
+        'Aug' => '08',
+        'Sep' => '09',
+        'Oct' => '10',
+        'Nov' => '11',
+        'Dec' => '12'    
+    };
+
     public static DateTime parseRFC2822(String input) {
         List<String> parts = input.substring(input.indexOf(', ') + 2).split(' ');
         List<String> dateparts = new List<String>{parts[2], parts[1],parts[0]};
         List<String> timeparts = parts[3].split(':');
 
-        dateparts[1] = Constants.GLOBAL_VARIABLE.RFC2822_MONTHS.get(dateparts[1]);
+        dateparts[1] = RFC2822_MONTHS.get(dateparts[1]);
         return DateTime.newInstanceGMT(integer.valueOf(dateParts[0]), 
             integer.valueOf(dateParts[1]),
             integer.valueOf(dateParts[2]),

@@ -43,7 +43,7 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
        
         PermissionsUtil.putSObjectField(inboundEmail, Schema.sObjectType.Inbound_Email__c.fields.Html_Body__c, maskContent(abbreviateResult.abbreviatedStacktrace));
         
-        PermissionsUtil.putSObjectField(inboundEmail, Schema.sObjectType.Inbound_Email__c.fields.Subject__c, s.abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH));
+        PermissionsUtil.putSObjectField(inboundEmail, Schema.sObjectType.Inbound_Email__c.fields.Subject__c, s.abbreviate(ConfigUtil.MAX_LENGTH_TEXT_FIELD));
         PermissionsUtil.putSObjectField(inboundEmail, Schema.sObjectType.Inbound_Email__c.fields.From__c, email.fromAddress + (String.isNotBlank(email.fromName) ? ' (' + email.fromName + ')' : ''));
 
         if (ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c) {
@@ -361,8 +361,8 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
     public static void createInternalLog(String fullErrorMessage, Inbound_Email__c email, Logger loggerInst) {
         if(String.isBlank(fullErrorMessage)) return;
 
-        String summary = ('Failed to create Log for Inbound Email: ' + fullErrorMessage).abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH);
-        String details = fullErrorMessage + Constants.GLOBAL_VARIABLE.NEWLINE_CHARACTERS;
+        String summary = ('Failed to create Log for Inbound Email: ' + fullErrorMessage).abbreviate(ConfigUtil.MAX_LENGTH_TEXT_FIELD);
+        String details = fullErrorMessage + ConfigUtil.NEW_LINE_CARRIAGE_RETURN;
         if (String.isNotBlank(email?.Html_Body__c)
             && email?.Html_Body__c.startsWithIgnoreCase('<')) {
             details += email.Html_Body__c;

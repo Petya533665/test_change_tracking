@@ -42,7 +42,7 @@ public with sharing class EmailServicesService {
     public with sharing class EmailServicesAddressService {
 
         public String getEmailFromEmailServiceAddress(EmailServicesAddress address) {
-            return address.LocalPart.toLowerCase() + Constants.GLOBAL_VARIABLE.SYMBOL_AT + address.EmailDomainName;
+            return address.LocalPart.toLowerCase() + ConfigUtil.EMAIL_SERVICE_DATA_KEY_EMAIL_SYMBOL + address.EmailDomainName;
         }
 
         public String createEmailServicesAddress(Id functionId) {

@@ -2054,7 +2054,7 @@ public class Test_AdminController {
 
     @IsTest
     private static void test_admin_service_getRemoteSiteSettings() {
-        List<MetadataServiceUtil.RemoteSiteSettingsWrapper> result;
+        List<AdminService.RemoteSiteSettingsWrapper> result;
         HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(getRemoteSiteSettingsMock());
         Test.setMock(HttpCalloutMock.class, multiCalloutMock);
 
@@ -2099,12 +2099,12 @@ public class Test_AdminController {
         Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
         Map<String, Object> data = new Map<String, Object>();
 
-        MetadataServiceUtil.RemoteSiteSettingsWrapper wrapper1 = new MetadataServiceUtil.RemoteSiteSettingsWrapper();
+        AdminService.RemoteSiteSettingsWrapper wrapper1 = new AdminService.RemoteSiteSettingsWrapper();
         wrapper1.Id = 'someId';
         wrapper1.IsActive = true;
         wrapper1.SiteName = 'someSiteName';
         wrapper1.EndpointUrl = endpointUrl;
-        data.put(ConfigUtil.REMOTE_SITE_SETTINGS_KEY_RECORDS, new List<MetadataServiceUtil.RemoteSiteSettingsWrapper>());
+        data.put(ConfigUtil.REMOTE_SITE_SETTINGS_KEY_RECORDS, new List<AdminService.RemoteSiteSettingsWrapper>());
         TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
                 200,
                 'OK',
@@ -2278,7 +2278,7 @@ public class Test_AdminController {
         Test.startTest();
         result = (String)AdminService.saveSlackSettings(data);
         Test.stopTest();
-        System.assertEquals(Constants.UI.RESULT_SUCCESS, result);
+        System.assertEquals(ConfigUtil.SAVE_SLACK_SETTINGS_SUCCESS, result);
     }
 
     @IsTest
@@ -2298,7 +2298,7 @@ public class Test_AdminController {
         Test.startTest();
         result = (String)AdminService.savePagerDutySettings(data);
         Test.stopTest();
-        System.assertEquals(Constants.UI.RESULT_SUCCESS, result);
+        System.assertEquals(ConfigUtil.SAVE_PAGER_DUTY_SETTINGS_SUCCESS, result);
     }
 
     @IsTest
@@ -2336,7 +2336,7 @@ public class Test_AdminController {
         Test.startTest();
         result = (String)AdminService.resetJiraSettings();
         Test.stopTest();
-        System.assertEquals(Constants.UI.RESULT_SUCCESS, result);
+        System.assertEquals(ConfigUtil.SAVE_JIRA_SETTINGS_SUCCESS, result);
     }
 
     @IsTest
@@ -2345,7 +2345,7 @@ public class Test_AdminController {
         Test.startTest();
         result = (String)AdminService.resetAzureDevOpsSettings();
         Test.stopTest();
-        System.assertEquals(Constants.UI.RESULT_SUCCESS, result);
+        System.assertEquals(ConfigUtil.SAVE_JIRA_SETTINGS_SUCCESS, result);
     }
 
     @IsTest
@@ -2364,7 +2364,7 @@ public class Test_AdminController {
         Test.startTest();
         result = (String)AdminService.saveAzureDevOpsSettings(data);
         Test.stopTest();
-        System.assertEquals(Constants.UI.RESULT_SUCCESS, result);
+        System.assertEquals(ConfigUtil.SAVE_JIRA_SETTINGS_SUCCESS, result);
     }
 
     @IsTest
@@ -2381,7 +2381,7 @@ public class Test_AdminController {
         Test.startTest();
         result = (String)AdminService.saveDebugLogServiceSettings(data);
         Test.stopTest();
-        System.assertEquals(Constants.UI.RESULT_SUCCESS, result);
+        System.assertEquals(ConfigUtil.SAVE_JIRA_SETTINGS_SUCCESS, result);
     }
 
     @IsTest
@@ -3216,8 +3216,8 @@ public class Test_AdminController {
         Assert.areEqual(UserInfo.getFirstName(), wrapper.currentUser.FirstName, 'User First Name does not match');
         Assert.areEqual(UserInfo.getLastName(), wrapper.currentUser.LastName, 'User Last Name does not match');
         Assert.areEqual(2, wrapper.scheduleInfoWrappers.size(), 'Number of scheduled jobs do not match');
-        Assert.areEqual(Constants.JOBS.JOB_NAME_PHAROS_LOG_SERVICE_SCHEDULER_MODE_1, wrapper.scheduleInfoWrappers.get(0).jobName, 'Job Name does not match');
-        Assert.areEqual(Constants.JOBS.JOB_NAME_PHAROS_LOG_SERVICE_SCHEDULER_MODE_2, wrapper.scheduleInfoWrappers.get(1).jobName, 'Job Name does not match');
+        Assert.areEqual(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME, wrapper.scheduleInfoWrappers.get(0).jobName, 'Job Name does not match');
+        Assert.areEqual(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME, wrapper.scheduleInfoWrappers.get(1).jobName, 'Job Name does not match');
     }
 
     @IsTest
@@ -3244,8 +3244,8 @@ public class Test_AdminController {
         Assert.areEqual(UserInfo.getFirstName(), newWrapper.currentUser.FirstName, 'User First Name does not match');
         Assert.areEqual(UserInfo.getLastName(), newWrapper.currentUser.LastName, 'User Last Name does not match');
         Assert.areEqual(2, newWrapper.scheduleInfoWrappers.size(), 'Number of scheduled jobs do not match');
-        Assert.areEqual(Constants.JOBS.JOB_NAME_PHAROS_LOG_SERVICE_SCHEDULER_MODE_1, newWrapper.scheduleInfoWrappers.get(0).jobName, 'Job Name does not match');
-        Assert.areEqual(Constants.JOBS.JOB_NAME_PHAROS_LOG_SERVICE_SCHEDULER_MODE_2, newWrapper.scheduleInfoWrappers.get(1).jobName, 'Job Name does not match');
+        Assert.areEqual(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_1_NAME, newWrapper.scheduleInfoWrappers.get(0).jobName, 'Job Name does not match');
+        Assert.areEqual(ConfigUtil.PHAROS_LOG_SERVICE_SCHEDULER_MODE_2_NAME, newWrapper.scheduleInfoWrappers.get(1).jobName, 'Job Name does not match');
         Assert.areNotEqual(oldWrapper.scheduleInfoWrappers.get(0).jobId, newWrapper.scheduleInfoWrappers.get(0).jobId, 'Job IDs should not match');
         Assert.areNotEqual(oldWrapper.scheduleInfoWrappers.get(1).jobId, newWrapper.scheduleInfoWrappers.get(1).jobId, 'Job IDs should not match');
     }
@@ -3325,7 +3325,7 @@ public class Test_AdminController {
     @IsTest
     static void test_RemoteAction_validateEmailServiceDataWithEmailServicesAndChangedApexEmailNotification() {
         Logger_Settings__c loggerSettings = Logger_Settings__c.getOrgDefaults();
-        loggerSettings.Enable_Email_To_Case_Error_Tracking__c = Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED;
+        loggerSettings.Enable_Email_To_Case_Error_Tracking__c = AdminService.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED;
         loggerSettings.Batch_Error_Tracking_Enabled__c = true;
         upsert loggerSettings;
 
@@ -3362,7 +3362,7 @@ public class Test_AdminController {
         Test.stopTest();
         
         Assert.isTrue((Boolean) response.get('data'));
-        Assert.areEqual(Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_DISABLED, ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c);
+        Assert.areEqual(AdminService.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_DISABLED, ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c);
         Assert.isFalse(ConfigUtil.SETTINGS.Batch_Error_Tracking_Enabled__c);
         Assert.areEqual(null, ConfigUtil.PHAROS_SETTINGS.Archival_Scheduler_Cron_Exp__c);
     }

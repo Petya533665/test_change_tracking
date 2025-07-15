@@ -3,17 +3,16 @@ public without sharing class PlatformEventSubscriberConfigService {
     @TestVisible
     private final String PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME = 'PharosOrderEventTriggerConfig';
     private final String PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME_AI_EVENT = 'PharosOrderEventTriggerConfigAIEvent';
-    private final String PLATFORM_EVENT_SUBSCRIPTION_CONFIG_URL = Constants.GLOBAL_VARIABLE.BASE_URL + '/setup/build/SharedSubscriptionsPage.apexp';
     private final Integer PLATFORM_EVENT_SUBSCRIBER_CONFIG_BATCH_SIZE = 200;
 
     private final Map<String, String> PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME_BY_SOBJECT_API_NAME = new Map<String, String>{
-        Constants.AI_EVENT_SOBJECT.SOBJECT_TYPE_NAME => PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME_AI_EVENT,
-        Constants.LOG_EVENT_SOBJECT.SOBJECT_TYPE_NAME => PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME
+        Schema.SObjectType.AI_Event__e.getName() => PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME_AI_EVENT,
+        Schema.SObjectType.Log_Event__e.getName() => PLATFORM_EVENT_SUBSCRIBER_CONFIG_NAME
     };
 
     private final Map<String, String> PLATFORM_EVENT_SUBSCRIBER_CONFIG_TRIGGER_NAME_BY_SOBJECT_API_NAME = new Map<String, String>{
-        Constants.AI_EVENT_SOBJECT.SOBJECT_TYPE_NAME => Constants.AI_EVENT_SOBJECT.TRIGGER_NAME_AI_EVENT,
-        Constants.LOG_EVENT_SOBJECT.SOBJECT_TYPE_NAME => Constants.LOG_EVENT_SOBJECT.TRIGGER_NAME_LOG_EVENT
+        Schema.SObjectType.AI_Event__e.getName() => ConfigUtil.PLATFORM_EVENT_SUBSCRIBER_CONFIG_TRIGGER_NAME_AI_EVENT,
+        Schema.SObjectType.Log_Event__e.getName() => ConfigUtil.PLATFORM_EVENT_SUBSCRIBER_CONFIG_TRIGGER_NAME_LOG_EVENT
     };
 
     private SObjectType sobjectType;
@@ -31,7 +30,7 @@ public without sharing class PlatformEventSubscriberConfigService {
     }
 
     public String getUrlToPlatformEventSubscriberConfig() {
-        return PLATFORM_EVENT_SUBSCRIPTION_CONFIG_URL + '?subscriptionName=' + this.triggerId.left(15) + '&topicApiName=' + this.sObjectName;
+        return ConfigUtil.PLATFORM_EVENT_SUBSCRIPTION_CONFIG_URL + '?subscriptionName=' + this.triggerId.left(15) + '&topicApiName=' + this.sObjectName;
     }
 
     public Boolean isPlatformEventConfigSetupCompleted() {
