@@ -122,6 +122,7 @@ public without sharing class PermissionsUtil {
 	public static final String FP_EVENT_MONITORING_ENABLED = 'EventMonitoringEnabled';
 	public static final String FP_DEBUG_POST_PROCESSING_ENABLED = 'DebugPostProcessingEnabled';
 	public static final String FP_FLOW_LOGGING_ENABLED = 'FlowLoggingEnabled';
+	public static final String FP_METADATA_CHAT_ENABLED = 'MetadataChatEnabled';
 
 	public static final String FP_CHARGIFY_PRODUCT_EDITION = 'Edition';
 	public static final String CHARGIFY_PRODUCT_EDITION_ENTERPRISE = 'Enterprise';
@@ -165,7 +166,8 @@ public without sharing class PermissionsUtil {
 		FP_MANDATORY_ERROR_REPORT_ENABLED => 24,
 		FP_DEBUG_POST_PROCESSING_ENABLED => 25,
 		FP_FLOW_LOGGING_ENABLED => 26,
-		FP_EVENT_MONITORING_ENABLED => 27
+		FP_EVENT_MONITORING_ENABLED => 27,
+		FP_METADATA_CHAT_ENABLED => 28
 	};
 
 	public static Map<Integer, Boolean> FeatureMap1 {
@@ -507,6 +509,17 @@ public without sharing class PermissionsUtil {
 				IssueTrackingEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_ISSUE_TRACKING_ENABLED));
 			}
 			return IssueTrackingEnabled;
+		}
+		private set;
+	}
+
+	@TestVisible
+	public static Boolean MetadataChatEnabled {
+		get {
+			if(MetadataChatEnabled == null) {
+				MetadataChatEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_METADATA_CHAT_ENABLED));
+			}
+			return MetadataChatEnabled;
 		}
 		private set;
 	}
