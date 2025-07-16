@@ -223,7 +223,9 @@ public without sharing class AdminService {
             'IssueAnalysisEnabled' => PermissionsUtil.IssueAnalysisEnabled,
             'MandatoryErrorReportingEnabled' => PermissionsUtil.MandatoryErrorReportingEnabled,
             'EventMonitoringEnabled' => PermissionsUtil.EventMonitoringEnabled,
-            'FlowLoggingEnabled' => PermissionsUtil.FlowLoggingEnabled
+            'FlowLoggingEnabled' => PermissionsUtil.FlowLoggingEnabled,
+            'IssueTrackingEnabled' => PermissionsUtil.IssueTrackingEnabled,
+            'MetadataChatEnabled' => PermissionsUtil.MetadataChatEnabled
         };
         return result;
     }
