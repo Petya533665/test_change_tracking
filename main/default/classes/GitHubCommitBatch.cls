@@ -211,7 +211,7 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
         public String instance;
         public String session;
         public String isProd;
-        public String metadataChatEnabled;
+        public String indexEmpty;
 
         public String packageXML;
         public String masterBranchName;
@@ -252,7 +252,9 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
                 this.openAiApiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
                 this.logOrgId = corg.Name;
             }
-            this.metadataChatEnabled = String.valueOf(PermissionsUtil.MetadataChatEnabled);
+            if (PermissionsUtil.MetadataChatEnabled) {
+                this.indexEmpty = String.valueOf(PharosChatController.isCodeIndexed(this.oid));
+            }
         }
     }
 
