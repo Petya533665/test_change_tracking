@@ -253,7 +253,7 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
                 this.logOrgId = corg.Name;
             }
             if (PermissionsUtil.MetadataChatEnabled) {
-                this.indexEmpty = String.valueOf(PharosChatController.isCodeIndexed(this.oid));
+                this.indexEmpty = String.valueOf(!PharosChatController.isCodeIndexed(this.oid));
             }
         }
     }
