@@ -252,7 +252,7 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
                 this.openAiApiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
                 this.logOrgId = corg.Name;
             }
-            if (PermissionsUtil.MetadataChatEnabled) {
+            if (PermissionsUtil.MetadataChatEnabled) {//
                 this.indexEmpty = String.valueOf(!PharosChatController.isCodeIndexed(this.oid));
             }
         }
