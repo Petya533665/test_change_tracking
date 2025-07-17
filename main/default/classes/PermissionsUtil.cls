@@ -516,10 +516,11 @@ public without sharing class PermissionsUtil {
 	@TestVisible
 	public static Boolean MetadataChatEnabled {
 		get {
-			if(MetadataChatEnabled == null) {
-				MetadataChatEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_METADATA_CHAT_ENABLED));
-			}
-			return MetadataChatEnabled;
+			return false;
+			// if(MetadataChatEnabled == null) {
+			// 	MetadataChatEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_METADATA_CHAT_ENABLED));
+			// }
+			// return MetadataChatEnabled;
 		}
 		private set;
 	}
