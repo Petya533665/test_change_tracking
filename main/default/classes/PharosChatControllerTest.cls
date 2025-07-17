@@ -46,7 +46,6 @@ public class PharosChatControllerTest {
         ConfigUtil.OPEN_AI_SETTINGS.Token__c = 'Token';
         upsert ConfigUtil.OPEN_AI_SETTINGS;
 
-        ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
         ConfigUtil.GIT_API_SETTINGS.Username__c = TEST_GIT_OWNER;
         ConfigUtil.GIT_API_SETTINGS.Reponame__c = TEST_GIT_REPO;
         ConfigUtil.GIT_API_SETTINGS.Branch_Name__c = TEST_GIT_BRANCH;
