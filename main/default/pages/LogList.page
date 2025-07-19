@@ -1,5 +1,6 @@
-<apex:page showHeader="true" sidebar="false" controller="LogListController">
+<apex:page showHeader="true" sidebar="false" controller="LogListController" standardStylesheets="false">
     <base href="/apex/LogList"/>
+    <apex:slds />
     <apex:stylesheet value="{!URLFOR($Resource.libs, '/libs/syncfusion-material.css')}"/>
     
     <script>
