@@ -8,6 +8,7 @@
             remoteActionHandlerName: '{!$RemoteAction.LogListController.remoteActionHandler}',
             assetsPath: "{!URLFOR($Resource.loglistapp, 'assets')}",
             packageNamespace: JSON.stringify('{!packageNamespace}'),
+            sldsIconsPath: "/apexpages/slds/latest/assets/icons"
         };
     </script>
 
@@ -21,6 +22,7 @@
                 console.log('PHAROS ADMIN APP IN DEVELOPMENT MODE');
                 console.log('************************************');
                 console.log('************************************');
+                window.APP_CONFIG.assetsPath = 'https://localhost:4200/assets';
             </script>
             <div style="position: fixed; top: 0; right: 0; background-color: #ef4646; color: #fff; padding: 0 7px; z-index: 99999;">http://localhost:4200</div>
             <script type="text/javascript" src="https://localhost:4200/runtime.js"></script>
