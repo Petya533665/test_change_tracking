@@ -100,37 +100,33 @@ public with sharing class PharosChatController {
             type = 'other';
         }
 
-        String namespacePrefix = ConfigUtil.nameSpacePrefix;
         String instance = System.Url.getOrgDomainUrl().toExternalForm();
 
         switch on type {
             when 'field' {
-                String objectName = namespacePrefix + name.split('\\.').get(0);
-                List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
+                String objectName = name.split('\\.').get(0);
+                List<EntityDefinition> objects = [SELECT DurableId, QualifiedApiName FROM EntityDefinition WHERE QualifiedApiName LIKE :('%' + objectName)];
                 if (objects.isEmpty()) return null;
 
-                String fieldName = namespacePrefix + name.split('\\.').get(1);
+                String fieldName = name.split('\\.').get(1);
                 List<FieldDefinition> fields = [SELECT DurableId FROM FieldDefinition
-                    WHERE EntityDefinition.QualifiedApiName = :objectName
-                    AND QualifiedApiName = :fieldName];
+                    WHERE EntityDefinition.QualifiedApiName = :objects[0].QualifiedApiName
+                    AND QualifiedApiName LIKE :('%' + fieldName)];
                 return fields.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/FieldsAndRelationships/' + fields[0].DurableId.split('\\.').get(1) + '/view';
             }
             when 'object' {
-                String objectName = namespacePrefix + name;
-                List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
+                List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName LIKE :('%' + name)];
                 return objects.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/view';
             }
             when 'other' {
                 // search Apex class first, if not found search LWC component
-                String namespace = namespacePrefix.replace('__', '');
-                List<ApexClass> classes = [SELECT Id FROM ApexClass WHERE Name = :name AND NamespacePrefix = :namespace];
+                List<ApexClass> classes = [SELECT Id FROM ApexClass WHERE Name = :name];
                 if (!classes.isEmpty()) {
                     return instance + '/' + classes[0].Id;
                 } else {
                     String query = new QBuilder('LightningComponentBundle')
                             .selectFields(new Set<String>{'Id'})
                             .add(QBuilder.condition('DeveloperName').equalsTo(name))
-                            .add(QBuilder.condition('NamespacePrefix').equalsTo(namespace))
                             .build();
                     List<Object> lwcComponents = HttpUtils.runToolingQuery(instance, ConnectedOrgService.getSelfConnectedOrgAccessToken(), query, ConfigUtil.TOOLING_QUERY_API_ENDPOINT);
                     return lwcComponents.isEmpty() ? null : instance + '/lightning/setup/LightningComponentBundles/page?address=/' + ((Map<String, Object>)lwcComponents[0]).get('Id');
