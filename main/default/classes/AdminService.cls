@@ -1516,10 +1516,14 @@ public without sharing class AdminService {
 
     public static Map<String, Boolean> pushGitChanges() {
         GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-        Boolean isExecuted = DatabaseUtils.executeBatchWithLimitCheck('GitHubCommitBatch', batchInstance);
+        Boolean isExecuted = false;
+        Boolean isBatchValid = batchInstance.initialValidation();
+        if (isBatchValid) {
+            isExecuted = DatabaseUtils.executeBatchWithLimitCheck('GitHubCommitBatch', batchInstance);
+        }
         return new Map<String, Boolean>{
             'changesPushed' => isExecuted,
-            'initialValidation' => DatabaseUtils.getCurrentJobs(new List<String>{'GitHubCommitBatch'}).isEmpty()
+            'initialValidationPassed' => isBatchValid
         };
     }
 
