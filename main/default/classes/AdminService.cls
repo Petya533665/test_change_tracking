@@ -698,6 +698,7 @@ public without sharing class AdminService {
         Map<String, Object> output = new Map<String, Object>{
             ConfigUtil.EMAIL_SERVICE_DATA_KEY_CONFIRMED => ConfigUtil.SETTINGS.Email_Service_Confirmed__c,
             ConfigUtil.CONFIRM_AUTOMATED_FLOW_ERROR_TRACKING_KEY => flowErrorTracking,
+            ConfigUtil.CONFIRM_EVENT_MONITORING_TRACKING_KEY => ConfigUtil.EVENT_MONITORING_SETTINGS?.Enabled__c,
             ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_KEY => ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c,
             ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_KEY => ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED,
             ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_ENABLED_KEY => emailToCaseErrorTracking,
@@ -1024,6 +1025,51 @@ public without sharing class AdminService {
         return getEmailServiceData(flowErrorTracking, emailToCaseErrorTracking, emailToCaseErrorTrackingType, emailToCaseErrorTrackingAvailable, isEmailServicesAvailable);
     }
 
+    public static Map<String, Object> eventMonitoringTracking(Object data) {
+        Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
+        Boolean incomingValue = Boolean.valueOf(input.get(ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE));
+
+        Boolean flowErrorTracking = getAutomatedFlowErrorTracking();
+        String emailToCaseErrorTrackingType = getEmailToCaseErrorTrackingType();
+        Boolean emailToCaseErrorTrackingAvailable = getEmailToCaseErrorTrackingAvailable();
+        Boolean isEmailServicesAvailable = isEmailServicesAvailable();
+        Boolean emailToCaseErrorTracking = getEmailToCaseErrorTracking();
+        
+        try {
+            // enable event log generation in metadata settings if this settings in metadata is disabled
+            if(incomingValue) {
+                if(!MetadataServiceUtil.getEventSettingsLogGenerationEnabled()) {
+                    // enable event log generation in metadata settings
+                    MetadataServiceUtil.setEventSettingsLogGeneration(incomingValue);
+                }
+            }
+            // enable event monitoring in custom settings
+            AdminService.setEventMonitoringSetting(new Map<String, Object>{
+                ConfigUtil.MONITORING_APP_KEY_ENABLED => incomingValue
+            });
+
+            // set enabled event types with default enabled event types
+            // or disable all event types
+            ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = (incomingValue) 
+                ? EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES_STRING
+                : EventMonitoringUtil.DEFAULT_DISABLED_EVENT_TYPES_STRING;
+            // Round to previous hour and remove minutes/seconds
+            DateTime now = DateTime.now();
+            DateTime roundedHour = DateTime.newInstance(now.year(), now.month(), now.day(), now.hour(), 0, 0);
+            // Subtract 1 hour to get the previous hour
+            DateTime previousHour = roundedHour.addHours(-1);
+            
+            ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c = previousHour;
+            update ConfigUtil.EVENT_MONITORING_SETTINGS;
+        }
+        catch(Exception e) {
+            throw new AdminServiceException(e);
+        }
+        
+        return getEmailServiceData(flowErrorTracking, emailToCaseErrorTracking, emailToCaseErrorTrackingType, emailToCaseErrorTrackingAvailable, isEmailServicesAvailable);
+
+    }
+
     public static Map<String, Object> flowErrorTracking(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         MetadataServiceUtil.setAutomatedFlowErrorTracking(Boolean.valueOf(input.get(ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE)));
@@ -1235,15 +1281,18 @@ public without sharing class AdminService {
         Boolean emailToCaseErrorTrackingAvailable = getEmailToCaseErrorTrackingAvailable();
         Boolean flowErrorTracking = getAutomatedFlowErrorTracking();
         String emailServiceAddress = getPackageEmailServiceFunctionEmailAddress();
+        Boolean eventMonitoringTracking = ConfigUtil.EVENT_MONITORING_SETTINGS?.Enabled__c;
         Decimal percentComplete = 0;
         if(emailToCaseErrorTrackingAvailable) {
-            percentComplete += (String.isNotBlank(emailServiceAddress)) ? 33.33 : 0;
-            percentComplete += (flowErrorTracking) ? 33.33 : 0;
-            percentComplete += (ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) ? 33.33 : 0;
+            percentComplete += (String.isNotBlank(emailServiceAddress)) ? 25 : 0;
+            percentComplete += (flowErrorTracking) ? 25 : 0;
+            percentComplete += (eventMonitoringTracking) ? 25 : 0;
+            percentComplete += (ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) ? 25 : 0;
         }
         else {
-            percentComplete += (String.isNotBlank(emailServiceAddress)) ? 50 : 0;
-            percentComplete += (flowErrorTracking) ? 50 : 0;
+            percentComplete += (String.isNotBlank(emailServiceAddress)) ? 33.33 : 0;
+            percentComplete += (flowErrorTracking) ? 33.33 : 0;
+            percentComplete += (eventMonitoringTracking) ? 33.33 : 0;
         }
         return percentComplete;
     }
@@ -1469,7 +1518,8 @@ public without sharing class AdminService {
         GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
         Boolean isExecuted = DatabaseUtils.executeBatchWithLimitCheck('GitHubCommitBatch', batchInstance);
         return new Map<String, Boolean>{
-            'changesPushed' => isExecuted
+            'changesPushed' => isExecuted,
+            'initialValidation' => batchInstance.initialValidation()
         };
     }
 
