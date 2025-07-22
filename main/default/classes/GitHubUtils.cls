@@ -43,38 +43,77 @@ public with sharing class GitHubUtils {
     public static String GIT_API_GET_REPO_BRANCHES_INFO = 'https://api.github.com/repos/{0}/{1}/branches/{2}';
     public static final String GIT_API_V3_JSON_HEADER = 'application/vnd.github.v3+json';
 
-    public static Boolean validateGitHubConnection() {
-        List<GitRepoBranchInfo> branches = getRepoBranchesInfos(ConfigUtil.GIT_API_SETTINGS.Reponame__c);
-        for(GitRepoBranchInfo branch : branches) {
-            if(branch.name == ConfigUtil.GIT_API_SETTINGS.Branch_Name__c) {
-                return true;
-            }
+    public class GitValidationResult {
+        public Boolean gitValid;
+        public String errorMessage;
+
+        public GitValidationResult(Boolean gitValid) {
+            this.gitValid = gitValid;
         }
-        return false;
+
+        public GitValidationResult(Boolean gitValid, String errorMessage) {
+            this.gitValid = gitValid;
+            this.errorMessage = errorMessage;
+        }
     }
 
-    public static Boolean validateGitHubConnectionForChat() {
-        if (!ConfigUtil.GIT_API_SETTINGS.Enabled__c || String.isBlank(GIT_USERNAME) || String.isBlank(GIT_REPONAME) || String.isBlank(ConfigUtil.GIT_API_SETTINGS.Branch_Name__c)) {
-            return false;
+    public static GitValidationResult validateGitHubConnection(Boolean enabled, String gitUsername, String gitReponame, String gitBranchName) {
+        if (!enabled || String.isBlank(gitUsername) || String.isBlank(gitReponame) || String.isBlank(gitBranchName)) {
+            return new GitValidationResult(false);
         }
 
-        List<GitRepoBranchInfo> branches = getRepoBranchesInfos(
-            GIT_USERNAME,
-            GIT_REPONAME,
-            ConfigUtil.GIT_API_SETTINGS.Branch_Name__c
-        );
-        for(GitRepoBranchInfo branch : branches) {
-            if(branch.name == ConfigUtil.GIT_API_SETTINGS.Branch_Name__c) {
-                return true;
+        try {
+            List<GitRepoBranchInfo> branches = getRepoBranchesInfos(gitUsername, gitReponame, gitBranchName);
+            for (GitRepoBranchInfo branch : branches) {
+                if (branch.name == gitBranchName) {
+                    return new GitValidationResult(true);
+                }
             }
+        } catch (Exception e) {
+            return new GitValidationResult(false, 'Token validation failed: ' + e.getMessage());
         }
-        return false;
+
+        return new GitValidationResult(false);
     }
 
-    public static Map<String, Boolean> validateGitHubConnectionForChangeTracking() {
-        return new Map<String, Boolean>{
-            'valid' => validateGitHubConnectionForChat()
-        };
+    public static GitValidationResult validateGitHubConnection() {
+        return validateGitHubConnection(ConfigUtil.GIT_API_SETTINGS.Enabled__c, GIT_USERNAME, GIT_REPONAME, ConfigUtil.GIT_API_SETTINGS.Branch_Name__c);
+    }
+
+    public static GitValidationResult validateGitHubConnection(Object data) {
+        if (data == null) {
+            return validateGitHubConnection();
+        }
+
+        Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
+        List<String> ownerRepo = getOwnerAndRepositoryNameFromUrl(String.valueOf(input.get('repositoryUrl')));
+        String username = ownerRepo.get(0);
+        String repoName = ownerRepo.get(1);
+        String branchName = String.valueOf(input.get('branchName'));
+
+        String currentToken = GIT_TOKEN;
+        GIT_TOKEN = 'token ' + String.valueOf(input.get('apiToken'));
+        GitValidationResult result = validateGitHubConnection(true, username, repoName, branchName);
+        GIT_TOKEN = currentToken;
+        return result;
+    }
+
+    // https://github.com/grsys/Logger.git
+    // return ['grsys', 'Logger']
+    public static List<String> getOwnerAndRepositoryNameFromUrl(String repositoryUrl) {
+        List<String> result = new List<String>{'', ''};
+        if(String.isNotBlank(repositoryUrl)) {
+            List<String> parts = repositoryUrl.split('/');
+            if(parts.size() == 5) {
+                result.set(0, parts.get(3));
+                result.set(1, (parts.get(4)).removeEnd('.git'));
+            }
+        }
+        return result;
+    }
+
+    public static String getRepositoryUrlFromOwnerAndRepositoryName(List<String> parts) {
+        return (parts != null && parts.size() == 2 && parts.get(0) != null && parts.get(1) != null) ? String.format('https://github.com/{0}/{1}.git', parts) : '';
     }
 
     public static List<GitRepoBranchInfo> getRepoBranchesInfos(Object data) {
