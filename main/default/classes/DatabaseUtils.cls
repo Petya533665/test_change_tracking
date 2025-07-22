@@ -403,4 +403,42 @@ public with sharing class DatabaseUtils {
 		}
 	}
 
+	public static Map<String, Boolean> executeBatchWithLimitCheckDebug(List<String> jobNames, Object batchInstance) {
+		if (jobNames == null || jobNames.isEmpty()) return new Map<String, Boolean>{'jobNames' => false};
+
+		PharosBatchImpl pharosBatch = (PharosBatchImpl)batchInstance;
+
+		if (TEST_MODE) startJobs.add(jobNames[0]);
+
+		if (!pharosBatch.isForceStart && !pharosBatch.isExecutionTime(jobNames[0])) return new Map<String, Boolean>{'executionTime' => false};
+		if (!pharosBatch.initialValidation()) return new Map<String, Boolean>{'initialValidation' => false};
+
+		// check duplicate jobs
+		if (!getCurrentJobs(jobNames).isEmpty()) return new Map<String, Boolean>{'duplicateJobs' => false};
+
+		// check AsyncApexExecutions limits
+		Integer sumTotalJobItems = getSumTotalJobItems();
+		Integer availableQuantityAsyncApexExecutionsOnOrg = Integer.valueOf(LimitsService.getAvailableQuantityAsyncApexExecutions() * percentAsyncApexJobsFreeOnOrg);
+		Integer availableQuantityAsyncApexExecutions = availableQuantityAsyncApexExecutionsOnOrg - (sumTotalJobItems != null ? sumTotalJobItems : 0);
+
+		Integer batchIterations = Integer.valueOf(Math.ceil(pharosBatch.getIterationsCount() / Decimal.valueOf(pharosBatch.BATCH_SCOPE)));
+		// "-2" - Decreasing count by 2 to reserve slots for batch start and finish in async apex executions.
+		Decimal neededAsyncApexExecutionsRuns = (availableQuantityAsyncApexExecutions - batchIterations - 2);
+
+		if (batchIterations <= 0 || neededAsyncApexExecutionsRuns <= 0) return new Map<String, Boolean>{'asyncApexExecutions' => false};
+
+		// check You've exceeded the limit of 100 jobs in the flex queue
+		if (!LimitsService.isFlexQueueSlotAvailable()) return new Map<String, Boolean>{'flexQueueSlotAvailable' => false};
+
+		try {
+			pharosBatch.jobId = Database.executeBatch((Database.Batchable<PharosBatchInterface>)pharosBatch, pharosBatch.BATCH_SCOPE);
+			return new Map<String, Boolean>{'valid' => true};
+		}
+		catch(Exception e) {
+			String className = String.valueOf(batchInstance).split(':')[0];
+			Logger.getInstance().internalError(e, null, true, className, className);
+			return new Map<String, Boolean>{'valid' => false};
+		}
+	}
+
 }
