@@ -1518,6 +1518,7 @@ public without sharing class AdminService {
         GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
         Boolean isBatchValid = batchInstance.initialValidation();
         Boolean isJobAlreadyRunning = !DatabaseUtils.getCurrentJobs(new List<String>{'GitHubCommitBatch'}).isEmpty();
+        
         Boolean isExecuted = false;
         if (isBatchValid && !isJobAlreadyRunning) {
             isExecuted = DatabaseUtils.executeBatchWithLimitCheck('GitHubCommitBatch', batchInstance);
