@@ -404,17 +404,17 @@ public with sharing class DatabaseUtils {
 	}
 
 	public static Map<String, Boolean> executeBatchWithLimitCheckDebug(List<String> jobNames, Object batchInstance) {
-		if (jobNames == null || jobNames.isEmpty()) return new Map<String, Boolean>{'jobNames' => false};
+		if (jobNames == null || jobNames.isEmpty()) return new Map<String, Boolean>{'jobNamesPassed' => false};
 
 		PharosBatchImpl pharosBatch = (PharosBatchImpl)batchInstance;
 
 		if (TEST_MODE) startJobs.add(jobNames[0]);
 
-		if (!pharosBatch.isForceStart && !pharosBatch.isExecutionTime(jobNames[0])) return new Map<String, Boolean>{'executionTime' => false};
-		if (!pharosBatch.initialValidation()) return new Map<String, Boolean>{'initialValidation' => false};
+		if (!pharosBatch.isForceStart && !pharosBatch.isExecutionTime(jobNames[0])) return new Map<String, Boolean>{'executionTimePassed' => false};
+		if (!pharosBatch.initialValidation()) return new Map<String, Boolean>{'initialValidationPassed' => false};
 
 		// check duplicate jobs
-		if (!getCurrentJobs(jobNames).isEmpty()) return new Map<String, Boolean>{'duplicateJobs' => false};
+		if (!getCurrentJobs(jobNames).isEmpty()) return new Map<String, Boolean>{'duplicateJobsPassed' => false};
 
 		// check AsyncApexExecutions limits
 		Integer sumTotalJobItems = getSumTotalJobItems();
@@ -425,10 +425,10 @@ public with sharing class DatabaseUtils {
 		// "-2" - Decreasing count by 2 to reserve slots for batch start and finish in async apex executions.
 		Decimal neededAsyncApexExecutionsRuns = (availableQuantityAsyncApexExecutions - batchIterations - 2);
 
-		if (batchIterations <= 0 || neededAsyncApexExecutionsRuns <= 0) return new Map<String, Boolean>{'asyncApexExecutions' => false};
+		if (batchIterations <= 0 || neededAsyncApexExecutionsRuns <= 0) return new Map<String, Boolean>{'asyncApexExecutionsPassed' => false};
 
 		// check You've exceeded the limit of 100 jobs in the flex queue
-		if (!LimitsService.isFlexQueueSlotAvailable()) return new Map<String, Boolean>{'flexQueueSlotAvailable' => false};
+		if (!LimitsService.isFlexQueueSlotAvailable()) return new Map<String, Boolean>{'flexQueueSlotAvailablePassed' => false};
 
 		try {
 			pharosBatch.jobId = Database.executeBatch((Database.Batchable<PharosBatchInterface>)pharosBatch, pharosBatch.BATCH_SCOPE);
