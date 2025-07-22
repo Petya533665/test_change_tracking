@@ -1518,8 +1518,7 @@ public without sharing class AdminService {
         GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
         Boolean isExecuted = DatabaseUtils.executeBatchWithLimitCheck('GitHubCommitBatch', batchInstance);
         return new Map<String, Boolean>{
-            'changesPushed' => isExecuted,
-            'initialValidation' => batchInstance.initialValidation()
+            'changesPushed' => isExecuted
         };
     }
 
