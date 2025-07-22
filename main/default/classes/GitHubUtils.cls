@@ -71,6 +71,12 @@ public with sharing class GitHubUtils {
         return false;
     }
 
+    public static Map<String, Boolean> validateGitHubConnectionForChangeTracking() {
+        return new Map<String, Boolean>{
+            'valid' => validateGitHubConnectionForChat()
+        };
+    }
+
     public static List<GitRepoBranchInfo> getRepoBranchesInfos(Object data) {
         String owner;
         String reponame;
