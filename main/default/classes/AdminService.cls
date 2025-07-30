@@ -3859,7 +3859,7 @@ public without sharing class AdminService {
     }
 
     public static MetadataChatSettings setupMetadataChatTrustedSite() {
-        MetadataServiceUtil.upsertCspTrustedSite('Pharos_Chat_Websockt', 'wss://chat.pharos.ai', 'Pharos chat websocket connection');
+        MetadataServiceUtil.upsertCspTrustedSite('Pharos_Chat_Websockt', 'wss://chat.pharos.ai', 'Pharos chat websocke connection');
         return new MetadataChatSettings(true);
     }
 }
