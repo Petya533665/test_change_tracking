@@ -156,6 +156,10 @@ public with sharing class HttpUtils {
         return postput('POST', url, body, headers, expectedResponceCode, rssInstance);
     }
 
+	public static String postputBlobBody(String url, Blob body, Map<String, String> headers, Integer expectedResponceCode) {
+		return postputBlobBody('POST', url, body, headers, expectedResponceCode, null);
+	}
+
     public static String put(String url, String body, Map<String, String> headers, Integer expectedResponseCode) {
         return postput('PUT', url, body, headers, expectedResponseCode, null);
     }
@@ -197,6 +201,42 @@ public with sharing class HttpUtils {
             throw new HttpUtilsException(res.getStatusCode() + ': ' + res.getBody());
         }
     }
+
+	public static String postputBlobBody(String method, String url, Blob body, Map<String, String> headers, Integer expectedResponseCode, MetadataService.RemoteSiteSetting rssInstance) {
+		HTTPRequest req = new HTTPRequest();
+		req.setEndpoint(url);
+		req.setMethod(method);
+		if (headers != null) {
+			for (String key : headers.keySet()) {
+				req.setHeader(key, headers.get(key));
+			}
+		}
+		if(body != null) {
+			req.setBodyAsBlob(body);
+		}
+		req.setTimeout(120000);
+		debugHttpRequest(req, headers);
+
+		Http h = new Http();
+		HttpResponse res = h.send(req);
+		debugHttpResponse(res);
+		while (res.getStatusCode() == 302) {
+			req.setEndpoint(res.getHeader('Location'));
+			if(rssInstance != null) {
+				rssInstance.url = res.getHeader('Location');
+				MetadataServiceUtil.upsertRemoteSiteSettingsMetadata(rssInstance);
+			}
+			res = new Http().send(req);
+		}
+		if (res.getStatusCode() == expectedResponseCode) {
+			for(String headerKey : res.getHeaderKeys()) {
+				responseHeaders.put(headerKey, res.getHeader(headerKey));
+			}
+			return res.getBody();
+		} else {
+			throw new HttpUtilsException(res.getStatusCode() + ': ' + res.getBody());
+		}
+	}
 
     public static HttpResponse send(String endpoint, String method, Map<String, String> headers, String body) {
         HttpRequest req = new HttpRequest();
@@ -331,6 +371,57 @@ public with sharing class HttpUtils {
 			}
 			return startWith + String.join(valuesParts, '&');
 		}
+	}
+
+	public static String getContentType(String filename) {
+		String extension = filename.substringAfterLast('.');
+		if (extension.equalsIgnoreCase('jpg') || extension.equalsIgnoreCase('jpeg')) {
+			return 'image/jpeg';
+		} else if (extension.equalsIgnoreCase('png')) {
+			return 'image/png';
+		} else if (extension.equalsIgnoreCase('gif')) {
+			return 'image/gif';
+		} else if (extension.equalsIgnoreCase('bmp')) {
+			return 'image/bmp';
+		} else {
+			return 'application/octet-stream';
+		}
+	}
+
+	public static String getNameAttachment(String filename) {
+		String baseName = filename;
+		String extension = 'png';
+		
+		if (filename.contains('.')) {
+			List<String> parts = filename.split('\\.');
+			if (parts.size() > 1) {
+				extension = parts[parts.size() - 1];
+				baseName = filename.substringBeforeLast('.');
+			}
+		}
+		
+		return baseName +
+			'_' + String.valueOf(Datetime.now().getTime()) +
+			'_' + String.valueOf(Math.abs(Crypto.getRandomInteger())) +
+			'.' + extension;
+	}
+
+	public static Blob getMultipartFormData(String boundary, Blob fileBlob, String filename) {
+
+		// Prepare file data
+		String headerPart = '--' + boundary + '\r\n' +
+			'Content-Disposition: form-data; name="file"; filename="' + filename + '"\r\n' +
+			'Content-Type: ' + HttpUtils.getContentType(filename) + '\r\n\r\n';
+		String footerPart = '\r\n--' + boundary + '--';
+
+		Blob headerBlob = Blob.valueOf(headerPart);
+		Blob footerBlob = Blob.valueOf(footerPart);
+
+		// Combine the parts using hex conversion
+		String combinedDataAsHex = EncodingUtil.convertToHex(headerBlob) + EncodingUtil.convertToHex(fileBlob) + EncodingUtil.convertToHex(footerBlob);
+		Blob bodyBlob = EncodingUtil.convertFromHex(combinedDataAsHex);
+
+		return bodyBlob;
 	}
 
 	public class HttpUtilsException extends Exception {}
