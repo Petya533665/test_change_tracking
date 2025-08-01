@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>pharos__All</fullName>
+    <columns>NAME</columns>
+    <columns>pharos__Icon__c</columns>
+    <columns>pharos__Category__c</columns>
+    <columns>pharos__Type__c</columns>
+    <columns>pharos__Area__c</columns>
+    <columns>pharos__Summary__c</columns>
+    <columns>pharos__Is_New__c</columns>
+    <columns>pharos__Created_At__c</columns>
+    <columns>pharos__First_Occurred_On__c</columns>
+    <columns>pharos__User__c</columns>
+    <columns>pharos__Related_Object__c</columns>
+    <filterScope>Everything</filterScope>
+    <label>All</label>
+</ListView>

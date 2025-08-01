@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>pharos__All</fullName>
+    <columns>NAME</columns>
+    <columns>pharos__Active__c</columns>
+    <columns>pharos__AggregateType__c</columns>
+    <columns>pharos__Name__c</columns>
+    <columns>pharos__EventTimeInterval__c</columns>
+    <columns>pharos__FilterLogic__c</columns>
+    <filterScope>Everything</filterScope>
+    <label>All</label>
+</ListView>

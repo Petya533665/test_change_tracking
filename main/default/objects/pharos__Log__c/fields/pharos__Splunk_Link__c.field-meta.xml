@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>pharos__Splunk_Link__c</fullName>
+    <deprecated>false</deprecated>
+    <externalId>false</externalId>
+    <formula>IF(NOT(ISNULL(pharos__Sent_To_Splunk__c)), HYPERLINK($Setup.pharos__Splunk_Settings__c.pharos__Splunk_Url__c&amp;IF(NOT(ISBLANK($Setup.pharos__Splunk_Settings__c.pharos__Splunk_Web_Port__c)),&apos;:&apos;&amp;$Setup.pharos__Splunk_Settings__c.pharos__Splunk_Web_Port__c,&apos;&apos;)&amp;&quot;/app/search/search?q=search%20index%3D%22pharos%22%20Id%3D%22&quot;&amp; CASESAFEID(Id) &amp;&quot;%22&amp;latest=&quot;,&quot;View in Splunk&quot;), &apos;&apos;)</formula>
+    <label>Splunk Link</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

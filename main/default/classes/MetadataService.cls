@@ -6169,6 +6169,7 @@ public with sharing class MetadataService {
     }
     public class EventSettings extends Metadata {
 		public String type = 'EventSettings';
+        private String[] type_att_info = new String[]{'xsi:type'};
 		public String fullName;
 		private String[] fullName_type_info = new String[]{'fullName',SOAP_M_URI,'string','0','1','false'};
 		public Boolean bypassMeteringBlock;
@@ -6176,21 +6177,27 @@ public with sharing class MetadataService {
 		public Boolean enableDeleteMonitoringData;
 		public Boolean enableDynamicStreamingChannel;
 		public Boolean enableEventLogGeneration;
+		public Boolean enableEventLogObjectFeature;
 		public Boolean enableEventLogWaveIntegration;
+		public Boolean enableLightningLoggerEvents;
 		public Boolean enableLoginForensics;
 		public Boolean enableStreamingApi;
 		public Boolean enableTransactionSecurityPolicies;
+		public Integer eventLogRetentionDuration;
 		private String[] bypassMeteringBlock_type_info = new String[]{'bypassMeteringBlock',SOAP_M_URI,'boolean','0','1','false'};
 		private String[] enableApexLimitEvents_type_info = new String[]{'enableApexLimitEvents',SOAP_M_URI,'boolean','0','1','false'};
 		private String[] enableDeleteMonitoringData_type_info = new String[]{'enableDeleteMonitoringData',SOAP_M_URI,'boolean','0','1','false'};
 		private String[] enableDynamicStreamingChannel_type_info = new String[]{'enableDynamicStreamingChannel',SOAP_M_URI,'boolean','0','1','false'};
 		private String[] enableEventLogGeneration_type_info = new String[]{'enableEventLogGeneration',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] enableEventLogObjectFeature_type_info = new String[]{'enableEventLogObjectFeature',SOAP_M_URI,'boolean','0','1','false'};
 		private String[] enableEventLogWaveIntegration_type_info = new String[]{'enableEventLogWaveIntegration',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] enableLightningLoggerEvents_type_info = new String[]{'enableLightningLoggerEvents',SOAP_M_URI,'boolean','0','1','false'};
 		private String[] enableLoginForensics_type_info = new String[]{'enableLoginForensics',SOAP_M_URI,'boolean','0','1','false'};
 		private String[] enableStreamingApi_type_info = new String[]{'enableStreamingApi',SOAP_M_URI,'boolean','0','1','false'};
 		private String[] enableTransactionSecurityPolicies_type_info = new String[]{'enableTransactionSecurityPolicies',SOAP_M_URI,'boolean','0','1','false'};
+		private String[] eventLogRetentionDuration_type_info = new String[]{'eventLogRetentionDuration',SOAP_M_URI,'int','1','1','false'};
 		private String[] apex_schema_type_info = new String[]{SOAP_M_URI,'true','false'};
-		private String[] field_order_type_info = new String[]{'fullName','bypassMeteringBlock','enableApexLimitEvents','enableDeleteMonitoringData','enableDynamicStreamingChannel','enableEventLogGeneration','enableEventLogWaveIntegration','enableLoginForensics','enableStreamingApi','enableTransactionSecurityPolicies'};
+		private String[] field_order_type_info = new String[]{'fullName','bypassMeteringBlock','enableApexLimitEvents','enableDeleteMonitoringData','enableDynamicStreamingChannel','enableEventLogGeneration','enableEventLogObjectFeature','enableEventLogWaveIntegration','enableLightningLoggerEvents','enableLoginForensics','enableStreamingApi','enableTransactionSecurityPolicies','eventLogRetentionDuration'};
 	}
     public class EventSubscription extends Metadata {
         public String type = 'EventSubscription';
@@ -8796,6 +8803,20 @@ public with sharing class MetadataService {
     }
     public class readCaseSettingsResponse_element implements IReadResponseElement {
         public MetadataService.ReadCaseSettingsResult result;
+        public IReadResult getResult() { return result; }
+        private String[] result_type_info = new String[]{'result',SOAP_M_URI,null,'1','1','false'};
+        private String[] apex_schema_type_info = new String[]{SOAP_M_URI,'true','false'};
+        private String[] field_order_type_info = new String[]{'result'};
+    }
+    public class ReadEventSettingsResult implements IReadResult {
+        public MetadataService.EventSettings[] records;
+        public MetadataService.Metadata[] getRecords() { return records; }
+        private String[] records_type_info = new String[]{'records',SOAP_M_URI,null,'0','-1','false'};
+        private String[] apex_schema_type_info = new String[]{SOAP_M_URI,'true','false'};
+        private String[] field_order_type_info = new String[]{'records'};
+    }
+    public class readEventSettingsResponse_element implements IReadResponseElement {
+        public MetadataService.ReadEventSettingsResult result;
         public IReadResult getResult() { return result; }
         private String[] result_type_info = new String[]{'result',SOAP_M_URI,null,'1','1','false'};
         private String[] apex_schema_type_info = new String[]{SOAP_M_URI,'true','false'};

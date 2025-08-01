@@ -747,6 +747,7 @@ public with sharing class ConfigUtil {
 
     public static final String CONFIRM_EMAIL_SERVICE_KEY_VALUE = 'value';
     public static final String CONFIRM_AUTOMATED_FLOW_ERROR_TRACKING_KEY = 'flowErrorTracking';
+    public static final String CONFIRM_EVENT_MONITORING_TRACKING_KEY = 'eventMonitoringTracking';
     public static final String CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_KEY = 'emailToCaseTracking';
     public static final String CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_KEY = 'emailToCaseTrackingStatus';
     public static final String CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_ENABLED_KEY = 'enabledEmailToCaseTracking';

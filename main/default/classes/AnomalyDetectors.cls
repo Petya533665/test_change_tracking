@@ -453,6 +453,12 @@ public class AnomalyDetectors {
             return exceptionData.stackTrace;
         }
 
+        protected override DateTime generateLogTimestamp(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.ApexUnexpectedExceptionData exceptionData = (EventLogProcessors.ApexUnexpectedExceptionData)event;
+            // Use timestampDerived (ISO format) for ApexUnexpectedExceptionData instead of timestamp (raw format)
+            return exceptionData.timestampDerived != null ? exceptionData.timestampDerived : ((BaseEventData)event).timestamp;
+        }
+
         protected override String generateSummary(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
             String summary = String.valueOf(value);
             if (String.isNotBlank(summary)) {

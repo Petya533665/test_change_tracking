@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>pharos__Jira_Integration_Status__c</fullName>
+    <deprecated>false</deprecated>
+    <externalId>false</externalId>
+    <label>Jira Integration Status</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Ticket Pending</fullName>
+                <default>false</default>
+                <label>Ticket Pending</label>
+            </value>
+            <value>
+                <fullName>New Ticket Created</fullName>
+                <default>false</default>
+                <label>New Ticket Created</label>
+            </value>
+            <value>
+                <fullName>Existing Ticket Linked</fullName>
+                <default>false</default>
+                <label>Existing Ticket Linked</label>
+            </value>
+            <value>
+                <fullName>Error</fullName>
+                <default>false</default>
+                <label>Error</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>
