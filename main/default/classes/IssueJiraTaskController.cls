@@ -96,6 +96,10 @@ public with sharing class IssueJiraTaskController {
 				response.data = AzureService.searchEpics(data);
 			} else if (method == 'getAzureDevOpsProjectTeamMemberWrapper') {
 				response.data = AzureService.getProjectTeamMemberWrapper(data);
+			} else if (method == 'getTeamBoards') {
+                response.data = AzureService.getTeamBoards(data);
+            } else if (method == 'getAzureDevOpsWorkItemTypesWithValidation') {
+                response.data = AzureService.getAzureDevOpsWorkItemTypesWithValidation(data);
 			} else if (method == 'getAzureDevOpsClassificationNodes') {
 				response.data = AzureService.getClassificationNodes(data);
 			} else if (method == 'getDefaultAzureDevOpsActionTemplate') {

@@ -1316,6 +1316,23 @@ public with sharing class RuleUtil {
 		}
 	}
 
+	public static String getAzureDevOpsBoardId(String teamIdAndBoardId) {
+		if (String.isNotBlank(teamIdAndBoardId) && teamIdAndBoardId.contains(';') && teamIdAndBoardId.split(';').size() > 1) {
+			return teamIdAndBoardId.split(';')[1];
+		}
+		return null;
+	}
+
+	public static String getAzureDevOpsTeamId(String teamIdAndBoardId) {
+		if (String.isNotBlank(teamIdAndBoardId)) {
+			if (teamIdAndBoardId.contains(';') && teamIdAndBoardId.split(';').size() > 0) {
+				return teamIdAndBoardId.split(';')[0];
+			}
+			return teamIdAndBoardId;
+		}
+		return null;
+	}
+
 	public class Action {
 		public Id id;
 		public Id recordTypeId;
@@ -1331,6 +1348,7 @@ public with sharing class RuleUtil {
 		public String subject;
 		public String pagerDutyType;
 		public String teamId;
+		public String boardId;
 		public String channelId;
 		public String slackChannels;
 		public String emailBody;
@@ -1371,7 +1389,8 @@ public with sharing class RuleUtil {
 			this.subtype = action.Subtype__c;
 			this.subject = action.Subject__c;
 			this.pagerDutyType = action.PagerDuty_Type__c;
-			this.teamId = action.Team_Id__c;
+			this.teamId = getAzureDevOpsTeamId(action.Team_Id__c);
+			this.boardId = getAzureDevOpsBoardId(action.Team_Id__c);
 			this.channelId = action.Channel_Id__c;
 			this.slackChannels = action.SlackChannels__c;
 			this.emailBody = action.EmailBody__c;
@@ -1454,7 +1473,7 @@ public with sharing class RuleUtil {
 					Subtype__c = subtype,
 					Subject__c = subject,
 					PagerDuty_Type__c = pagerDutyType,
-					Team_Id__c = teamId,
+					Team_Id__c = teamId + (String.isNotBlank(boardId) ? ';' + boardId : ''),
 					Channel_Id__c = channelId,
 					SlackChannels__c = slackChannels,
 					EmailBody__c = emailBody,
@@ -2126,33 +2145,47 @@ public with sharing class RuleUtil {
 				},
 				'decimal' => new Set<String>{
 					'com.atlassian.jira.plugin.system.customfieldtypes:float',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
 					'number'
 				},
 				'integer' => new Set<String>{
 					'com.atlassian.jira.plugin.system.customfieldtypes:float',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
 					'number'
 				},
 				'date' => new Set<String>{
 					'com.atlassian.jira.plugin.system.customfieldtypes:datepicker',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
 					'date'
 				},
 				'datetime' => new Set<String>{
 					'com.atlassian.jira.plugin.system.customfieldtypes:datetime',
 					'com.atlassian.jira.plugin.system.customfieldtypes:datepicker',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
 					'datetime'
 				},
 				'url' => new Set<String>{
 					'com.atlassian.jira.plugin.system.customfieldtypes:url',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
 					'url'
 				},
 				'multivalue' => new Set<String>{
 					'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes',
 					'com.atlassian.jira.plugin.system.customfieldtypes:multiselect',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
 					'array'
 				},
 				'boolean' => new Set<String>{
 					'com.atlassian.jira.plugin.system.customfieldtypes:select',
 					'com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
 					'boolean'
 				}
 			};

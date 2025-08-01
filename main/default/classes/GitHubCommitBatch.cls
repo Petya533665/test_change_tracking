@@ -256,7 +256,8 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
 
             this.metadataChatEnabled = String.valueOf(PermissionsUtil.MetadataChatEnabled);
             if (PermissionsUtil.MetadataChatEnabled) {
-                this.pineconeNsEmpty = String.valueOf(!PharosChatController.isCodeIndexed(this.oid));
+                PharosChatController.NamespaceStatusResponse namespaceStatus = PharosChatController.getNamespaceStatus(this.oid);
+                this.pineconeNsEmpty = String.valueOf(!namespaceStatus.empty);
             }
         }
     }
@@ -472,9 +473,6 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
     }
 
     @TestVisible
-    private static AuditChangeWrapper testAuditChangeWrapper;
-
-    @TestVisible
     private static List<SetupAuditTrail> mockAuditTrails = new List<SetupAuditTrail>();
 
     private static List<SetupAuditTrail> getAuditTrailRecords(String lastProcessedId) {
@@ -510,10 +508,6 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
     public static AuditChangeWrapper getAuditTrails(String lastProcessedId) {
         AuditChangeWrapper result;
 
-        if(testAuditChangeWrapper != null) {
-            result = testAuditChangeWrapper;
-            return result;
-        }
         List<SetupAuditTrail> records = getAuditTrailRecords(lastProcessedId);
 
         if(lastProcessedId == null) {
@@ -521,8 +515,13 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
             result = new AuditChangeWrapper(currentLastProcessedId);
         }
         else {
-            Integer lastIndex = !records.isEmpty() ? records.size() - 1 : null;
-            String currentLastProcessedId = (lastIndex != null) ? records.get(lastIndex).Id : null;
+            /**
+             * AuditTrail records are in descending order, so we need to get the first record
+             * 1 AuditTrail, DateTime: 2025-07-28 10:00:00, Id: 1002
+             * 2 AuditTrail, DateTime: 2025-07-28 09:00:00, Id: 1001
+             * 3 AuditTrail, DateTime: 2025-07-28 08:00:00, Id: 1000
+             */
+            String currentLastProcessedId = (records.isEmpty()) ? null : records.get(0).Id;
 
             Map<String, AuditChange> changes = new Map<String, AuditChange>();
             for(SetupAuditTrail record : records) {
