@@ -21,8 +21,12 @@ public with sharing class EventMonitoringUtil {
     public static final String EVENT_LOG_FILE_SEQUENCE = 'Sequence';
 
     public static List<SObject> getEventLogs(String eventType) {
+        return getEventLogs(new List<String>{eventType});
+    }
+    
+    public static List<SObject> getEventLogs(List<String> eventTypes) {
         // Handle null parameters or unavailable object
-        if (eventType == null || 
+        if (eventTypes == null || eventTypes.isEmpty() || 
             ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c == null ||
             !isEventLogFileAvailable()) {
             return new List<SObject>();
@@ -49,7 +53,7 @@ public with sharing class EventMonitoringUtil {
         
         QBuilder queryBuilder = new QBuilder(getEventLogFileType())
             .selectFields(selectFields)
-            .add(QBuilder.condition(EVENT_LOG_FILE_EVENT_TYPE).equalsTo(eventType))
+            .add(QBuilder.condition(EVENT_LOG_FILE_EVENT_TYPE).isIn(eventTypes))
             .add(QBuilder.condition(EVENT_LOG_FILE_LOG_DATE).isGreaterOrEquals(String.valueOf(lastProcessedHourlyDateTime)))
             .add(QBuilder.condition(EVENT_LOG_FILE_INTERVAL).equalsTo(INTERVAL_HOURLY))
             .add(QBuilder.orderBy(EVENT_LOG_FILE_LOG_DATE).descending())
@@ -255,6 +259,23 @@ public with sharing class EventMonitoringUtil {
         if (value instanceof Integer) return (Integer)value;
         if (value instanceof Decimal) return ((Decimal)value).intValue();
         if (value instanceof String) return Integer.valueOf((String)value);
+        return null;
+    }
+
+    /**
+     * Get double field value from SObject safely
+     * @param record SObject
+     * @param fieldName String
+     * @return Double
+     */
+    public static Double getDoubleValue(SObject record, String fieldName) {
+        
+        Object value = getFieldValue(record, fieldName);
+        if (value == null) return null;
+        if (value instanceof Double) return (Double)value;
+        if (value instanceof Decimal) return ((Decimal)value).doubleValue();
+        if (value instanceof Integer) return Double.valueOf((Integer)value);
+        if (value instanceof String) return Double.valueOf((String)value);
         return null;
     }
 
@@ -465,7 +486,7 @@ public with sharing class EventMonitoringUtil {
     public static Map<String, List<EventLogProcessors.FilterField>> getEventMonitoringFields() {
         Map<String, List<EventLogProcessors.FilterField>> result = new Map<String, List<EventLogProcessors.FilterField>>();
 
-        if (ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c) {
+        if (PermissionsUtil.EventMonitoringEnabled && ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c) {
             List<Boolean> enabledEventTypes = getEnabledMembersFromSettings();
             // get the enabled event types index from the MAP_ENABLED_EVENT_TYPES
             // if the index is in the enabledEventTypes, add the event type to the result
@@ -490,7 +511,7 @@ public with sharing class EventMonitoringUtil {
      */
     public static List<EventLogProcessingBatch.EventLogFileType> getEnabledMembers() {
         List<EventLogProcessingBatch.EventLogFileType> result = new List<EventLogProcessingBatch.EventLogFileType>();
-        if (ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c) {
+        if (PermissionsUtil.EventMonitoringEnabled && ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c) {
             List<Boolean> enabledEventTypes = getEnabledMembersFromSettings();
             // get the enabled event types index from the MAP_ENABLED_EVENT_TYPES
             // if the index is in the enabledEventTypes, add the event type to the result
@@ -512,24 +533,18 @@ public with sharing class EventMonitoringUtil {
      */
     public static List<Boolean> getEnabledMembersFromSettings() {
         List<Boolean> result = new List<Boolean>();
-        if (ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c) {
-            String enabledEventTypes = ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c;
-            List<String> enabledEventTypesList = String.isNotBlank(enabledEventTypes)
-                ? new List<String>(enabledEventTypes.split(','))
-                : new List<String>();
-            for(Integer i = 0; i < MAP_ENABLED_EVENT_TYPES.size(); i++) {
-                try {
-                    result.add(Boolean.valueOf(enabledEventTypesList[i] == '1'));
-                }
-                catch (Exception e) {
-                    result.add(false);
-                }
+
+        String enabledEventTypes = ConfigUtil.EVENT_MONITORING_SETTINGS?.Enabled_Types__c;
+        List<String> enabledEventTypesList = String.isNotBlank(enabledEventTypes)
+            ? new List<String>(enabledEventTypes.split(','))
+            : new List<String>();
+        
+        for(Integer i = 0; i < MAP_ENABLED_EVENT_TYPES.size(); i++) {
+            try {
+                result.add(Boolean.valueOf(enabledEventTypesList[i] == '1'));
             }
-            for (String eventType : DEFAULT_ENABLED_EVENT_TYPES) {
-                Integer index = MAP_ENABLED_EVENT_TYPES.get(eventType);
-                if (index != null) {
-                    result[index] = true;
-                }
+            catch (Exception e) {
+                result.add(false);
             }
         }
         return result;
@@ -562,6 +577,24 @@ public with sharing class EventMonitoringUtil {
         update ConfigUtil.EVENT_MONITORING_SETTINGS;
     }
 
+    public void disableEventType(String eventTypeToDisable) {
+        List<Boolean> enabledMembersFromSettings = getEnabledMembersFromSettings();
+        Integer index = MAP_ENABLED_EVENT_TYPES.get(eventTypeToDisable);
+        if (index != null) {
+            enabledMembersFromSettings[index] = false;
+        }
+        List<String> enabledTypes = new List<String>();
+        for (Integer i = 0; i < enabledMembersFromSettings.size(); i++) {
+            if (enabledMembersFromSettings[i]) {
+                enabledTypes.add('1');
+            } else {
+                enabledTypes.add('0');
+            }
+        }
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = String.join(enabledTypes, ',');
+        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+    }
+
     /**
      * Default enabled event types
      * @return Set<String>
@@ -569,6 +602,52 @@ public with sharing class EventMonitoringUtil {
     public static Set<String> DEFAULT_ENABLED_EVENT_TYPES = new Set<String>{
         EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION
     };
+
+    public static String DEFAULT_ENABLED_EVENT_TYPES_STRING {
+        get {
+            if(DEFAULT_ENABLED_EVENT_TYPES_STRING == null || String.isBlank(DEFAULT_ENABLED_EVENT_TYPES_STRING)) {
+                DEFAULT_ENABLED_EVENT_TYPES_STRING = getAllWithDefaultEnabledEventTypesAsString();
+            }
+            return DEFAULT_ENABLED_EVENT_TYPES_STRING;
+        }
+        private set;
+    }
+
+    public static String DEFAULT_DISABLED_EVENT_TYPES_STRING {
+        get {
+            if(DEFAULT_DISABLED_EVENT_TYPES_STRING == null || String.isBlank(DEFAULT_DISABLED_EVENT_TYPES_STRING)) {
+                DEFAULT_DISABLED_EVENT_TYPES_STRING = getAllDisabledEventTypesAsString();
+            }
+            return DEFAULT_DISABLED_EVENT_TYPES_STRING;
+        }
+        private set;
+    }
+
+    public static String getAllWithDefaultEnabledEventTypesAsString() {
+        List<String> result = new List<String>();
+            
+        for(String eventType : MAP_ENABLED_EVENT_TYPES.keySet()) {
+            try {
+                String value = (DEFAULT_ENABLED_EVENT_TYPES.contains(eventType)) ? '1' : '0';
+                result.add(value);
+            }
+            catch (Exception e) {
+                result.add('0');
+            }
+        }
+        
+        return String.join(result, ',');
+    }
+
+    public static String getAllDisabledEventTypesAsString() {
+        List<String> result = new List<String>();
+            
+        for(String eventType : MAP_ENABLED_EVENT_TYPES.keySet()) {
+            result.add('0');
+        }
+            
+        return String.join(result, ',');
+    }
 
     /**
      * Map of event types to their indexes used in the settings
@@ -584,7 +663,7 @@ public with sharing class EventMonitoringUtil {
                     EventLogProcessors.EVENT_TYPE_APEX_REST_API =>                      3,
                     EventLogProcessors.EVENT_TYPE_APEX_SOAP =>                          4,
                     EventLogProcessors.EVENT_TYPE_APEX_TRIGGER =>                       5,
-                    EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION =>          6, // enabled by default
+                    EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION =>          6,
                     EventLogProcessors.EVENT_TYPE_API_TOTAL_USAGE =>                    7,
                     EventLogProcessors.EVENT_TYPE_ASYNCHRONOUS_REPORT_RUN =>            8,
                     EventLogProcessors.EVENT_TYPE_AURA_REQUEST =>                       9,

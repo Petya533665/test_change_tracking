@@ -127,9 +127,15 @@ private class EventMonitoringUtilTest {
         );
         insert settings;
     }
+
+    static void enableEventMonitoringPermissions() {
+        PermissionsUtil.EventMonitoringEnabled = true;
+    }
     
     @IsTest
     static void testGetEventLogs() {
+        enableEventMonitoringPermissions();
+
         // Arrange
         DateTime testDateTime = DateTime.now().addHours(-1);
         SObject testLog = EventMonitoringUtil.createTestEventLogSObject(
@@ -163,36 +169,17 @@ private class EventMonitoringUtilTest {
     static void testGetEventLogsWithNullParams() {
         // Act
         Test.startTest();
-        List<SObject> result = EventMonitoringUtil.getEventLogs(null);
+        List<SObject> result = EventMonitoringUtil.getEventLogs((String)null);
         Test.stopTest();
         
         // Assert
         System.assertEquals(0, result.size(), 'Should return empty list for null event type');
     }
-
-    @IsTest
-    static void testGetEnabledMembersWithDefaultEnabledEventTypes() {
-        // Arrange
-        Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
-        settings.Enabled__c = true;
-        settings.Enabled_Types__c = '0,0,0'; // Disable all event types
-        update settings;
-        
-        // Act
-        Test.startTest();
-        List<EventLogProcessingBatch.EventLogFileType> result = EventMonitoringUtil.getEnabledMembers();
-        Test.stopTest();
-        
-        // Assert
-        System.assertNotEquals(0, result.size(), 'Should return enabled event types');
-
-        EventLogProcessingBatch.EventLogFileType eventType = result.get(0);
-        System.assertEquals(1, result.size(), 'Should return only one event type');
-        System.assertEquals(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION, eventType.type, 'Unexpected Exception event type should be enabled by default');
-    }
     
     @IsTest
     static void testGetEnabledMembers() {
+        enableEventMonitoringPermissions();
+        
         // Arrange
         Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
         settings.Enabled__c = true;
@@ -226,6 +213,8 @@ private class EventMonitoringUtilTest {
     
     @IsTest
     static void testGetEnabledMembersFromSettings() {
+        enableEventMonitoringPermissions();
+        
         // Arrange
         Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
         settings.Enabled__c = true;
@@ -242,13 +231,12 @@ private class EventMonitoringUtilTest {
             'Should return list matching MAP_ENABLED_EVENT_TYPES size');
         System.assertEquals(true, result[0], 'First event type should be enabled');
         System.assertEquals(false, result[1], 'Second event type should be disabled');
-
-        Integer index = EventMonitoringUtil.MAP_ENABLED_EVENT_TYPES.get(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION);
-        System.assertEquals(true, result[index], 'Unexpected Exception event type should be enabled by default');
     }
     
     @IsTest
     static void testIsEnabled() {
+        enableEventMonitoringPermissions();
+        
         // Arrange
         Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
         settings.Enabled__c = true;
@@ -270,6 +258,8 @@ private class EventMonitoringUtilTest {
     
     @IsTest
     static void testEnableEventType() {
+        enableEventMonitoringPermissions();
+
         // Arrange
         Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
         settings.Enabled__c = true;
@@ -287,6 +277,29 @@ private class EventMonitoringUtilTest {
         settings = Event_Monitoring__c.getOrgDefaults();
         System.assert(settings.Enabled_Types__c.startsWith('1'), 
             'First event type should be enabled');
+    }
+
+    @IsTest
+    static void testDisableEventType() {
+        enableEventMonitoringPermissions();
+
+        // Arrange
+        Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
+        settings.Enabled__c = true;
+        settings.Enabled_Types__c = '1,0,0';
+        update settings;
+        
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        
+        // Act
+        Test.startTest();
+        util.disableEventType(EventLogProcessors.EVENT_TYPE_API);
+        Test.stopTest();
+        
+        // Assert
+        settings = Event_Monitoring__c.getOrgDefaults();
+        System.assert(settings.Enabled_Types__c.startsWith('0'), 
+            'First event type should be disabled');
     }
     
     @IsTest
@@ -321,6 +334,8 @@ private class EventMonitoringUtilTest {
     
     @IsTest
     static void testGetEnabledMembersWithInvalidSettings() {
+        enableEventMonitoringPermissions();
+        
         // Arrange
         Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
         settings.Enabled__c = true;
@@ -463,5 +478,16 @@ private class EventMonitoringUtilTest {
         System.assertEquals(null, nullFieldValue, 'getFieldValue should handle null SObject gracefully');
         
         Test.stopTest();
+    }
+
+    @IsTest
+    static void testDefaultEnabledEventTypesString() {
+        Test.startTest();
+        String result = EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES_STRING;
+        String result2 = EventMonitoringUtil.DEFAULT_DISABLED_EVENT_TYPES_STRING;
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result, 'DEFAULT_ENABLED_EVENT_TYPES_STRING should not be null');
+        System.assertNotEquals(null, result2, 'DEFAULT_DISABLED_EVENT_TYPES_STRING should not be null');
     }
 }

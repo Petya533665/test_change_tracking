@@ -95,7 +95,7 @@ public class EventLogProcessors {
 
     // Event types to check for duplicates
     // when a errors comes from several sources (Email, Event Log, etc), we need to check for duplicates
-    private static final Set<String> EVENT_TYPES_TO_CHECK_DUPLICATES = new Set<String>{
+    public static final Set<String> EVENT_TYPES_TO_CHECK_DUPLICATES = new Set<String>{
         EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION
     };
 
@@ -222,10 +222,8 @@ public class EventLogProcessors {
             try {
                 // Detect anomalies for the batch
                 List<AnomalyDetectors.EventAnomaly> anomalies = detector.detectAnomalies(batchResults, fieldMetadataConfig);
-                
-                List<Log__c> logsToCheckExistingLogIndex = new List<Log__c>();
 
-                // Process detected anomalies
+                // Process detected anomalies - removed deduplication logic to avoid SOQL in loop
                 for (AnomalyDetectors.EventAnomaly anomaly : anomalies) {
                     LogBuilder logBuilder = LogBuilder.getInstance()
                         .type(anomaly.logType)
@@ -243,33 +241,14 @@ public class EventLogProcessors {
                         logBuilder.createIssue();
                     }
 
-                    // check existing log index for non-critical anomalies
+                    // Check if this event type needs duplicate checking - but don't perform it here
+                    // The deduplication will be handled at the batch level after all CSV processing is complete
                     if (EVENT_TYPES_TO_CHECK_DUPLICATES.contains(anomaly.eventType)) {
-                        // add trace point for calculate hash1 to use in the check for duplicates
-                        logsToCheckExistingLogIndex.add(logBuilder.tracePoint().build());
+                        // add trace point for calculate hash1 to use later in the deduplication check
+                        this.logger.add(logBuilder.tracePoint().build());
                     }
                     else {
                         this.logger.add(logBuilder.build());
-                    }
-                }
-
-                if (!logsToCheckExistingLogIndex.isEmpty()) {
-                    Set<String> logIndexKeys = new Set<String>();
-                    for (Log__c log : logsToCheckExistingLogIndex) {
-                        if (String.isNotBlank(log.Hash_1__c) && String.isNotBlank(log.Organization_Id__c)) {
-                            logIndexKeys.add(ConfigUtil.getLogIndexKey(log.Hash_1__c, log.Organization_Id__c));
-                        }
-                    }
-
-                    if (!logIndexKeys.isEmpty()) {
-                        ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(logIndexKeys);
-                        for (Log__c log : logsToCheckExistingLogIndex) {
-                            ConfigUtil.LogIndex index = helper.getLogIndex(log);
-                            // if no index found, add the log to the logger
-                            if (index == null) {
-                                this.logger.add(log);
-                            }
-                        }
                     }
                 }
             }
@@ -412,6 +391,23 @@ public class EventLogProcessors {
          * It also provides methods chunk process the csv rows and process them in batches. after processing the batch, it calls the callback to process the batch results.
          */
         public virtual void batchProcessLogFileSObject(SObject logFile, IBatchProcessor batchProcessor) {
+            // Process entire file (legacy behavior)
+            batchProcessLogFileSObject(logFile, batchProcessor, null, null);
+        }
+
+        /**
+         * Batch Process EventLogFile using SObject for safe access with chunking support
+         * 
+         * This method is used to process a log file in chunks using SObject for safe field access.
+         * It uses the CSVParser to parse the log file and the requiredHeaders to validate the headers.
+         * It processes only the specified range of rows (startRow to endRow) for chunked processing.
+         * 
+         * @param logFile The log file SObject
+         * @param batchProcessor The batch processor callback
+         * @param startRow The starting row index (0-based, null for entire file)
+         * @param endRow The ending row index (exclusive, null for entire file)
+         */
+        public virtual void batchProcessLogFileSObject(SObject logFile, IBatchProcessor batchProcessor, Integer startRow, Integer endRow) {
             if (logFile == null) return;
 
             // Get LogFile blob safely
@@ -439,13 +435,28 @@ public class EventLogProcessors {
     
             Integer rowIndex = 0;
             List<List<String>> csvRows = new List<List<String>>();
+            Integer processedRows = 0;
 
             // Iterate over the csv rows
             for (Iterator<List<String>> iter = csvParser.iterator(); iter.hasNext(); ) {
-                csvRows.add(iter.next());
+                List<String> currentRow = iter.next();
                 
-                // Process batch when it reaches size 10 or when there are no more records
-                if (csvRows.size() == 10 || !iter.hasNext()) {
+                // Skip rows before startRow if chunking is enabled
+                if (startRow != null && rowIndex < startRow) {
+                    rowIndex++;
+                    continue;
+                }
+                
+                // Stop processing if we've reached endRow
+                if (endRow != null && rowIndex >= endRow) {
+                    break;
+                }
+                
+                csvRows.add(currentRow);
+                
+                // Process batch when it reaches chunk size or when there are no more records
+                Integer chunkSize = getChunkSize();
+                if (csvRows.size() == chunkSize || !iter.hasNext()) {
                     try {
                         // bulk parse csv row fields to instance of IBaseEventData
                         List<IBaseEventData> batchResults = batchProcessCSVRows(csvRows, headerMap);
@@ -457,9 +468,11 @@ public class EventLogProcessors {
                         }
                     }
                     catch (Exception e) {}
-                    rowIndex += csvRows.size();
+                    processedRows += csvRows.size();
                     csvRows.clear();
                 }
+                
+                rowIndex++;
             }
         }
 
@@ -3276,7 +3289,7 @@ public class EventLogProcessors {
         
         // User Information
         public String userIdDerived { get; private set; }    // USER_ID_DERIVED: 18-char user ID
-        
+
         public MetadataApiOperationData(Map<String, Object> eventData) {
             super(eventData);
         }
@@ -8447,5 +8460,352 @@ public class EventLogProcessors {
             values.addAll(tmpValues);
             return position;
         }
+    }
+
+    // ==========================================
+    // Enhanced Deduplication Methods
+    // ==========================================
+
+    /**
+     * Process event logs with email awareness - Request_Id population and timing analysis
+     * @param eventLogs List of event logs from CSV processing
+     * @param dedupSettings Deduplication settings
+     * @param logger Logger instance for logging
+     * @return List of event logs that should be created
+     */
+    public static List<Log__c> processEventLogsWithEmailAwareness(List<Log__c> eventLogs, Map<String, Object> dedupSettings, Logger logger) {
+        List<Log__c> logsToCreate = new List<Log__c>();
+        List<Log__c> emailLogsToUpdate = new List<Log__c>();
+        
+        if (eventLogs.isEmpty()) {
+            return logsToCreate;
+        }
+        
+        // Build maps for bulk processing
+        Map<String, DateTime> hashToTimestampMap = new Map<String, DateTime>();
+        Map<String, String> hashToRequestIdMap = new Map<String, String>();
+        Set<String> requestIdsToCheck = new Set<String>();
+        
+        for (Log__c log : eventLogs) {
+            if (String.isNotBlank(log.Hash_1__c)) {
+                DateTime logTimestamp = log.Created_At__c;
+                String requestId = log.Request_Id_External__c;
+                
+                hashToTimestampMap.put(log.Hash_1__c, logTimestamp);
+                if (String.isNotBlank(requestId)) {
+                    hashToRequestIdMap.put(log.Hash_1__c, requestId);
+                    requestIdsToCheck.add(requestId);
+                }
+            }
+        }
+        
+        if (!hashToTimestampMap.isEmpty()) {
+            // STAGE 1: Fast filter - Check for existing Request_Ids (prevents duplicate processing)
+            Set<String> existingRequestIds = getExistingRequestIds(requestIdsToCheck);
+            
+            // STAGE 2: Bulkified - Get ALL existing logs for all hashes at once (NO SOQL IN LOOP)
+            Map<String, List<EmailLogTimingInfo>> allExistingEmailLogTimings = getAllExistingEmailLogTimings(hashToTimestampMap);
+            
+            // Process each event log
+            for (Log__c eventLog : eventLogs) {
+                String hash = eventLog.Hash_1__c;
+                String requestId = eventLog.Request_Id_External__c;
+                
+                // Skip if Request_Id already exists (fast filter)
+                if (String.isNotBlank(requestId) && existingRequestIds.contains(requestId)) {
+                    continue;
+                }
+                
+                // Get existing email logs with timing info for this hash
+                List<EmailLogTimingInfo> existingEmailLogTimings = allExistingEmailLogTimings.get(hash);
+                
+                if (existingEmailLogTimings != null && !existingEmailLogTimings.isEmpty()) {
+                    // Analyze timing match
+                    LogMatchingResult result = analyzeLogMatching(eventLog, existingEmailLogTimings, dedupSettings);
+                    
+                    if (result.hasTimingMatch && result.emailLogMatch != null) {
+                        // Update email log with Request_Id_External__c
+                        result.emailLogMatch.emailLog.Request_Id_External__c = requestId;
+                        emailLogsToUpdate.add(result.emailLogMatch.emailLog);
+                    } else {
+                        // No timing match, create event log
+                        logsToCreate.add(eventLog);
+                    }
+                } else {
+                    // No existing email logs, create event log
+                    logsToCreate.add(eventLog);
+                }
+            }
+            
+            // Bulk update email logs with Request_Id_External__c
+            if (!emailLogsToUpdate.isEmpty()) {
+                DatabaseUtils.getInstance().performUpdateDML(emailLogsToUpdate, Schema.SObjectType.Log__c)
+                    .handleError(EventLogProcessors.class.getName(), '.processEventLogsWithEmailAwareness', logger);
+            }
+        } else {
+            logsToCreate = eventLogs;
+        }
+        
+        return logsToCreate;
+    }
+
+    /**
+     * Get ALL existing logs for all hashes with timing information (NO SOQL IN LOOP)
+     * @param hashToTimestampMap Map of hash1 values to their event log timestamps
+     * @return Map of hash1 to list of existing log timing information
+     */
+    public static Map<String, List<EmailLogTimingInfo>> getAllExistingEmailLogTimings(Map<String, DateTime> hashToTimestampMap) {
+        Map<String, List<EmailLogTimingInfo>> timingInfoMap = new Map<String, List<EmailLogTimingInfo>>();
+        
+        if (hashToTimestampMap.isEmpty()) {
+            return timingInfoMap;
+        }
+        
+        // Use hourly time window from custom settings with +/- 10 minute tolerance
+        DateTime lastProcessedHourlyTime = ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c;
+        
+        DateTime windowStart;
+        DateTime windowEnd;
+        
+        if (lastProcessedHourlyTime != null) {
+            // Use custom settings hourly time window with +/- 10 minute tolerance
+            windowStart = lastProcessedHourlyTime.addMinutes(-10);
+            windowEnd = lastProcessedHourlyTime.addHours(1).addMinutes(10);
+        } else {
+            // Fallback to original logic if custom setting is not available
+            DateTime earliestTime = null;
+            DateTime latestTime = null;
+            
+            for (DateTime timestamp : hashToTimestampMap.values()) {
+                if (earliestTime == null || timestamp < earliestTime) {
+                    earliestTime = timestamp;
+                }
+                if (latestTime == null || timestamp > latestTime) {
+                    latestTime = timestamp;
+                }
+            }
+            
+            // Expand window by 1 hour on each side (Salesforce event log CSV window)
+            windowStart = earliestTime.addHours(-1);
+            windowEnd = latestTime.addHours(1);
+        }
+        
+        // SINGLE QUERY to get ALL existing logs for ALL hashes within the hourly time window
+        List<Log__c> existingLogs = [
+            SELECT Id, Hash_1__c, CreatedDate, Organization_Id__c, Created_At__c,
+                   (SELECT Id, CreatedDate FROM Inbound_Emails__r ORDER BY CreatedDate ASC)
+            FROM Log__c 
+            WHERE Hash_1__c IN :hashToTimestampMap.keySet()
+            AND Created_At__c >= :windowStart
+            AND Created_At__c <= :windowEnd
+            ORDER BY Hash_1__c, Created_At__c
+        ];
+        
+        for (Log__c existingLog : existingLogs) {
+            EmailLogTimingInfo timingInfo = new EmailLogTimingInfo();
+            timingInfo.logId = existingLog.Id;
+            timingInfo.logCreatedDate = existingLog.CreatedDate;
+            timingInfo.logCreatedAt = existingLog.Created_At__c;
+            timingInfo.hash = existingLog.Hash_1__c;
+            timingInfo.organizationId = existingLog.Organization_Id__c;
+            
+            // Get ALL inbound email creation dates
+            timingInfo.inboundEmailDates = new List<DateTime>();
+            for (Inbound_Email__c inboundEmail : existingLog.Inbound_Emails__r) {
+                timingInfo.inboundEmailDates.add(inboundEmail.CreatedDate);
+            }
+            
+            // Store ALL existing logs for this hash
+            if (!timingInfoMap.containsKey(existingLog.Hash_1__c)) {
+                timingInfoMap.put(existingLog.Hash_1__c, new List<EmailLogTimingInfo>());
+            }
+            timingInfoMap.get(existingLog.Hash_1__c).add(timingInfo);
+        }
+        
+        return timingInfoMap;
+    }
+
+    /**
+     * Check if Request_Id_External__c values already exist in the system
+     * @param requestIdsToCheck Set of Request_Id_External__c values to check
+     * @return Set of Request_Id_External__c values that already exist
+     */
+    public static Set<String> getExistingRequestIds(Set<String> requestIdsToCheck) {
+        Set<String> existingRequestIds = new Set<String>();
+        
+        if (requestIdsToCheck.isEmpty()) {
+            return existingRequestIds;
+        }
+        
+        for (Log__c existingLog : [
+            SELECT Request_Id_External__c 
+            FROM Log__c 
+            WHERE Request_Id_External__c IN :requestIdsToCheck
+        ]) {
+            if (String.isNotBlank(existingLog?.Request_Id_External__c)) {
+                existingRequestIds.add(existingLog.Request_Id_External__c);
+            }
+        }
+        
+        return existingRequestIds;
+    }
+
+    /**
+     * Analyze timing matches between an event log and existing email logs
+     * @param eventLog The event log to analyze
+     * @param emailLogsForHash List of existing email logs with same hash1
+     * @param dedupSettings Deduplication settings
+     * @return LogMatchingResult with analysis results
+     */
+    public static LogMatchingResult analyzeLogMatching(Log__c eventLog, List<EmailLogTimingInfo> emailLogsForHash, Map<String, Object> dedupSettings) {
+        LogMatchingResult result = new LogMatchingResult();
+        result.eventLogHash = eventLog.Hash_1__c;
+        result.eventLogTimestamp = eventLog.Created_At__c;
+        result.emailLogsCount = emailLogsForHash != null ? emailLogsForHash.size() : 0;
+        
+        if (emailLogsForHash == null || emailLogsForHash.isEmpty()) {
+            return result;
+        }
+        
+        Integer timingToleranceSeconds = (Integer)dedupSettings.get('timingToleranceSeconds');
+        
+        // Analyze each email log for timing matches
+        for (EmailLogTimingInfo emailInfo : emailLogsForHash) {
+            EmailLogMatch emailMatch = new EmailLogMatch();
+            emailMatch.emailLogId = emailInfo.logId;
+            emailMatch.emailLogCreatedAt = emailInfo.logCreatedAt;
+            emailMatch.emailLogCreatedDate = emailInfo.logCreatedDate;
+            emailMatch.inboundEmailDates = emailInfo.inboundEmailDates;
+            
+            // Create the email log object for update
+            emailMatch.emailLog = new Log__c();
+            emailMatch.emailLog.Id = emailInfo.logId;
+            
+            // Check log Created_At timing
+            if (emailInfo.logCreatedAt != null) {
+                emailMatch.timeDifferenceSeconds = Math.abs(eventLog.Created_At__c.getTime() - emailInfo.logCreatedAt.getTime()) / 1000;
+                emailMatch.isWithinTolerance = emailMatch.timeDifferenceSeconds <= timingToleranceSeconds;
+            }
+            
+            // Check inbound email timing (priority over log timing)
+            if (emailInfo.inboundEmailDates != null && !emailInfo.inboundEmailDates.isEmpty()) {
+                Long closestDiff = null;
+                for (DateTime inboundDate : emailInfo.inboundEmailDates) {
+                    Long diff = Math.abs(eventLog.Created_At__c.getTime() - inboundDate.getTime()) / 1000;
+                    if (closestDiff == null || diff < closestDiff) {
+                        closestDiff = diff;
+                    }
+                }
+                emailMatch.closestInboundEmailDiff = closestDiff;
+                emailMatch.inboundEmailWithinTolerance = closestDiff != null && closestDiff <= timingToleranceSeconds;
+            }
+            
+            result.emailLogMatches.add(emailMatch);
+            
+            // Determine if this is a timing match (prioritize inbound email timing)
+            Boolean isTimingMatch = emailMatch.inboundEmailWithinTolerance || emailMatch.isWithinTolerance;
+            
+            if (isTimingMatch && !result.hasTimingMatch) {
+                result.hasTimingMatch = true;
+                result.emailLogMatch = emailMatch;
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * Enhanced deduplication with Request_Id population and timing analysis
+     * Maintains optimized flow after CSV processing is complete
+     * @param eventType The event type being processed
+     * @param dedupSettings Deduplication settings as Map
+     * @param logger Logger instance for logging
+     * @param allLogs All logs from the logger queue
+     * @return List of final logs to keep after deduplication
+     */
+    public static List<Log__c> processEnhancedDeduplication(String eventType, Map<String, Object> dedupSettings, Logger logger, List<Log__c> allLogs) {
+        try {
+            // Check if deduplication is enabled and event type is configured
+            Boolean enableEmailEventDeduplication = (Boolean)dedupSettings.get('enableEmailEventDeduplication');
+            Set<String> eventTypesToCheck = (Set<String>)dedupSettings.get('eventTypesToCheck');
+            
+            if (!enableEmailEventDeduplication || !eventTypesToCheck.contains(eventType)) {
+                return allLogs;
+            }
+
+            if (allLogs.isEmpty()) {
+                return allLogs;
+            }
+            
+            // Separate event logs (have Request_Id_External__c) from other logs
+            List<Log__c> eventLogs = new List<Log__c>();
+            List<Log__c> otherLogs = new List<Log__c>();
+            
+            for (Log__c log : allLogs) {
+                String requestId = log.Request_Id_External__c;
+                if (String.isNotBlank(requestId)) {
+                    eventLogs.add(log);
+                } else {
+                    otherLogs.add(log);
+                }
+            }
+            
+            // Process event logs with email awareness
+            List<Log__c> finalEventLogsToKeep = processEventLogsWithEmailAwareness(eventLogs, dedupSettings, logger);
+            
+            // Combine final results
+            List<Log__c> finalLogsToKeep = new List<Log__c>();
+            finalLogsToKeep.addAll(finalEventLogsToKeep);
+            finalLogsToKeep.addAll(otherLogs); // Keep all other logs as-is
+
+            return finalLogsToKeep;
+        }
+        catch (Exception e) {
+            logger?.add(logger?.getInternalError(e, null, EventLogProcessors.class.getName(), 'Error processing enhanced deduplication'));
+            return allLogs; // Return original logs if error occurs
+        }
+    }
+
+    // ==========================================
+    // Helper Classes for Enhanced Deduplication
+    // ==========================================
+
+    // Helper class to store email log timing information
+    public class EmailLogTimingInfo {
+        public String logId;
+        public String hash;
+        public String organizationId;
+        public DateTime logCreatedDate;
+        public DateTime logCreatedAt;
+        public List<DateTime> inboundEmailDates;
+    }
+
+    // Helper class to store log matching analysis results
+    public class LogMatchingResult {
+        public String eventLogHash;
+        public DateTime eventLogTimestamp;
+        public Integer emailLogsCount;
+        public Boolean hasTimingMatch;
+        public EmailLogMatch emailLogMatch;
+        public List<EmailLogMatch> emailLogMatches;
+        
+        public LogMatchingResult() {
+            this.emailLogMatches = new List<EmailLogMatch>();
+            this.hasTimingMatch = false;
+        }
+    }
+
+    // Helper class to store individual email log match details
+    public class EmailLogMatch {
+        public String emailLogId;
+        public DateTime emailLogCreatedAt;
+        public DateTime emailLogCreatedDate;
+        public List<DateTime> inboundEmailDates;
+        public Long timeDifferenceSeconds;
+        public Boolean isWithinTolerance;
+        public Boolean inboundEmailWithinTolerance;
+        public Long closestInboundEmailDiff;
+        
+        public Log__c emailLog;
     }
 }

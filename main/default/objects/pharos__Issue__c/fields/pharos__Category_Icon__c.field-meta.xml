@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>pharos__Category_Icon__c</fullName>
+    <deprecated>false</deprecated>
+    <externalId>false</externalId>
+    <formula>IMAGE(&quot;/resource/&quot; + $Setup.pharos__Logger_Settings__c.pharos__Namespace__c + &quot;pharos_ds/pharos_ds/icons/category/&quot; + CASE(
+pharos__Category__c,
+&quot;Error&quot;, &quot;error.svg&quot;,
+&quot;Warning&quot;, &quot;warning.svg&quot;,
+&quot;Debug&quot;, &quot;bug.svg&quot;,
+&quot;Event&quot;, &quot;events.svg&quot;,
+&quot;Apex&quot;, &quot;apex.svg&quot;,
+&quot;Bulk API&quot;, &quot;cart.svg&quot;,
+&quot;Flow&quot;, &quot;flow.svg&quot;,
+&quot;Integration&quot;, &quot;apex_plugin.svg&quot;,
+&quot;Process Builder&quot;, &quot;all.svg&quot;,
+&quot;Email-to-Case&quot;, &quot;case_email.svg&quot;,
+&quot;Web-to-Case&quot;, &quot;case.svg&quot;,
+&quot;Web-to-Lead&quot;, &quot;lead.svg&quot;,
+&quot;Pharos Error&quot;, &quot;pharos.svg&quot;,
+&quot;Mulesoft&quot;, &quot;mulesoft.svg&quot;,
+&quot;OmniStudio&quot;, &quot;omni_channel.svg&quot;,
+&quot;help.svg&quot;)
+, pharos__Category__c, 16, 16)</formula>
+    <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
+    <label>Category Icon</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

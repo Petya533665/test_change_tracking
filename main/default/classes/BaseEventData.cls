@@ -34,7 +34,7 @@ public virtual class BaseEventData implements EventLogProcessors.IBaseEventData 
             String second = timestamp.substring(12, 14);
             String millisecond = timestamp.substring(15);
 
-            return DateTime.newInstance(Integer.valueOf(year), Integer.valueOf(month), Integer.valueOf(day), Integer.valueOf(hour), Integer.valueOf(minute), Integer.valueOf(second));
+            return DateTime.newInstanceGMT(Integer.valueOf(year), Integer.valueOf(month), Integer.valueOf(day), Integer.valueOf(hour), Integer.valueOf(minute), Integer.valueOf(second));
         }
         catch (Exception e) {
             return null;

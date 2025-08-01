@@ -1,5 +1,44 @@
 public with sharing class MetadataServiceUtil {
 
+    public static final MetadataService.EventSettings EVENT_SETTINGS {
+        get {
+            if (EVENT_SETTINGS == null) {
+                EVENT_SETTINGS = getEventSettings();
+            }
+            return EVENT_SETTINGS;
+        }
+        private set;
+    }
+
+    public static MetadataService.EventSettings getEventSettings() {
+        MetadataService.MetadataPort service = getEventSettingsService();
+        return (MetadataService.EventSettings) service.readMetadata('EventSettings', new String[] { 'Event' }).getRecords()[0];
+    }
+
+    public static MetadataService.MetadataPort getEventSettingsService() {
+        MetadataService.MetadataPort service = createMetadataPort();
+        service.setMetadataAPIVersion('63.0');
+        return service;
+    }
+
+    public static Boolean getEventSettingsLogGenerationEnabled() {
+        MetadataService.MetadataPort service = getEventSettingsService();
+        MetadataService.EventSettings eventSettings = getEventSettings();
+        return eventSettings.enableEventLogGeneration;
+    }
+
+    public static void setEventSettingsLogGeneration(Boolean value) {
+        MetadataService.MetadataPort service = getEventSettingsService();
+
+        MetadataService.EventSettings eventSettings = getEventSettings();
+        eventSettings.enableEventLogGeneration = value;
+
+        List<MetadataService.SaveResult> results =
+            service.updateMetadata(
+                new MetadataService.Metadata[] {eventSettings});
+        handleSaveResults(results[0]);
+    }
+
     public static final MetadataService.CaseSettings CASE_SETTINGS {
         get {
             if (CASE_SETTINGS == null) {

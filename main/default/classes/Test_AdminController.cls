@@ -3759,4 +3759,453 @@ public class Test_AdminController {
 		);
 		return getProjectAssignableUsersRespMock;
 	}
+
+    @IsTest
+    static void test_eventMonitoringTracking_EnableSuccess() {
+        // Setup test data
+        TestDataFactory.createConnectedOrg();
+        
+        // Mock metadata service calls
+        Test.setMock(WebServiceMock.class, new EventMonitoringTrackingWebServiceMockImpl());
+        
+        // Setup initial state - event monitoring disabled
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = false;
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = EventMonitoringUtil.DEFAULT_DISABLED_EVENT_TYPES_STRING;
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c = null;
+        upsert ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        
+        // Test enabling event monitoring
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'eventMonitoringTracking',
+            'data' => new Map<String, Object>{
+                ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => true
+            }
+        };
+        
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+        
+        Test.stopTest();
+        
+        // Verify response
+        System.assertEquals(null, responseMap.get('error'), 'Should not have error');
+        System.assertNotEquals(null, responseMap.get('data'), 'Should have data');
+        
+        // Verify settings were updated
+        Event_Monitoring__c updatedSettings = Event_Monitoring__c.getOrgDefaults();
+        System.assertEquals(true, updatedSettings.Enabled__c, 'Event monitoring should be enabled');
+        System.assertEquals(EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES_STRING, 
+            updatedSettings.Enabled_Types__c, 'Should have default enabled event types');
+        System.assertNotEquals(null, updatedSettings.Last_Processed_Hourly_Events__c, 
+            'Last processed hourly events should be set');
+    }
+
+    @IsTest
+    static void test_eventMonitoringTracking_DisableSuccess() {
+        // Setup test data
+        TestDataFactory.createConnectedOrg();
+        
+        // Mock metadata service calls
+        Test.setMock(WebServiceMock.class, new EventMonitoringTrackingWebServiceMockImpl());
+        
+        // Setup initial state - event monitoring enabled
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = true;
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES_STRING;
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c = DateTime.now().addHours(-1);
+        upsert ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        
+        // Test disabling event monitoring
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'eventMonitoringTracking',
+            'data' => new Map<String, Object>{
+                ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => false
+            }
+        };
+        
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+        
+        Test.stopTest();
+        
+        // Verify response
+        System.assertEquals(null, responseMap.get('error'), 'Should not have error');
+        System.assertNotEquals(null, responseMap.get('data'), 'Should have data');
+        
+        // Verify settings were updated
+        Event_Monitoring__c updatedSettings = Event_Monitoring__c.getOrgDefaults();
+        System.assertEquals(false, updatedSettings.Enabled__c, 'Event monitoring should be disabled');
+        System.assertEquals(EventMonitoringUtil.DEFAULT_DISABLED_EVENT_TYPES_STRING, 
+            updatedSettings.Enabled_Types__c, 'Should have all event types disabled');
+        System.assertNotEquals(null, updatedSettings.Last_Processed_Hourly_Events__c, 
+            'Last processed hourly events should still be set');
+    }
+
+    @IsTest
+    static void test_eventMonitoringTracking_EnableWithMetadataUpdate() {
+        // Setup test data
+        TestDataFactory.createConnectedOrg();
+        
+        // Mock metadata service calls to simulate event log generation being disabled
+        Test.setMock(WebServiceMock.class, new EventMonitoringTrackingWebServiceMockImpl());
+        
+        // Setup initial state
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = false;
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = EventMonitoringUtil.DEFAULT_DISABLED_EVENT_TYPES_STRING;
+        upsert ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        
+        // Test enabling event monitoring (should trigger metadata update)
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'eventMonitoringTracking',
+            'data' => new Map<String, Object>{
+                ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => true
+            }
+        };
+        
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+        
+        Test.stopTest();
+        
+        // Verify response
+        System.assertEquals(null, responseMap.get('error'), 'Should not have error');
+        System.assertNotEquals(null, responseMap.get('data'), 'Should have data');
+        
+        // Verify settings were updated
+        Event_Monitoring__c updatedSettings = Event_Monitoring__c.getOrgDefaults();
+        System.assertEquals(true, updatedSettings.Enabled__c, 'Event monitoring should be enabled');
+        System.assertEquals(EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES_STRING, 
+            updatedSettings.Enabled_Types__c, 'Should have default enabled event types');
+    }
+
+    @IsTest
+    static void test_eventMonitoringTracking_ExceptionHandling() {
+        // Setup test data
+        TestDataFactory.createConnectedOrg();
+        
+        // Mock metadata service calls to throw exception
+        Test.setMock(WebServiceMock.class, new EventMonitoringTrackingWebServiceMockImpl());
+        
+        // Setup initial state
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = false;
+        upsert ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        
+        // Test with invalid data to trigger exception
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'eventMonitoringTracking',
+            'data' => new Map<String, Object>{
+                'invalidKey' => 'invalidValue'
+            }
+        };
+        
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+        
+        Test.stopTest();
+        
+        // Verify error response
+        System.assertNotEquals(null, responseMap.get('error'), 'Should have error');
+        System.assertNotEquals(null, responseMap.get('stack'), 'Should have stack trace');
+    }
+
+    @IsTest
+    static void test_eventMonitoringTracking_LastProcessedHourlyEventsCalculation() {
+        // Setup test data
+        TestDataFactory.createConnectedOrg();
+        
+        // Mock metadata service calls
+        Test.setMock(WebServiceMock.class, new EventMonitoringTrackingWebServiceMockImpl());
+        
+        // Setup initial state
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = false;
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c = null;
+        upsert ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        
+        // Test enabling event monitoring
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'eventMonitoringTracking',
+            'data' => new Map<String, Object>{
+                ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => true
+            }
+        };
+        
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        
+        Test.stopTest();
+        
+        // Verify Last_Processed_Hourly_Events__c calculation
+        Event_Monitoring__c updatedSettings = Event_Monitoring__c.getOrgDefaults();
+        System.assertNotEquals(null, updatedSettings.Last_Processed_Hourly_Events__c, 
+            'Last processed hourly events should be set');
+        
+        // Verify it's set to previous hour (rounded down)
+        DateTime now = DateTime.now();
+        DateTime expectedTime = DateTime.newInstance(now.year(), now.month(), now.day(), now.hour(), 0, 0).addHours(-1);
+        System.assertEquals(expectedTime, updatedSettings.Last_Processed_Hourly_Events__c, 
+            'Last processed hourly events should be set to previous hour');
+    }
+
+    @IsTest
+    static void test_eventMonitoringTracking_EmailServiceDataReturn() {
+        // Setup test data
+        TestDataFactory.createConnectedOrg();
+        
+        // Mock metadata service calls
+        Test.setMock(WebServiceMock.class, new EventMonitoringTrackingWebServiceMockImpl());
+        
+        // Setup initial state
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = false;
+        upsert ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        
+        // Test enabling event monitoring
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'eventMonitoringTracking',
+            'data' => new Map<String, Object>{
+                ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => true
+            }
+        };
+        
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+        Map<String, Object> data = (Map<String, Object>)responseMap.get('data');
+        
+        Test.stopTest();
+        
+        // Verify email service data is returned
+        System.assertNotEquals(null, data, 'Should have data');
+        System.assert(data.containsKey(ConfigUtil.CONFIRM_AUTOMATED_FLOW_ERROR_TRACKING_KEY), 
+            'Should contain flow error tracking key');
+        System.assert(data.containsKey(ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_KEY), 
+            'Should contain email to case error tracking key');
+        System.assert(data.containsKey(ConfigUtil.CONFIRM_EVENT_MONITORING_TRACKING_KEY), 
+            'Should contain event monitoring tracking key');
+    }
+
+    @IsTest
+    static void test_eventMonitoringTracking_AdminServiceDirectCall() {
+        // Setup test data
+        TestDataFactory.createConnectedOrg();
+        
+        // Mock metadata service calls
+        Test.setMock(WebServiceMock.class, new EventMonitoringTrackingWebServiceMockImpl());
+        
+        // Setup initial state
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = false;
+        upsert ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        
+        // Test direct AdminService call
+        Map<String, Object> inputData = new Map<String, Object>{
+            ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => true
+        };
+        
+        Map<String, Object> result = AdminService.eventMonitoringTracking(inputData);
+        
+        Test.stopTest();
+        
+        // Verify result
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey(ConfigUtil.CONFIRM_AUTOMATED_FLOW_ERROR_TRACKING_KEY), 
+            'Should contain flow error tracking key');
+        System.assert(result.containsKey(ConfigUtil.CONFIRM_EMAIL_TO_CASE_ERROR_TRACKING_KEY), 
+            'Should contain email to case error tracking key');
+        System.assert(result.containsKey(ConfigUtil.CONFIRM_EVENT_MONITORING_TRACKING_KEY), 
+            'Should contain event monitoring tracking key');
+        
+        // Verify settings were updated
+        Event_Monitoring__c updatedSettings = Event_Monitoring__c.getOrgDefaults();
+        System.assertEquals(true, updatedSettings.Enabled__c, 'Event monitoring should be enabled');
+    }
+
+    @IsTest
+    static void test_eventMonitoringTracking_WithExistingSettings() {
+        // Setup test data
+        TestDataFactory.createConnectedOrg();
+        
+        // Mock metadata service calls
+        Test.setMock(WebServiceMock.class, new EventMonitoringTrackingWebServiceMockImpl());
+        
+        // Setup initial state with existing settings
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = true;
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = '1,0,1,0,1';
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c = DateTime.now().addHours(-2);
+        upsert ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        
+        // Test toggling event monitoring
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'eventMonitoringTracking',
+            'data' => new Map<String, Object>{
+                ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => false
+            }
+        };
+        
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+        
+        Test.stopTest();
+        
+        // Verify response
+        System.assertEquals(null, responseMap.get('error'), 'Should not have error');
+        
+        // Verify settings were updated
+        Event_Monitoring__c updatedSettings = Event_Monitoring__c.getOrgDefaults();
+        System.assertEquals(false, updatedSettings.Enabled__c, 'Event monitoring should be disabled');
+        System.assertEquals(EventMonitoringUtil.DEFAULT_DISABLED_EVENT_TYPES_STRING, 
+            updatedSettings.Enabled_Types__c, 'Should have all event types disabled');
+        System.assertNotEquals(null, updatedSettings.Last_Processed_Hourly_Events__c, 
+            'Last processed hourly events should still be set');
+    }
+
+    @IsTest
+    static void test_eventMonitoringTracking_InvalidInputData() {
+        // Setup test data
+        TestDataFactory.createConnectedOrg();
+        
+        Test.startTest();
+        
+        // Test with null data
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'eventMonitoringTracking',
+            'data' => null
+        };
+        
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+        
+        Test.stopTest();
+        
+        // Verify error response
+        System.assertNotEquals(null, responseMap.get('error'), 'Should have error for null data');
+    }
+
+    @IsTest
+    static void test_eventMonitoringTracking_EmptyInputData() {
+        // Setup test data
+        TestDataFactory.createConnectedOrg();
+        
+        Test.startTest();
+        
+        // Test with empty data
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'eventMonitoringTracking',
+            'data' => new Map<String, Object>()
+        };
+        
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+        
+        Test.stopTest();
+        
+        // Verify error response
+        System.assertNotEquals(null, responseMap.get('error'), 'Should have error for empty data');
+    }
+
+    @IsTest
+    static void test_eventMonitoringTracking_IntegrationWithOtherServices() {
+        // Setup test data
+        TestDataFactory.createConnectedOrg();
+        
+        // Mock metadata service calls
+        Test.setMock(WebServiceMock.class, new EventMonitoringTrackingWebServiceMockImpl());
+        
+        // Setup initial state
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = false;
+        upsert ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        
+        // Test enabling event monitoring
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'eventMonitoringTracking',
+            'data' => new Map<String, Object>{
+                ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => true
+            }
+        };
+        
+        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+        Map<String, Object> data = (Map<String, Object>)responseMap.get('data');
+        
+        Test.stopTest();
+        
+        // Verify integration with other services
+        System.assertNotEquals(null, data, 'Should have data');
+        System.assert(data.containsKey('emailToCaseErrorTrackingAvailable'), 
+            'Should contain email to case error tracking available');
+        System.assert(data.containsKey('emailToCaseErrorTrackingType'), 
+            'Should contain email to case error tracking type');
+        System.assert(data.containsKey('emailServicesFunctionIsActive'), 
+            'Should contain email services function active status');
+    }
+
+    public class EventMonitoringTrackingWebServiceMockImpl implements WebServiceMock {
+        
+        public EventMonitoringTrackingWebServiceMockImpl() {}
+
+        public void doInvoke(
+                Object stub,
+                Object request,
+                Map<String, Object> response,
+                String endpoint,
+                String soapAction,
+                String requestName,
+                String responseNS,
+                String responseName,
+                String responseType) {
+
+            if(request instanceof MetadataService.readMetadata_element) {
+                MetadataService.readMetadata_element readMetadataRequest = (MetadataService.readMetadata_element)request;
+                
+
+                if (readMetadataRequest.type_x == 'EventSettings') {
+                    MetadataService.readEventSettingsResponse_element metadataResponse = new MetadataService.readEventSettingsResponse_element();
+                    MetadataService.ReadEventSettingsResult result = new MetadataService.ReadEventSettingsResult();
+                    result.records = new List<MetadataService.EventSettings>();
+                    
+                    MetadataService.EventSettings eventSettings = new MetadataService.EventSettings();
+                    eventSettings.fullName = 'EventSettings';
+                    eventSettings.enableEventLogGeneration = true;
+                    result.records.add(eventSettings);
+                    metadataResponse.result = result;
+                    response.put('response_x', metadataResponse);
+                }
+                else if (readMetadataRequest.type_x == 'CaseSettings') {
+                    MetadataService.readCaseSettingsResponse_element metadataResponse = new MetadataService.readCaseSettingsResponse_element();
+                    MetadataService.ReadCaseSettingsResult result = new MetadataService.ReadCaseSettingsResult();
+                    result.records = new List<MetadataService.CaseSettings>();
+                    MetadataService.CaseSettings caseSettings = new MetadataService.CaseSettings();
+                    caseSettings.fullName = 'CaseSettings';
+                    result.records.add(caseSettings);
+                    metadataResponse.result = result;
+                    response.put('response_x', metadataResponse);
+                }
+                else if (readMetadataRequest.type_x == 'FlowSettings') {
+                    MetadataService.readFlowSettingsResponse_element metadataResponse = new MetadataService.readFlowSettingsResponse_element();
+                    MetadataService.ReadFlowSettingsResult result = new MetadataService.ReadFlowSettingsResult();
+                    result.records = new List<MetadataService.FlowSettings>();
+                    MetadataService.FlowSettings flowSettings = new MetadataService.FlowSettings();
+                    flowSettings.fullName = 'FlowSettings';
+                    flowSettings.enableFlowUseApexExceptionEmail = true;
+                    result.records.add(flowSettings);
+                    metadataResponse.result = result;
+                    response.put('response_x', metadataResponse);
+                }
+            }
+                
+        }
+    }
 }

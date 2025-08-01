@@ -582,6 +582,7 @@ private class EventLogProcessingBatchTest {
     @IsTest
     static void testEnabledEventTypes() {
         setupTestDataSettings();
+        PermissionsUtil.EventMonitoringEnabled = true;
 
         EventMonitoringUtil util = new EventMonitoringUtil();
 
@@ -598,7 +599,8 @@ private class EventLogProcessingBatchTest {
         // Create custom settings for Event Monitoring
         Event_Monitoring__c settings = new Event_Monitoring__c(
             Enabled__c = true,
-            Last_Processed_Hourly_Events__c = Datetime.now().addHours(-1)
+            Last_Processed_Hourly_Events__c = Datetime.now().addHours(-1),
+            Enabled_Types__c = EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES_STRING
         );
         insert settings;
         return settings;
@@ -838,10 +840,14 @@ private class EventLogProcessingBatchTest {
                           '"REQUEST_ID","ORGANIZATION_ID","USER_ID","USER_ID_DERIVED","TIMESTAMP_DERIVED",' +
                           '"TIMESTAMP","USER_ID"';
         
+        DateTime testTime = DateTime.now();
+        String formattedTiming = testTime.format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String timestampFormat = testTime.format('yyyyMMddHHmmss') + '.000';
+        
         String csvData = '"APEX_CODE","List index out of bounds: 0","System.ListException",' +
                         '"Class.TestClass.processData: line 15\\nClass.TestClass.execute: line 5",' +
                         '"REQ-BATCH-001","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
-                        '"2024-01-01T12:00:00Z","20130715233322.670","005xx000001234AAA"';
+                        '"' + formattedTiming + '","' + timestampFormat + '","005xx000001234AAA"';
         
         return csvHeader + '\n' + csvData;
     }
@@ -855,23 +861,36 @@ private class EventLogProcessingBatchTest {
         List<String> csvRows = new List<String>();
         csvRows.add(csvHeader);
         
+        // Calculate proper timestamps for each record
+        DateTime baseTime = DateTime.now();
+        DateTime time1 = baseTime.addMinutes(1);
+        DateTime time2 = baseTime.addMinutes(2);
+        DateTime time3 = baseTime.addMinutes(3);
+        
+        String formattedTime1 = time1.format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String timestamp1 = time1.format('yyyyMMddHHmmss') + '.000';
+        String formattedTime2 = time2.format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String timestamp2 = time2.format('yyyyMMddHHmmss') + '.000';
+        String formattedTime3 = time3.format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String timestamp3 = time3.format('yyyyMMddHHmmss') + '.000';
+        
         // First exception record
         csvRows.add('"APEX_CODE","List index out of bounds: 0","System.ListException",' +
                     '"Class.TestClass.processData: line 15\\nClass.TestClass.execute: line 5",' +
                     '"REQ-MIXED-001","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
-                    '"2024-01-01T12:00:00Z","20130715233322.670","005xx000001234AAA"');
+                    '"' + formattedTime1 + '","' + timestamp1 + '","005xx000001234AAA"');
         
         // Second exception record
         csvRows.add('"APEX_CODE","Null pointer exception","System.NullPointerException",' +
                     '"Class.AnotherClass.handleData: line 25\\nClass.AnotherClass.run: line 10",' +
                     '"REQ-MIXED-002","00D123456789012345","005xx000001234BBB","005xx000001234BBB",' +
-                    '"2024-01-01T13:00:00Z","20130715234322.670","005xx000001234BBB"');
+                    '"' + formattedTime2 + '","' + timestamp2 + '","005xx000001234BBB"');
         
         // Third exception record
         csvRows.add('"APEX_CODE","DML Exception occurred","System.DmlException",' +
                     '"Class.DataProcessor.updateRecords: line 30\\nClass.DataProcessor.process: line 15",' +
                     '"REQ-MIXED-003","00D123456789012345","005xx000001234CCC","005xx000001234CCC",' +
-                    '"2024-01-01T14:00:00Z","20130715235322.670","005xx000001234CCC"');
+                    '"' + formattedTime3 + '","' + timestamp3 + '","005xx000001234CCC"');
         
         return String.join(csvRows, '\n');
     }
@@ -889,4 +908,779 @@ private class EventLogProcessingBatchTest {
                'String,String,String,String,DateTime,' +
                'String,String';
     }
+
+    // ==========================================
+    // Enhanced Deduplication Test Cases
+    // ==========================================
+
+    @IsTest
+    static void testEnhancedDeduplicationDisabled() {
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+        
+        // Configure batch with deduplication disabled
+        EventLogProcessingBatch batch = EventLogProcessingBatch.getInstance();
+        EventLogProcessingBatch.EnhancedDeduplicationSettings dedupSettings = new EventLogProcessingBatch.EnhancedDeduplicationSettings();
+        dedupSettings.enableEmailEventDeduplication = false;
+        dedupSettings.enableDetailedLogging = true;
+        batch.configureDeduplication(dedupSettings);
+        
+        // Enable the event type
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        util.enableEventType(eventType);
+        
+        // Create test data with Request_Id_External__c
+        String csvData = generateApexUnexpectedExceptionWithRequestIdCsvData();
+        SObject testLogFile = createMockEventLogFile(eventType, csvData);
+        
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionWithRequestIdFieldNames();
+        EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionWithRequestIdFieldTypes();
+        
+        Map<String, Map<String, ThresholdConfig>> testThresholds = new Map<String, Map<String, ThresholdConfig>>{
+            eventType => new Map<String, ThresholdConfig>{
+                'EXCEPTION_MESSAGE' => ThresholdManager.exceptionMessage(eventType)
+            }
+        };
+        
+        Test.startTest();
+        ThresholdManager.testThresholds = testThresholds;
+        batch.startBatch();
+        Test.stopTest();
+        
+        // Verify all logs were created (no deduplication)
+        List<Log__c> createdLogs = [SELECT Id, Request_Id_External__c FROM Log__c];
+        System.assert(createdLogs.size() > 0, 'Logs should be created when deduplication is disabled');
+    }
+
+    @IsTest
+    static void testEnhancedDeduplicationWithNoExistingLogs() {
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+        
+        // Configure batch with deduplication enabled
+        EventLogProcessingBatch batch = EventLogProcessingBatch.getInstance();
+        EventLogProcessingBatch.EnhancedDeduplicationSettings dedupSettings = new EventLogProcessingBatch.EnhancedDeduplicationSettings();
+        dedupSettings.enableEmailEventDeduplication = true;
+        dedupSettings.timingToleranceSeconds = 10;
+        dedupSettings.enableDetailedLogging = true;
+        batch.configureDeduplication(dedupSettings);
+        
+        // Enable the event type
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        util.enableEventType(eventType);
+        
+        // Create test data with Request_Id_External__c
+        String csvData = generateApexUnexpectedExceptionWithRequestIdCsvData();
+        SObject testLogFile = createMockEventLogFile(eventType, csvData);
+        
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionWithRequestIdFieldNames();
+        EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionWithRequestIdFieldTypes();
+        
+        Map<String, Map<String, ThresholdConfig>> testThresholds = new Map<String, Map<String, ThresholdConfig>>{
+            eventType => new Map<String, ThresholdConfig>{
+                'EXCEPTION_MESSAGE' => ThresholdManager.exceptionMessage(eventType)
+            }
+        };
+        
+        Test.startTest();
+        ThresholdManager.testThresholds = testThresholds;
+        batch.startBatch();
+        Test.stopTest();
+        
+        // Verify logs were created (no existing logs to deduplicate against)
+        List<Log__c> createdLogs = [SELECT Id, Request_Id_External__c, Hash_1__c FROM Log__c];
+        System.assert(createdLogs.size() > 0, 'Event logs should be created when no existing logs exist');
+        
+        for (Log__c log : createdLogs) {
+            System.assert(String.isNotBlank(log.Request_Id_External__c), 'Event logs should have Request_Id_External__c');
+            System.assert(String.isNotBlank(log.Hash_1__c), 'Event logs should have Hash_1__c');
+        }
+    }
+
+    @IsTest
+    static void testEnhancedDeduplicationWithExistingEmailLogs() {
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+        
+        DateTime emailLogTime = DateTime.now().addSeconds(-5);
+        String testHash = 'LTeYLyEUH7KjnrUvHawj/Mss4FCZpYFS5HQMgfDpCtY='; // Use the actual hash from debug logs
+        
+        // Create existing email-based log with the known hash
+        Log__c existingEmailLog = new Log__c(
+            Hash_1__c = testHash,
+            Created_At__c = emailLogTime,
+            Organization_Id__c = UserInfo.getOrganizationId(),
+            Type__c = 'Email Exception',
+            Category__c = 'System',
+            Area__c = 'Exception Monitoring',
+            Summary__c = 'Test existing email log'
+        );
+        insert existingEmailLog;
+        
+        // Create an Inbound_Email__c record related to the existing log
+        Inbound_Email__c inboundEmail = new Inbound_Email__c(
+            Log__c = existingEmailLog.Id,
+            Subject__c = 'Test Exception Email'
+        );
+        insert inboundEmail;
+        
+        // Set up Last_Processed_Hourly_Events__c to be around the email log time
+        // This will create a proper +/- 10 minute window for the deduplication
+        DateTime hourlyProcessTime = emailLogTime.addMinutes(2); // 2 minutes after email log
+        Event_Monitoring__c settings = ConfigUtil.EVENT_MONITORING_SETTINGS;
+        settings.Last_Processed_Hourly_Events__c = hourlyProcessTime;
+        update settings;
+        
+        // Configure batch with deduplication enabled
+        EventLogProcessingBatch batch = EventLogProcessingBatch.getInstance();
+        EventLogProcessingBatch.EnhancedDeduplicationSettings dedupSettings = new EventLogProcessingBatch.EnhancedDeduplicationSettings();
+        dedupSettings.enableEmailEventDeduplication = true;
+        dedupSettings.timingToleranceSeconds = 600; // 10 minutes tolerance
+        dedupSettings.enableDetailedLogging = true;
+        batch.configureDeduplication(dedupSettings);
+        
+        // Enable the event type
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        util.enableEventType(eventType);
+        
+        // Create test data with timing within tolerance (will generate same hash)
+        // Use same timestamp as email log to ensure timing match
+        String csvData = generateApexUnexpectedExceptionWithTimingCsvData(emailLogTime);
+        SObject testLogFile = createMockEventLogFile(eventType, csvData);
+        
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionWithRequestIdFieldNames();
+        EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionWithRequestIdFieldTypes();
+        
+        Map<String, Map<String, ThresholdConfig>> testThresholds = new Map<String, Map<String, ThresholdConfig>>{
+            eventType => new Map<String, ThresholdConfig>{
+                'EXCEPTION_MESSAGE' => ThresholdManager.exceptionMessage(eventType)
+            }
+        };
+        
+        Integer logsBefore = [SELECT COUNT() FROM Log__c];
+        
+        Test.startTest();
+        ThresholdManager.testThresholds = testThresholds;
+        batch.startBatch();
+        Test.stopTest();
+        
+        Integer logsAfter = [SELECT COUNT() FROM Log__c];
+        
+        // Verify that event log was skipped due to timing match with existing email log
+        System.assertEquals(logsBefore, logsAfter, 'Event log should be skipped due to timing match with existing email log');
+        
+        // Verify that existing email log was updated with Request_Id_External__c
+        Log__c updatedEmailLog = [SELECT Id, Request_Id_External__c FROM Log__c WHERE Id = :existingEmailLog.Id];
+        System.assert(String.isNotBlank(updatedEmailLog.Request_Id_External__c), 'Existing email log should have Request_Id_External__c populated');
+    }
+
+    @IsTest
+    static void testEnhancedDeduplicationWithFastFilter() {
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+        
+        // Create existing log with Request_Id_External__c that will match new event log
+        String existingRequestId = 'REQ-FAST-FILTER-001';
+        Log__c existingLog = new Log__c(
+            Request_Id_External__c = existingRequestId,
+            Hash_1__c = 'EXISTING-HASH-001',
+            Created_At__c = DateTime.now(),
+            Type__c = 'Event Log Exception'
+        );
+        insert existingLog;
+        
+        // Configure batch with deduplication enabled
+        EventLogProcessingBatch batch = EventLogProcessingBatch.getInstance();
+        EventLogProcessingBatch.EnhancedDeduplicationSettings dedupSettings = new EventLogProcessingBatch.EnhancedDeduplicationSettings();
+        dedupSettings.enableEmailEventDeduplication = true;
+        dedupSettings.timingToleranceSeconds = 10;
+        dedupSettings.enableDetailedLogging = true;
+        batch.configureDeduplication(dedupSettings);
+        
+        // Enable the event type
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        util.enableEventType(eventType);
+        
+        // Create test data with same Request_Id_External__c
+        String csvData = generateApexUnexpectedExceptionWithSpecificRequestIdCsvData(existingRequestId);
+        SObject testLogFile = createMockEventLogFile(eventType, csvData);
+        
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionWithRequestIdFieldNames();
+        EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionWithRequestIdFieldTypes();
+        
+        Map<String, Map<String, ThresholdConfig>> testThresholds = new Map<String, Map<String, ThresholdConfig>>{
+            eventType => new Map<String, ThresholdConfig>{
+                'EXCEPTION_MESSAGE' => ThresholdManager.exceptionMessage(eventType)
+            }
+        };
+        
+        Integer logsBefore = [SELECT COUNT() FROM Log__c];
+        
+        Test.startTest();
+        ThresholdManager.testThresholds = testThresholds;
+        batch.startBatch();
+        Test.stopTest();
+        
+        Integer logsAfter = [SELECT COUNT() FROM Log__c];
+        
+        // Verify that event log was skipped due to existing Request_Id_External__c (fast filter)
+        System.assertEquals(logsBefore, logsAfter, 'Event log should be skipped due to existing Request_Id_External__c');
+    }
+
+    @IsTest
+    static void testEnhancedDeduplicationMixedScenario() {
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+        
+        // Calculate the hash that would be generated for the timing match test
+        DateTime emailLogTime = DateTime.now().addMinutes(-5);
+        String exceptionMessage = 'Test exception for timing';
+        String stackTrace = 'Class.TestClass.processData: line 20';
+        String expectedHash = 'LTeYLyEUH7KjnrUvHawj/Mss4FCZpYFS5HQMgfDpCtY=';
+
+        
+        // Create one existing email log for timing match
+        Log__c existingEmailLog = new Log__c(
+            Hash_1__c = expectedHash,
+            Created_At__c = emailLogTime,
+            Organization_Id__c = UserInfo.getOrganizationId(),
+            Type__c = 'Email Exception',
+            Category__c = 'System',
+            Area__c = 'Exception Monitoring',
+            Summary__c = 'Test existing email log'
+        );
+        insert existingEmailLog;
+        
+        Inbound_Email__c inboundEmail = new Inbound_Email__c(
+            Log__c = existingEmailLog.Id,
+            Subject__c = 'Test Exception Email'
+        );
+        insert inboundEmail;
+        
+        // Create one existing event log for fast filter
+        String existingRequestId = 'REQ-MIXED-002';
+        Log__c existingEventLog = new Log__c(
+            Request_Id_External__c = existingRequestId,
+            Hash_1__c = 'MIXED-HASH-002',
+            Organization_Id__c = UserInfo.getOrganizationId(),
+            Type__c = 'Event Log Exception',
+            Category__c = 'System',
+            Area__c = 'Exception Monitoring',
+            Summary__c = 'Test existing event log'
+        );
+        insert existingEventLog;
+        
+        // Configure batch with deduplication enabled
+        EventLogProcessingBatch batch = EventLogProcessingBatch.getInstance();
+        EventLogProcessingBatch.EnhancedDeduplicationSettings dedupSettings = new EventLogProcessingBatch.EnhancedDeduplicationSettings();
+        dedupSettings.enableEmailEventDeduplication = true;
+        dedupSettings.timingToleranceSeconds = 600; // 10 minutes tolerance
+        dedupSettings.enableDetailedLogging = true;
+        batch.configureDeduplication(dedupSettings);
+        
+        // Enable the event type
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        util.enableEventType(eventType);
+        
+        // Create test data with mixed scenarios:
+        // 1. One log with same hash as email log (should be skipped)
+        // 2. One log with same Request_Id as existing event log (should be skipped)
+        // 3. One log with new hash and Request_Id (should be created)
+        String csvData = generateMixedDeduplicationCsvData(expectedHash, existingRequestId, emailLogTime, exceptionMessage, stackTrace);
+        SObject testLogFile = createMockEventLogFile(eventType, csvData);
+        
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionWithRequestIdFieldNames();
+        EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionWithRequestIdFieldTypes();
+        
+        Map<String, Map<String, ThresholdConfig>> testThresholds = new Map<String, Map<String, ThresholdConfig>>{
+            eventType => new Map<String, ThresholdConfig>{
+                'EXCEPTION_MESSAGE' => ThresholdManager.exceptionMessage(eventType)
+            }
+        };
+        
+        Integer logsBefore = [SELECT COUNT() FROM Log__c];
+        
+        Test.startTest();
+        ThresholdManager.testThresholds = testThresholds;
+        batch.startBatch();
+        Test.stopTest();
+        
+        Integer logsAfter = [SELECT COUNT() FROM Log__c];
+        
+        // Verify mixed results: should have created some logs but not all
+        System.assert(logsAfter > logsBefore, 'Some new logs should be created');
+        System.assert(logsAfter < logsBefore + 3, 'Not all logs should be created due to deduplication');
+        
+        // Verify that existing email log was updated with Request_Id_External__c
+        Log__c updatedEmailLog = [SELECT Id, Request_Id_External__c FROM Log__c WHERE Id = :existingEmailLog.Id];
+        System.assert(String.isNotBlank(updatedEmailLog.Request_Id_External__c), 'Existing email log should have Request_Id_External__c populated');
+    }
+
+    @IsTest
+    static void testProcessEnhancedDeduplicationStaticMethod() {
+        // Test the static method directly
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+        
+        // Create test logs
+        List<Log__c> testLogs = new List<Log__c>();
+        testLogs.add(new Log__c(
+            Request_Id_External__c = 'REQ-STATIC-001',
+            Hash_1__c = 'STATIC-HASH-001',
+            Created_At__c = DateTime.now(),
+            Type__c = 'Test Event Log'
+        ));
+        testLogs.add(new Log__c(
+            Hash_1__c = 'STATIC-HASH-002',
+            Created_At__c = DateTime.now(),
+            Type__c = 'Test Other Log'
+        ));
+        
+        // Create deduplication settings
+        Map<String, Object> dedupSettings = new Map<String, Object>{
+            'enableEmailEventDeduplication' => true,
+            'timingToleranceSeconds' => 10,
+            'preserveAllEventLogs' => true,
+            'enableDetailedLogging' => true,
+            'eventTypesToCheck' => new Set<String>{eventType}
+        };
+        
+        Test.startTest();
+        
+        // Call the static method
+        List<Log__c> result = EventLogProcessors.processEnhancedDeduplication(
+            eventType, 
+            dedupSettings, 
+            Logger.getInstance(), 
+            testLogs
+        );
+        
+        Test.stopTest();
+        
+        // Verify results
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertEquals(2, result.size(), 'Should return processed logs');
+    }
+
+    // Helper methods for generating test data
+
+    private static SObject createMockEventLogFile(String eventType, String csvData) {
+        SObject testLogFile = EventMonitoringUtil.createTestEventLogSObject(
+            eventType,
+            Date.today(),
+            Blob.valueOf(csvData)
+        );
+        
+        if (testLogFile == null) {
+            // Fallback for orgs without EventLogFile
+            Account mockAccount = new Account(Name = 'Test Mock EventLog - ' + eventType);
+            testLogFile = (SObject)mockAccount;
+            testLogFile.put('Id', '001000000000' + String.valueOf(Math.random()).substring(2, 8)); // Mock ID
+        }
+        
+        return testLogFile;
+    }
+
+    private static String generateApexUnexpectedExceptionWithRequestIdCsvData() {
+        String csvHeader = '"EXCEPTION_CATEGORY","EXCEPTION_MESSAGE","EXCEPTION_TYPE","STACK_TRACE",' +
+                          '"REQUEST_ID","ORGANIZATION_ID","USER_ID","USER_ID_DERIVED","TIMESTAMP_DERIVED",' +
+                          '"TIMESTAMP","HASH_1"';
+        
+        DateTime testTime = DateTime.now();
+        String formattedTiming = testTime.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String timestampFormat = testTime.formatGMT('yyyyMMddHHmmss') + '.000';
+        
+        String csvData = '"APEX_CODE","List index out of bounds: 0","System.ListException",' +
+                        '"Class.TestClass.processData: line 15\\nClass.TestClass.execute: line 5",' +
+                        '"REQ-TEST-001","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
+                        '"' + formattedTiming + '","' + timestampFormat + '","TEST-HASH-001"';
+        
+        return csvHeader + '\n' + csvData;
+    }
+
+    private static String generateApexUnexpectedExceptionWithTimingCsvData(DateTime timing) {
+        String csvHeader = '"EXCEPTION_CATEGORY","EXCEPTION_MESSAGE","EXCEPTION_TYPE","STACK_TRACE",' +
+                          '"REQUEST_ID","ORGANIZATION_ID","USER_ID","USER_ID_DERIVED","TIMESTAMP_DERIVED",' +
+                          '"TIMESTAMP","HASH_1"';
+        
+        String formattedTiming = timing.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String timestampFormat = timing.formatGMT('yyyyMMddHHmmss') + '.000'; // Convert to TIMESTAMP format
+        String csvData = '"APEX_CODE","Test exception for timing","System.TestException",' +
+                        '"Class.TestClass.processData: line 20",' +
+                        '"REQ-TIMING-001","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
+                        '"' + formattedTiming + '","' + timestampFormat + '","TEST-HASH-001"';
+        
+        return csvHeader + '\n' + csvData;
+    }
+
+    private static String generateApexUnexpectedExceptionWithSpecificRequestIdCsvData(String requestId) {
+        String csvHeader = '"EXCEPTION_CATEGORY","EXCEPTION_MESSAGE","EXCEPTION_TYPE","STACK_TRACE",' +
+                          '"REQUEST_ID","ORGANIZATION_ID","USER_ID","USER_ID_DERIVED","TIMESTAMP_DERIVED",' +
+                          '"TIMESTAMP","HASH_1"';
+        
+        DateTime testTime = DateTime.now();
+        String formattedTiming = testTime.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String timestampFormat = testTime.formatGMT('yyyyMMddHHmmss') + '.000';
+        
+        String csvData = '"APEX_CODE","Test exception for fast filter","System.TestException",' +
+                        '"Class.TestClass.processData: line 25",' +
+                        '"' + requestId + '","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
+                        '"' + formattedTiming + '","' + timestampFormat + '","FAST-FILTER-HASH-001"';
+        
+        return csvHeader + '\n' + csvData;
+    }
+
+    private static String generateMixedDeduplicationCsvData(String existingHash, String existingRequestId, DateTime emailLogTime, String exceptionMessage, String stackTrace) {
+        String csvHeader = '"EXCEPTION_CATEGORY","EXCEPTION_MESSAGE","EXCEPTION_TYPE","STACK_TRACE",' +
+                          '"REQUEST_ID","ORGANIZATION_ID","USER_ID","USER_ID_DERIVED","TIMESTAMP_DERIVED",' +
+                          '"TIMESTAMP","HASH_1"';
+        
+        List<String> csvRows = new List<String>();
+        csvRows.add(csvHeader);
+        
+        // Calculate proper timestamps for each log entry
+        DateTime log1Time = emailLogTime.addMinutes(3);
+        DateTime log2Time = emailLogTime.addMinutes(5);
+        DateTime log3Time = emailLogTime.addMinutes(7);
+        
+        String log1FormattedTiming = log1Time.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String log1Timestamp = log1Time.formatGMT('yyyyMMddHHmmss') + '.000';
+        String log2FormattedTiming = log2Time.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String log2Timestamp = log2Time.formatGMT('yyyyMMddHHmmss') + '.000';
+        String log3FormattedTiming = log3Time.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String log3Timestamp = log3Time.formatGMT('yyyyMMddHHmmss') + '.000';
+        
+        // Log 1: Should be skipped due to timing match with existing email log
+        // Create the same exception data that would generate the expected hash
+        csvRows.add('"APEX_CODE","' + exceptionMessage + '","System.TestException",' +
+                    '"' + stackTrace + '",' +
+                    '"REQ-MIXED-TIMING-001","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
+                    '"' + log1FormattedTiming + '","' + log1Timestamp + '","' + existingHash + '"');
+        
+        // Log 2: Should be skipped due to existing Request_Id
+        csvRows.add('"APEX_CODE","Exception with existing Request_Id","System.TestException",' +
+                    '"Class.TestClass.processData: line 35",' +
+                    '"' + existingRequestId + '","00D123456789012345","005xx000001234BBB","005xx000001234BBB",' +
+                    '"' + log2FormattedTiming + '","' + log2Timestamp + '","MIXED-HASH-002"');
+        
+        // Log 3: Should be created (new hash and Request_Id)
+        csvRows.add('"APEX_CODE","New exception to be created","System.TestException",' +
+                    '"Class.TestClass.processData: line 40",' +
+                    '"REQ-MIXED-NEW-001","00D123456789012345","005xx000001234CCC","005xx000001234CCC",' +
+                    '"' + log3FormattedTiming + '","' + log3Timestamp + '","MIXED-HASH-003"');
+        
+        return String.join(csvRows, '\n');
+    }
+
+    private static String generateApexUnexpectedExceptionWithRequestIdFieldNames() {
+        return 'EXCEPTION_CATEGORY,EXCEPTION_MESSAGE,EXCEPTION_TYPE,STACK_TRACE,' +
+               'REQUEST_ID,ORGANIZATION_ID,USER_ID,USER_ID_DERIVED,TIMESTAMP_DERIVED,' +
+               'TIMESTAMP,HASH_1';
+    }
+    
+    private static String generateApexUnexpectedExceptionWithRequestIdFieldTypes() {
+        return 'String,String,String,String,' +
+               'String,String,String,String,DateTime,' +
+               'String,String';
+    }
+
+    @IsTest
+    static void testEnhancedDeduplicationDirectCall() {
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        
+        // Create an existing email log with a known hash
+        DateTime emailLogTime = DateTime.now().addMinutes(-5);
+        String testHash = 'LTeYLyEUH7KjnrUvHawj/Mss4FCZpYFS5HQMgfDpCtY='; // Use the actual hash from debug logs
+        
+        Log__c existingEmailLog = new Log__c(
+            Hash_1__c = testHash,
+            Created_At__c = emailLogTime,
+            Organization_Id__c = UserInfo.getOrganizationId(),
+            Type__c = 'Email Exception',
+            Category__c = 'System',
+            Area__c = 'Exception Monitoring',
+            Summary__c = 'Test existing email log'
+        );
+        insert existingEmailLog;
+        
+        // Create an Inbound_Email__c record related to the existing log
+        Inbound_Email__c inboundEmail = new Inbound_Email__c(
+            Log__c = existingEmailLog.Id,
+            Subject__c = 'Test Exception Email'
+        );
+        insert inboundEmail;
+        
+        // Create a new event log with the same hash and timing within tolerance
+        Log__c newEventLog = new Log__c(
+            Hash_1__c = testHash,
+            Created_At__c = emailLogTime.addMinutes(3),
+            Organization_Id__c = UserInfo.getOrganizationId(),
+            Request_Id_External__c = 'REQ-TIMING-001',
+            Type__c = 'System.APEX_CODE',
+            Category__c = 'System',
+            Area__c = 'Apex',
+            Summary__c = 'Test exception for timing'
+        );
+        
+        // Test the enhanced deduplication directly
+        Map<String, Object> dedupSettings = new Map<String, Object>{
+            'enableEmailEventDeduplication' => true,
+            'timingToleranceSeconds' => 600,
+            'preserveAllEventLogs' => true,
+            'enableDetailedLogging' => true,
+            'eventTypesToCheck' => new Set<String>{'ApexUnexpectedException'}
+        };
+        
+        List<Log__c> inputLogs = new List<Log__c>{newEventLog};
+        List<Log__c> resultLogs = EventLogProcessors.processEnhancedDeduplication(
+            'ApexUnexpectedException', 
+            dedupSettings, 
+            Logger.getInstance(), 
+            inputLogs
+        );
+        
+        // Should return empty list because the event log should be skipped
+        System.assertEquals(0, resultLogs.size(), 'Event log should be skipped due to timing match');
+        
+        // Verify that existing email log was updated with Request_Id_External__c
+        Log__c updatedEmailLog = [SELECT Id, Request_Id_External__c FROM Log__c WHERE Id = :existingEmailLog.Id];
+        System.assert(String.isNotBlank(updatedEmailLog.Request_Id_External__c), 'Existing email log should have Request_Id_External__c populated');
+        System.assertEquals('REQ-TIMING-001', updatedEmailLog.Request_Id_External__c, 'Request_Id_External__c should match');
+    }
+
+    @IsTest
+    static void testEnhancedDeduplicationManualLogCreation() {
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        
+        // Create existing email log
+        DateTime emailLogTime = DateTime.now().addMinutes(-5);
+        String testHash = 'LTeYLyEUH7KjnrUvHawj/Mss4FCZpYFS5HQMgfDpCtY='; // Use the actual hash from debug logs
+        
+        Log__c existingEmailLog = new Log__c(
+            Hash_1__c = testHash,
+            Created_At__c = emailLogTime,
+            Organization_Id__c = UserInfo.getOrganizationId(),
+            Type__c = 'Email Exception',
+            Category__c = 'System',
+            Area__c = 'Exception Monitoring',
+            Summary__c = 'Test existing email log'
+        );
+        insert existingEmailLog;
+        
+        Inbound_Email__c inboundEmail = new Inbound_Email__c(
+            Log__c = existingEmailLog.Id,
+            Subject__c = 'Test Exception Email'
+        );
+        insert inboundEmail;
+        
+        // Set up Last_Processed_Hourly_Events__c to be around the email log time
+        DateTime hourlyProcessTime = emailLogTime.addMinutes(2);
+        Event_Monitoring__c settings = ConfigUtil.EVENT_MONITORING_SETTINGS;
+        settings.Last_Processed_Hourly_Events__c = hourlyProcessTime;
+        update settings;
+        
+        // Manually create an event log with the same hash and timing within tolerance
+        Log__c eventLog = new Log__c(
+            Hash_1__c = testHash,
+            Created_At__c = emailLogTime.addMinutes(1), // 1 minute after email log (within 10 minute tolerance)
+            Organization_Id__c = UserInfo.getOrganizationId(),
+            Request_Id_External__c = 'REQ-MANUAL-001',
+            Type__c = 'System.APEX_CODE',
+            Category__c = 'System',
+            Area__c = 'Apex',
+            Summary__c = 'Test exception for timing'
+        );
+        
+        // Test the enhanced deduplication directly
+        Map<String, Object> dedupSettings = new Map<String, Object>{
+            'enableEmailEventDeduplication' => true,
+            'timingToleranceSeconds' => 600,
+            'preserveAllEventLogs' => true,
+            'enableDetailedLogging' => true,
+            'eventTypesToCheck' => new Set<String>{'ApexUnexpectedException'}
+        };
+        
+        List<Log__c> inputLogs = new List<Log__c>{eventLog};
+        Integer logsBefore = [SELECT COUNT() FROM Log__c];
+        
+        Test.startTest();
+        List<Log__c> resultLogs = EventLogProcessors.processEventLogsWithEmailAwareness(
+            inputLogs, 
+            dedupSettings, 
+            Logger.getInstance()
+        );
+        Test.stopTest();
+        
+        Integer logsAfter = [SELECT COUNT() FROM Log__c];
+        
+        // Should return empty list because the event log should be skipped due to timing match
+        System.assertEquals(0, resultLogs.size(), 'Event log should be skipped due to timing match');
+        
+        // No new logs should be created
+        System.assertEquals(logsBefore, logsAfter, 'No new logs should be created due to deduplication');
+        
+        // Verify that existing email log was updated with Request_Id_External__c
+        Log__c updatedEmailLog = [SELECT Id, Request_Id_External__c FROM Log__c WHERE Id = :existingEmailLog.Id];
+        System.assertEquals('REQ-MANUAL-001', updatedEmailLog.Request_Id_External__c, 'Existing email log should have Request_Id_External__c populated');
+    }
+
+    @IsTest
+    static void testEnhancedEventLogFileType() {
+        // Test the enhanced EventLogFileType constructor
+        Double fileSizeBytes = 102400.0; // 100 KB
+        EventLogProcessingBatch.EventLogFileType chunk = 
+            new EventLogProcessingBatch.EventLogFileType('API', 'test-id', fileSizeBytes);
+        
+        // Verify the chunk properties
+        System.assertEquals('API', chunk.type, 'Event type should match');
+        System.assertEquals('test-id', chunk.logFileId, 'Log file ID should match');
+        System.assertEquals(fileSizeBytes, chunk.logFileLengthBytes, 'File size should match');
+        System.assertEquals(1000, chunk.estimatedRecordCount, 'Estimated record count should be 1000 for 100KB');
+        System.assertEquals(500, chunk.chunkSize, 'Chunk size should be 500 for 100KB file');
+        System.assertEquals(0, chunk.startRow, 'Start row should be 0');
+        System.assertEquals(500, chunk.endRow, 'End row should be 500');
+    }
+    
+    @IsTest
+    static void testChunkSizeCalculation() {
+        // Test small file (50 KB)
+        EventLogProcessingBatch.EventLogFileType smallChunk = new EventLogProcessingBatch.EventLogFileType('API', 'test', Double.valueOf(51200.0));
+        System.assertEquals(500, smallChunk.chunkSize, 'Small file should have 500 record chunks');
+        
+        // Test medium file (300 KB)
+        EventLogProcessingBatch.EventLogFileType mediumChunk = new EventLogProcessingBatch.EventLogFileType('API', 'test', Double.valueOf(307200.0));
+        System.assertEquals(1000, mediumChunk.chunkSize, 'Medium file should have 1000 record chunks');
+        
+        // Test large file (1 MB)
+        EventLogProcessingBatch.EventLogFileType largeChunk = new EventLogProcessingBatch.EventLogFileType('API', 'test', Double.valueOf(1048576.0));
+        System.assertEquals(2000, largeChunk.chunkSize, 'Large file should have 2000 record chunks');
+        
+        // Test very large file (5 MB)
+        EventLogProcessingBatch.EventLogFileType veryLargeChunk = new EventLogProcessingBatch.EventLogFileType('API', 'test', Double.valueOf(5242880.0));
+        System.assertEquals(5000, veryLargeChunk.chunkSize, 'Very large file should have 5000 record chunks');
+    }
+    
+    @IsTest
+    static void testRecordCountEstimation() {
+        // Test record count estimation
+        EventLogProcessingBatch.EventLogFileType smallChunk = new EventLogProcessingBatch.EventLogFileType('API', 'test', Double.valueOf(10240.0));
+        System.assertEquals(100, smallChunk.estimatedRecordCount, '10KB file should have ~100 records');
+        
+        EventLogProcessingBatch.EventLogFileType largeChunk = new EventLogProcessingBatch.EventLogFileType('API', 'test', Double.valueOf(1048576.0));
+        System.assertEquals(10240, largeChunk.estimatedRecordCount, '1MB file should have ~10240 records');
+    }
+
+    // Test batch processor class for chunked processing tests
+    private class TestBatchProcessor implements EventLogProcessors.IBatchProcessor {
+        public List<EventLogProcessors.IBaseEventData> processedRecords = new List<EventLogProcessors.IBaseEventData>();
+        
+        public void processBatchEventDataResults(List<EventLogProcessors.IBaseEventData> batchResults, EventLogProcessors.FieldMetadataConfig fieldMetadataConfig) {
+            processedRecords.addAll(batchResults);
+        }
+    }
+
+    // Helper method to create test event log file
+    private static SObject createTestEventLogFile(String eventType, String fileContent) {
+        // Use the existing helper method from the original test file
+        return createMockEventLogFile(eventType, fileContent);
+    }
+
+    @IsTest
+    static void testChunkedProcessing() {
+        // Test that chunked processing works correctly
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        
+        // Create a test log file with multiple rows
+        String csvHeader = 'REQUEST_ID,ORGANIZATION_ID,USER_ID,TIMESTAMP,CPU_TIME,REQUEST_STATUS\n';
+        List<String> dataRows = new List<String>();
+        
+        // Create 50 test rows
+        for (Integer i = 0; i < 50; i++) {
+            dataRows.add('REQ-' + String.valueOf(i).leftPad(3, '0') + 
+                        ',00D123456789012345,005xx000001234AAA,20130715233322.670,' +
+                        String.valueOf(100 + i) + ',Success');
+        }
+        
+        String fileContent = csvHeader + String.join(dataRows, '\n');
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_API, fileContent);
+        
+        // Create a chunk that processes rows 10-20 (10 rows total)
+        EventLogProcessingBatch.EventLogFileType chunk = new EventLogProcessingBatch.EventLogFileType('API', 'test-id', Double.valueOf(10240.0));
+        chunk.startRow = 10;
+        chunk.endRow = 20;
+        
+        // Create processor and test batch processor
+        EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_API);
+        TestBatchProcessor batchProcessor = new TestBatchProcessor();
+        
+        Test.startTest();
+        // Process only the specified chunk
+        processor.batchProcessLogFileSObject(logFile, batchProcessor, chunk.startRow, chunk.endRow);
+        Test.stopTest();
+        
+        // Verify that only the specified rows were processed
+        List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
+        System.assertEquals(10, results.size(), 'Should have processed exactly 10 rows from the chunk');
+        
+        // Verify the specific rows were processed (rows 10-19, 0-based index)
+        Set<String> expectedRequestIds = new Set<String>();
+        for (Integer i = 10; i < 20; i++) {
+            expectedRequestIds.add('REQ-' + String.valueOf(i).leftPad(3, '0'));
+        }
+        
+        Set<String> actualRequestIds = new Set<String>();
+        for (EventLogProcessors.IBaseEventData record : results) {
+            EventLogProcessors.SOAPAPIEventData apiData = (EventLogProcessors.SOAPAPIEventData)record;
+            actualRequestIds.add(apiData.requestId);
+        }
+        
+        System.assertEquals(expectedRequestIds, actualRequestIds, 'Should have processed the correct rows from the chunk');
+    }
+
+    @IsTest
+    static void testChunkedProcessingWithNullBounds() {
+        // Test that processing with null bounds processes the entire file (legacy behavior)
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        
+        // Create a test log file with multiple rows
+        String csvHeader = 'REQUEST_ID,ORGANIZATION_ID,USER_ID,TIMESTAMP,CPU_TIME,REQUEST_STATUS\n';
+        List<String> dataRows = new List<String>();
+        
+        // Create 25 test rows
+        for (Integer i = 0; i < 25; i++) {
+            dataRows.add('REQ-' + String.valueOf(i).leftPad(3, '0') + 
+                        ',00D123456789012345,005xx000001234AAA,20130715233322.670,' +
+                        String.valueOf(100 + i) + ',Success');
+        }
+        
+        String fileContent = csvHeader + String.join(dataRows, '\n');
+        SObject logFile = createTestEventLogFile(EventLogProcessors.EVENT_TYPE_API, fileContent);
+        
+        // Create processor and test batch processor
+        EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_API);
+        TestBatchProcessor batchProcessor = new TestBatchProcessor();
+        
+        Test.startTest();
+        // Process entire file (null bounds)
+        processor.batchProcessLogFileSObject(logFile, batchProcessor, null, null);
+        Test.stopTest();
+        
+        // Verify that all rows were processed
+        List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
+        System.assertEquals(25, results.size(), 'Should have processed all 25 rows when bounds are null');
+    }
+
 }
