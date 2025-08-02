@@ -41,7 +41,6 @@ public with sharing class IssueNotificationBatch extends DatabaseUtils.PharosBat
     }
 
     public void execute(Database.BatchableContext info, List<SObject> scope) {
-
         // Now each scope contains a single record with its iteration context
         this.notificationServiceImpl.batchExecuteIteration(info, scope, this.contextManager);
     }
@@ -50,11 +49,11 @@ public with sharing class IssueNotificationBatch extends DatabaseUtils.PharosBat
     public void setIterationContext(String recordId, NotificationService.ActionIteration iteration) {
         contextManager.setIterationContext(recordId, iteration);
     }
-
+    
     public NotificationService.ActionIteration getIterationContext(String recordId) {
         return contextManager.getIterationContext(recordId);
     }
-
+    
     public void clearIterationContext(String recordId) {
         contextManager.clearIterationContext(recordId);
     }
@@ -65,54 +64,6 @@ public with sharing class IssueNotificationBatch extends DatabaseUtils.PharosBat
 
     public void addRecordNotificationAttempt(String recordId) {
         contextManager.addRecordNotificationAttempt(recordId);
-    }
-
-    // New methods for notification attempts tracking
-    public void incrementNotificationAttempts(String recordId) {
-        contextManager.incrementNotificationAttempts(recordId);
-    }
-
-    public Integer getNotificationAttempts(String recordId) {
-        return contextManager.getNotificationAttempts(recordId);
-    }
-
-    public void clearNotificationAttempts(String recordId) {
-        contextManager.clearNotificationAttempts(recordId);
-    }
-
-    // New methods for chart data
-    public void storeChartData(String recordId, String chartData) {
-        contextManager.storeChartData(recordId, chartData);
-    }
-
-    public String getChartData(String recordId) {
-        return contextManager.getChartData(recordId);
-    }
-
-    public void clearChartData(String recordId) {
-        contextManager.clearChartData(recordId);
-    }
-
-    // New methods for chart images
-    public void storeChartImages(String recordId, Map<String, String> images) {
-        contextManager.storeChartImages(recordId, images);
-    }
-
-    public Map<String, String> getChartImages(String recordId) {
-        return contextManager.getChartImages(recordId);
-    }
-
-    public void clearChartImages(String recordId) {
-        contextManager.clearChartImages(recordId);
-    }
-
-    // Missing methods for timestamp tracking
-    public void setNotificationTimestamp(DateTime timestamp) {
-        contextManager.setNotificationTimestamp(timestamp);
-    }
-
-    public DateTime getNotificationTimestamp() {
-        return contextManager.getNotificationTimestamp();
     }
 
     public void finish(Database.BatchableContext info) {

@@ -151,7 +151,7 @@ public class JiraNotificationBatchTest {
 		endpoint2TestResp.put(newTicketEndpoint, createAzureDevOpsNewTicketMock());
 		String existingTicketEndpoint = String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM_ID_EXPAND_ALL, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_WORK_ITEM_ID});
 		endpoint2TestResp.put(existingTicketEndpoint, createAzureDevOpsExistTicketMock());
-		String workItemCommentEndpoint = String.format(AzureApiClient.AZURE_DEVOPS_REST_API_WORK_ITEM_COMMENT, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_WORK_ITEM_ID});
+		String workItemCommentEndpoint = String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM_COMMENT, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_WORK_ITEM_ID});
 		endpoint2TestResp.put(workItemCommentEndpoint, createAzureTicketCommentMock());
 		return endpoint2TestResp;
 	}
@@ -406,7 +406,7 @@ public class JiraNotificationBatchTest {
 		Rule__c jiraRule = createTicketingRule(true);
 		PermissionsUtil.JiraIntegrationEnabled = true;
 		TestDataFactory.enableMaxJiraRules();
-
+		
 		// Create paginated mocks for custom fields
 		Map<String, HttpCalloutMock> endpoint2TestResp = createJiraCustomFieldsPaginatedMocks();
 		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
@@ -415,15 +415,15 @@ public class JiraNotificationBatchTest {
 		Test.startTest();
 		// Test the paginated method directly
 		List<JiraService.JiraProjectIssueField> allFields = JiraService.getService().getProjectIssueFields(JIRA_MOCK_PROJECT_ID, JIRA_MOCK_ISSUE_TYPE_ID);
-
+		
 		// Test custom fields method
 		Map<String, JiraService.JiraProjectIssueField> customFields = JiraService.getService().getProjectIssueCustomFields(JIRA_MOCK_PROJECT_ID, JIRA_MOCK_ISSUE_TYPE_ID);
 		Test.stopTest();
-
+		
 		// Verify we got results from multiple pages
 		System.assert(allFields.size() >= 4, 'Should have fields from multiple pages');
 		System.assert(customFields.size() >= 2, 'Should have custom fields from multiple pages');
-
+		
 		// Verify custom fields are properly filtered
 		for (String key : customFields.keySet()) {
 			System.assert(key.startsWith('customfield'), 'All returned fields should be custom fields');
@@ -1053,7 +1053,7 @@ public class JiraNotificationBatchTest {
 
 		String newTicketCommentEndpoint = isJira 
 			? JiraService.getService().getCreateIssueCommentEndpoint(JIRA_MOCK_NEW_TICKET_ID)
-			: String.format(AzureApiClient.AZURE_DEVOPS_REST_API_WORK_ITEM_COMMENT, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_WORK_ITEM_ID});
+			: String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM_COMMENT, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_WORK_ITEM_ID});
 		HttpRequest postRequest = multiCalloutMock.getRequest(newTicketCommentEndpoint);
 		System.assertNotEquals(null, postRequest.getBody());
 		System.assertNotEquals(null, issue.Bug_Tracker__c);
@@ -1841,16 +1841,16 @@ public class JiraNotificationBatchTest {
 	// Helper method to create paginated mock responses for custom fields
 	public static Map<String, HttpCalloutMock> createJiraCustomFieldsPaginatedMocks() {
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-
-		// Mock for first page (startAt=0, maxResults=200) - returns 2 fields, total=202
+		
+		// Mock for first page (startAt=0, maxResults=200) - returns 2 fields, total=202 
 		String firstPageEndpoint = JiraService.getService().getProjectIssueFieldsEndpoint(JIRA_MOCK_PROJECT_ID, JIRA_MOCK_ISSUE_TYPE_ID, 0, 200);
 		endpoint2TestResp.put(firstPageEndpoint, getProjectIssueFieldsPaginatedMock(0, 200, 202, createFirstPageFields()));
-
+		
 		// Mock for second page (startAt=200, maxResults=200) - returns 2 fields, total=202
 		// This is the last page: (200 + 2) >= 202, so pagination stops
 		String secondPageEndpoint = JiraService.getService().getProjectIssueFieldsEndpoint(JIRA_MOCK_PROJECT_ID, JIRA_MOCK_ISSUE_TYPE_ID, 200, 200);
 		endpoint2TestResp.put(secondPageEndpoint, getProjectIssueFieldsPaginatedMock(200, 200, 202, createSecondPageFields()));
-
+		
 		return endpoint2TestResp;
 	}
 
@@ -1923,7 +1923,7 @@ public class JiraNotificationBatchTest {
 	// Helper method to create first page of fields
 	private static List<JiraService.JiraProjectIssueField> createFirstPageFields() {
 		List<JiraService.JiraProjectIssueField> fields = new List<JiraService.JiraProjectIssueField>();
-
+		
 		// Add a system field
 		JiraService.JiraProjectIssueField systemField = new JiraService.JiraProjectIssueField();
 		systemField.fieldId = 'summary';
@@ -1931,7 +1931,7 @@ public class JiraNotificationBatchTest {
 		systemField.required = true;
 		systemField.operations = new List<String>{'set'};
 		fields.add(systemField);
-
+		
 		// Add first custom field
 		JiraService.JiraProjectIssueField customField1 = new JiraService.JiraProjectIssueField();
 		customField1.fieldId = 'customfield_10100';
@@ -1942,14 +1942,14 @@ public class JiraNotificationBatchTest {
 		customField1.schema.type = 'any';
 		customField1.schema.custom = 'com.pyxis.greenhopper.jira:gh-epic-link';
 		fields.add(customField1);
-
+		
 		return fields;
 	}
 
 	// Helper method to create second page of fields
 	private static List<JiraService.JiraProjectIssueField> createSecondPageFields() {
 		List<JiraService.JiraProjectIssueField> fields = new List<JiraService.JiraProjectIssueField>();
-
+		
 		// Add second custom field
 		JiraService.JiraProjectIssueField customField2 = new JiraService.JiraProjectIssueField();
 		customField2.fieldId = 'customfield_10200';
@@ -1960,7 +1960,7 @@ public class JiraNotificationBatchTest {
 		customField2.schema.type = 'array';
 		customField2.schema.custom = 'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes';
 		fields.add(customField2);
-
+		
 		// Add third custom field
 		JiraService.JiraProjectIssueField customField3 = new JiraService.JiraProjectIssueField();
 		customField3.fieldId = 'customfield_10201';
@@ -1971,7 +1971,7 @@ public class JiraNotificationBatchTest {
 		customField3.schema.type = 'date';
 		customField3.schema.custom = 'com.atlassian.jira.plugin.system.customfieldtypes:datepicker';
 		fields.add(customField3);
-
+		
 		return fields;
 	}
 
@@ -3247,8 +3247,6 @@ public class JiraNotificationBatchTest {
 	private static void test_event_action_notifications_jira_positive() {
 		// Setup
 		TestDataFactory.enableMaxJiraRules();
-		PermissionsUtil.JiraIntegrationEnabled = true;
-		
 		Map<String, HttpCalloutMock> endpoint2TestResp = createJiraMocks();
 		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
 		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
@@ -3266,16 +3264,13 @@ public class JiraNotificationBatchTest {
 
 		// Verify EventAction was processed
 		EventAction__c updatedEventAction = [
-			SELECT Id, Executed_On__c, Response__c, Delivered_to__c
+			SELECT Id, Executed_On__c, Response__c, Delivered_to__c 
 			FROM EventAction__c 
 			WHERE Id = :eventAction.Id
 		];
 		
 		System.assertNotEquals(null, updatedEventAction.Executed_On__c, 'EventAction should be marked as executed');
 		System.assertNotEquals(null, updatedEventAction.Response__c, 'Response should contain ticket ID');
-		System.assertEquals('test', updatedEventAction.Response__c, 'Response should be equal to ticket ID');
-		System.assertNotEquals(null, updatedEventAction.Delivered_to__c, 'Delivered_to__c should contain ticket URL');
-		System.assertEquals('http://test.jira.com/browse/test', updatedEventAction.Delivered_to__c, 'Delivered_to__c should equal ticket URL');
 		
 		assertNoInternalLogs();
 	}
@@ -3533,7 +3528,7 @@ public class JiraNotificationBatchTest {
 		System.assertEquals(MonitoringUtil.ACTION_TYPE_EMAIL_NOTIFICATION, actionType, 'EmailActionHandler should return correct action type');
 		
 		// Test execute method (should not throw exceptions)
-		emailHandler.execute(log.Id, emailAction, log, null);
+		emailHandler.execute(log.Id, emailAction);
 		// Email handler doesn't do actual execution in the execute method, so no specific assertions
 		
 		// Test exception handling
@@ -3576,7 +3571,7 @@ public class JiraNotificationBatchTest {
 		System.assertEquals(MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION, actionType, 'SlackActionHandler should return correct action type');
 		
 		// Test execute method with valid settings
-		slackHandler.execute(log.Id, slackAction, log, null);
+		slackHandler.execute(log.Id, slackAction);
 		// No exception should be thrown with proper mock setup
 		
 		// Test exception handling
@@ -3620,7 +3615,7 @@ public class JiraNotificationBatchTest {
 		System.assertEquals(MonitoringUtil.ACTION_TYPE_TEAMS_NOTIFICATION, actionType, 'TeamsActionHandler should return correct action type');
 		
 		// Test execute method with valid settings
-		teamsHandler.execute(log.Id, teamsAction, log, null);
+		teamsHandler.execute(log.Id, teamsAction);
 		// No exception should be thrown with proper mock setup
 		
 		// Test exception handling
@@ -3662,7 +3657,7 @@ public class JiraNotificationBatchTest {
 		System.assertEquals(MonitoringUtil.ACTION_TYPE_PAGERDUTY_NOTIFICATION, actionType, 'PagerDutyActionHandler should return correct action type');
 		
 		// Test execute method with valid settings
-		pagerDutyHandler.execute(log.Id, pagerDutyAction, log, null);
+		pagerDutyHandler.execute(log.Id, pagerDutyAction);
 		// No exception should be thrown with proper mock setup
 		
 		// Test exception handling
@@ -3748,7 +3743,7 @@ public class JiraNotificationBatchTest {
 		NotificationService.SlackActionHandler slackHandler = new NotificationService.SlackActionHandler();
 		
 		// Test normal execution (no exception)
-		exceptionHandler.executeWithExceptionHandling(slackHandler, log.Id, testAction, log, logErrors, null);
+		exceptionHandler.executeWithExceptionHandling(slackHandler, log.Id, testAction, logErrors);
 		
 		// Verify no exceptions recorded for normal execution
 		List<System.Exception> slackExceptions = logErrors.slackExceptions.get(log.Id);
@@ -3758,7 +3753,7 @@ public class JiraNotificationBatchTest {
 		TestActionHandler testHandler = new TestActionHandler();
 		
 		// Test exception handling scenario
-		exceptionHandler.executeWithExceptionHandling(testHandler, log.Id, testAction, log, logErrors, null);
+		exceptionHandler.executeWithExceptionHandling(testHandler, log.Id, testAction, logErrors);
 		
 		// Verify exception was handled correctly
 		List<System.Exception> testExceptions = logErrors.slackExceptions.get(log.Id);
@@ -3918,12 +3913,8 @@ public class JiraNotificationBatchTest {
 			throw new System.CalloutException('Test exception for ActionExceptionHandler');
 		}
 
-		public void execute(String recordId, Action__c actionFields, SObject record) {
-			throw new System.CalloutException('Test exception for ActionExceptionHandler');
-		}
-
-		public void execute(String recordId, Action__c actionFields, SObject record, NotificationService.BatchContextManager batchContext) {
-			execute(recordId, actionFields, record);
+		public void execute(String recordId, Action__c actionFields, NotificationService.BatchContextManager batchContext) {
+			execute(recordId, actionFields);
 		}
 
 		public void handleException(String recordId, Exception e, NotificationService.ErrorsHelper logErrors) {
@@ -4829,10 +4820,6 @@ public class JiraNotificationBatchTest {
 	// Simple Mock BatchContextManager for testing
 	private class TestBatchContextManager implements NotificationService.BatchContextManager {
 		private Map<String, NotificationService.ActionIteration> contexts = new Map<String, NotificationService.ActionIteration>();
-		private Map<String, Integer> notificationAttempts = new Map<String, Integer>();
-		private Map<String, String> chartData = new Map<String, String>();
-		private Map<String, Map<String, String>> chartImages = new Map<String, Map<String, String>>();
-		private DateTime notificationTimestamp;
 		
 		public void setIterationContext(String recordId, NotificationService.ActionIteration iteration) {
 			contexts.put(recordId, iteration);
@@ -4852,55 +4839,6 @@ public class JiraNotificationBatchTest {
 
 		public void addRecordNotificationAttempt(String recordId) {
 			// do nothing
-		}
-
-		// New methods for notification attempts tracking
-		public void incrementNotificationAttempts(String recordId) {
-			Integer currentCount = notificationAttempts.get(recordId);
-			notificationAttempts.put(recordId, currentCount != null ? currentCount + 1 : 1);
-		}
-
-		public Integer getNotificationAttempts(String recordId) {
-			return notificationAttempts.get(recordId) != null ? notificationAttempts.get(recordId) : 0;
-		}
-
-		public void clearNotificationAttempts(String recordId) {
-			notificationAttempts.remove(recordId);
-		}
-
-		// New methods for timestamp tracking
-		public void setNotificationTimestamp(DateTime timestamp) {
-			this.notificationTimestamp = timestamp;
-		}
-
-		public DateTime getNotificationTimestamp() {
-			return this.notificationTimestamp;
-		}
-
-		// New methods for chart data
-		public void storeChartData(String recordId, String chartData) {
-			this.chartData.put(recordId, chartData);
-		}
-
-		public String getChartData(String recordId) {
-			return this.chartData.get(recordId);
-		}
-
-		public void clearChartData(String recordId) {
-			this.chartData.remove(recordId);
-		}
-
-		// New methods for chart images
-		public void storeChartImages(String recordId, Map<String, String> images) {
-			this.chartImages.put(recordId, images);
-		}
-
-		public Map<String, String> getChartImages(String recordId) {
-			return this.chartImages.get(recordId);
-		}
-
-		public void clearChartImages(String recordId) {
-			this.chartImages.remove(recordId);
 		}
 	}
 
@@ -8878,14 +8816,14 @@ public class JiraNotificationBatchTest {
 
 		// Set up timeout mock responses
 		Test.setMock(HttpCalloutMock.class, new DirectTimeoutMock());
-
+		
 		Test.startTest();
 		
 		// Execute JiraNotificationBatch for Log__c processing only
 		Database.executeBatch(JiraNotificationBatch.getInstance(), 1);
 		
 		Test.stopTest();
-
+		
 		// Verify Log record was processed despite timeout
 		Log__c processedLog = [SELECT Id, Executable_Rules__c, Notification_Integration_Status__c FROM Log__c WHERE Id = :testLog.Id];
 		
@@ -9882,7 +9820,7 @@ public class JiraNotificationBatchTest {
 		Log__c updatedLog = [SELECT Id, Executable_Rules__c, Notification_Integration_Status__c FROM Log__c WHERE Id = :log.Id];
 		NotificationService.ExecutableRulesConfig finalConfig = 
 			NotificationService.getExecutableRuleConfig(updatedLog);
-
+		
 		// Verify at least one action was processed (success criteria)
 		System.assertEquals(true, finalConfig.hasCompletedActions(), 
 			'Should have some completed actions');
@@ -9921,10 +9859,10 @@ public class JiraNotificationBatchTest {
 		// Setup: Enable Slack integration and create test data
 		TestDataFactory.createSlackSettings();
 		PermissionsUtil.SlackIntegrationEnabled = true;
-
+		
 		// Create Slack notification rule
 		Rule__c slackRule = createSlackNotificationRule();
-
+		
 		// Create test log that will trigger Slack notification
 		Log__c testLog = new Log__c();
 		testLog.Summary__c = 'Test Slack Rate Limit Log';
@@ -9932,23 +9870,23 @@ public class JiraNotificationBatchTest {
 		testLog.Area__c = Logger.AREA_PHAROS_ERROR;
 		testLog.Post_Processing_Status__c = LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED;
 		testLog.Originated_From__c = ConfigUtil.ORIGINATED_FROM_BROADCAST;
-
+		
 		// Create proper ExecutableRulesConfig format (new format)
 		NotificationService.ExecutableRulesConfig config = new NotificationService.ExecutableRulesConfig();
 		config.addToRun(slackRule.Id);
 		testLog.Executable_Rules__c = config.toJSON();
-
+		
 		// Set notification status to PENDING to trigger processing
 		testLog.Notification_Integration_Status__c = MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_PENDING;
-
+		
 		insert testLog;
-
+		
 		// Setup HTTP mocks for rate-limited Slack responses
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-
+		
 		// Mock Slack channels endpoint (needed for validation)
 		endpoint2TestResp.put(ConfigUtil.SLACK_CONVERSATION_LIST_ENDPOINT, createSlackChannelsRequestMock());
-
+		
 		// Mock Slack rate limit response (HTTP 429)
 		TestDataFactory.SingleRequestMock rateLimitMock = new TestDataFactory.SingleRequestMock(
 			429,
@@ -9956,33 +9894,33 @@ public class JiraNotificationBatchTest {
 			'{"ok":false,"error":"rate_limited"}'
 		);
 		endpoint2TestResp.put(ConfigUtil.SLACK_POST_MESSAGE_ENDPOINT, rateLimitMock);
-
+		
 		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
 		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
+		
 		// Count logs before test
 		Integer logCountBefore = [SELECT COUNT() FROM Log__c];
-
+		
 		Test.startTest();
-
+		
 		// Create notification service with logger
 		Logger testLogger = Logger.getInstance();
 		NotificationService notificationService = NotificationService.getInstance(
 			NotificationService.NOTIFICATION_SERVICE_TYPE.LOG, testLogger);
-
+		
 		// Create a batch context manager to track rate limits
 		TestRateLimitBatchContextManager batchManager = new TestRateLimitBatchContextManager();
-
+		
 		// Process the log directly by calling executeIteration to trigger Slack notification
-		NotificationService.NotificationServiceDefaultImpl serviceImpl =
+		NotificationService.NotificationServiceDefaultImpl serviceImpl = 
 			(NotificationService.NotificationServiceDefaultImpl) notificationService.strategy;
-
+		
 		// Initialize the service with our test log
 		serviceImpl.init(testLog);
-
+		
 		// Ensure the logger is set on the strategy (this is critical for rate limit summary logging)
 		serviceImpl.setLogger(testLogger);
-
+		
 		// Execute iteration with batch context to trigger Slack action and rate limit detection
 		serviceImpl.executeIteration(null, batchManager);
 
@@ -9990,7 +9928,7 @@ public class JiraNotificationBatchTest {
 		serviceImpl.setLogger(testLogger);
 		serviceImpl.finish(null, batchManager);
 		testLogger.flush();
-
+		
 		/*
 		// Call finish() to trigger rate limit summary logging
 		try {
@@ -10000,60 +9938,60 @@ public class JiraNotificationBatchTest {
 		} catch (Exception e) {
 			// Continue with test even if finish() fails
 		}
-
+		
 		// Force flush the logger to ensure all logs are persisted
 		try {
 			testLogger.flush();
 		} catch (Exception e) {
 			// Continue with test even if flush() fails
 		}*/
-
+		
 		Test.stopTest();
-
+		
 		// Get batch stats for verification
 		NotificationService.BatchExecutionStats stats = batchManager.getBatchStats();
-
+		
 		// Verify rate limit summary log was created
 		List<Log__c> rateLimitLogs = [
 			SELECT Id, Summary__c, Category__c, Area__c, Type__c, Details__c, Related_Objects__c
-			FROM Log__c
-			WHERE Category__c = 'Pharos Error'
-			AND Area__c = 'Pharos'
+			FROM Log__c 
+			WHERE Category__c = 'Pharos Error' 
+			AND Area__c = 'Pharos' 
 			AND Type__c = 'Rate Limit Summary'
 			AND CreatedDate = TODAY
 		];
-
+		
 		// If no rate limit logs found, check if any Slack exceptions occurred
 		if (rateLimitLogs.isEmpty()) {
 			// Check if the original log was processed and has errors
-			testLog = [SELECT Id, Notification_Integration_Status__c, Slack_Integration_Status__c
+			testLog = [SELECT Id, Notification_Integration_Status__c, Slack_Integration_Status__c 
 					   FROM Log__c WHERE Id = :testLog.Id];
 		}
-
-		System.assertEquals(1, rateLimitLogs.size(),
-			'Should have exactly one rate limit summary log. Stats: Total=' + stats.totalSlackActions +
+		
+		System.assertEquals(1, rateLimitLogs.size(), 
+			'Should have exactly one rate limit summary log. Stats: Total=' + stats.totalSlackActions + 
 			', RateLimited=' + stats.rateLimitedSlackActions + ', HasEvents=' + stats.hasRateLimitEvents());
-
+		
 		if (!rateLimitLogs.isEmpty()) {
 			Log__c rateLimitLog = rateLimitLogs[0];
-
+			
 			// Verify summary contains rate limit information
-			System.assert(rateLimitLog.Summary__c.contains('Slack Rate Limit Impact'),
+			System.assert(rateLimitLog.Summary__c.contains('Slack Rate Limit Impact'), 
 				'Summary should mention rate limit impact');
-
-			// Verify category and type are correct
+			
+			// Verify category and type are correct  
 			System.assertEquals('Pharos Error', rateLimitLog.Category__c, 'Category should be Pharos Error');
 			System.assertEquals('Pharos', rateLimitLog.Area__c, 'Area should be Pharos');
 			System.assertEquals('Rate Limit Summary', rateLimitLog.Type__c, 'Type should be Rate Limit Summary');
-
+			
 			// Verify details contain comprehensive batch summary
-			System.assert(rateLimitLog.Details__c.contains('SLACK RATE LIMIT BATCH SUMMARY'),
+			System.assert(rateLimitLog.Details__c.contains('SLACK RATE LIMIT BATCH SUMMARY'), 
 				'Details should contain batch summary header');
 		}
 	}
+	
 
-
-
+	
 	/**
 	 * Test for batch context manager rate limit tracking
 	 */
@@ -10061,7 +9999,7 @@ public class JiraNotificationBatchTest {
 	private static void test_batch_context_manager_rate_limit_tracking() {
 		// Create a test batch context manager
 		TestRateLimitBatchContextManager batchManager = new TestRateLimitBatchContextManager();
-
+		
 		// Test rate limit tracking methods
 		batchManager.trackSlackAction('record1');
 		batchManager.trackSlackAction('record2');
@@ -10069,7 +10007,7 @@ public class JiraNotificationBatchTest {
 		batchManager.trackSlackRateLimit('record2', 'Rate limit exceeded', DateTime.now().addMinutes(1));
 		// Rate limited actions are also failed actions, so track it as failure too
 		batchManager.trackSlackFailure('record2');
-
+		
 		// Verify batch statistics
 		NotificationService.BatchExecutionStats stats = batchManager.getBatchStats();
 		System.assertEquals(2, stats.totalSlackActions, 'Should track 2 total actions');
@@ -10078,24 +10016,24 @@ public class JiraNotificationBatchTest {
 		System.assertEquals(1, stats.rateLimitedSlackActions, 'Should track 1 rate limited action');
 		System.assertEquals(2, stats.affectedRecordIds.size(), 'Should track 2 affected records');
 		System.assertEquals(1, stats.rateLimitEvents.size(), 'Should track 1 rate limit event');
-
+		
 		// Test rate limit event details
 		NotificationService.RateLimitEvent event = stats.rateLimitEvents[0];
 		System.assertEquals('record2', event.recordId, 'Event should track correct record ID');
 		System.assertEquals('Rate limit exceeded', event.message, 'Event should track correct message');
 		System.assertNotEquals(null, event.timestamp, 'Event should have timestamp');
 		System.assertNotEquals(null, event.retryAfter, 'Event should have retry after time');
-
+		
 		// Test success rate calculation
 		System.assertEquals(50.0, stats.getSuccessRate(), 'Success rate should be 50%');
-
+		
 		// Test pending actions calculation
 		System.assertEquals(0, stats.getPendingSlackActions(), 'Should have 0 pending actions');
-
+		
 		// Test has rate limit events
 		System.assertEquals(true, stats.hasRateLimitEvents(), 'Should indicate rate limit events occurred');
 	}
-
+	
 	/**
 	 * Focused test for rate limit summary logging functionality in isolation
 	 */
@@ -10103,12 +10041,12 @@ public class JiraNotificationBatchTest {
 	private static void test_rate_limit_summary_logging_isolated() {
 		// Count logs before test
 		Integer logCountBefore = [SELECT COUNT() FROM Log__c];
-
+		
 		Test.startTest();
-
+		
 		// Create a batch context manager and manually add rate limit events
 		TestRateLimitBatchContextManager batchManager = new TestRateLimitBatchContextManager();
-
+		
 		// Manually track some rate limit events
 		batchManager.trackSlackAction('record1');
 		batchManager.trackSlackAction('record2');
@@ -10116,60 +10054,60 @@ public class JiraNotificationBatchTest {
 		batchManager.trackSlackRateLimit('record1', 'Slack API rate limit hit. Retry after: 60 seconds', DateTime.now().addSeconds(60));
 		batchManager.trackSlackRateLimit('record2', 'Slack API rate limit hit. Retry after: 30 seconds', DateTime.now().addSeconds(30));
 		batchManager.trackSlackSuccess('record3');
-
+		
 		// Verify rate limit events are tracked
 		NotificationService.BatchExecutionStats stats = batchManager.getBatchStats();
 		System.assertEquals(3, stats.totalSlackActions, 'Should track 3 total actions');
 		System.assertEquals(2, stats.rateLimitedSlackActions, 'Should track 2 rate limited actions');
 		System.assertEquals(true, stats.hasRateLimitEvents(), 'Should have rate limit events');
-
+		
 		// Create notification service and call finish() method directly
 		Logger testLogger = Logger.getInstance();
 		NotificationService notificationService = NotificationService.getInstance(
 			NotificationService.NOTIFICATION_SERVICE_TYPE.LOG, testLogger);
-		NotificationService.NotificationServiceDefaultImpl serviceImpl =
+		NotificationService.NotificationServiceDefaultImpl serviceImpl = 
 			(NotificationService.NotificationServiceDefaultImpl) notificationService.strategy;
-
+		
 		// Ensure the logger is set on the strategy immediately before finish() call
 		serviceImpl.setLogger(testLogger);
-
+		
 		// Call finish() which should create the rate limit summary log
 		serviceImpl.finish(null, batchManager);
-
+		
 		// Force flush the logger to persist any logs created
 		testLogger.flush();
-
+		
 		Test.stopTest();
-
+		
 		// Verify rate limit summary log was created
 		List<Log__c> rateLimitLogs = [
 			SELECT Id, Summary__c, Category__c, Area__c, Type__c, Details__c, Related_Objects__c
-			FROM Log__c
-			WHERE Category__c = 'Pharos Error'
-			AND Area__c = 'Pharos'
+			FROM Log__c 
+			WHERE Category__c = 'Pharos Error' 
+			AND Area__c = 'Pharos' 
 			AND Type__c = 'Rate Limit Summary'
 			AND CreatedDate = TODAY
 		];
-
+		
 		System.assertEquals(1, rateLimitLogs.size(), 'Should have exactly one rate limit summary log created');
-
+		
 		Log__c rateLimitLog = rateLimitLogs[0];
-
+		
 		// Verify summary content
-		System.assert(rateLimitLog.Summary__c.contains('Slack Rate Limit Impact'),
+		System.assert(rateLimitLog.Summary__c.contains('Slack Rate Limit Impact'), 
 			'Summary should mention rate limit impact');
-		System.assert(rateLimitLog.Summary__c.contains('2 of 3 actions affected'),
+		System.assert(rateLimitLog.Summary__c.contains('2 of 3 actions affected'), 
 			'Summary should show correct count of affected actions');
-
+		
 		// Verify details content
-		System.assert(rateLimitLog.Details__c.contains('SLACK RATE LIMIT BATCH SUMMARY'),
+		System.assert(rateLimitLog.Details__c.contains('SLACK RATE LIMIT BATCH SUMMARY'), 
 			'Details should contain batch summary header');
-		System.assert(rateLimitLog.Details__c.contains('Rate Limited Actions: 2'),
+		System.assert(rateLimitLog.Details__c.contains('Rate Limited Actions: 2'), 
 			'Details should show rate limited count');
-
+		
 		// Verify only one new log was created
 		Integer logCountAfter = [SELECT COUNT() FROM Log__c];
-		System.assertEquals(logCountBefore + 1, logCountAfter,
+		System.assertEquals(logCountBefore + 1, logCountAfter, 
 			'Should only have created one new rate limit summary log');
 	}
 
@@ -10197,20 +10135,20 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_jira_field_transformer_plugin_pattern() {
 		Test.startTest();
-
+		
 		JiraService.JiraServiceDefaultImpl service = new JiraService.JiraService_Hosted_9_4_14_Impl();
-
+		
 		// Test getting supported field types
 		Set<String> supportedTypes = service.getSupportedFieldTypes();
-
+		
 		System.assert(supportedTypes.size() > 0, 'Should have supported field types');
-		System.assert(supportedTypes.contains('com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes'),
+		System.assert(supportedTypes.contains('com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes'), 
 			'Should support multi-checkbox fields');
-		System.assert(supportedTypes.contains('com.atlassian.jira.plugin.system.customfieldtypes:datepicker'),
+		System.assert(supportedTypes.contains('com.atlassian.jira.plugin.system.customfieldtypes:datepicker'), 
 			'Should support date picker fields');
-		System.assert(supportedTypes.contains('com.atlassian.jira.plugin.system.customfieldtypes:datetime'),
+		System.assert(supportedTypes.contains('com.atlassian.jira.plugin.system.customfieldtypes:datetime'), 
 			'Should support datetime fields');
-
+		
 		Test.stopTest();
 	}
 
@@ -10220,35 +10158,35 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_multi_checkbox_transformer() {
 		Test.startTest();
-
+		
 		JiraService.MultiCheckboxTransformer transformer = new JiraService.MultiCheckboxTransformer();
-
+		
 		// Test successful transformation
 		String validInput = 'Option1,Option2,Option3';
 		Object result = transformer.transform(validInput);
-
+		
 		List<Map<String, String>> expectedResult = new List<Map<String, String>>{
 			new Map<String, String>{'id' => 'Option1'},
 			new Map<String, String>{'id' => 'Option2'},
 			new Map<String, String>{'id' => 'Option3'}
 		};
-
-		System.assertEquals(JSON.serialize(expectedResult), JSON.serialize(result),
+		
+		System.assertEquals(JSON.serialize(expectedResult), JSON.serialize(result), 
 			'Multi-checkbox should transform to array of value objects');
-
+		
 		// Test validation - valid input
 		JiraService.JiraFieldValidationResult validationResult = transformer.validateInput(validInput);
 		System.assertEquals(true, validationResult.isValid, 'Valid input should pass validation');
-
+		
 		// Test validation - blank input
 		validationResult = transformer.validateInput('');
 		System.assertEquals(false, validationResult.isValid, 'Blank input should fail validation');
 		System.assertNotEquals(null, validationResult.errorMessage, 'Should have error message');
-
+		
 		// Test validation - input with empty values
 		validationResult = transformer.validateInput('Option1,,Option3');
 		System.assertEquals(false, validationResult.isValid, 'Input with empty values should fail validation');
-
+		
 		Test.stopTest();
 	}
 
@@ -10258,34 +10196,31 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_date_picker_transformer() {
 		Test.startTest();
-
+		
 		JiraService.DatePickerTransformer transformer = new JiraService.DatePickerTransformer();
-
+		
 		// Test successful transformation - date only format
 		String validDateInput = '2023-04-13';
 		Object result = transformer.transform(validDateInput);
-		// The date might be shifted due to timezone conversion, so check if it's either the original date or one day before/after
-		String resultStr = String.valueOf(result);
-		Boolean isValidDate = resultStr == '2023-04-13' || resultStr == '2023-04-12' || resultStr == '2023-04-14';
-		System.assert(isValidDate, 'Date should be formatted correctly. Expected: 2023-04-13, 2023-04-12, or 2023-04-14, Actual: ' + resultStr);
-
+		System.assertEquals('2023-04-13', result, 'Date should be formatted correctly');
+		
 		// Test successful transformation - ISO format
 		String isoInput = '2023-04-13T19:03:25.153Z';
 		result = transformer.transform(isoInput);
 		System.assertNotEquals(null, result, 'ISO format should be transformed');
-
+		
 		// Test validation - valid date
 		JiraService.JiraFieldValidationResult validationResult = transformer.validateInput(validDateInput);
 		System.assertEquals(true, validationResult.isValid, 'Valid date should pass validation');
-
+		
 		// Test validation - invalid format
 		validationResult = transformer.validateInput('invalid-date');
 		System.assertEquals(false, validationResult.isValid, 'Invalid date format should fail validation');
-
+		
 		// Test validation - blank input
 		validationResult = transformer.validateInput('');
 		System.assertEquals(false, validationResult.isValid, 'Blank input should fail validation');
-
+		
 		Test.stopTest();
 	}
 
@@ -10295,31 +10230,31 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_datetime_transformer() {
 		Test.startTest();
-
+		
 		JiraService.DateTimeTransformer transformer = new JiraService.DateTimeTransformer();
-
+		
 		// Test successful transformation - datetime format
 		String validDateTimeInput = '2023-04-13 19:03:25';
 		Object result = transformer.transform(validDateTimeInput);
 		System.assertNotEquals(null, result, 'DateTime should be transformed');
-
+		
 		// Test successful transformation - ISO format
 		String isoInput = '2023-04-13T19:03:25.153Z';
 		result = transformer.transform(isoInput);
 		System.assertNotEquals(null, result, 'ISO format should be transformed');
-
+		
 		// Test validation - valid datetime
 		JiraService.JiraFieldValidationResult validationResult = transformer.validateInput(validDateTimeInput);
 		System.assertEquals(true, validationResult.isValid, 'Valid datetime should pass validation');
-
+		
 		// Test validation - date only format (should also be valid for datetime)
 		validationResult = transformer.validateInput('2023-04-13');
 		System.assertEquals(true, validationResult.isValid, 'Date format should be valid for datetime field');
-
+		
 		// Test validation - invalid format
 		validationResult = transformer.validateInput('invalid-datetime');
 		System.assertEquals(false, validationResult.isValid, 'Invalid datetime format should fail validation');
-
+		
 		Test.stopTest();
 	}
 
@@ -10329,32 +10264,32 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_number_transformer() {
 		Test.startTest();
-
+		
 		JiraService.NumberTransformer transformer = new JiraService.NumberTransformer();
-
+		
 		// Test successful transformation - integer
 		String integerInput = '123';
 		Object result = transformer.transform(integerInput);
 		System.assertEquals(123, result, 'Integer should be transformed to Decimal');
-
+		
 		// Test successful transformation - decimal
 		String decimalInput = '123.45';
 		result = transformer.transform(decimalInput);
 		System.assertEquals(123.45, result, 'Decimal should be transformed correctly');
-
+		
 		// Test invalid number transformation (fallback to string)
 		String invalidInput = 'not-a-number';
 		result = transformer.transform(invalidInput);
 		System.assertEquals(invalidInput, result, 'Invalid number should fallback to original string');
-
+		
 		// Test validation - valid number
 		JiraService.JiraFieldValidationResult validationResult = transformer.validateInput(integerInput);
 		System.assertEquals(true, validationResult.isValid, 'Valid number should pass validation');
-
+		
 		// Test validation - invalid number
 		validationResult = transformer.validateInput(invalidInput);
 		System.assertEquals(false, validationResult.isValid, 'Invalid number should fail validation');
-
+		
 		Test.stopTest();
 	}
 
@@ -10364,25 +10299,25 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_radio_button_transformer() {
 		Test.startTest();
-
+		
 		JiraService.RadioButtonTransformer transformer = new JiraService.RadioButtonTransformer();
-
+		
 		// Test successful transformation
 		String validInput = 'Option1';
 		Object result = transformer.transform(validInput);
-
+		
 		Map<String, String> expectedResult = new Map<String, String>{'id' => 'Option1'};
-		System.assertEquals(JSON.serialize(expectedResult), JSON.serialize(result),
+		System.assertEquals(JSON.serialize(expectedResult), JSON.serialize(result), 
 			'Radio button should transform to value object');
-
+		
 		// Test validation - valid input
 		JiraService.JiraFieldValidationResult validationResult = transformer.validateInput(validInput);
 		System.assertEquals(true, validationResult.isValid, 'Valid input should pass validation');
-
+		
 		// Test validation - blank input
 		validationResult = transformer.validateInput('');
 		System.assertEquals(false, validationResult.isValid, 'Blank input should fail validation');
-
+		
 		Test.stopTest();
 	}
 
@@ -10392,28 +10327,28 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_text_transformers() {
 		Test.startTest();
-
+		
 		JiraService.TextAreaTransformer textAreaTransformer = new JiraService.TextAreaTransformer();
 		JiraService.TextFieldTransformer textFieldTransformer = new JiraService.TextFieldTransformer();
-
+		
 		String testInput = 'This is a test text';
-
+		
 		// Test text area transformation (should return as-is)
 		Object textAreaResult = textAreaTransformer.transform(testInput);
 		System.assertEquals(testInput, textAreaResult, 'Text area should return input as-is');
-
+		
 		// Test text field transformation (should return as-is)
 		Object textFieldResult = textFieldTransformer.transform(testInput);
 		System.assertEquals(testInput, textFieldResult, 'Text field should return input as-is');
-
+		
 		// Test validation - text area (should allow blank)
 		JiraService.JiraFieldValidationResult validationResult = textAreaTransformer.validateInput('');
 		System.assertEquals(true, validationResult.isValid, 'Text area should allow blank input');
-
+		
 		// Test validation - text field (should allow blank)
 		validationResult = textFieldTransformer.validateInput('');
 		System.assertEquals(true, validationResult.isValid, 'Text field should allow blank input');
-
+		
 		Test.stopTest();
 	}
 
@@ -10423,31 +10358,31 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_url_transformer() {
 		Test.startTest();
-
+		
 		JiraService.UrlTransformer transformer = new JiraService.UrlTransformer();
-
+		
 		// Test successful transformation (should return as-is)
 		String validUrl = 'https://example.com';
 		Object result = transformer.transform(validUrl);
 		System.assertEquals(validUrl, result, 'URL should return as-is');
-
+		
 		// Test validation - valid HTTPS URL
 		JiraService.JiraFieldValidationResult validationResult = transformer.validateInput(validUrl);
 		System.assertEquals(true, validationResult.isValid, 'Valid HTTPS URL should pass validation');
-
+		
 		// Test validation - valid HTTP URL
 		String httpUrl = 'http://example.com';
 		validationResult = transformer.validateInput(httpUrl);
 		System.assertEquals(true, validationResult.isValid, 'Valid HTTP URL should pass validation');
-
+		
 		// Test validation - invalid URL (no protocol)
 		validationResult = transformer.validateInput('example.com');
 		System.assertEquals(false, validationResult.isValid, 'URL without protocol should fail validation');
-
+		
 		// Test validation - blank input
 		validationResult = transformer.validateInput('');
 		System.assertEquals(false, validationResult.isValid, 'Blank URL should fail validation');
-
+		
 		Test.stopTest();
 	}
 
@@ -10457,56 +10392,53 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_transform_custom_field_value_integration() {
 		Test.startTest();
-
+		
 		JiraService.JiraServiceDefaultImpl service = new JiraService.JiraService_Hosted_9_4_14_Impl();
 		Logger logger = Logger.getInstance();
-
+		
 		// Test multi-checkbox field transformation
 		JiraService.JiraProjectIssueField multiCheckboxField = createMockCustomField(
-			'customfield_10100',
+			'customfield_10100', 
 			'Multi Checkbox Field',
 			'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes'
 		);
-
+		
 		Object result = service.transformCustomFieldValue('Option1,Option2', multiCheckboxField, logger);
 		List<Map<String, String>> expectedMultiResult = new List<Map<String, String>>{
 			new Map<String, String>{'id' => 'Option1'},
 			new Map<String, String>{'id' => 'Option2'}
 		};
-		System.assertEquals(JSON.serialize(expectedMultiResult), JSON.serialize(result),
+		System.assertEquals(JSON.serialize(expectedMultiResult), JSON.serialize(result), 
 			'Multi-checkbox integration should work correctly');
-
+		
 		// Test date field transformation
 		JiraService.JiraProjectIssueField dateField = createMockCustomField(
-			'customfield_10101',
+			'customfield_10101', 
 			'Date Field',
 			'com.atlassian.jira.plugin.system.customfieldtypes:datepicker'
 		);
-
+		
 		result = service.transformCustomFieldValue('2023-04-13', dateField, logger);
-		// The date might be shifted due to timezone conversion, so check if it's either the original date or one day before/after
-		String resultStr = String.valueOf(result);
-		Boolean isValidDate = resultStr == '2023-04-13' || resultStr == '2023-04-12' || resultStr == '2023-04-14';
-		System.assert(isValidDate, 'Date integration should work correctly. Expected: 2023-04-13, 2023-04-12, or 2023-04-14, Actual: ' + resultStr);
-
+		System.assertEquals('2023-04-13', result, 'Date integration should work correctly');
+		
 		// Test unsupported field type (should return as-is)
 		JiraService.JiraProjectIssueField unsupportedField = createMockCustomField(
-			'customfield_10102',
+			'customfield_10102', 
 			'Unsupported Field',
 			'com.atlassian.jira.plugin.system.customfieldtypes:unsupported'
 		);
-
+		
 		result = service.transformCustomFieldValue('test value', unsupportedField, logger);
 		System.assertEquals('test value', result, 'Unsupported field should return as-is');
-
+		
 		// Test blank input
 		result = service.transformCustomFieldValue('', multiCheckboxField, logger);
 		System.assertEquals('', result, 'Blank input should return as-is');
-
+		
 		// Test null field
 		result = service.transformCustomFieldValue('test', null, logger);
 		System.assertEquals('test', result, 'Null field should return input as-is');
-
+		
 		Test.stopTest();
 	}
 
@@ -10516,31 +10448,31 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_transform_custom_field_value_error_handling() {
 		Test.startTest();
-
+		
 		JiraService.JiraServiceDefaultImpl service = new JiraService.JiraService_Hosted_9_4_14_Impl();
 		Logger logger = Logger.getInstance();
-
+		
 		// Test invalid input for multi-checkbox (should log error and return original)
 		JiraService.JiraProjectIssueField multiCheckboxField = createMockCustomField(
-			'customfield_10100',
+			'customfield_10100', 
 			'Multi Checkbox Field',
 			'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes'
 		);
-
+		
 		// This will fail validation and should return original value
 		Object result = service.transformCustomFieldValue('Option1,,Option3', multiCheckboxField, logger);
 		System.assertEquals('Option1,,Option3', result, 'Invalid input should return original value');
-
+		
 		// Test invalid date input
 		JiraService.JiraProjectIssueField dateField = createMockCustomField(
-			'customfield_10101',
+			'customfield_10101', 
 			'Date Field',
 			'com.atlassian.jira.plugin.system.customfieldtypes:datepicker'
 		);
-
+		
 		result = service.transformCustomFieldValue('invalid-date', dateField, logger);
 		System.assertEquals('invalid-date', result, 'Invalid date should return original value');
-
+		
 		Test.stopTest();
 	}
 
@@ -10550,41 +10482,41 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_is_jira_custom_field_has_allowed_type() {
 		Test.startTest();
-
+		
 		JiraService.JiraServiceDefaultImpl service = new JiraService.JiraService_Hosted_9_4_14_Impl();
-
+		
 		// Test supported field type
 		JiraService.JiraProjectIssueField supportedField = createMockCustomField(
-			'customfield_10100',
+			'customfield_10100', 
 			'Multi Checkbox Field',
 			'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes'
 		);
-
+		
 		Boolean isSupported = service.isJiraCustomFieldHasAllowedType(supportedField);
 		System.assertEquals(true, isSupported, 'Supported field type should return true');
-
+		
 		// Test unsupported field type
 		JiraService.JiraProjectIssueField unsupportedField = createMockCustomField(
-			'customfield_10101',
+			'customfield_10101', 
 			'Unsupported Field',
 			'com.atlassian.jira.plugin.system.customfieldtypes:unsupported'
 		);
-
+		
 		isSupported = service.isJiraCustomFieldHasAllowedType(unsupportedField);
 		System.assertEquals(false, isSupported, 'Unsupported field type should return false');
-
+		
 		// Test field with no schema
 		JiraService.JiraProjectIssueField noSchemaField = new JiraService.JiraProjectIssueField();
 		noSchemaField.key = 'customfield_10102';
 		noSchemaField.name = 'No Schema Field';
-
+		
 		isSupported = service.isJiraCustomFieldHasAllowedType(noSchemaField);
 		System.assertEquals(false, isSupported, 'Field with no schema should return false');
-
+		
 		// Test null field
 		isSupported = service.isJiraCustomFieldHasAllowedType(null);
 		System.assertEquals(false, isSupported, 'Null field should return false');
-
+		
 		Test.stopTest();
 	}
 
@@ -10608,31 +10540,28 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_date_formatting_helper() {
 		Test.startTest();
-
+		
 		JiraService.DatePickerTransformer dateTransformer = new JiraService.DatePickerTransformer();
 		JiraService.DateTimeTransformer dateTimeTransformer = new JiraService.DateTimeTransformer();
-
+		
 		// Test various date formats
 		String dateOnly = '2023-04-13';
 		String dateTimeWithSpace = '2023-04-13 19:03:25';
 		String isoFormat = '2023-04-13T19:03:25.153Z';
-
+		
 		// Date transformer should format without time
 		Object dateResult = dateTransformer.transform(dateOnly);
-		// The date might be shifted due to timezone conversion, so check if it's either the original date or one day before/after
-		String dateResultStr = String.valueOf(dateResult);
-		Boolean isValidDateResult = dateResultStr == '2023-04-13' || dateResultStr == '2023-04-12' || dateResultStr == '2023-04-14';
-		System.assert(isValidDateResult, 'Date only should format correctly. Expected: 2023-04-13, 2023-04-12, or 2023-04-14, Actual: ' + dateResultStr);
-
+		System.assertEquals('2023-04-13', dateResult, 'Date only should format correctly');
+		
 		// DateTime transformer should format with time
 		Object dateTimeResult = dateTimeTransformer.transform(dateTimeWithSpace);
 		System.assertNotEquals(null, dateTimeResult, 'DateTime should be formatted');
 		System.assert(dateTimeResult.toString().contains('T'), 'DateTime should contain T separator');
-
+		
 		// Test ISO format handling
 		dateTimeResult = dateTimeTransformer.transform(isoFormat);
 		System.assertNotEquals(null, dateTimeResult, 'ISO format should be handled');
-
+		
 		Test.stopTest();
 	}
 
@@ -10642,30 +10571,30 @@ public class JiraNotificationBatchTest {
 	@IsTest
 	private static void test_multi_select_transformer() {
 		Test.startTest();
-
+		
 		JiraService.MultiSelectTransformer transformer = new JiraService.MultiSelectTransformer();
-
+		
 		// Test successful transformation
 		String validInput = 'Value1,Value2,Value3';
 		Object result = transformer.transform(validInput);
-
+		
 		List<Map<String, String>> expectedResult = new List<Map<String, String>>{
 			new Map<String, String>{'id' => 'Value1'},
 			new Map<String, String>{'id' => 'Value2'},
 			new Map<String, String>{'id' => 'Value3'}
 		};
-
-		System.assertEquals(JSON.serialize(expectedResult), JSON.serialize(result),
+		
+		System.assertEquals(JSON.serialize(expectedResult), JSON.serialize(result), 
 			'Multi-select should transform to array of value objects');
-
+		
 		// Test validation
 		JiraService.JiraFieldValidationResult validationResult = transformer.validateInput(validInput);
 		System.assertEquals(true, validationResult.isValid, 'Valid input should pass validation');
-
+		
 		// Test validation failure
 		validationResult = transformer.validateInput('Value1,,Value3');
 		System.assertEquals(false, validationResult.isValid, 'Input with empty values should fail validation');
-
+		
 		Test.stopTest();
 	}
 

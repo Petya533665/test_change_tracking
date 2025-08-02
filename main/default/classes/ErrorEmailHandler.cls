@@ -108,9 +108,8 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                             }
                             // process large stacktrace
                             // and all flow error to determinate fault path and skip create logs if this error is fault path
-                            else if (!isLogRoutedFromPassthroughMode(log) 
-                                && (log?.Stacktrace__c?.length() > ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD
-                                    || log.Category__c == FlowExceptionParser.FLOW_CATEGORY)) {
+                            else if (log?.Stacktrace__c?.length() > ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD
+                                || log.Category__c == FlowExceptionParser.FLOW_CATEGORY) {
                                 
                                 // enable post processing for stacktrace only
                                 log.Post_Processing_Settings__c = LogPostProcessingService.POST_PROCESSING_SETTINGS_STACKTRACE_ONLY;
@@ -132,9 +131,8 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                         }
                         // process large stacktrace
                         // and all flow error to determinate fault path and skip create logs if this error is fault path
-                        else if (!isLogRoutedFromPassthroughMode(log) 
-                            && (log?.Stacktrace__c?.length() > ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD
-                                || log.Category__c == FlowExceptionParser.FLOW_CATEGORY)) {
+                        else if (log?.Stacktrace__c?.length() > ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD
+                            || log.Category__c == FlowExceptionParser.FLOW_CATEGORY) {
 
                             // enable post processing for stacktrace only
                             log.Post_Processing_Settings__c = LogPostProcessingService.POST_PROCESSING_SETTINGS_STACKTRACE_ONLY;
@@ -236,16 +234,6 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
         createInboundEmailInternalLog(email, upsertUtilResult?.upsertResults, loggerInstance);
         createInternalLog(fullErrorMessage, inboundEmail, loggerInstance);
         loggerInstance?.flush();
-    }
-
-    /**
-     * for Passthrough Mode, if the log is routed from passthrough mode,
-     * Post processing will be skipped to avoid System.CalloutException: Callout loop not allowed.
-     * Salesforce A  ----Callout----> Salesforce B  ----Callout----> Webservice (Error happened here)
-     * Post processing logic will be executed in regular async job (LogPostProcessingBatch).
-     */
-    public static Boolean isLogRoutedFromPassthroughMode(Log__c log) {
-        return (log?.Originated_From__c == ConfigUtil.ORIGINATED_FROM_PASSTHROUGH);
     }
 
     public static void createStacktraceParseResultCV(Map<String, String> dataByLogId, Logger logger) {
