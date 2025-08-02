@@ -19,6 +19,13 @@ public with sharing class LogListController {
         }
     }
 
+    public class RemoteActionResponse {
+		public Object params;
+		public Object data;
+		public String error;
+		public String stack;
+	}
+
     @RemoteAction
 	public static String remoteActionHandler(String input) {
 		String result;
@@ -34,7 +41,7 @@ public with sharing class LogListController {
 			methodName = method;
 			Object data = request.get('data');
 			if (method == 'getLogs') {
-				// response.data = 
+				response.data = getLogs();
 			} else {
 				response.error = 'Action not found';
 			}
@@ -57,10 +64,37 @@ public with sharing class LogListController {
 		return result;
 	}
 
-    public class RemoteActionResponse {
-		public Object params;
-		public Object data;
-		public String error;
-		public String stack;
+	public class LogElement {
+		public String name;
+		public String category;
+		public String type;
+		public String summary;
+		public Boolean isNew;
+		public DateTime createdAt;
+
+		public LogElement(Log__c log) {
+			this.name = log.Name;
+			this.category = log.Category__c;
+			this.type = JSON.serialize(log);
+			this.summary = log.Summary__c;
+			this.isNew = log.Is_New__c;
+			this.createdAt = log.Created_At__c;
+		}
+	}
+
+	@RemoteAction
+	public static List<LogElement> getLogs() {
+		List<Log__c> logs = [
+			SELECT Name, Category__c, Type__c, Summary__c, Is_New__c, Created_At__c
+			FROM Log__c
+			ORDER BY Name DESC 
+			LIMIT 20
+		];
+
+		List<LogElement> logElements = new List<LogElement>();
+		for (Log__c log : logs) {
+			logElements.add(new LogElement(log));
+		}
+		return logElements;
 	}
 }
