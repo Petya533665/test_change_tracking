@@ -167,7 +167,7 @@ public without sharing class SlackService {
      */
     public static RateLimitInfo parseRateLimitResponse(HttpResponse response) {
         RateLimitInfo info = new RateLimitInfo();
-        
+
         if (response == null) {
             info.isRateLimited = false;
             return info;
@@ -199,44 +199,6 @@ public without sharing class SlackService {
         
         return info;
     }
-
-    public static void sendMessageToSlackWithChartAttachments(
-        String message, String slack_channel_id, ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient) {
-
-
-        if (chartGeneratorImageLambdaClient != null && chartGeneratorImageLambdaClient.hasCharts()) {
-            List<Map<String, Object>> filesList = new List<Map<String, Object>>();
-
-            for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
-                if (chart != null && String.isNotBlank(chart)) {
-                    // Check if the chart type exists in ChartService.Chart enum
-                    ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
-                    if (chartEnum != null) {
-                        Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
-                        String filename = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
-                        String  uploadResul = getUploadUrl(filename, chartBlob.size());
-                        Map<String, Object> resultMap = (Map<String, Object>) JSON.deserializeUntyped(uploadResul);
-
-                        String fileid = (String) resultMap.get('fileId');
-                        String uploadUrl = (String) resultMap.get('uploadUrl');
-                        if (String.isNotBlank(fileid) && String.isNotBlank(uploadUrl)) {
-                            uploadFileToSlack((String) resultMap.get('uploadUrl'), chartBlob, filename);
-                            filesList.add(new Map<String, Object> {
-                                'id' =>   fileid
-                            });
-                        }
-                    } else {
-                        // Chart type not found in enum
-                    }
-                }
-            }
-            if (!filesList?.isEmpty()) {
-                completeUpload(filesList, message, slack_channel_id);
-            }
-        }
-    }
-
-
 
     public static void sendMessageToSlack(String message, String slack_channel_id) {
 
@@ -437,72 +399,6 @@ public without sharing class SlackService {
         }
     }
 
-    public class SlackServiceException extends Exception {
-    }
-
-    private static String getUploadUrl(String filename, Integer length) {
-        String requestBody = 'filename=' + EncodingUtil.urlEncode(filename, 'UTF-8') +
-                '&length=' + length;
-        Map<String, String> headers = new Map<String, String>(ConfigUtil.SLACK_API_HEADERS);
-        headers.putAll(HttpUtils.getHeadersContentTypeFormUrlencoded());
-
-        String response = HttpUtils.post(
-                ConfigUtil.SLACK_GET_UPLOAD_URL_EXTERNAL_ENDPOINT,
-                requestBody,
-                headers,
-                200
-        );
-
-        Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(response);
-        if ((Boolean) responseMap.get('ok')) {
-            String uploadUrl = (String) responseMap.get('upload_url');
-            String fileId = (String) responseMap.get('file_id');
-            return JSON.serialize(new Map<String, String> {
-                    'uploadUrl' => uploadUrl, 'fileId' => fileId
-            });
-        } else {
-            // Error in response
-        }
-        return '';
-    }
-
-    private static void uploadFileToSlack(String uploadUrl, Blob fileBlob, String filename) {
-        String boundary = '----WebKitFormBoundary' + System.currentTimeMillis();
-        Map<String, String> headers = new Map<String, String>(ConfigUtil.SLACK_API_HEADERS);
-        headers.put('Content-Type', 'multipart/form-data; boundary=' + boundary);
-
-        Blob bodyBlob = HttpUtils.getMultipartFormData(boundary, fileBlob, filename);
-
-       String response = HttpUtils.postputBlobBody(
-               uploadUrl,
-               bodyBlob,
-               headers,
-               200
-       );
-    }
-
-    private static void completeUpload(List<Map<String, Object>> filesList, String slackMessage, String selectedChannel) {
-
-        Map<String, String> headers = new Map<String, String>(ConfigUtil.SLACK_API_HEADERS);
-        headers.put('Content-Type', 'application/json; charset=utf-8');
-
-        Map<String, Object> requestBodyMap = new Map<String, Object> {
-                'files' => filesList,
-                'channel_id' => selectedChannel,
-                'initial_comment' => slackMessage
-        };
-
-        String requestBody = JSON.serialize(requestBodyMap);
-
-        String response = HttpUtils.post(
-                ConfigUtil.SLACK_FILES_COMPLETE_UPLOAD_EXTERNAL_ENDPOINT,
-                requestBody,
-                headers,
-                200
-        );
-
-
-
-    }
+    public class SlackServiceException extends Exception {}
 
 }

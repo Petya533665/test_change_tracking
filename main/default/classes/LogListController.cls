@@ -65,6 +65,7 @@ public with sharing class LogListController {
 	}
 
 	public class LogElement {
+		public String id;
 		public String name;
 		public String category;
 		public String type;
@@ -73,19 +74,19 @@ public with sharing class LogListController {
 		public DateTime createdAt;
 
 		public LogElement(Log__c log) {
+			this.id = log.Id;
 			this.name = log.Name;
 			this.category = log.Category__c;
-			this.type = JSON.serialize(log);
+			this.type = log.Type__c;
 			this.summary = log.Summary__c;
 			this.isNew = log.Is_New__c;
 			this.createdAt = log.Created_At__c;
 		}
 	}
 
-	@RemoteAction
 	public static List<LogElement> getLogs() {
 		List<Log__c> logs = [
-			SELECT Name, Category__c, Type__c, Summary__c, Is_New__c, Created_At__c
+			SELECT Id, Name, Category__c, Type__c, Summary__c, Is_New__c, Created_At__c
 			FROM Log__c
 			ORDER BY Name DESC 
 			LIMIT 20

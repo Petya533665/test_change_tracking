@@ -15,7 +15,7 @@ public with sharing class TicketingService {
         MonitoringUtil.ActionType.AZURE_DEV_OPS => new TicketingServiceAzureDevOpsImpl(),
         MonitoringUtil.ActionType.AZURE_DEV_OPS_WORK_ITEM_COMMENT => new TicketingServiceAzureDevOpsImpl()
     };
-
+    
     public TicketingService(MonitoringUtil.ActionType actionType, Logger logger) {
         this.logger = logger;
         this.strategy = ACTION_TYPE_TO_SERVICE.get(actionType);
@@ -146,14 +146,11 @@ public with sharing class TicketingService {
                 if(isInvalidDataTaskInfo()) return;
                 createNewTicketComment();
                 
-                // Only update SObject if we have a wrapper (not for event actions)
-                if (this.sObjectWrapper != null) {
-                    SObject sObjectRecord = PermissionsUtil.newSObject(this.sObjectWrapper.describeSObjectResult);
-                    PermissionsUtil.putSObjectField(sObjectRecord, 'Id', this.sObjectWrapper.id);
-                    PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrJiraIntegrationStatus, ConfigUtil.NEW_TICKET_CREATED_STATUS);
-                    DatabaseUtils.getInstance().performUpdateDML(new List<SObject>{sObjectRecord}, this.sObjectWrapper.describeSObjectResult)
-                            .handleError(TicketingService.class.getName(), '.saveCreatedTicketCommentInfo', logger);
-                }
+                SObject sObjectRecord = PermissionsUtil.newSObject(this.sObjectWrapper.describeSObjectResult);
+                PermissionsUtil.putSObjectField(sObjectRecord, 'Id', this.sObjectWrapper.id);
+                PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrJiraIntegrationStatus, ConfigUtil.NEW_TICKET_CREATED_STATUS);
+                DatabaseUtils.getInstance().performUpdateDML(new List<SObject>{sObjectRecord}, this.sObjectWrapper.describeSObjectResult)
+                        .handleError(TicketingService.class.getName(), '.saveCreatedTicketCommentInfo', logger);
             }
             catch(Exception e) {
                 this.logger?.add(logger.getInternalError(e, null, TicketingService.class.getName(), 'createTicketComment'));
@@ -202,10 +199,6 @@ public with sharing class TicketingService {
         }
 
         public virtual String getBugTrackerLinkFromLogIndex() {
-            // Only get bug tracker link if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper == null) {
-                return null;
-            }
             String key = ConfigUtil.getLogIndexKey(this.sObjectWrapper.hash1, this.sObjectWrapper.organizationId);
             ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(new Set<String>{key});
             ConfigUtil.LogIndex index = helper.getLogIndex(key);
@@ -214,76 +207,64 @@ public with sharing class TicketingService {
 
         public virtual void handleCreateTicketError(Exception e) {
             this.logger?.add(logger.getInternalError(e, null, TicketingService.class.getName(), 'createTicket'));
-
-            // Only update SObject if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper != null) {
-                SObject sObjectRecord = PermissionsUtil.newSObject(this.sObjectWrapper.describeSObjectResult);
-                PermissionsUtil.putSObjectField(sObjectRecord, 'Id', this.sObjectWrapper.id);
-                PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrBugTracker, null);
-                PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrJiraIntegrationStatus, ConfigUtil.TICKET_CREATE_ERROR_STATUS);
-                DatabaseUtils.getInstance().performUpdateDML(new List<SObject>{sObjectRecord}, this.sObjectWrapper.describeSObjectResult)
-                        .handleError(TicketingService.class.getName(), '.handleCreateTicketError', logger);
-            }
+            SObject sObjectRecord = PermissionsUtil.newSObject(this.sObjectWrapper.describeSObjectResult);
+            PermissionsUtil.putSObjectField(sObjectRecord, 'Id', this.sObjectWrapper.id);
+            PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrBugTracker, null);
+            PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrJiraIntegrationStatus, ConfigUtil.TICKET_CREATE_ERROR_STATUS);
+            DatabaseUtils.getInstance().performUpdateDML(new List<SObject>{sObjectRecord}, this.sObjectWrapper.describeSObjectResult)
+                    .handleError(TicketingService.class.getName(), '.handleCreateTicketError', logger);
         }
 
         public virtual void saveCreatedTicketInfo(TicketCreateResult result, TicketStatusInfo ticketStatus) {
             String ticketUrl = result.url;
 
-            // Only update SObject if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper != null) {
-                if(this.sObjectWrapper.sObjectType == Log__c.SObjectType) {
-                    String logIndexKey = ConfigUtil.getLogIndexKey(this.sObjectWrapper.hash1, this.sObjectWrapper.organizationId);
-                    ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(new Set<String>{logIndexKey});
-                    ConfigUtil.LogIndex index = helper.getLogIndex(this.sObjectWrapper.hash1, this.sObjectWrapper.organizationId);
-                    if(index != null) {
-                        index.bugTracker = ticketUrl;
-                        index.resolvedOn = null;
-                        helper.saveLogIndex(logger, index);
-                    }
+            if(this.sObjectWrapper.sObjectType == Log__c.SObjectType) {
+                String logIndexKey = ConfigUtil.getLogIndexKey(this.sObjectWrapper.hash1, this.sObjectWrapper.organizationId);
+                ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(new Set<String>{logIndexKey});
+                ConfigUtil.LogIndex index = helper.getLogIndex(this.sObjectWrapper.hash1, this.sObjectWrapper.organizationId);
+                if(index != null) {
+                    index.bugTracker = ticketUrl;
+                    index.resolvedOn = null;
+                    helper.saveLogIndex(logger, index);
                 }
+            }
 
-                String query = new QBuilder(this.sObjectWrapper.sObjectType)
-                    .selectFields(new Set<String>{'Id', this.sObjectWrapper.dfrBugTracker.getName(), this.sObjectWrapper.dfrJiraIntegrationStatus.getName()})
-                    .add(QBuilder.condition(this.sObjectWrapper.dfrHash1.getName()).equalsTo(this.sObjectWrapper.hash1))
-                    .add(QBuilder.condition(this.sObjectWrapper.dfrHash1.getName()).notEqualsTo(null))
-                    .add(QBuilder.condition(this.sObjectWrapper.dfrBugTracker.getName()).equalsTo(null))
-                    .add(this.sObjectWrapper.sObjectType == Log__c.SObjectType && this.sObjectWrapper.dfrOrganizationId != null
-                        ? QBuilder.condition(this.sObjectWrapper.dfrOrganizationId.getName()).equalsTo(this.sObjectWrapper.organizationId)
-                        : null
-                    )
-                    .add(QBuilder.condition('Id').notEqualsTo(this.sObjectWrapper.id))
-                    .build();
-                List<SObject> sObjectRecordsToUpdate = new List<SObject>();
-                for (SObject sObjectRecordWithHash1 : Database.query(query)) {
-                    SObject sObjectRecord = PermissionsUtil.newSObject(this.sObjectWrapper.describeSObjectResult);
-                    PermissionsUtil.putSObjectField(sObjectRecord, 'Id', sObjectRecordWithHash1.Id);
-                    PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrBugTracker, ticketUrl);
-                    PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrJiraIntegrationStatus, ConfigUtil.EXISTING_TICKET_LINKED_STATUS);
-                    if(ticketStatus?.resolutionDateTime != null) {
-                        PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrResolvedOn, ticketStatus?.resolutionDateTime);
-                    }
-                    sObjectRecordsToUpdate.add(sObjectRecord);
-                }
-
-                if (!sObjectRecordsToUpdate.isEmpty()) {
-                    DatabaseUtils.getInstance().performUpdateDML(sObjectRecordsToUpdate, sObjectWrapper.describeSObjectResult)
-                            .handleError(TicketingService.class.getName(), '.saveCreatedTicketInfo', logger);
-                }
+            String query = new QBuilder(this.sObjectWrapper.sObjectType)
+                .selectFields(new Set<String>{'Id', this.sObjectWrapper.dfrBugTracker.getName(), this.sObjectWrapper.dfrJiraIntegrationStatus.getName()})
+                .add(QBuilder.condition(this.sObjectWrapper.dfrHash1.getName()).equalsTo(this.sObjectWrapper.hash1))
+                .add(QBuilder.condition(this.sObjectWrapper.dfrHash1.getName()).notEqualsTo(null))
+                .add(QBuilder.condition(this.sObjectWrapper.dfrBugTracker.getName()).equalsTo(null))
+                .add(this.sObjectWrapper.sObjectType == Log__c.SObjectType && this.sObjectWrapper.dfrOrganizationId != null
+                    ? QBuilder.condition(this.sObjectWrapper.dfrOrganizationId.getName()).equalsTo(this.sObjectWrapper.organizationId)
+                    : null
+                )
+                .add(QBuilder.condition('Id').notEqualsTo(this.sObjectWrapper.id))
+                .build();
+            List<SObject> sObjectRecordsToUpdate = new List<SObject>();
+            for (SObject sObjectRecordWithHash1 : Database.query(query)) {
                 SObject sObjectRecord = PermissionsUtil.newSObject(this.sObjectWrapper.describeSObjectResult);
-                PermissionsUtil.putSObjectField(sObjectRecord, 'Id', this.sObjectWrapper.id);
+                PermissionsUtil.putSObjectField(sObjectRecord, 'Id', sObjectRecordWithHash1.Id);
                 PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrBugTracker, ticketUrl);
-                PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrJiraIntegrationStatus, ConfigUtil.NEW_TICKET_CREATED_STATUS);
-                DatabaseUtils.getInstance().performUpdateDML(new List<SObject>{sObjectRecord}, this.sObjectWrapper.describeSObjectResult)
+                PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrJiraIntegrationStatus, ConfigUtil.EXISTING_TICKET_LINKED_STATUS);
+                if(ticketStatus?.resolutionDateTime != null) {
+                    PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrResolvedOn, ticketStatus?.resolutionDateTime);
+                }
+                sObjectRecordsToUpdate.add(sObjectRecord);
+            }
+
+            if (!sObjectRecordsToUpdate.isEmpty()) {
+                DatabaseUtils.getInstance().performUpdateDML(sObjectRecordsToUpdate, sObjectWrapper.describeSObjectResult)
                         .handleError(TicketingService.class.getName(), '.saveCreatedTicketInfo', logger);
             }
+            SObject sObjectRecord = PermissionsUtil.newSObject(this.sObjectWrapper.describeSObjectResult);
+            PermissionsUtil.putSObjectField(sObjectRecord, 'Id', this.sObjectWrapper.id);
+            PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrBugTracker, ticketUrl);
+            PermissionsUtil.putSObjectField(sObjectRecord, this.sObjectWrapper.dfrJiraIntegrationStatus, ConfigUtil.NEW_TICKET_CREATED_STATUS);
+            DatabaseUtils.getInstance().performUpdateDML(new List<SObject>{sObjectRecord}, this.sObjectWrapper.describeSObjectResult)
+                    .handleError(TicketingService.class.getName(), '.saveCreatedTicketInfo', logger);
         }
 
         public virtual void linkExistingTickets() {
-            // Only link existing tickets if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper == null) {
-                return;
-            }
-
             SObject sObjectRecord = PermissionsUtil.newSObject(this.sObjectWrapper.describeSObjectResult);
             PermissionsUtil.putSObjectField(sObjectRecord, 'Id', this.sObjectWrapper.id);
             if(sObjectRecord.getSObjectType() == Log__c.SObjectType) {
@@ -357,8 +338,7 @@ public with sharing class TicketingService {
 
         public override TicketStatusInfo getTicketStatus() {
             TicketStatusInfo result;
-            // Only get ticket status if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper != null && this.sObjectWrapper.sObjectRecord.getSobjectType() == Log__c.SObjectType) {
+            if (this.sObjectWrapper.sObjectRecord.getSobjectType() == Log__c.SObjectType) {
                 if(String.isBlank(this.sObjectWrapper.bugTracker)) {
                     this.sObjectWrapper.bugTracker = getBugTrackerLinkFromLogIndex();
                 }
@@ -373,8 +353,7 @@ public with sharing class TicketingService {
         }
 
         public override TicketCreateResult getExistingTickets() {
-            // Only get existing tickets if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper == null || String.isBlank(this.sObjectWrapper.bugTracker)) {
+            if(String.isBlank(this.sObjectWrapper.bugTracker)) {
                 return null;
             }
             String existingIssueKey = JiraService.getIssueKeyByUrl(this.sObjectWrapper.bugTracker);
@@ -414,12 +393,9 @@ public with sharing class TicketingService {
         }
 
         private void populateDefaultFields() {
-            // For event actions, we don't have an sObjectWrapper, so we can't populate these fields
-            if (this.sObjectWrapper != null) {
-                this.taskInfo.recordId = this.sObjectWrapper.id;
-                this.taskInfo.hash2 = this.sObjectWrapper.hash2;
-                this.taskInfo.hash3 = this.sObjectWrapper.hash3;
-            }
+            this.taskInfo.recordId = this.sObjectWrapper.id;
+            this.taskInfo.hash2 = this.sObjectWrapper.hash2;
+            this.taskInfo.hash3 = this.sObjectWrapper.hash3;
             Integer detailsFieldLength = Integer.valueOf(ConfigUtil.JIRA_SETTINGS.Jira_Details_Field_Length__c > 0 ? ConfigUtil.JIRA_SETTINGS.Jira_Details_Field_Length__c : 30000);
             this.taskInfo.details = this.taskInfo.details.abbreviate(detailsFieldLength);
             
@@ -521,11 +497,6 @@ public with sharing class TicketingService {
 
         public override void createTicketRelations(TicketCreateResult result) {
             String issueKey = result.id;
-            // Only create ticket relations if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper == null) {
-                return;
-            }
-
             if(this.sObjectWrapper.sObjectRecord.getSObjectType() == Issue__c.SObjectType
                 && String.isNotBlank(this.sObjectWrapper.bugTracker)) {
                 try {
@@ -556,7 +527,7 @@ public with sharing class TicketingService {
                 try {
                     /* Search for first Jira Issue linked by Hash1 */
                     List<Log__c> firstLogByHash1Available = getOtherLogsWithHash1AndNotEmptyBugTrackerLink(this.sobjectWrapper.id, this.sobjectWrapper.hash1, this.sobjectWrapper.organizationId, this.settings.createUniqueTicketsByOrg);
-
+            
                     String firstLogByHash1BugTracker = this.sobjectWrapper.bugTracker;
                     if(!firstLogByHash1Available.isEmpty()) {
                         firstLogByHash1BugTracker = firstLogByHash1Available.get(0).Bug_Tracker__c;
@@ -590,41 +561,19 @@ public with sharing class TicketingService {
         }
 
         public override void createNewTicketComment() {
-            // Only create ticket comment if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper != null && String.isNotBlank(this.sobjectWrapper.bugTracker)) {
+            if(String.isNotBlank(this.sobjectWrapper.bugTracker)) {
                 String issueKey = JiraService.getIssueKeyByUrl(this.sobjectWrapper.bugTracker);
-                JiraService.JiraServiceInterface jiraServiceInterface = JiraService.getService();
 
-                List<String> chartsTypeForPrepare = this.taskInfo?.chartsTypeForPrepare;
+                this.bodyRequest = new Map<String, Object>{
+                    'body' => this.taskInfo.details
+                };
 
-                String comments = this.taskInfo.details;
-                if (chartsTypeForPrepare?.size() > 0) {
-                    if (this.sobjectWrapper.sObjectRecord != null) {
-                        Map<String, Object> parameters = ReportService.parametersBySObjectRecord(this.sobjectWrapper.sObjectRecord);
-
-                        Map<ChartService.Chart, Map<ReportService.SystemReport, String>> chartToChartData = ReportService.getReportDataByChart(
-                            chartsTypeForPrepare,
-                            parameters
-                        );
-
-                        ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
-                            .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
-
-                        String comment = jiraServiceInterface.addCommentToIssueWithAttachments(comments, issueKey, chartGeneratorImageLambdaClient);
-
-                        this.bodyRequest = new Map<String, Object>{
-                            'body' => comment
-                        };
-
-                        jiraServiceInterface.createNewTicketComment(JSON.serialize(this.bodyRequest), issueKey);
-                    }
-                } else {
-                    this.bodyRequest = new Map<String, Object>{
-                        'body' => comments
-                    };
-
-                    jiraServiceInterface.createNewTicketComment(JSON.serialize(this.bodyRequest), issueKey);
-                }
+                String b = HttpUtils.post(
+                    JiraService.getService().getCreateIssueCommentEndpoint(issueKey),
+                    JSON.serialize(this.bodyRequest),
+                    JiraService.JIRA_HEADERS,
+                    201
+                );
             }
         }
 
@@ -667,7 +616,7 @@ public with sharing class TicketingService {
         public override String getCompletedTicketStatus() {
             return 'Done';
         }
-
+        
         public override void init(TicketingServiceInputData data, Logger logger) {
             super.init(data, logger);
             this.settings = new TicketingServiceSettings(ConfigUtil.AZURE_DEV_OPS_API_SETTINGS);
@@ -679,18 +628,17 @@ public with sharing class TicketingService {
 
         public override TicketStatusInfo getTicketStatus() {
             TicketStatusInfo result;
-            // Only get ticket status if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper != null && this.sObjectWrapper.sObjectRecord.getSobjectType() == Log__c.SObjectType) {
+            if (this.sObjectWrapper.sObjectRecord.getSobjectType() == Log__c.SObjectType) {
                 if(String.isBlank(this.sObjectWrapper.bugTracker)) {
                     this.sObjectWrapper.bugTracker = getBugTrackerLinkFromLogIndex();
                 }
             }
-            if (this.sObjectWrapper != null && String.isNotBlank(this.sObjectWrapper.bugTracker)) {
+            if(String.isNotBlank(this.sObjectWrapper.bugTracker)) {
                 AzureService.WorkItemUrlParser urlWorkItem = new AzureService.WorkItemUrlParser(sObjectWrapper.bugTracker);
                 if(String.isNotBlank(urlWorkItem.organizationName)
                     && String.isNotBlank(urlWorkItem.projectIdOrName)
                     && String.isNotBlank(urlWorkItem.workItemId)) {
-
+                    
                     AzureService.AzureDevOpsWorkItem existWorkItem = AzureService.getProjectWorkItem(urlWorkItem.organizationName, urlWorkItem.projectIdOrName, urlWorkItem.workItemId);
 
                     //return existWorkItem?.fields?.State;
@@ -702,21 +650,12 @@ public with sharing class TicketingService {
         }
 
         public override TicketCreateResult getExistingTickets() {
-            // Only get existing tickets if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper == null || String.isBlank(this.sObjectWrapper.bugTracker)) {
-                return null;
-            }
             AzureService.WorkItemUrlParser urlWorkItem = new AzureService.WorkItemUrlParser(sObjectWrapper.bugTracker);
             return new TicketCreateResult(urlWorkItem.workItemId, this.sObjectWrapper.bugTracker);
         }
 
         private List<String> getRelatedWorkItemIds() {
             Set<String> result = new Set<String>();
-
-            // Only get related work item IDs if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper == null) {
-                return new List<String>();
-            }
 
             if(this.sObjectWrapper.sObjectRecord.getSObjectType() == Issue__c.SObjectType) {
                 if(String.isNotBlank(this.sObjectWrapper?.bugTracker)) {
@@ -773,16 +712,13 @@ public with sharing class TicketingService {
         }
 
         private void populateDefaultFields() {
-            // For event actions, we don't have an sObjectWrapper, so we can't populate these fields
-            if (this.sObjectWrapper != null) {
-                this.taskInfo.recordId = this.sObjectWrapper.id;
-                this.taskInfo.hash2 = this.sObjectWrapper.hash2;
-                this.taskInfo.hash3 = this.sObjectWrapper.hash3;
-            }
+            this.taskInfo.recordId = this.sObjectWrapper.id;
+            this.taskInfo.hash2 = this.sObjectWrapper.hash2;
+            this.taskInfo.hash3 = this.sObjectWrapper.hash3;
             this.workItemRequest = new List<AzureService.AzureDevOpsWorkItemRequestBody>();
 
             this.workItemRequest.add(new AzureService.AzureDevOpsWorkItemRequestBody(
-                AzureService.WORK_ITEM_TYPE_OPERATION_ADD, AzureService.WOKR_ITEM_REQUEST_PATH_FIELDS + AzureService.WORK_ITEM_TYPE_FIELD_TITLE, this.taskInfo.summary)
+			    AzureService.WORK_ITEM_TYPE_OPERATION_ADD, AzureService.WOKR_ITEM_REQUEST_PATH_FIELDS + AzureService.WORK_ITEM_TYPE_FIELD_TITLE, this.taskInfo.summary)
             );
             this.workItemRequest.add(new AzureService.AzureDevOpsWorkItemRequestBody(
                 AzureService.WORK_ITEM_TYPE_OPERATION_ADD, AzureService.WOKR_ITEM_REQUEST_PATH_FIELDS + AzureService.WORK_ITEM_TYPE_FIELD_DESCRIPTION, this.taskInfo.details)
@@ -836,7 +772,7 @@ public with sharing class TicketingService {
                 );
             }
         }
-
+        
         private void populateArea() {
             if(String.isNotBlank(this.taskInfo.area)) {
                 this.workItemRequest.add(new AzureService.AzureDevOpsWorkItemRequestBody(
@@ -865,45 +801,26 @@ public with sharing class TicketingService {
         }
 
         public override void createNewTicketComment() {
-
-            // Only create ticket comment if we have a wrapper (not for event actions)
-            if (this.sObjectWrapper != null && String.isNotBlank(this.sobjectWrapper.bugTracker)) {
+            
+            if(String.isNotBlank(this.sobjectWrapper.bugTracker)) {
                 AzureService.WorkItemUrlParser urlWorkItem = new AzureService.WorkItemUrlParser(this.sobjectWrapper.bugTracker);
                 String workItemId = urlWorkItem.workItemId;
                 String projectId = urlWorkItem.projectIdOrName;
                 String organizationId = urlWorkItem.organizationName;
 
-                AzureApiClient client = new AzureApiClient()
-                    .setOrganization(organizationId)
-                    .setProject(projectId)
-                    .setWorkItem(workItemId);
+                Map<String, Object> payload = new Map<String, Object>{
+                    'text' => this.taskInfo.details
+                };
 
-
-                if(String.isNotBlank(this.sobjectWrapper.bugTracker)) {
-
-                    List<String> chartsTypeForPrepare = this.taskInfo?.chartsTypeForPrepare;
-
-                    String comments = this.taskInfo.details;
-
-
-                    if (chartsTypeForPrepare?.size() > 0) {
-                        if (this.sobjectWrapper.sObjectRecord != null) {
-                            Map<String, Object> parameters = ReportService.parametersBySObjectRecord(this.sobjectWrapper.sObjectRecord);
-
-                            Map<ChartService.Chart, Map<ReportService.SystemReport, String>> chartToChartData = ReportService.getReportDataByChart(
-                                chartsTypeForPrepare,
-                                parameters
-                            );
-
-                            ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
-                                .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
-
-                            client.addCommentWithAttachments(comments, chartGeneratorImageLambdaClient);
-                        }
-                    } else {
-                        client.addComment(comments);
-                    }
-                }
+                String endpoint = String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM_COMMENT, new List<String>{organizationId, projectId, workitemId});
+                Map<String, String> headers = HttpUtils.getHeadersAuthorizationAcceptJson(AzureService.AZURE_DEVOPS_REST_API_TOKEN_TYPE_BEARER + AzureService.OAUTH_API_TOKEN);
+                headers.putAll(HttpUtils.getHeadersContentTypeJSON());
+                String b = HttpUtils.post(
+                    endpoint,
+                    JSON.serialize(payload),
+                    headers,
+                    200
+                );
             }
         }
 
@@ -938,7 +855,7 @@ public with sharing class TicketingService {
                 if(e.getMessage().contains(AZURE_DEV_OPS_ERROR_CREATE_TAGS)) {
                     for(Integer i = 0; i < this.workItemRequest?.size(); i++){
                         AzureService.AzureDevOpsWorkItemRequestBody item = this.workItemRequest.get(i);
-                        if(item?.op == AzureService.WORK_ITEM_TYPE_OPERATION_ADD
+                        if(item?.op == AzureService.WORK_ITEM_TYPE_OPERATION_ADD 
                             && item?.path == AzureService.WOKR_ITEM_REQUEST_PATH_FIELDS + AzureService.WORK_ITEM_TYPE_FIELD_TAG) {
                             this.workItemRequest.remove(i);
                         }
@@ -971,18 +888,15 @@ public with sharing class TicketingService {
             'Hash_2__c',
             'Hash_3__c',
             'Jira_Integration_Status__c',
-            'Organization_Id__c',
-            'Resolved_On__c'
+            'Organization_Id__c'
         },
         Issue__c.SObjectType => new Set<String>{
             'Id',
-            'Name',
             'Summary__c',
             'Description__c',
             'Bug_Tracker__c',
             'Key__c',
-            'Jira_Integration_Status__c',
-            'Resolved_On__c'
+            'Jira_Integration_Status__c'
         }
     };
 
@@ -1111,7 +1025,6 @@ public with sharing class TicketingService {
         public String additionalMetadata;
         public List<String> componentIds;
         public Map<String, String> customFields;
-        public List<String> chartsTypeForPrepare;
 
         public Id recordId;
         public String hash2;
@@ -1121,14 +1034,9 @@ public with sharing class TicketingService {
 
         public TicketingTaskInfo(EventAction__c eventAction) {
             List<String> renderMessages = NotificationService.renderMergeFields(
-                eventAction.Event__c,
-                new List<String>{eventAction.Action__r.Subject__c, eventAction.Action__r.Body__c},
-                new NotificationService.MergeFieldSettings(eventAction.Action__r.Action_Type__c));
-
-            AutoChart.AutoChartFieldsResult autoChartFieldsResult = new NotificationService.MergeFields().getChartFieldsAndClear(renderMessages);
-            renderMessages = autoChartFieldsResult.cleanedMessages;
-            this.chartsTypeForPrepare = autoChartFieldsResult.autoChartFields;
-
+                    eventAction.Event__c,
+                    new List<String>{eventAction.Action__r.Subject__c, eventAction.Action__r.Body__c},
+                    new NotificationService.MergeFieldSettings(eventAction.Action__r.Action_Type__c));
             this.summary = renderMessages.get(0)?.abbreviate(255);
             this.details = renderMessages.get(1);
             this.labels = eventAction.Action__r.JIRALabels__c;
@@ -1148,23 +1056,18 @@ public with sharing class TicketingService {
 
         public TicketingTaskInfo(Action__c jiraAction, TicketingSObjectWrapper sObjectWrapper) {
             List<String> renderMessages = NotificationService.renderMergeFields(
-                sObjectWrapper.id,
-                new List<String>{jiraAction.Subject__c, jiraAction.Body__c},
-                new NotificationService.MergeFieldSettings(jiraAction.Action_Type__c));
-
-            AutoChart.AutoChartFieldsResult autoChartFieldsResult = new NotificationService.MergeFields().getChartFieldsAndClear(renderMessages);
-            renderMessages = autoChartFieldsResult.cleanedMessages;
-            this.chartsTypeForPrepare = autoChartFieldsResult.autoChartFields;
-
+                    sObjectWrapper.id,
+                    new List<String>{jiraAction.Subject__c, jiraAction.Body__c},
+                    new NotificationService.MergeFieldSettings(jiraAction.Action_Type__c));
             this.summary = (String.isBlank(jiraAction.Subject__c))
-                ? sObjectWrapper.summary
-                : renderMessages.get(0);
+                    ? sObjectWrapper.summary
+                    : renderMessages.get(0);
             if(jiraAction.Action_Type__c == RuleUtil.ACTION_TYPE_JIRA_TICKET_COMMENT || jiraAction.Action_Type__c == RuleUtil.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT) {
                 this.summary = '';
             }
             this.details = (String.isBlank(jiraAction.Body__c)
-                ? Url.getOrgDomainUrl().toExternalForm() + '/' + sObjectWrapper.id + '\n\n' + sObjectWrapper.details
-                : renderMessages.get(1));
+                    ? Url.getOrgDomainUrl().toExternalForm() + '/' + sObjectWrapper.id + '\n\n' + sObjectWrapper.details
+                    : renderMessages.get(1));
             if(jiraAction.Action_Type__c == RuleUtil.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION) {
                 this.details = this.details.replaceAll('\n', '</br>');
             }
@@ -1190,19 +1093,12 @@ public with sharing class TicketingService {
             Map<String, List<String>> contentsMap = new Map<String, List<String>>();
             contentsMap.put(whatId, additionalMetadata.values());
             Map<String, NotificationService.MergeFieldSettings> mergeFieldSettingsMap = new Map<String, NotificationService.MergeFieldSettings>{
-                whatId => settings
+                    whatId => settings
             };
             Map<String, List<String>> renderResult = NotificationService.renderMergeFields(contentsMap, mergeFieldSettingsMap);
-
             Integer index = 0;
-
-            NotificationService.MergeFields mergeFields = new NotificationService.MergeFields();
-
             for (String key : additionalMetadata.keySet()) {
-                List<String> results = renderResult.get(whatId);
-                        AutoChart.AutoChartFieldsResult autoChartFieldsResult = mergeFields.getChartFieldsAndClear(results);
-                results = autoChartFieldsResult.cleanedMessages;
-                additionalMetadata.put(key, results.get(index++));
+                additionalMetadata.put(key, renderResult.get(whatId).get(index++));
             }
             return JSON.serialize(additionalMetadata);
         }
@@ -1244,9 +1140,9 @@ public with sharing class TicketingService {
             SELECT Id, Bug_Tracker__c
             FROM Log__c
             WHERE Id != :sObjectWrapper.id
-            AND Hash_1__c = :sObjectWrapper.hash1
-            AND Resolved_On__c = NULL
-            AND Bug_Tracker__c != NULL
+                AND Hash_1__c = :sObjectWrapper.hash1
+                AND Resolved_On__c = NULL
+                AND Bug_Tracker__c != NULL
             LIMIT 1
         ] : [
             SELECT Id, Bug_Tracker__c

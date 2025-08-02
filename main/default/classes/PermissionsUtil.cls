@@ -122,7 +122,6 @@ public without sharing class PermissionsUtil {
 	public static final String FP_EVENT_MONITORING_ENABLED = 'EventMonitoringEnabled';
 	public static final String FP_DEBUG_POST_PROCESSING_ENABLED = 'DebugPostProcessingEnabled';
 	public static final String FP_FLOW_LOGGING_ENABLED = 'FlowLoggingEnabled';
-	public static final String FP_AUTO_CHART_ENABLED = 'AutoChartEnabled';
 	public static final String FP_METADATA_CHAT_ENABLED = 'MetadataChatEnabled';
 
 	public static final String FP_CHARGIFY_PRODUCT_EDITION = 'Edition';
@@ -168,8 +167,7 @@ public without sharing class PermissionsUtil {
 		FP_DEBUG_POST_PROCESSING_ENABLED => 25,
 		FP_FLOW_LOGGING_ENABLED => 26,
 		FP_EVENT_MONITORING_ENABLED => 27,
-		FP_METADATA_CHAT_ENABLED => 28,
-        FP_AUTO_CHART_ENABLED => 29
+		FP_METADATA_CHAT_ENABLED => 28
 	};
 
 	public static Map<Integer, Boolean> FeatureMap1 {
@@ -567,19 +565,6 @@ public without sharing class PermissionsUtil {
 		private set;
 	}
 
-	@TestVisible
-	public static Boolean AutoChartEnabled {
-		get {
-			if(AutoChartEnabled == null) {
-				AutoChartEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_AUTO_CHART_ENABLED));
-			}
-			return AutoChartEnabled;
-		}
-		private set;
-	}
-
-
-	
 	public static Boolean IntegrationDebugViewEnabled {
 		get {
 			if(IntegrationDebugViewEnabled == null) {
@@ -795,7 +780,7 @@ public without sharing class PermissionsUtil {
 			if(DebugJiraRefreshTokensEnabled == null) {
 				DebugJiraRefreshTokensEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_DEBUG_JIRA_REFRESH_TOKENS_ENABLED));
 			}
-			return DebugJiraRefreshTokensEnabled;
+			return false;
 		}
 		private set;
 	}

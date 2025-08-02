@@ -2,20 +2,15 @@ public with sharing class ChartService {
 
 	private final ChartServiceInterface strategy;
 
-	public enum Chart {
+	private enum Chart {
 		OCCURRENCE,
-		OCCURRENCE_LAST_7_DAYS,
-		OCCURRENCE_LAST_30_DAYS,
 		USER_IMPACT_LAST_30_DAYS,
-		USER_IMPACT_LAST_7_DAYS_DETAILS,
 		USER_IMPACT_LAST_30_DAYS_DETAILS,
 		DATA_IMPACT_LAST_30_DAYS,
 		DATA_IMPACT_LAST_30_DAYS_DETAILS,
 		TODAYS_USER_IMPACT,
 		TODAYS_DATA_IMPACT,
 		OCCURRENCE_LOGS,
-		OCCURRENCE_LOGS_LAST_7_DAYS,
-		OCCURRENCE_LOGS_LAST_30_DAYS,
 		TIMING_LOGS,
 		EVENT_LOG_RECORDS_BY_TYPE,
 		EVENT_LOG_RECORDS_BY_CATEGORY
@@ -29,70 +24,8 @@ public with sharing class ChartService {
 		BULK_API
 	}
 
-	public static final Map<Chart, Map<String, ReportService.SystemReport>> CHART_TO_SYSTEM_REPORTS = new Map<Chart, Map<String, ReportService.SystemReport>> {
-		Chart.OCCURRENCE => new Map<String, ReportService.SystemReport> {
-			'1' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_ISSUE
-		},
-		Chart.OCCURRENCE_LAST_7_DAYS => new Map<String, ReportService.SystemReport> {
-			'1' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_ISSUE
-		},
-		Chart.OCCURRENCE_LAST_30_DAYS => new Map<String, ReportService.SystemReport> {
-			'1' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_ISSUE
-		},
-		Chart.USER_IMPACT_LAST_30_DAYS => new Map<String, ReportService.SystemReport> {
-
-		},
-		Chart.USER_IMPACT_LAST_7_DAYS_DETAILS => new Map<String, ReportService.SystemReport> {
-			'1' => ReportService.SystemReport.SYSTEM_CHART_USER_IMPACT_DETAILS_LINKED,
-			'2' => ReportService.SystemReport.SYSTEM_CHART_USER_IMPACT_DETAILS_DUP
-		},
-		Chart.USER_IMPACT_LAST_30_DAYS_DETAILS => new Map<String, ReportService.SystemReport> {
-			'1' => ReportService.SystemReport.SYSTEM_CHART_USER_IMPACT_DETAILS_LINKED,
-			'2' => ReportService.SystemReport.SYSTEM_CHART_USER_IMPACT_DETAILS_DUP
-		},
-		Chart.DATA_IMPACT_LAST_30_DAYS => new Map<String, ReportService.SystemReport> {
-
-		},
-		Chart.DATA_IMPACT_LAST_30_DAYS_DETAILS => new Map<String, ReportService.SystemReport> {
-
-		},
-		Chart.TODAYS_USER_IMPACT => new Map<String, ReportService.SystemReport> {
-
-		},
-		Chart.TODAYS_DATA_IMPACT => new Map<String, ReportService.SystemReport> {
-
-		},
-		Chart.OCCURRENCE_LOGS => new Map<String, ReportService.SystemReport> {
-			'1' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH1,
-			'2' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH2,
-			'3' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH3
-		},
-		Chart.OCCURRENCE_LOGS_LAST_7_DAYS => new Map<String, ReportService.SystemReport> {
-			'1' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH1,
-			'2' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH2,
-			'3' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH3
-		},
-		Chart.OCCURRENCE_LOGS_LAST_30_DAYS => new Map<String, ReportService.SystemReport> {
-			'1' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH1,
-			'2' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH2,
-			'3' => ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH3
-		},
-		Chart.TIMING_LOGS => new Map<String, ReportService.SystemReport> {
-
-		},
-		Chart.EVENT_LOG_RECORDS_BY_TYPE => new Map<String, ReportService.SystemReport> {
-
-		},
-		Chart.EVENT_LOG_RECORDS_BY_CATEGORY => new Map<String, ReportService.SystemReport> {
-
-		}
-	};
-
 	public static final String ISSUE_CHART_OCCURRENCE = 'Occurrence';
-	public static final String ISSUE_CHART_OCCURRENCE_LAST_7_DAYS = 'Occurrence Last 7 Days';
-	public static final String ISSUE_CHART_OCCURRENCE_LAST_30_DAYS = 'Occurrence Last 30 Days';
 	public static final String ISSUE_CHART_USER_IMPACT_LAST_30_DAYS = 'User Impact Last 30 Days';
-	public static final String ISSUE_CHART_USER_IMPACT_LAST_7_DAYS_DETAILS = 'User Impact Last 7 Days Details';
 	public static final String ISSUE_CHART_USER_IMPACT_LAST_30_DAYS_DETAILS = 'User Impact Last 30 Days Details';
 	public static final String ISSUE_CHART_DATA_IMPACT_LAST_30_DAYS = 'Data Impact Last 30 Days';
 	public static final String ISSUE_CHART_DATA_IMPACT_LAST_30_DAYS_DETAILS = 'Data Impact Last 30 Days Details';
@@ -101,12 +34,7 @@ public with sharing class ChartService {
 	public static final String ISSUE_CHART_TODAYS_DATA_IMPACT = 'Todays Data Impact';
 
 	public static final String LOG_CHART_OCCURRENCE_LOGS = 'Occurrence Logs';
-	public static final String LOG_CHART_OCCURRENCE_LOGS_LAST_7_DAYS = 'Occurrence Logs Last 7 Days';
-	public static final String LOG_CHART_OCCURRENCE_LOGS_LAST_30_DAYS = 'Occurrence Logs Last 30 Days';
 	public static final String LOG_CHART_TIMING_LOGS = 'Timing Logs';
-
-	public static final String CHART_PREFIX_Label = 'System Auto Chart';
-	public static final String CHART_PREFIX= 'System_Auto_Chart';
 
 	private static final String EVENT_CHART_EVENT_LOG_RECORDS_BY_TYPE = 'Event Log Records By Type';
 	private static final String EVENT_CHART_EVENT_LOG_RECORDS_BY_CATEGORY = 'Event Log Records By Category';
@@ -118,22 +46,17 @@ public with sharing class ChartService {
 	private static final String STACKTRACE_CHART_BULK_API = 'Bulk API';
 
 	private static final Map<String, Chart> CHART_MAP = new Map<String, Chart>{
-		ISSUE_CHART_OCCURRENCE => Chart.OCCURRENCE,
-		ISSUE_CHART_OCCURRENCE_LAST_7_DAYS => Chart.OCCURRENCE_LAST_7_DAYS,
-		ISSUE_CHART_OCCURRENCE_LAST_30_DAYS => Chart.OCCURRENCE_LAST_30_DAYS,
-		ISSUE_CHART_USER_IMPACT_LAST_30_DAYS => Chart.USER_IMPACT_LAST_30_DAYS,
-		ISSUE_CHART_USER_IMPACT_LAST_7_DAYS_DETAILS => Chart.USER_IMPACT_LAST_7_DAYS_DETAILS,
-		ISSUE_CHART_USER_IMPACT_LAST_30_DAYS_DETAILS => Chart.USER_IMPACT_LAST_30_DAYS_DETAILS,
-		ISSUE_CHART_DATA_IMPACT_LAST_30_DAYS => Chart.DATA_IMPACT_LAST_30_DAYS,
-		ISSUE_CHART_DATA_IMPACT_LAST_30_DAYS_DETAILS => Chart.DATA_IMPACT_LAST_30_DAYS_DETAILS,
-		ISSUE_CHART_TODAYS_USER_IMPACT => Chart.TODAYS_USER_IMPACT,
-		ISSUE_CHART_TODAYS_DATA_IMPACT => Chart.TODAYS_DATA_IMPACT,
-		LOG_CHART_OCCURRENCE_LOGS => Chart.OCCURRENCE_LOGS,
-		LOG_CHART_OCCURRENCE_LOGS_LAST_7_DAYS => Chart.OCCURRENCE_LOGS_LAST_7_DAYS,
-		LOG_CHART_OCCURRENCE_LOGS_LAST_30_DAYS => Chart.OCCURRENCE_LOGS_LAST_30_DAYS,
-		LOG_CHART_TIMING_LOGS => Chart.TIMING_LOGS,
-		EVENT_CHART_EVENT_LOG_RECORDS_BY_TYPE => Chart.EVENT_LOG_RECORDS_BY_TYPE,
-		EVENT_CHART_EVENT_LOG_RECORDS_BY_CATEGORY => Chart.EVENT_LOG_RECORDS_BY_CATEGORY
+			ISSUE_CHART_OCCURRENCE => Chart.OCCURRENCE,
+			ISSUE_CHART_USER_IMPACT_LAST_30_DAYS => Chart.USER_IMPACT_LAST_30_DAYS,
+			ISSUE_CHART_USER_IMPACT_LAST_30_DAYS_DETAILS => Chart.USER_IMPACT_LAST_30_DAYS_DETAILS,
+			ISSUE_CHART_DATA_IMPACT_LAST_30_DAYS => Chart.DATA_IMPACT_LAST_30_DAYS,
+			ISSUE_CHART_DATA_IMPACT_LAST_30_DAYS_DETAILS => Chart.DATA_IMPACT_LAST_30_DAYS_DETAILS,
+			ISSUE_CHART_TODAYS_USER_IMPACT => Chart.TODAYS_USER_IMPACT,
+			ISSUE_CHART_TODAYS_DATA_IMPACT => Chart.TODAYS_DATA_IMPACT,
+			LOG_CHART_OCCURRENCE_LOGS => Chart.OCCURRENCE_LOGS,
+			LOG_CHART_TIMING_LOGS => Chart.TIMING_LOGS,
+			EVENT_CHART_EVENT_LOG_RECORDS_BY_TYPE => Chart.EVENT_LOG_RECORDS_BY_TYPE,
+			EVENT_CHART_EVENT_LOG_RECORDS_BY_CATEGORY => Chart.EVENT_LOG_RECORDS_BY_CATEGORY
 	};
 
 	private static final Map<String, Category> CATEGORY_MAP = new Map<String, Category>{
@@ -143,66 +66,6 @@ public with sharing class ChartService {
 			STACKTRACE_CHART_INTEGRATION => Category.INTEGRATION,
 			STACKTRACE_CHART_BULK_API => Category.BULK_API
 	};
-
-
-
-	public static Chart getChartEnumByChartName(String chartName) {
-		List<ChartService.Chart> allCharts = ChartService.Chart.values();
-		
-		for (ChartService.Chart chart : allCharts) {
-			if (chart.name() == chartName) {
-				return chart;
-			}
-		}
-		
-		return null;
-	}
-
-	public static List<AdminService.MergeField> getChartsFields() {
-		return new List<AdminService.MergeField> {
-			//Issue object
-			new AdminService.MergeField(
-				CHART_PREFIX_Label + ' -> ' + ISSUE_CHART_USER_IMPACT_LAST_7_DAYS_DETAILS,
-				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ISSUE_CHART_USER_IMPACT_LAST_7_DAYS_DETAILS)).toString() + '}',
-				'issue',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ISSUE_CHART_USER_IMPACT_LAST_7_DAYS_DETAILS)).toString()
-			),
-			new AdminService.MergeField(
-				CHART_PREFIX_Label + ' -> ' + ISSUE_CHART_USER_IMPACT_LAST_30_DAYS_DETAILS,
-				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.ISSUE_CHART_USER_IMPACT_LAST_30_DAYS_DETAILS)).toString()+ '}',
-				'issue',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.ISSUE_CHART_USER_IMPACT_LAST_30_DAYS_DETAILS)).toString()
-			),
-
-			new AdminService.MergeField(
-				CHART_PREFIX_Label + ' -> ' + ISSUE_CHART_OCCURRENCE_LAST_7_DAYS,
-				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ISSUE_CHART_OCCURRENCE_LAST_7_DAYS)).toString() + '}',
-				'issue',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ISSUE_CHART_OCCURRENCE_LAST_7_DAYS)).toString()
-			),
-			new AdminService.MergeField(
-				CHART_PREFIX_Label + ' -> ' + ISSUE_CHART_OCCURRENCE_LAST_30_DAYS,
-				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.ISSUE_CHART_OCCURRENCE_LAST_30_DAYS)).toString()+ '}',
-				'issue',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.ISSUE_CHART_OCCURRENCE_LAST_30_DAYS)).toString()
-			),
-
-			//Log object
-			new AdminService.MergeField(
-				CHART_PREFIX_Label + ' -> ' + LOG_CHART_OCCURRENCE_LOGS_LAST_7_DAYS,
-				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.LOG_CHART_OCCURRENCE_LOGS_LAST_7_DAYS)).toString() + '}',
-				'log',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.LOG_CHART_OCCURRENCE_LOGS_LAST_7_DAYS)).toString()
-
-			),
-			new AdminService.MergeField(
-				CHART_PREFIX_Label + ' -> ' + LOG_CHART_OCCURRENCE_LOGS_LAST_30_DAYS,
-				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.LOG_CHART_OCCURRENCE_LOGS_LAST_30_DAYS)).toString() + '}',
-				'log',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.LOG_CHART_OCCURRENCE_LOGS_LAST_30_DAYS)).toString()
-			)
-		};
-	}
 
 	private static final String ALL_RELATED_OPTION = 'All';
 	private static final String NONE_RELATED_OPTION = 'None';
@@ -443,10 +306,8 @@ public with sharing class ChartService {
 				if (isCurrentIssue) aChartData.bgColor = CURRENT_ISSUE_OCCURRENCE_COLOR;
 				chartData.add(aChartData);
 			}
-
 			return chartData;
 		}
-
 		private override Set<String> getRecordIds(String recordId, String related) {
 			Set<String> recordIds = new Set<String>();
 			List<Issue__c> currentIssues = [SELECT Id, Related_Issue__c, Related_Issue__r.Related_Issue__c FROM Issue__c WHERE Id = :recordId];
@@ -510,10 +371,13 @@ public with sharing class ChartService {
 		public override List<ChartData> getChartData() {
 			List<ChartData> chartData = new List<ChartData>();
 			Date createdAt = Date.valueOf(chartDataProperties.requestedCreatedAt);
-			
-			// Refactored query with improved readability
-			List<Log__c> logs = getUserImpactLogs(createdAt);
-			
+			List<Log__c> logs = [
+					SELECT Id, User_Name__c, User_Id__c, Created_At__c
+					FROM Log__c
+					WHERE (Issue__c IN :chartDataProperties.recordIds OR (Issue__r.Related_Issue__c IN :chartDataProperties.recordIds AND Issue__r.Status__c = :IssueService.ISSUE_STATUS_DUPLICATE))
+					AND	DAY_ONLY(convertTimezone(Created_At__c)) = :createdAt
+					ORDER BY Created_At__c DESC
+			];
 			Set<String> labels = new Set<String>();
 			for (Log__c log : logs) {
 				if (String.isNotBlank(log.User_Name__c)) {
@@ -544,27 +408,6 @@ public with sharing class ChartService {
 			}
 			return chartData;
 		}
-		
-		/**
-		 * Retrieves logs for user impact analysis with improved query structure
-		 * @param createdAt The date to filter logs by
-		 * @return List of Log__c records
-		 */
-		private List<Log__c> getUserImpactLogs(Date createdAt) {
-			return [
-				SELECT Id, User_Name__c, User_Id__c, Created_At__c
-				FROM Log__c
-				WHERE (
-					Issue__c IN :chartDataProperties.recordIds
-					OR (
-						Issue__r.Related_Issue__c IN :chartDataProperties.recordIds
-						AND Issue__r.Status__c = :IssueService.ISSUE_STATUS_DUPLICATE
-					)
-				)
-				AND DAY_ONLY(convertTimezone(Created_At__c)) = :createdAt
-				ORDER BY Created_At__c DESC
-			];
-		}
 	}
 
 	// BLUR MODE // USER_IMPACT_LAST_30_DAYS, USER_IMPACT_LAST_30_DAYS_DETAILS
@@ -588,10 +431,13 @@ public with sharing class ChartService {
 		public override List<ChartData> getChartData() {
 			List<ChartData> chartData = new List<ChartData>();
 			Date createdAt = Date.valueOf(chartDataProperties.requestedCreatedAt);
-			
-			// Refactored query with improved readability
-			List<Log__c> logs = getDataImpactLogs(createdAt);
-			
+			List<Log__c> logs = [
+					SELECT Id, Related_Objects__c, Related_Object_Type__c, Related_Id__c, Created_At__c
+					FROM Log__c
+					WHERE (Issue__c IN :chartDataProperties.recordIds OR (Issue__r.Related_Issue__c IN :chartDataProperties.recordIds AND Issue__r.Status__c = :IssueService.ISSUE_STATUS_DUPLICATE))
+					AND	DAY_ONLY(convertTimezone(Created_At__c)) = :createdAt
+					ORDER BY Created_At__c DESC
+			];
 			Set<String> labels = new Set<String>();
 			for (Log__c log : logs) {
 				if (String.isNotBlank(log.Related_Objects__c)) {
@@ -649,27 +495,6 @@ public with sharing class ChartService {
 				chartData.add(aChartData);
 			}
 			return chartData;
-		}
-		
-		/**
-		 * Retrieves logs for data impact analysis with improved query structure
-		 * @param createdAt The date to filter logs by
-		 * @return List of Log__c records
-		 */
-		private List<Log__c> getDataImpactLogs(Date createdAt) {
-			return [
-				SELECT Id, Related_Objects__c, Related_Object_Type__c, Related_Id__c, Created_At__c
-				FROM Log__c
-				WHERE (
-					Issue__c IN :chartDataProperties.recordIds
-					OR (
-						Issue__r.Related_Issue__c IN :chartDataProperties.recordIds
-						AND Issue__r.Status__c = :IssueService.ISSUE_STATUS_DUPLICATE
-					)
-				)
-				AND DAY_ONLY(convertTimezone(Created_At__c)) = :createdAt
-				ORDER BY Created_At__c DESC
-			];
 		}
 	}
 
@@ -735,8 +560,7 @@ public with sharing class ChartService {
 						Organization_Id__c = :currentLogs[0].Organization_Id__c AND
 						Hash_1__c != NULL AND
 						DAY_ONLY(Created_At__c) >= :startDate AND
-						DAY_ONLY(Created_At__c) <= :endDate
-						) OR
+						DAY_ONLY(Created_At__c) <= :endDate) OR
 						Id = :currentLogs[0].Id
 						ORDER BY Created_At__c DESC];
 				List<Log__c> logsWithHash2 = [
@@ -769,7 +593,6 @@ public with sharing class ChartService {
 				dataMap.put('hash2', ConfigUtil.getSObjectWithoutNameSpace(logsWithHash2));
 				dataMap.put('hash3', ConfigUtil.getSObjectWithoutNameSpace(logsWithHash3));
 			}
-
 			return JSON.serialize(dataMap);
 		}
 	}

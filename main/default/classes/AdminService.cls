@@ -134,7 +134,6 @@ public without sharing class AdminService {
 
             Schema.SObjectField sfd = fieldsMap.get(sobjectFieldName);
             Schema.DescribeFieldResult dfr = sfd.getDescribe();
-            if(!dfr.isAccessible()) continue;
             if(isStandardPreferencesField(dfr)) continue;
             String label = ((parent != null) ? (parent.getLabel() + ' -> ') : '') + dfr.getLabel();
             String localName = (parent != null) ? (parent.getRelationshipName() + '.' + dfr.getName()) : dfr.getName();
@@ -173,13 +172,9 @@ public without sharing class AdminService {
         mergeFields.addAll(addCustomMergeFields(traceResultDsR, 'traceResult'));
         mergeFields.addAll(getSobjectFields(traceResultDsR, 'traceResult'));
 
-        mergeFields.addAll(ChartService.getChartsFields());
-
         mergeFields.sort();
         return mergeFields;
     }
-
-
 
     public class MergeField implements Comparable{
         public String label;
@@ -807,9 +802,8 @@ public without sharing class AdminService {
             }
 
             try {
-                ApexEmailNotification apexEmailNotification = !apexEmailNotifications.isEmpty() ? apexEmailNotifications.get(0) : null;
                 String errorEmailServiceAddress = getPackageEmailServiceFunctionEmailAddress();
-                upsertApexEmailNotification(errorEmailServiceAddress, apexEmailNotification);
+                upsertApexEmailNotification(errorEmailServiceAddress, apexEmailNotifications.get(0));
             }
             catch(Exception e) {
                 throw new AdminServiceException(e);
@@ -1522,22 +1516,9 @@ public without sharing class AdminService {
 
     public static Map<String, Boolean> pushGitChanges() {
         GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-        Boolean isJobAlreadyRunning = !DatabaseUtils.getCurrentJobs(new List<String>{'GitHubCommitBatch'}).isEmpty();
-        Boolean hasAuditChanges = String.isBlank(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c);
-        if (!hasAuditChanges) {
-            GitHubCommitBatch.AuditChangeWrapper lastChanges = GitHubCommitBatch.getAuditTrails(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c);
-            hasAuditChanges = (lastChanges != null && !lastChanges.auditChange.isEmpty()) || false;
-        }
-        
-        Boolean isExecuted = false;
-        if (!isJobAlreadyRunning && hasAuditChanges) {
-            isExecuted = DatabaseUtils.executeBatchWithLimitCheck('GitHubCommitBatch', batchInstance);
-        }
-
+        Boolean isExecuted = DatabaseUtils.executeBatchWithLimitCheck('GitHubCommitBatch', batchInstance);
         return new Map<String, Boolean>{
-            'changesPushed' => isExecuted,
-            'hasChanges' => hasAuditChanges,
-            'jobAlreadyRunning' => isJobAlreadyRunning
+            'changesPushed' => isExecuted
         };
     }
 
@@ -1555,6 +1536,24 @@ public without sharing class AdminService {
     public static final String GIT_API_REPOSITORY_NAME_NOT_FOUND = 'Repository name not found';
     public static final String GIT_API_BRANCH_NAME_NOT_FOUND = 'Branch name not found';
 
+    // https://github.com/grsys/Logger.git
+    // return ['grsys', 'Logger']
+    public static List<String> getOwnerAndRepositoryNameFromUrl(String repositoryUrl) {
+        List<String> result = new List<String>{'', ''};
+        if(String.isNotBlank(repositoryUrl)) {
+            List<String> parts = repositoryUrl.split('/');
+            if(parts.size() == 5) {
+                result.set(0, parts.get(3));
+                result.set(1, (parts.get(4)).removeEnd('.git'));
+            }
+        }
+        return result;
+    }
+
+    public static String getRepositoryUrlFromOwnerAndRepositoryName(List<String> parts) {
+        return (parts != null && parts.size() == 2 && parts.get(0) != null && parts.get(1) != null) ? String.format('https://github.com/{0}/{1}.git', parts) : '';
+    }
+
     public static GitHubSettings setGitHubSettings(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         if(input.get('enabled') != null) {
@@ -1563,7 +1562,7 @@ public without sharing class AdminService {
         ConfigUtil.GIT_API_SETTINGS.Token__c = input.get('apiToken') != null ? String.valueOf(input.get('apiToken')) : null;
         String newBranchName = input.get('branchName') != null ? String.valueOf(input.get('branchName')) : null;
         String repositoryUrl = input.get('repositoryUrl') != null ? String.valueOf(input.get('repositoryUrl')) : null;
-        List<String> ownerRepo = GitHubUtils.getOwnerAndRepositoryNameFromUrl(repositoryUrl);
+        List<String> ownerRepo = getOwnerAndRepositoryNameFromUrl(repositoryUrl);
         String newOwner = ownerRepo.get(0);
         String newRepoName = ownerRepo.get(1);
 
@@ -1803,11 +1802,10 @@ public without sharing class AdminService {
         Map<String,Schema.SObjectField> mfields = logType.getDescribe().fields.getMap();
         List<String> fieldKeys = (new List<String>(mfields.keySet()));
         for (String k : fieldKeys) {
-            Schema.DescribeFieldResult dsr = mfields.get(k).getDescribe();
-            if(dsr.isAccessible() && !FILTERS_EXCLUDE_LOG_FIELDS.contains(k.toLowerCase())) {
+            if(!FILTERS_EXCLUDE_LOG_FIELDS.contains(k.toLowerCase())) {
                 result.add(new Map<String, String>{
-                    ConfigUtil.PICKLIST_KEY_VALUE => dsr.getName(),
-                    ConfigUtil.PICKLIST_KEY_LABEL => dsr.getLabel()
+                    ConfigUtil.PICKLIST_KEY_VALUE => mfields.get(k).getDescribe().getName(),
+                    ConfigUtil.PICKLIST_KEY_LABEL => mfields.get(k).getDescribe().getLabel()
                 });
             }
         }
@@ -1822,13 +1820,10 @@ public without sharing class AdminService {
         Map<String,Schema.SObjectField> mfields = issueType.getDescribe().fields.getMap();
         List<String> fieldKeys = (new List<String>(mfields.keySet()));
         for (String k : fieldKeys) {
-            Schema.DescribeFieldResult dsr = mfields.get(k).getDescribe();
-            if(dsr.isAccessible()) {
-                result.add(new Map<String, String> {
-                    ConfigUtil.PICKLIST_KEY_VALUE => dsr.getName(),
-                    ConfigUtil.PICKLIST_KEY_LABEL => dsr.getLabel()
-                });
-            }
+            result.add(new Map<String, String>{
+                ConfigUtil.PICKLIST_KEY_VALUE => mfields.get(k).getDescribe().getName(),
+                ConfigUtil.PICKLIST_KEY_LABEL => mfields.get(k).getDescribe().getLabel()
+            });
         }
 
         return result;
@@ -3311,7 +3306,7 @@ public without sharing class AdminService {
             this.enabled = settings.Enabled__c;
             this.reponame = settings.Reponame__c;
             this.branchName = settings.Branch_Name__c;
-            this.repositoryUrl = GitHubUtils.getRepositoryUrlFromOwnerAndRepositoryName(
+            this.repositoryUrl = AdminService.getRepositoryUrlFromOwnerAndRepositoryName(
                 new List<String>{settings.Username__c, settings.Reponame__c}
             );
         }
@@ -3836,14 +3831,12 @@ public without sharing class AdminService {
         public Boolean openAiConfigured;
         public Boolean gitConfigured;
         public Boolean codebaseIndexed;
-        public Boolean indexingInProgress;
         public Boolean trustedSiteReady;
 
-        public MetadataChatSettings(Boolean openAiConfigured, Boolean gitConfigured, Boolean codebaseIndexed, Boolean indexingInProgress, Boolean trustedSiteReady) {
+        public MetadataChatSettings(Boolean openAiConfigured, Boolean gitConfigured, Boolean codebaseIndexed, Boolean trustedSiteReady) {
             this.openAiConfigured = openAiConfigured;
             this.gitConfigured = gitConfigured;
             this.codebaseIndexed = codebaseIndexed;
-            this.indexingInProgress = indexingInProgress;
             this.trustedSiteReady = trustedSiteReady;
         }
 
@@ -3854,22 +3847,18 @@ public without sharing class AdminService {
 
     public static MetadataChatSettings getMetadataChatSettings() {
         Map<String, MetadataServiceUtil.CspTrustedSiteWrapper> trustedSites = MetadataServiceUtil.getCspTrustedSitesMap();
-        Boolean trustedSiteReady = trustedSites.containsKey(PharosChatController.CHAT_WEBSOCKET_URL);
+        Boolean trustedSiteReady = trustedSites.containsKey('wss://chat.pharos.ai');
         
         String orgId = UserInfo.getOrganizationId();
         String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
         Boolean openAiConfigured = ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c && String.isNotBlank(openAiKey) && OpenAI.validateToken(openAiKey);
-        Boolean gitConfigured = GitHubUtils.validateGitHubConnection().gitValid;
-        
-        PharosChatController.NamespaceStatusResponse namespaceStatus = PharosChatController.getNamespaceStatus(orgId);
-        Boolean codebaseIndexed = !namespaceStatus.empty;
-        Boolean indexingInProgress = namespaceStatus.indexingInProgress;
-        
-        return new MetadataChatSettings(openAiConfigured, gitConfigured, codebaseIndexed, indexingInProgress, trustedSiteReady);
+        Boolean gitConfigured = GitHubUtils.validateGitHubConnectionForChat();
+        Boolean codebaseIndexed = PharosChatController.isCodeIndexed(orgId);
+        return new MetadataChatSettings(openAiConfigured, gitConfigured, codebaseIndexed, trustedSiteReady);
     }
 
     public static MetadataChatSettings setupMetadataChatTrustedSite() {
-        MetadataServiceUtil.upsertCspTrustedSite('Pharos_Chat_Websocket', PharosChatController.CHAT_WEBSOCKET_URL, 'Pharos chat websocket connection');
+        MetadataServiceUtil.upsertCspTrustedSite('Pharos_Chat_Websocket', 'wss://chat.pharos.ai', 'Pharos chat websocket connection');
         return new MetadataChatSettings(true);
     }
 }

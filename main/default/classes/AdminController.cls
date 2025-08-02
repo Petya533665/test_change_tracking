@@ -124,10 +124,6 @@ public with sharing class AdminController {
                 response.data = AzureService.searchEpics(data);
             } else if (method == 'getAzureDevOpsProjectTeamMemberWrapper') {
                 response.data = AzureService.getProjectTeamMemberWrapper(data);
-            } else if (method == 'getTeamBoards') {
-                response.data = AzureService.getTeamBoards(data);
-            } else if (method == 'getAzureDevOpsWorkItemTypesWithValidation') {
-                response.data = AzureService.getAzureDevOpsWorkItemTypesWithValidation(data);
             } else if (method == 'createConnectedApp') {
                 response.data = AdminService.createConnectedApp(data);
             } else if (method == 'getMasks') {
@@ -337,7 +333,7 @@ public with sharing class AdminController {
             } else if (method == 'resetGitHubSettings') {
                 response.data = AdminService.resetGitHubSettings();
             } else if (method == 'validateGitHubConnection') {
-                response.data = GitHubUtils.validateGitHubConnection(data);
+                response.data = GitHubUtils.validateGitHubConnection();
             } else if (method == 'setChangeTrackingSettings') {
                 response.data = AdminService.setChangeTrackingSettings(data);
             } else if (method == 'getChangeTrackingSettings') {

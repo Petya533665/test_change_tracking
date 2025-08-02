@@ -31,18 +31,11 @@ public class PharosChatControllerTest {
             ''
         );
 
-        TestDataFactory.SingleRequestMock cspTrustedSitesMock = new TestDataFactory.SingleRequestMock(
-            200,
-            'OK',
-            '{"records": [{"Id": "test-id", "IsActive": true, "DeveloperName": "Pharos_Chat_Websocket", "EndpointUrl": "' + PharosChatController.CHAT_WEBSOCKET_URL + '"}]}'
-        );
-
         return new Map<String, HttpCalloutMock>{
             ConfigUtil.OPEN_AI_USAGE_ENDPOINT => openAiValidationMock,
             GIT_ENDPOINT => gitValidationMock,
             PharosChatController.CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + UserInfo.getOrganizationId() => namespaceStatusMock,
-            PharosChatController.CHAT_INIT_ENDPOINT => chatInitMock,
-            ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_CSP_TRUSTED_SITES_QUERY => cspTrustedSitesMock
+            PharosChatController.CHAT_INIT_ENDPOINT => chatInitMock
         };
     }
 
