@@ -102,43 +102,43 @@ public with sharing class LogListController {
 	}
 
 	public class LogsPerDayData {
-		public String dateStr;
+		public String timePoint;
 		public Map<String, Integer> categoryCounts;
 
-		public LogsPerDayData(String dateStr) {
-			this.dateStr = dateStr;
+		public LogsPerDayData(String timePoint) {
+			this.timePoint = timePoint;
 			this.categoryCounts = new Map<String, Integer>();
 		}
 	}
 
 	public static List<LogsPerDayData> getLogsPerDayByCategory(Object data) {
 		Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
-		String fromDateStr = (input.get('from') != null) ? (String)input.get('from') : null;
-		String toDateStr = (input.get('to') != null) ? (String)input.get('to') : null;
+		String fromDatetime = (input.get('from') != null) ? (String)input.get('from') : null;
+		String toDatetime = (input.get('to') != null) ? (String)input.get('to') : null;
 		
 		// Set default date range (last 30 days) if not provided
-		Date startDate = Date.today().addDays(-30);
-		Date endDate = Date.today();
+		DateTime startDateTime = DateTime.now().addDays(-30);
+		DateTime endDateTime = DateTime.now();
 		
 		// Parse provided dates if available
-		if (String.isNotBlank(fromDateStr)) {
-			startDate = parseDateString(fromDateStr);
+		if (String.isNotBlank(fromDatetime)) {
+			startDateTime = DateTime.valueOf(fromDatetime);
 		}
-		if (String.isNotBlank(toDateStr)) {
-			endDate = parseDateString(toDateStr);
+		if (String.isNotBlank(toDatetime)) {
+			endDateTime = DateTime.valueOf(toDatetime);
 		}
 		
 		List<Log__c> logs = [
 			SELECT Id, Category__c, Created_At__c
 			FROM Log__c
-			WHERE Created_At__c >= :startDate AND Created_At__c <= :endDate
+			WHERE Created_At__c >= :startDateTime AND Created_At__c <= :endDateTime
 			ORDER BY Created_At__c DESC
 		];
 
 		Map<String, LogsPerDayData> logsPerDayMap = new Map<String, LogsPerDayData>();
 		
 		for (Log__c log : logs) {
-			String dateKey = log.Created_At__c.date().format();
+			String dateKey = String.valueOf(log.Created_At__c);
 			String category = log.Category__c != null ? log.Category__c : 'Uncategorized';
 			
 			if (!logsPerDayMap.containsKey(dateKey)) {
@@ -160,29 +160,12 @@ public with sharing class LogListController {
 		return result;
 	}
 
-	private static Date parseDateString(String dateStr) {
-		try {
-			// Try standard YYYY-MM-DD format first
-			return Date.valueOf(dateStr);
-		} catch (Exception e) {
-			// Try M/D/YYYY format
-			List<String> parts = dateStr.split('/');
-			if (parts.size() == 3) {
-				Integer month = Integer.valueOf(parts[0]);
-				Integer day = Integer.valueOf(parts[1]);
-				Integer year = Integer.valueOf(parts[2]);
-				return Date.newInstance(year, month, day);
-			}
-			throw new IllegalArgumentException('Invalid date format: ' + dateStr);
-		}
-	}
-
 	public class LogsPerDayDataComparator implements Comparator<LogsPerDayData> {
 		public Integer compare(LogsPerDayData a, LogsPerDayData b) {
-			Date dateA = parseDateString(a.dateStr);
-			Date dateB = parseDateString(b.dateStr);
-			if (dateB > dateA) return 1;
-			if (dateB < dateA) return -1;
+			DateTime dateTimeA = DateTime.valueOfGmt(a.timePoint);
+			DateTime dateTimeB = DateTime.valueOfGmt(b.timePoint);
+			if (dateTimeB > dateTimeA) return 1;
+			if (dateTimeB < dateTimeA) return -1;
 			return 0;
 		}
 	}
