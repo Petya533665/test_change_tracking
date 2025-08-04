@@ -138,11 +138,11 @@ public with sharing class LogListController {
 		Map<String, LogsPerDayData> logsPerDayMap = new Map<String, LogsPerDayData>();
 		
 		for (Log__c log : logs) {
-			String dateKey = String.valueOf(log.Created_At__c);
+			String dateKey = log.Created_At__c.date().format();
 			String category = log.Category__c != null ? log.Category__c : 'Uncategorized';
 			
 			if (!logsPerDayMap.containsKey(dateKey)) {
-				logsPerDayMap.put(dateKey, new LogsPerDayData(dateKey));
+				logsPerDayMap.put(dateKey, new LogsPerDayData(String.valueOf(log.Created_At__c)));
 			}
 			
 			LogsPerDayData dayData = logsPerDayMap.get(dateKey);
