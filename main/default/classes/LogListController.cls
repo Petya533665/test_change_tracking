@@ -42,8 +42,8 @@ public with sharing class LogListController {
 			Object data = request.get('data');
 			if (method == 'getLogs') {
 				response.data = getLogs();
-			} else if (method == 'getLogsPerDayByCategory') {
-				response.data = getLogsPerDayByCategory(data);
+			} else if (method == 'getLogsPerPeriodByCategory') {
+				response.data = getLogsPerPeriodByCategory(data);
 			} else {
 				response.error = 'Action not found';
 			}
@@ -101,17 +101,17 @@ public with sharing class LogListController {
 		return logElements;
 	}
 
-	public class LogsPerDayData {
+	public class LogsPerPeriodData {
 		public String timePoint;
 		public Map<String, Integer> categoryCounts;
 
-		public LogsPerDayData(String timePoint) {
+		public LogsPerPeriodData(String timePoint) {
 			this.timePoint = timePoint;
 			this.categoryCounts = new Map<String, Integer>();
 		}
 	}
 
-	public static List<LogsPerDayData> getLogsPerDayByCategory(Object data) {
+	public static List<LogsPerPeriodData> getLogsPerPeriodByCategory(Object data) {
 		Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
 		String fromDatetime = (input.get('from') != null) ? (String)input.get('from') : null;
 		String toDatetime = (input.get('to') != null) ? (String)input.get('to') : null;
@@ -135,33 +135,47 @@ public with sharing class LogListController {
 			ORDER BY Created_At__c DESC
 		];
 
-		Map<String, LogsPerDayData> logsPerDayMap = new Map<String, LogsPerDayData>();
+		// Calculate time period duration
+		Long totalMillis = endDateTime.getTime() - startDateTime.getTime();
+		Long periodMillis = totalMillis / 30;
+		
+		Map<String, LogsPerPeriodData> logsPerPeriodMap = new Map<String, LogsPerPeriodData>();
 		
 		for (Log__c log : logs) {
-			String dateKey = log.Created_At__c.date().format();
+			if (log.Created_At__c == null) continue;
+			
+			// Calculate which period this log belongs to
+			Long logMillis = log.Created_At__c.getTime() - startDateTime.getTime();
+			Integer periodIndex = (Integer)(logMillis / periodMillis);
+			if (periodIndex >= 30) periodIndex = 29; // Ensure we don't exceed 30 periods
+			
+			// Create period key
+			DateTime periodStart = startDateTime.addSeconds((Integer)((periodIndex * periodMillis) / 1000));
+			String periodKey = String.valueOf(periodStart);
+			
 			String category = log.Category__c != null ? log.Category__c : 'Uncategorized';
 			
-			if (!logsPerDayMap.containsKey(dateKey)) {
-				logsPerDayMap.put(dateKey, new LogsPerDayData(String.valueOf(log.Created_At__c)));
+			if (!logsPerPeriodMap.containsKey(periodKey)) {
+				logsPerPeriodMap.put(periodKey, new LogsPerPeriodData(periodKey));
 			}
 			
-			LogsPerDayData dayData = logsPerDayMap.get(dateKey);
+			LogsPerPeriodData periodData = logsPerPeriodMap.get(periodKey);
 			
-			if (dayData.categoryCounts.containsKey(category)) {
-				dayData.categoryCounts.put(category, dayData.categoryCounts.get(category) + 1);
+			if (periodData.categoryCounts.containsKey(category)) {
+				periodData.categoryCounts.put(category, periodData.categoryCounts.get(category) + 1);
 			} else {
-				dayData.categoryCounts.put(category, 1);
+				periodData.categoryCounts.put(category, 1);
 			}
 		}
 		
-		List<LogsPerDayData> result = new List<LogsPerDayData>(logsPerDayMap.values());
-		result.sort(new LogsPerDayDataComparator());
+		List<LogsPerPeriodData> result = new List<LogsPerPeriodData>(logsPerPeriodMap.values());
+		result.sort(new LogsPerPeriodDataComparator());
 		
 		return result;
 	}
 
-	public class LogsPerDayDataComparator implements Comparator<LogsPerDayData> {
-		public Integer compare(LogsPerDayData a, LogsPerDayData b) {
+	public class LogsPerPeriodDataComparator implements Comparator<LogsPerPeriodData> {
+		public Integer compare(LogsPerPeriodData a, LogsPerPeriodData b) {
 			DateTime dateTimeA = DateTime.valueOfGmt(a.timePoint);
 			DateTime dateTimeB = DateTime.valueOfGmt(b.timePoint);
 			if (dateTimeB > dateTimeA) return 1;
