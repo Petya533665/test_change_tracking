@@ -83,7 +83,7 @@
             if (chartName === USERS_INFO_DETAILS_CHART_NAME) {
                 _chartData = chartData
                     .sort((a, b) => {
-                        return a.recordCount - b.recordCount;
+                        return a.count - b.count;
                     });
             }
             else if (chartName === SENSITIVE_PERMISSIONS_CHART_NAME) {
@@ -130,7 +130,7 @@
                         item.stackingCounts.forEach(stackingCount => {
                             if (stackingCount.subName === data.name && !data.userIds.includes(item.id)) {
                                 data.userIds.push(item.id);
-                                data.count++;
+                                data.count += stackingCount.count;
                             }
                         });
                     });
