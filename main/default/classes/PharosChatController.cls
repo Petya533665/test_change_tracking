@@ -2,11 +2,13 @@ public with sharing class PharosChatController {
     public static final String CHAT_ENV_URL = 'https://ai.pharos.ai/chat';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
+    public static final String CHAT_WEBSOCKET_URL = 'wss://chat.pharos.ai';
 
     public static final String ERROR_OPENAI_NOT_READY = 'OpenAI token is not configured or is invalid. Please set up OpenAI integration first.';
     public static final String ERROR_GIT_NOT_INTEGRATED = 'Git integration is not configured. Please set up Git integration first.';
     public static final String ERROR_CODE_NOT_INDEXED = 'Codebase is not indexed. Please wait for indexing to complete.';
     public static final String ERROR_INIT_FAILED = 'Chat initialization has failed.';
+    public static final String ERROR_TRUSTED_SITE_NOT_READY = 'CSP Trusted Site is not configured. Please set up CSP Trusted Site first.';
 
     public class InitChatResponse {
         @AuraEnabled public Boolean success;
@@ -21,6 +23,16 @@ public with sharing class PharosChatController {
         public InitChatResponse(String sessionId) {
             this.success = true;
             this.sessionId = sessionId;
+        }
+    }
+
+    public class NamespaceStatusResponse {
+        public Boolean empty;
+        public Boolean indexingInProgress;
+
+        public NamespaceStatusResponse(Boolean empty, Boolean indexingInProgress) {
+            this.empty = empty;
+            this.indexingInProgress = indexingInProgress;
         }
     }
 
@@ -43,7 +55,7 @@ public with sharing class PharosChatController {
         }
     }
 
-    public static Boolean isCodeIndexed(String logOrgId) {
+    public static NamespaceStatusResponse getNamespaceStatus(String logOrgId) {
         try {
             String response = HttpUtils.get(
                     CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + logOrgId,
@@ -51,24 +63,31 @@ public with sharing class PharosChatController {
                     200
             );
             Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(response);
-            return (Boolean) body.get('empty') == false;
+            return new NamespaceStatusResponse(
+                (Boolean) body.get('empty'),
+                body.containsKey('indexingInProgress') ? (Boolean) body.get('indexingInProgress') : false
+            );
         } catch (Exception e) {
-            Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'isCodeIndexed');
-            return false;
+            Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'getNamespaceStatus');
+            return new NamespaceStatusResponse(false, false);
         }
     }
 
     private static List<String> validatePreconditions(String orgId, String openAiKey) {
         List<String> errors = new List<String>();
+        AdminService.MetadataChatSettings settings = AdminService.getMetadataChatSettings();
 
-        if (!ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c || String.isBlank(openAiKey) || !OpenAI.validateToken(openAiKey)) {
+        if (!settings.openAiConfigured) {
             errors.add(ERROR_OPENAI_NOT_READY);
         }
-        if (!GitHubUtils.validateGitHubConnectionForChat()) {
+        if (!settings.gitConfigured) {
             errors.add(ERROR_GIT_NOT_INTEGRATED);
         }
-        if (!isCodeIndexed(orgId)) {
+        if (!settings.codebaseIndexed) {
             errors.add(ERROR_CODE_NOT_INDEXED);
+        }
+        if (!settings.trustedSiteReady) {
+            errors.add(ERROR_TRUSTED_SITE_NOT_READY);
         }
         return errors;
     }
@@ -84,6 +103,11 @@ public with sharing class PharosChatController {
             HttpUtils.getHeadersContentTypeJSON(),
             200
         );
+    }
+
+    @AuraEnabled
+    public static Boolean isMetadataChatEnabled() {
+        return PermissionsUtil.MetadataChatEnabled;
     }
 
     @AuraEnabled
@@ -105,32 +129,45 @@ public with sharing class PharosChatController {
 
         switch on type {
             when 'field' {
-                String objectName = namespacePrefix + name.split('\\.').get(0);
-                List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
+                String objectName = name.split('\\.').get(0);
+                String prefixedObjectName = namespacePrefix + objectName;
+                List<EntityDefinition> objects = [
+                    SELECT DurableId, QualifiedApiName FROM EntityDefinition
+                    WHERE QualifiedApiName=:objectName OR QualifiedApiName=:prefixedObjectName
+                    ORDER BY NamespacePrefix ASC
+                    LIMIT 1
+                ];
                 if (objects.isEmpty()) return null;
 
-                String fieldName = namespacePrefix + name.split('\\.').get(1);
-                List<FieldDefinition> fields = [SELECT DurableId FROM FieldDefinition
-                    WHERE EntityDefinition.QualifiedApiName = :objectName
-                    AND QualifiedApiName = :fieldName];
+                String fieldName = name.split('\\.').get(1);
+                String prefixedFieldName = namespacePrefix + fieldName;
+                List<FieldDefinition> fields = [
+                    SELECT DurableId FROM FieldDefinition
+                    WHERE EntityDefinition.QualifiedApiName=:objects[0].QualifiedApiName AND (QualifiedApiName=:fieldName OR QualifiedApiName=:prefixedFieldName)
+                    ORDER BY NamespacePrefix ASC
+                    LIMIT 1
+                ];
                 return fields.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/FieldsAndRelationships/' + fields[0].DurableId.split('\\.').get(1) + '/view';
             }
             when 'object' {
-                String objectName = namespacePrefix + name;
-                List<EntityDefinition> objects = [SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName = :objectName];
+                String prefixedObjectName = namespacePrefix + name;
+                List<EntityDefinition> objects = [
+                    SELECT DurableId, QualifiedApiName FROM EntityDefinition
+                    WHERE QualifiedApiName=:name OR QualifiedApiName=:prefixedObjectName
+                    ORDER BY NamespacePrefix ASC
+                    LIMIT 1
+                ];
                 return objects.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/view';
             }
             when 'other' {
                 // search Apex class first, if not found search LWC component
-                String namespace = namespacePrefix.replace('__', '');
-                List<ApexClass> classes = [SELECT Id FROM ApexClass WHERE Name = :name AND NamespacePrefix = :namespace];
+                List<ApexClass> classes = [SELECT Id FROM ApexClass WHERE Name = :name];
                 if (!classes.isEmpty()) {
                     return instance + '/' + classes[0].Id;
                 } else {
                     String query = new QBuilder('LightningComponentBundle')
                             .selectFields(new Set<String>{'Id'})
                             .add(QBuilder.condition('DeveloperName').equalsTo(name))
-                            .add(QBuilder.condition('NamespacePrefix').equalsTo(namespace))
                             .build();
                     List<Object> lwcComponents = HttpUtils.runToolingQuery(instance, ConnectedOrgService.getSelfConnectedOrgAccessToken(), query, ConfigUtil.TOOLING_QUERY_API_ENDPOINT);
                     return lwcComponents.isEmpty() ? null : instance + '/lightning/setup/LightningComponentBundles/page?address=/' + ((Map<String, Object>)lwcComponents[0]).get('Id');

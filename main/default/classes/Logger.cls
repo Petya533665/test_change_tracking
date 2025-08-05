@@ -293,7 +293,7 @@ global with sharing class Logger {
     }
 
     @InvocableMethod(Category='Logging' Label='Issue Analysis' Description='Start Issue analysis from a flow or process builder'
-    IconName='resource:pharos__pharos_logo_simple:icon')
+    IconName='resource:pharos_logo_simple:icon')
     global static void startAnalysis(List<IssueAnalysis> issueAnalyses) {
         Set<String> issueIds = new Set<String>();
         String keyPrefix = Issue__c.getSObjectType().getDescribe().keyPrefix;

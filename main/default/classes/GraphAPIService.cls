@@ -117,6 +117,10 @@ public with sharing class GraphAPIService {
 	}
 
 	public static ChatMessage sendChannelMessage(String teamId, String channelId, ChatMessage chatMessage) {
+		return sendChannelMessage(teamId, channelId, JSON.serialize(chatMessage));
+	}
+
+	public static ChatMessage sendChannelMessage(String teamId, String channelId, String chatMessage) {
 		ChatMessage result;
 
 		Map<String, String> headers = HttpUtils.getHeadersAuthorizationAcceptJson(GRAPH_API_TOKEN_TYPE_BEARER + OAUTH_API_TOKEN);
@@ -124,19 +128,22 @@ public with sharing class GraphAPIService {
 
 		String b = HttpUtils.post(
 			String.format(GRAPH_API_SEND_CHANNEL_MESSAGE, new List<String>{teamId, channelId}),
-			JSON.serialize(chatMessage),
+			chatMessage,
 			headers,
 			201
 		);
 		result = (ChatMessage)JSON.deserialize(b, ChatMessage.class);
 		return result;
 	}
+
 	private static final String START_TAG_PRE = '<pre>';
 	private static final String END_TAG_PRE = '</pre>';
 
 	public class ChatMessage {
 		public String subject;
 		public ChatMessageBody body;
+		public List<Map<String, Object>> hostedContents;
+
 
 		public ChatMessage(){}
 		public ChatMessage(String subject, String body) {
@@ -144,6 +151,37 @@ public with sharing class GraphAPIService {
 			this.body = new ChatMessageBody();
 			this.body.content = START_TAG_PRE + body + END_TAG_PRE;
 			this.body.contentType = 'html';
+			this.hostedContents = new List<Map<String, Object>>();
+		}
+
+		public ChatMessage addImagesByImageLambdaClient(ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient) {
+
+			if (chartGeneratorImageLambdaClient != null && chartGeneratorImageLambdaClient.hasCharts()) {
+
+				for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
+					if (chart != null && String.isNotBlank(chart)) {
+						// Check if the chart type exists in ChartService.Chart enum
+						ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
+						if (chartEnum != null) {
+							String chartBase64 = chartGeneratorImageLambdaClient.getBase64ImageForChart(chartEnum.name());
+							String filename = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+
+							this.hostedContents.add(new Map<String, Object> {
+								'contentBytes' => chartBase64,
+								'contentType' => 'image/png',
+								'@microsoft.graph.temporaryId' => filename
+							});
+							this.body.content += String.format('<br>{0}Chart:<br> <img height="297" src="../hostedContents/{1}/$value" width="297">', 
+								new List<String>{chartEnum.name(), filename});
+
+						} else {
+							// Chart type not found in enum
+						}
+					}
+				}
+
+			}
+			return this;
 		}
 	}
 

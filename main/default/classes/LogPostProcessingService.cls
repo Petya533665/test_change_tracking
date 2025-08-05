@@ -18,7 +18,7 @@ public with sharing class LogPostProcessingService {
 	@TestVisible
 	private static final String AUDIT_TRAIL_SOBJECT = 'SetupAuditTrail';
 	public static final Set<String> USER_FIELDS = new Set<String> {
-		'Id', 'Name'
+		'Id', 'Name', 'ProfileId', 'Profile.Name', 'Profile.UserLicense.Name', 'UserRoleId', 'UserRole.Name'
 	};
 	public static final Set<String> AUDIT_TRAIL_FIELDS = new Set<String>{
 		'Id','Action','CreatedBy.Name','CreatedDate','Display','Section','DelegateUser'
@@ -280,7 +280,14 @@ public with sharing class LogPostProcessingService {
 			}
 			if (corg != null) {
 				LogPostProcessingService.PostProcessingSettings logSettings = new LogPostProcessingService.PostProcessingSettings(log.Post_Processing_Settings__c);
-				if (logSettings.isEnabled(USER_INFO_KEY)) fillUserName(log, logger);
+				if (logSettings.isEnabled(USER_INFO_KEY)) {
+					fillUserName(log, logger);
+					fillProfileId(log, logger);
+					fillProfileName(log, logger);
+					fillRoleId(log, logger);
+					fillRoleName(log, logger);
+					fillSalesforceLicenseTypeName(log, logger);
+				}
 				if (logSettings.isEnabled(OBJECT_INFO_KEY)) fillArea(log, logger);
 				if (logSettings.isEnabled(RELATED_OBJECTS_KEY)) fillRelateObjectType(log, logger);
 				if (logSettings.isEnabled(RELATED_OBJECTS_KEY)) fillRelatedObjects(log, logger);
@@ -484,6 +491,56 @@ public with sharing class LogPostProcessingService {
 		catch (Exception e) {
 			result.addError(e);
 			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getUserName');
+		}
+	}
+
+	public static void fillProfileId(Log__c log, Logger logger) {
+		try {
+			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Profile_Id__c, getProfileId(log.User_Id__c));
+		}
+		catch (Exception e) {
+			result.addError(e);
+			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getProfileId');
+		}
+	}
+
+	public static void fillProfileName(Log__c log, Logger logger) {
+		try {
+			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Profile_Name__c, getProfileName(log.User_Id__c));
+		}
+		catch (Exception e) {
+			result.addError(e);
+			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getProfileName');
+		}
+	}
+
+	public static void fillRoleId(Log__c log, Logger logger) {
+		try {
+			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Role_Id__c, getRoleId(log.User_Id__c));
+		}
+		catch (Exception e) {
+			result.addError(e);
+			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getRoleId');
+		}
+	}
+
+	public static void fillRoleName(Log__c log, Logger logger) {
+		try {
+			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Role_Name__c, getRoleName(log.User_Id__c));
+		}
+		catch (Exception e) {
+			result.addError(e);
+			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getRoleName');
+		}
+	}
+
+	public static void fillSalesforceLicenseTypeName(Log__c log, Logger logger) {
+		try {
+			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Salesforce_License_Type_Name__c, getSalesforceLicenseTypeName(log.User_Id__c));
+		}
+		catch (Exception e) {
+			result.addError(e);
+			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getSalesforceLicenseTypeName');
 		}
 	}
 
@@ -701,18 +758,70 @@ public with sharing class LogPostProcessingService {
 		if (String.isBlank(userId)) return userName;
 		CacheUtils cacheUtil = new CacheUtils(corg.Name);
 		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
-		Map<String, String> mapUsers = cacheObject != null ? (Map<String, String>)cacheObject : new Map<String, String>();
-		if (mapUsers.containsKey(userId)) {
-			userName = mapUsers.get(userId);
+		Map<String, UserInfoWrapper> userInfoByUserId = cacheObject != null ? (Map<String, UserInfoWrapper>)cacheObject : new Map<String, UserInfoWrapper>();
+		if (userInfoByUserId.containsKey(userId)) {
+			userName = userInfoByUserId.get(userId).userFullName;
 		} else {
 			List<User> users = getUserNameFromOrg(corg, userId);
 			if (users != null && users.size() == 1) {
-				userName = users[0].Name;
-				mapUsers.put(userId, userName);
-				cacheUtil.putValue(CacheUtils.KEY_REQUEST_USER_INFO, mapUsers);
+				UserInfoWrapper userInfoWrapper = new UserInfoWrapper(users.get(0));
+				userName = userInfoWrapper.userFullName;
+				userInfoByUserId.put(userId, userInfoWrapper);
+				cacheUtil.putValue(CacheUtils.KEY_REQUEST_USER_INFO, userInfoByUserId);
 			}
 		}
+
 		return userName;
+	}
+
+	public static String getProfileId(String userId) {
+		if (String.isBlank(userId)) return null;
+
+		CacheUtils cacheUtil = new CacheUtils(corg.Name);
+		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
+		Map<String, UserInfoWrapper> userInfoByUserId = (Map<String, UserInfoWrapper>) cacheObject;
+
+		return userInfoByUserId?.get(userId)?.profileId;
+	}
+
+	public static String getProfileName(String userId) {
+		if (String.isBlank(userId)) return null;
+
+		CacheUtils cacheUtil = new CacheUtils(corg.Name);
+		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
+		Map<String, UserInfoWrapper> userInfoByUserId = (Map<String, UserInfoWrapper>) cacheObject;
+
+		return userInfoByUserId?.get(userId)?.profileName;
+	}
+
+	public static String getRoleId(String userId) {
+		if (String.isBlank(userId)) return null;
+
+		CacheUtils cacheUtil = new CacheUtils(corg.Name);
+		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
+		Map<String, UserInfoWrapper> userInfoByUserId = (Map<String, UserInfoWrapper>) cacheObject;
+
+		return userInfoByUserId?.get(userId)?.roleId;
+	}
+
+	public static String getRoleName(String userId) {
+		if (String.isBlank(userId)) return null;
+
+		CacheUtils cacheUtil = new CacheUtils(corg.Name);
+		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
+		Map<String, UserInfoWrapper> userInfoByUserId = (Map<String, UserInfoWrapper>) cacheObject;
+
+		return userInfoByUserId?.get(userId)?.roleName;
+	}
+
+	public static String getSalesforceLicenseTypeName(String userId) {
+		if (String.isBlank(userId)) return null;
+
+		CacheUtils cacheUtil = new CacheUtils(corg.Name);
+		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
+		Map<String, UserInfoWrapper> userInfoByUserId = (Map<String, UserInfoWrapper>) cacheObject;
+
+		return userInfoByUserId?.get(userId)?.licenseTypeName;
 	}
 
 	public static List<User> getUserNameFromOrg(Connected_Org__c corg, String userId) {
@@ -1116,6 +1225,26 @@ public with sharing class LogPostProcessingService {
 
 	public class ApexClassWrapper {
 		public String Name;
+	}
+
+	private class UserInfoWrapper {
+		private String userId;
+		private String userFullName;
+		private String profileId;
+		private String profileName;
+		private String roleId;
+		private String roleName;
+		private String licenseTypeName;
+
+		private UserInfoWrapper(User user) {
+			this.userId = user.Id;
+			this.userFullName = user.Name;
+			this.profileId = user.ProfileId;
+			this.profileName = user.Profile.Name;
+			this.roleId = user.UserRoleId;
+			this.roleName = user.UserRole.Name;
+			this.licenseTypeName = user.Profile.UserLicense.Name;
+		}
 	}
 
 	public class LogPostProcessingServiceException extends Exception {}
