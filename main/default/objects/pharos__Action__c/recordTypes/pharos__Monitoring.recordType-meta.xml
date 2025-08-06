@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>pharos__Monitoring</fullName>
+    <active>true</active>
+    <label>Monitoring</label>
+    <picklistValues>
+        <picklist>pharos__PagerDuty_Type__c</picklist>
+        <values>
+            <fullName>Event</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Incident</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>pharos__Subtype__c</picklist>
+        <values>
+            <fullName>Default</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Notification</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>pharos__Type__c</picklist>
+        <values>
+            <fullName>Email Notification</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Jira Notification</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>PagerDuty Notification</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Slack Notification</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Teams Notification</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+</RecordType>
