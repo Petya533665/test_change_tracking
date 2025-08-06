@@ -2,7 +2,6 @@
     <base href="/apex/LogList"/>
     
     <apex:stylesheet value="{!URLFOR($Resource.libs, '/libs/syncfusion-material.css')}"/>
-    <apex:stylesheet value="{!URLFOR($Resource.pharos_ds, '/pharos_ds/styles/slds252.min.css')}"/>
     
     <script>
         window.APP_CONFIG = {
