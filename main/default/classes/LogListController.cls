@@ -41,7 +41,7 @@ public with sharing class LogListController {
 			methodName = method;
 			Object data = request.get('data');
 			if (method == 'getLogs') {
-				response.data = getLogs();
+				response.data = getLogs(data);
 			} else if (method == 'getLogsPerPeriodByCategory') {
 				response.data = getLogsPerPeriodByCategory(data);
 			} else {
@@ -86,10 +86,27 @@ public with sharing class LogListController {
 		}
 	}
 
-	public static List<LogElement> getLogs() {
+	public static List<LogElement> getLogs(Object data) {
+		Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
+		String fromDatetime = (input.get('from') != null) ? (String)input.get('from') : null;
+		String toDatetime = (input.get('to') != null) ? (String)input.get('to') : null;
+		
+		// Set default date range (last 30 days) if not provided
+		DateTime startDateTime = DateTime.now().addDays(-30);
+		DateTime endDateTime = DateTime.now();
+		
+		// Parse provided dates if available
+		if (String.isNotBlank(fromDatetime)) {
+			startDateTime = DateTime.valueOf(fromDatetime);
+		}
+		if (String.isNotBlank(toDatetime)) {
+			endDateTime = DateTime.valueOf(toDatetime);
+		}
+		
 		List<Log__c> logs = [
 			SELECT Id, Name, Category__c, Type__c, Summary__c, Is_New__c, Created_At__c
 			FROM Log__c
+			WHERE Created_At__c >= :startDateTime AND Created_At__c <= :endDateTime
 			ORDER BY Name DESC 
 			LIMIT 20
 		];
