@@ -795,7 +795,7 @@ public without sharing class PermissionsUtil {
 			if(DebugJiraRefreshTokensEnabled == null) {
 				DebugJiraRefreshTokensEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_DEBUG_JIRA_REFRESH_TOKENS_ENABLED));
 			}
-			return DebugJiraRefreshTokensEnabled;
+			return false;
 		}
 		private set;
 	}
