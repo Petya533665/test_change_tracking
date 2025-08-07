@@ -8,6 +8,8 @@ public with sharing class LogListController {
 	}
 
 	private static final Integer DEFAULT_LOGS_QUERY_LIMIT = 100;
+	private static final Integer MAX_QUERY_LIMIT = 5000;
+	private static final Integer LOG_PERIODS_AMOUNT = 30;
 
     public LogListController() {
         String isDevParam = ApexPages.currentPage().getParameters().get('dev');
@@ -94,11 +96,11 @@ public with sharing class LogListController {
 		String toDatetime = (input.get('to') != null) ? (String)input.get('to') : null;
 		Integer queryLimit = (input.get('limit') != null) ? (Integer)input.get('limit') : DEFAULT_LOGS_QUERY_LIMIT;
 		String lastId = (input.get('lastId') != null) ? (String)input.get('lastId') : null;
-
+		
 		// Set default date range (last 30 days) if not provided
 		DateTime startDateTime = DateTime.now().addDays(-30);
 		DateTime endDateTime = DateTime.now();
-
+		
 		// Parse provided dates if available
 		if (String.isNotBlank(fromDatetime)) {
 			startDateTime = DateTime.valueOf(fromDatetime);
@@ -106,18 +108,18 @@ public with sharing class LogListController {
 		if (String.isNotBlank(toDatetime)) {
 			endDateTime = DateTime.valueOf(toDatetime);
 		}
-
+		
 		String query = 'SELECT Id, Name, Category__c, Type__c, Summary__c, Is_New__c, Created_At__c ' +
 					   'FROM Log__c ' +
 					   'WHERE Created_At__c >= :startDateTime AND Created_At__c <= :endDateTime ';
-
+		
 		// Add pagination condition if lastId is provided
 		if (String.isNotBlank(lastId)) {
 			query += 'AND Id > :lastId ';
 		}
-
-		query += 'ORDER BY Id ASC LIMIT :queryLimit';
-
+		
+		query += 'ORDER BY Id DESC LIMIT :queryLimit';
+		
 		List<Log__c> logs = Database.query(query);
 
 		List<LogElement> logElements = new List<LogElement>();
@@ -141,11 +143,11 @@ public with sharing class LogListController {
 		Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
 		String fromDatetime = (input.get('from') != null) ? (String)input.get('from') : null;
 		String toDatetime = (input.get('to') != null) ? (String)input.get('to') : null;
-
+		
 		// Set default date range (last 30 days) if not provided
 		DateTime startDateTime = DateTime.now().addDays(-30);
 		DateTime endDateTime = DateTime.now();
-
+		
 		// Parse provided dates if available
 		if (String.isNotBlank(fromDatetime)) {
 			startDateTime = DateTime.valueOf(fromDatetime);
@@ -153,51 +155,81 @@ public with sharing class LogListController {
 		if (String.isNotBlank(toDatetime)) {
 			endDateTime = DateTime.valueOf(toDatetime);
 		}
-
-		//TODO: handle more than 5000 logs, maybe use count and group by?
-		List<Log__c> logs = [
-			SELECT Id, Category__c, Created_At__c
-			FROM Log__c
-			WHERE Created_At__c >= :startDateTime AND Created_At__c <= :endDateTime
-			ORDER BY Created_At__c DESC
-		];
-
+		
 		// Calculate time period duration
 		Long totalMillis = endDateTime.getTime() - startDateTime.getTime();
-		Long periodMillis = totalMillis / 30;
-
+		Long periodMillis = totalMillis / LOG_PERIODS_AMOUNT;
+		
 		Map<String, LogsPerPeriodData> logsPerPeriodMap = new Map<String, LogsPerPeriodData>();
-
-		for (Log__c log : logs) {
-			if (log.Created_At__c == null) continue;
-
-			// Calculate which period this log belongs to
-			Long logMillis = log.Created_At__c.getTime() - startDateTime.getTime();
-			Integer periodIndex = (Integer)(logMillis / periodMillis);
-			if (periodIndex >= 30) periodIndex = 29; // Ensure we don't exceed 30 periods
-
-			// Create period key
-			DateTime periodStart = startDateTime.addSeconds((Integer)((periodIndex * periodMillis) / 1000));
+		
+		// Initialize all 30 periods
+		for (Integer i = 0; i < LOG_PERIODS_AMOUNT; i++) {
+			DateTime periodStart = startDateTime.addSeconds((Integer)((i * periodMillis) / 1000));
 			String periodKey = String.valueOf(periodStart);
-
-			String category = log.Category__c != null ? log.Category__c : 'Uncategorized';
-
-			if (!logsPerPeriodMap.containsKey(periodKey)) {
-				logsPerPeriodMap.put(periodKey, new LogsPerPeriodData(periodKey));
+			logsPerPeriodMap.put(periodKey, new LogsPerPeriodData(periodKey));
+		}
+		
+		// Process logs in batches to handle more than 5000 records
+		// Alternative approach: Use aggregate queries with COUNT and GROUP BY
+		// This would be more efficient but requires pre-calculating time periods
+		String lastId = null;
+		Boolean hasMoreRecords = true;
+		
+		while (hasMoreRecords) {
+			String query = 'SELECT Id, Category__c, Created_At__c FROM Log__c ' +
+						  'WHERE Created_At__c >= :startDateTime AND Created_At__c <= :endDateTime ';
+			
+			if (lastId != null) {
+				query += 'AND Id > :lastId ';
 			}
-
-			LogsPerPeriodData periodData = logsPerPeriodMap.get(periodKey);
-
-			if (periodData.categoryCounts.containsKey(category)) {
-				periodData.categoryCounts.put(category, periodData.categoryCounts.get(category) + 1);
+			
+			query += 'ORDER BY Id LIMIT ' + MAX_QUERY_LIMIT;
+			
+			List<Log__c> logsBatch = Database.query(query);
+			
+			// Process this batch
+			for (Log__c log : logsBatch) {
+				// Calculate which period this log belongs to
+				Long logMillis = log.Created_At__c.getTime() - startDateTime.getTime();
+				Integer periodIndex = (Integer)(logMillis / periodMillis);
+				if (periodIndex >= LOG_PERIODS_AMOUNT) periodIndex = LOG_PERIODS_AMOUNT - 1; // Ensure we don't exceed LOG_PERIODS_AMOUNT periods
+				if (periodIndex < 0) continue;
+				
+				// Create period key
+				DateTime periodStart = startDateTime.addSeconds((Integer)((periodIndex * periodMillis) / 1000));
+				String periodKey = String.valueOf(periodStart);
+				
+				String category = log.Category__c != null ? log.Category__c : 'Uncategorized';
+				
+				if (logsPerPeriodMap.containsKey(periodKey)) {
+					LogsPerPeriodData periodData = logsPerPeriodMap.get(periodKey);
+					
+					if (periodData.categoryCounts.containsKey(category)) {
+						periodData.categoryCounts.put(category, periodData.categoryCounts.get(category) + 1);
+					} else {
+						periodData.categoryCounts.put(category, 1);
+					}
+				}
+			}
+			
+			// Check if we have more records to process
+			if (logsBatch.size() < MAX_QUERY_LIMIT) {
+				hasMoreRecords = false;
 			} else {
-				periodData.categoryCounts.put(category, 1);
+				lastId = logsBatch[logsBatch.size() - 1].Id;
 			}
 		}
-
-		List<LogsPerPeriodData> result = new List<LogsPerPeriodData>(logsPerPeriodMap.values());
+		
+		// Filter out periods with empty categoryCounts
+		List<LogsPerPeriodData> result = new List<LogsPerPeriodData>();
+		for (LogsPerPeriodData periodData : logsPerPeriodMap.values()) {
+			if (!periodData.categoryCounts.isEmpty()) {
+				result.add(periodData);
+			}
+		}
+		
 		result.sort(new LogsPerPeriodDataComparator());
-
+		
 		return result;
 	}
 
