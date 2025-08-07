@@ -69,7 +69,7 @@ public with sharing class PharosChatController {
             );
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'getNamespaceStatus');
-            return new NamespaceStatusResponse(false, false);
+            return new NamespaceStatusResponse(true, false);
         }
     }
 

@@ -74,12 +74,25 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
     }
 
     public static void processEmail(List<Inbound_Email__c> inboundEmails) {
-        processEmail(inboundEmails, null, null, null, null);
+        processEmail(inboundEmails, null, null, null, null, false);
     }
     public static void processEmail(List<Inbound_Email__c> inboundEmails, String incomeOrganizationId) {
-        processEmail(inboundEmails, incomeOrganizationId, null, null, null);
+        processEmail(inboundEmails, incomeOrganizationId, null, null, null, false);
     }
-    public static void processEmail(List<Inbound_Email__c> inboundEmails, String incomeOrganizationId, DateTime createdAtDateTime, Messaging.inboundEmail email, FlowService.FlowErrorAbbreviateResult abbreviateResult) {
+    public static void processEmail(List<Inbound_Email__c> inboundEmails,
+                                    String incomeOrganizationId,
+                                    DateTime createdAtDateTime,
+                                    Messaging.inboundEmail email,
+                                    FlowService.FlowErrorAbbreviateResult abbreviateResult) {
+        processEmail(inboundEmails, incomeOrganizationId, createdAtDateTime, email, abbreviateResult, false);
+    }
+    public static void processEmail(List<Inbound_Email__c> inboundEmails,
+                                    String incomeOrganizationId,
+                                    DateTime createdAtDateTime,
+                                    Messaging.inboundEmail email,
+                                    FlowService.FlowErrorAbbreviateResult abbreviateResult,
+                                    Boolean isRoutedFromPassthroughMode) {
+                                       
         Inbound_Email__c inboundEmail = inboundEmails.get(0);
 
         List<Log__c> logsToAsyncJob = new List<Log__c>();
@@ -108,7 +121,7 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                             }
                             // process large stacktrace
                             // and all flow error to determinate fault path and skip create logs if this error is fault path
-                            else if (!isLogRoutedFromPassthroughMode(log) 
+                            else if (!isRoutedFromPassthroughMode
                                 && (log?.Stacktrace__c?.length() > ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD
                                     || log.Category__c == FlowExceptionParser.FLOW_CATEGORY)) {
                                 
@@ -132,7 +145,7 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                         }
                         // process large stacktrace
                         // and all flow error to determinate fault path and skip create logs if this error is fault path
-                        else if (!isLogRoutedFromPassthroughMode(log) 
+                        else if (!isRoutedFromPassthroughMode 
                             && (log?.Stacktrace__c?.length() > ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD
                                 || log.Category__c == FlowExceptionParser.FLOW_CATEGORY)) {
 
@@ -236,16 +249,6 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
         createInboundEmailInternalLog(email, upsertUtilResult?.upsertResults, loggerInstance);
         createInternalLog(fullErrorMessage, inboundEmail, loggerInstance);
         loggerInstance?.flush();
-    }
-
-    /**
-     * for Passthrough Mode, if the log is routed from passthrough mode,
-     * Post processing will be skipped to avoid System.CalloutException: Callout loop not allowed.
-     * Salesforce A  ----Callout----> Salesforce B  ----Callout----> Webservice (Error happened here)
-     * Post processing logic will be executed in regular async job (LogPostProcessingBatch).
-     */
-    public static Boolean isLogRoutedFromPassthroughMode(Log__c log) {
-        return (log?.Originated_From__c == ConfigUtil.ORIGINATED_FROM_PASSTHROUGH);
     }
 
     public static void createStacktraceParseResultCV(Map<String, String> dataByLogId, Logger logger) {
