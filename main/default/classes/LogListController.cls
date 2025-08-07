@@ -7,7 +7,7 @@ public with sharing class LogListController {
 		set;
 	}
 
-	private static final Integer QUERY_LIMIT = 50;
+	private static final Integer DEFAULT_LOGS_QUERY_LIMIT = 100;
 
     public LogListController() {
         String isDevParam = ApexPages.currentPage().getParameters().get('dev');
@@ -92,6 +92,7 @@ public with sharing class LogListController {
 		Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
 		String fromDatetime = (input.get('from') != null) ? (String)input.get('from') : null;
 		String toDatetime = (input.get('to') != null) ? (String)input.get('to') : null;
+		Integer queryLimit = (input.get('limit') != null) ? (Integer)input.get('limit') : DEFAULT_LOGS_QUERY_LIMIT;
 		String lastId = (input.get('lastId') != null) ? (String)input.get('lastId') : null;
 		
 		// Set default date range (last 30 days) if not provided
@@ -115,7 +116,7 @@ public with sharing class LogListController {
 			query += 'AND Id > :lastId ';
 		}
 		
-		query += 'ORDER BY Id ASC LIMIT :QUERY_LIMIT';
+		query += 'ORDER BY Id ASC LIMIT :queryLimit';
 		
 		List<Log__c> logs = Database.query(query);
 
