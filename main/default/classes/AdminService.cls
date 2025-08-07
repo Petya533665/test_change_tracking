@@ -134,7 +134,6 @@ public without sharing class AdminService {
 
             Schema.SObjectField sfd = fieldsMap.get(sobjectFieldName);
             Schema.DescribeFieldResult dfr = sfd.getDescribe();
-            if(!dfr.isAccessible()) continue;
             if(isStandardPreferencesField(dfr)) continue;
             String label = ((parent != null) ? (parent.getLabel() + ' -> ') : '') + dfr.getLabel();
             String localName = (parent != null) ? (parent.getRelationshipName() + '.' + dfr.getName()) : dfr.getName();
@@ -173,13 +172,9 @@ public without sharing class AdminService {
         mergeFields.addAll(addCustomMergeFields(traceResultDsR, 'traceResult'));
         mergeFields.addAll(getSobjectFields(traceResultDsR, 'traceResult'));
 
-        mergeFields.addAll(ChartService.getChartsFields());
-
         mergeFields.sort();
         return mergeFields;
     }
-
-
 
     public class MergeField implements Comparable{
         public String label;
@@ -807,9 +802,8 @@ public without sharing class AdminService {
             }
 
             try {
-                ApexEmailNotification apexEmailNotification = !apexEmailNotifications.isEmpty() ? apexEmailNotifications.get(0) : null;
                 String errorEmailServiceAddress = getPackageEmailServiceFunctionEmailAddress();
-                upsertApexEmailNotification(errorEmailServiceAddress, apexEmailNotification);
+                upsertApexEmailNotification(errorEmailServiceAddress, apexEmailNotifications.get(0));
             }
             catch(Exception e) {
                 throw new AdminServiceException(e);
@@ -1803,11 +1797,10 @@ public without sharing class AdminService {
         Map<String,Schema.SObjectField> mfields = logType.getDescribe().fields.getMap();
         List<String> fieldKeys = (new List<String>(mfields.keySet()));
         for (String k : fieldKeys) {
-            Schema.DescribeFieldResult dsr = mfields.get(k).getDescribe();
-            if(dsr.isAccessible() && !FILTERS_EXCLUDE_LOG_FIELDS.contains(k.toLowerCase())) {
+            if(!FILTERS_EXCLUDE_LOG_FIELDS.contains(k.toLowerCase())) {
                 result.add(new Map<String, String>{
-                    ConfigUtil.PICKLIST_KEY_VALUE => dsr.getName(),
-                    ConfigUtil.PICKLIST_KEY_LABEL => dsr.getLabel()
+                    ConfigUtil.PICKLIST_KEY_VALUE => mfields.get(k).getDescribe().getName(),
+                    ConfigUtil.PICKLIST_KEY_LABEL => mfields.get(k).getDescribe().getLabel()
                 });
             }
         }
@@ -1822,13 +1815,10 @@ public without sharing class AdminService {
         Map<String,Schema.SObjectField> mfields = issueType.getDescribe().fields.getMap();
         List<String> fieldKeys = (new List<String>(mfields.keySet()));
         for (String k : fieldKeys) {
-            Schema.DescribeFieldResult dsr = mfields.get(k).getDescribe();
-            if(dsr.isAccessible()) {
-                result.add(new Map<String, String> {
-                    ConfigUtil.PICKLIST_KEY_VALUE => dsr.getName(),
-                    ConfigUtil.PICKLIST_KEY_LABEL => dsr.getLabel()
-                });
-            }
+            result.add(new Map<String, String>{
+                ConfigUtil.PICKLIST_KEY_VALUE => mfields.get(k).getDescribe().getName(),
+                ConfigUtil.PICKLIST_KEY_LABEL => mfields.get(k).getDescribe().getLabel()
+            });
         }
 
         return result;
@@ -3854,13 +3844,16 @@ public without sharing class AdminService {
 
     public static MetadataChatSettings getMetadataChatSettings() {
         Map<String, MetadataServiceUtil.CspTrustedSiteWrapper> trustedSites = MetadataServiceUtil.getCspTrustedSitesMap();
-        Boolean trustedSiteReady = trustedSites.containsKey(PharosChatController.CHAT_WEBSOCKET_URL);
+        Boolean trustedSiteReady = trustedSites.containsKey('wss://chat.pharos.ai');
         
         String orgId = UserInfo.getOrganizationId();
         String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
         Boolean openAiConfigured = ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c && String.isNotBlank(openAiKey) && OpenAI.validateToken(openAiKey);
         Boolean gitConfigured = GitHubUtils.validateGitHubConnection().gitValid;
         
+        if (!Test.isRunningTest()) {
+            upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.AI_NAME, Constants.REMOTE_SITE_SETTINGS.AI_URL, Constants.REMOTE_SITE_SETTINGS.AI_DESCRIPTION);
+        }
         PharosChatController.NamespaceStatusResponse namespaceStatus = PharosChatController.getNamespaceStatus(orgId);
         Boolean codebaseIndexed = !namespaceStatus.empty;
         Boolean indexingInProgress = namespaceStatus.indexingInProgress;
@@ -3869,7 +3862,7 @@ public without sharing class AdminService {
     }
 
     public static MetadataChatSettings setupMetadataChatTrustedSite() {
-        MetadataServiceUtil.upsertCspTrustedSite('Pharos_Chat_Websocket', PharosChatController.CHAT_WEBSOCKET_URL, 'Pharos chat websocket connection');
+        MetadataServiceUtil.upsertCspTrustedSite('Pharos_Chat_Websocket', 'wss://chat.pharos.ai', 'Pharos chat websocket connection');
         return new MetadataChatSettings(true);
     }
 }
