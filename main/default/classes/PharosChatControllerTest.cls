@@ -37,12 +37,19 @@ public class PharosChatControllerTest {
             '{"records": [{"Id": "test-id", "IsActive": true, "DeveloperName": "Pharos_Chat_Websocket", "EndpointUrl": "' + PharosChatController.CHAT_WEBSOCKET_URL + '"}]}'
         );
 
+        TestDataFactory.SingleRequestMock remoteSiteSettingsMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            '{"records": [{"Id": "test-id", "IsActive": true, "SiteName": "' + Constants.REMOTE_SITE_SETTINGS.AI_NAME + '"  , "EndpointUrl": "' + Constants.REMOTE_SITE_SETTINGS.AI_URL + '"}]}'
+        );
+
         return new Map<String, HttpCalloutMock>{
             ConfigUtil.OPEN_AI_USAGE_ENDPOINT => openAiValidationMock,
             GIT_ENDPOINT => gitValidationMock,
             PharosChatController.CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + UserInfo.getOrganizationId() => namespaceStatusMock,
             PharosChatController.CHAT_INIT_ENDPOINT => chatInitMock,
-            ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_CSP_TRUSTED_SITES_QUERY => cspTrustedSitesMock
+            ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_CSP_TRUSTED_SITES_QUERY => cspTrustedSitesMock,
+            ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_REMOTE_SITE_SETTINGS_QUERY => remoteSiteSettingsMock
         };
     }
 
