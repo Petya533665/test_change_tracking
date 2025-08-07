@@ -7,6 +7,8 @@ public with sharing class LogListController {
 		set;
 	}
 
+	private static final Integer QUERY_LIMIT = 50;
+
     public LogListController() {
         String isDevParam = ApexPages.currentPage().getParameters().get('dev');
         if (String.isNotBlank(isDevParam)) {
@@ -90,6 +92,7 @@ public with sharing class LogListController {
 		Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
 		String fromDatetime = (input.get('from') != null) ? (String)input.get('from') : null;
 		String toDatetime = (input.get('to') != null) ? (String)input.get('to') : null;
+		String lastId = (input.get('lastId') != null) ? (String)input.get('lastId') : null;
 		
 		// Set default date range (last 30 days) if not provided
 		DateTime startDateTime = DateTime.now().addDays(-30);
@@ -103,13 +106,18 @@ public with sharing class LogListController {
 			endDateTime = DateTime.valueOf(toDatetime);
 		}
 		
-		List<Log__c> logs = [
-			SELECT Id, Name, Category__c, Type__c, Summary__c, Is_New__c, Created_At__c
-			FROM Log__c
-			WHERE Created_At__c >= :startDateTime AND Created_At__c <= :endDateTime
-			ORDER BY Name DESC 
-			LIMIT 20
-		];
+		String query = 'SELECT Id, Name, Category__c, Type__c, Summary__c, Is_New__c, Created_At__c ' +
+					   'FROM Log__c ' +
+					   'WHERE Created_At__c >= :startDateTime AND Created_At__c <= :endDateTime ';
+		
+		// Add pagination condition if lastId is provided
+		if (String.isNotBlank(lastId)) {
+			query += 'AND Id > :lastId ';
+		}
+		
+		query += 'ORDER BY Id ASC LIMIT :QUERY_LIMIT';
+		
+		List<Log__c> logs = Database.query(query);
 
 		List<LogElement> logElements = new List<LogElement>();
 		for (Log__c log : logs) {
@@ -145,6 +153,7 @@ public with sharing class LogListController {
 			endDateTime = DateTime.valueOf(toDatetime);
 		}
 		
+		//TODO: handle more than 5000 logs, maybe use count and group by?
 		List<Log__c> logs = [
 			SELECT Id, Category__c, Created_At__c
 			FROM Log__c
