@@ -129,6 +129,21 @@ public with sharing class LogListController {
 		return logElements;
 	}
 
+	public class LogChartDataResponse {
+		public List<LogChartDataMetric> metrics;
+		public List<LogsPerPeriodData> chartData;
+	}
+
+	public class LogChartDataMetric {
+		public String name;
+		public Integer value;
+
+		public LogChartDataMetric(String name, Integer value) {
+			this.name = name;
+			this.value = value;
+		}
+	}
+
 	public class LogsPerPeriodData {
 		public String timePoint;
 		public Map<String, Integer> categoryCounts;
@@ -139,7 +154,7 @@ public with sharing class LogListController {
 		}
 	}
 
-	public static List<LogsPerPeriodData> getLogsPerPeriodByCategory(Object data) {
+	public static LogChartDataResponse getLogsPerPeriodByCategory(Object data) {
 		Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
 		String fromDatetime = (input.get('from') != null) ? (String)input.get('from') : null;
 		String toDatetime = (input.get('to') != null) ? (String)input.get('to') : null;
@@ -174,9 +189,16 @@ public with sharing class LogListController {
 		// This would be more efficient but requires pre-calculating time periods
 		String lastId = null;
 		Boolean hasMoreRecords = true;
-		
+
+		// Initialize metrics
+		Integer total = 0;
+		Integer isNew = 0;
+		Integer userImpact = 0;
+		Integer objectImpact = 0;
+		Integer issues = 0;
+		Integer isParent = 0;
 		while (hasMoreRecords) {
-			String query = 'SELECT Id, Category__c, Created_At__c FROM Log__c ' +
+			String query = 'SELECT Id, Category__c, Created_At__c, Is_New__c, Is_Parent__c, User_Id__c, Related_Object_Type__c, Related_Id__c, Issue__c FROM Log__c ' +
 						  'WHERE Created_At__c >= :startDateTime AND Created_At__c <= :endDateTime ';
 			
 			if (lastId != null) {
@@ -187,6 +209,26 @@ public with sharing class LogListController {
 			
 			List<Log__c> logsBatch = Database.query(query);
 			
+			// Count metrics
+			total += logsBatch.size();
+			for (Log__c log : logsBatch) {
+				if (log.Is_New__c == true) {
+					isNew++;
+				}
+				if (log.Is_Parent__c == true) {
+					isParent++;
+				}
+				if (String.isNotBlank(log.User_Id__c)) {
+					userImpact++;
+				}
+				if (String.isNotBlank(log.Related_Object_Type__c) && String.isNotBlank(log.Related_Id__c)) {
+					objectImpact++;
+				}
+				if (String.isNotBlank(log.Issue__c)) {
+					issues++;
+				}
+			}
+
 			// Process this batch
 			for (Log__c log : logsBatch) {
 				// Calculate which period this log belongs to
@@ -221,16 +263,27 @@ public with sharing class LogListController {
 		}
 		
 		// Filter out periods with empty categoryCounts
-		List<LogsPerPeriodData> result = new List<LogsPerPeriodData>();
+		List<LogsPerPeriodData> chartData = new List<LogsPerPeriodData>();
 		for (LogsPerPeriodData periodData : logsPerPeriodMap.values()) {
 			if (!periodData.categoryCounts.isEmpty()) {
-				result.add(periodData);
+				chartData.add(periodData);
 			}
 		}
 		
-		result.sort(new LogsPerPeriodDataComparator());
-		
-		return result;
+		chartData.sort(new LogsPerPeriodDataComparator());
+
+		List<LogChartDataMetric> metrics = new List<LogChartDataMetric>();
+		metrics.add(new LogChartDataMetric('Total', total));
+		metrics.add(new LogChartDataMetric('Is New', isNew));
+		metrics.add(new LogChartDataMetric('User Impact', userImpact));
+		metrics.add(new LogChartDataMetric('Object Impact', objectImpact));
+		metrics.add(new LogChartDataMetric('Issues', issues));
+		metrics.add(new LogChartDataMetric('Is Parent', isParent));
+
+		LogChartDataResponse response = new LogChartDataResponse();
+		response.chartData = chartData;
+		response.metrics = metrics;
+		return response;
 	}
 
 	public class LogsPerPeriodDataComparator implements Comparator<LogsPerPeriodData> {
