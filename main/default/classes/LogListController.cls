@@ -10,6 +10,7 @@ public with sharing class LogListController {
 	private static final Integer DEFAULT_LOGS_QUERY_LIMIT = 100;
 	private static final Integer MAX_QUERY_LIMIT = 5000;
 	private static final Integer LOG_PERIODS_AMOUNT = 30;
+	private static final String DEFAULT_LOGS_SORT = 'Id DESC';
 
     public LogListController() {
         String isDevParam = ApexPages.currentPage().getParameters().get('dev');
@@ -90,12 +91,27 @@ public with sharing class LogListController {
 		}
 	}
 
+	private static String mapLogElementToLogField(String field) {
+		Map<String, String> fieldMapping = new Map<String, String>{
+			'id' => 'Id',
+			'name' => 'Name',
+			'category' => 'Category__c',
+			'type' => 'Type__c',
+			'summary' => 'Summary__c',
+			'isNew' => 'Is_New__c',
+			'createdAt' => 'Created_At__c'
+		};
+		
+		return fieldMapping.containsKey(field) ? fieldMapping.get(field) : field;
+	}
+
 	public static List<LogElement> getLogs(Object data) {
 		Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
 		String fromDatetime = (input.get('from') != null) ? (String)input.get('from') : null;
 		String toDatetime = (input.get('to') != null) ? (String)input.get('to') : null;
 		Integer queryLimit = (input.get('limit') != null) ? (Integer)input.get('limit') : DEFAULT_LOGS_QUERY_LIMIT;
 		String lastId = (input.get('lastId') != null) ? (String)input.get('lastId') : null;
+		String sortStr = (input.get('sort') != null) ? (String)input.get('sort') : DEFAULT_LOGS_SORT;
 		
 		// Set default date range (last 30 days) if not provided
 		DateTime startDateTime = DateTime.now().addDays(-30);
@@ -118,7 +134,8 @@ public with sharing class LogListController {
 			query += 'AND Id < :lastId ';
 		}
 		
-		query += 'ORDER BY Id DESC LIMIT :queryLimit';
+		String mappedSort = mapLogElementToLogField(sortStr.split(',')[0]) + ' ' + sortStr.split(',')[1];
+		query += 'ORDER BY ' + mappedSort + ' LIMIT :queryLimit';
 		
 		List<Log__c> logs = Database.query(query);
 
