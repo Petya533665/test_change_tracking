@@ -115,7 +115,7 @@ public with sharing class LogListController {
 		
 		// Add pagination condition if lastId is provided
 		if (String.isNotBlank(lastId)) {
-			query += 'AND Id > :lastId ';
+			query += 'AND Id < :lastId ';
 		}
 		
 		query += 'ORDER BY Id DESC LIMIT :queryLimit';
