@@ -398,6 +398,10 @@ public with sharing class AdminController {
                 response.data = AdminService.getMetadataChatSettings();
             } else if (method.equals('setupMetadataChatTrustedSite')) {
                 response.data = AdminService.setupMetadataChatTrustedSite();
+            } else if (method.equals('getAutoChartSetting')) {
+                response.data = AutoChartController.getAutoChartSetting();
+            } else if (method.equals('setAutoChartSetting')) {
+                response.data = AutoChartController.updateAutoChartSetting((String)request.get('data'));
             } else {
                 response.error = 'Action not found';
             }

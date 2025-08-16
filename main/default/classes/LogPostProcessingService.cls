@@ -280,14 +280,7 @@ public with sharing class LogPostProcessingService {
 			}
 			if (corg != null) {
 				LogPostProcessingService.PostProcessingSettings logSettings = new LogPostProcessingService.PostProcessingSettings(log.Post_Processing_Settings__c);
-				if (logSettings.isEnabled(USER_INFO_KEY)) {
-					fillUserName(log, logger);
-					fillProfileId(log, logger);
-					fillProfileName(log, logger);
-					fillRoleId(log, logger);
-					fillRoleName(log, logger);
-					fillSalesforceLicenseTypeName(log, logger);
-				}
+				if (logSettings.isEnabled(USER_INFO_KEY)) fillUserInfo(log, logger);
 				if (logSettings.isEnabled(OBJECT_INFO_KEY)) fillArea(log, logger);
 				if (logSettings.isEnabled(RELATED_OBJECTS_KEY)) fillRelateObjectType(log, logger);
 				if (logSettings.isEnabled(RELATED_OBJECTS_KEY)) fillRelatedObjects(log, logger);
@@ -484,63 +477,21 @@ public with sharing class LogPostProcessingService {
 		}
 	}
 
-	public static void fillUserName(Log__c log, Logger logger) {
+	public static void fillUserInfo(Log__c log, Logger logger) {
 		try {
-			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.User_Name__c, getUserName(log.User_Id__c));
+			UserInfoWrapper userInfoWrapper = getUserInfo(log.User_Id__c);
+			if (userInfoWrapper != null) {
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.User_Name__c, userInfoWrapper.userFullName);
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Profile_Id__c, userInfoWrapper.profileId);
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Profile_Name__c, userInfoWrapper.profileName);
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Role_Id__c, userInfoWrapper.roleId);
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Role_Name__c, userInfoWrapper.roleName);
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Salesforce_License_Type_Name__c, userInfoWrapper.licenseTypeName);
+			}
 		}
 		catch (Exception e) {
 			result.addError(e);
-			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getUserName');
-		}
-	}
-
-	public static void fillProfileId(Log__c log, Logger logger) {
-		try {
-			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Profile_Id__c, getProfileId(log.User_Id__c));
-		}
-		catch (Exception e) {
-			result.addError(e);
-			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getProfileId');
-		}
-	}
-
-	public static void fillProfileName(Log__c log, Logger logger) {
-		try {
-			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Profile_Name__c, getProfileName(log.User_Id__c));
-		}
-		catch (Exception e) {
-			result.addError(e);
-			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getProfileName');
-		}
-	}
-
-	public static void fillRoleId(Log__c log, Logger logger) {
-		try {
-			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Role_Id__c, getRoleId(log.User_Id__c));
-		}
-		catch (Exception e) {
-			result.addError(e);
-			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getRoleId');
-		}
-	}
-
-	public static void fillRoleName(Log__c log, Logger logger) {
-		try {
-			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Role_Name__c, getRoleName(log.User_Id__c));
-		}
-		catch (Exception e) {
-			result.addError(e);
-			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getRoleName');
-		}
-	}
-
-	public static void fillSalesforceLicenseTypeName(Log__c log, Logger logger) {
-		try {
-			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Salesforce_License_Type_Name__c, getSalesforceLicenseTypeName(log.User_Id__c));
-		}
-		catch (Exception e) {
-			result.addError(e);
-			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getSalesforceLicenseTypeName');
+			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getUserInfo');
 		}
 	}
 
@@ -753,75 +704,24 @@ public with sharing class LogPostProcessingService {
 		public List<SObjectDescribeInfo> sobjects;
 	}
 
-	public static String getUserName(String userId) {
-		String userName = null;
-		if (String.isBlank(userId)) return userName;
+	public static UserInfoWrapper getUserInfo(String userId) {
+		UserInfoWrapper userInfoWrapper;
+		if (String.isBlank(userId)) return userInfoWrapper;
 		CacheUtils cacheUtil = new CacheUtils(corg.Name);
 		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
 		Map<String, UserInfoWrapper> userInfoByUserId = cacheObject != null ? (Map<String, UserInfoWrapper>)cacheObject : new Map<String, UserInfoWrapper>();
 		if (userInfoByUserId.containsKey(userId)) {
-			userName = userInfoByUserId.get(userId).userFullName;
+			userInfoWrapper = userInfoByUserId.get(userId);
 		} else {
 			List<User> users = getUserNameFromOrg(corg, userId);
 			if (users != null && users.size() == 1) {
-				UserInfoWrapper userInfoWrapper = new UserInfoWrapper(users.get(0));
-				userName = userInfoWrapper.userFullName;
+				userInfoWrapper = new UserInfoWrapper(users.get(0));
 				userInfoByUserId.put(userId, userInfoWrapper);
 				cacheUtil.putValue(CacheUtils.KEY_REQUEST_USER_INFO, userInfoByUserId);
 			}
 		}
 
-		return userName;
-	}
-
-	public static String getProfileId(String userId) {
-		if (String.isBlank(userId)) return null;
-
-		CacheUtils cacheUtil = new CacheUtils(corg.Name);
-		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
-		Map<String, UserInfoWrapper> userInfoByUserId = (Map<String, UserInfoWrapper>) cacheObject;
-
-		return userInfoByUserId?.get(userId)?.profileId;
-	}
-
-	public static String getProfileName(String userId) {
-		if (String.isBlank(userId)) return null;
-
-		CacheUtils cacheUtil = new CacheUtils(corg.Name);
-		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
-		Map<String, UserInfoWrapper> userInfoByUserId = (Map<String, UserInfoWrapper>) cacheObject;
-
-		return userInfoByUserId?.get(userId)?.profileName;
-	}
-
-	public static String getRoleId(String userId) {
-		if (String.isBlank(userId)) return null;
-
-		CacheUtils cacheUtil = new CacheUtils(corg.Name);
-		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
-		Map<String, UserInfoWrapper> userInfoByUserId = (Map<String, UserInfoWrapper>) cacheObject;
-
-		return userInfoByUserId?.get(userId)?.roleId;
-	}
-
-	public static String getRoleName(String userId) {
-		if (String.isBlank(userId)) return null;
-
-		CacheUtils cacheUtil = new CacheUtils(corg.Name);
-		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
-		Map<String, UserInfoWrapper> userInfoByUserId = (Map<String, UserInfoWrapper>) cacheObject;
-
-		return userInfoByUserId?.get(userId)?.roleName;
-	}
-
-	public static String getSalesforceLicenseTypeName(String userId) {
-		if (String.isBlank(userId)) return null;
-
-		CacheUtils cacheUtil = new CacheUtils(corg.Name);
-		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
-		Map<String, UserInfoWrapper> userInfoByUserId = (Map<String, UserInfoWrapper>) cacheObject;
-
-		return userInfoByUserId?.get(userId)?.licenseTypeName;
+		return userInfoWrapper;
 	}
 
 	public static List<User> getUserNameFromOrg(Connected_Org__c corg, String userId) {

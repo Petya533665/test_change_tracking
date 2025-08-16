@@ -1,0 +1,38 @@
+public with sharing class AutoChartController {
+
+    public static String  getAutoChartSetting() {
+        Map<String, Object> autoChartSetting = new Map<String, Object> {
+            'isEnableNotificationCharts' => ConfigUtil.PHAROS_SETTINGS.EnableNotificationCharts__c
+        };
+
+        return JSON.serialize(autoChartSetting);
+    }
+
+    public static String  updateAutoChartSetting(String autoChartSettingJSON) {
+        Map<String, Object> autoChartSetting = (Map<String, Object>) JSON.deserializeUntyped(autoChartSettingJSON);
+        ConfigUtil.PHAROS_SETTINGS.EnableNotificationCharts__c = (Boolean) autoChartSetting.get('isEnableNotificationCharts');
+        
+        if (ConfigUtil.PHAROS_SETTINGS.EnableNotificationCharts__c) {
+            AdminService.upsertRemoteSiteSetting(
+                Constants.REMOTE_SITE_SETTINGS.PHAROS_API_NAME,
+                Constants.REMOTE_SITE_SETTINGS.PHAROS_API_API_URL,
+                Constants.REMOTE_SITE_SETTINGS.PHAROS_API_DESCRIPTION
+            );
+        } else {
+            MetadataServiceUtil.deleteRemoteSiteSettingsMetadata(
+                new List<String>{
+                    ConfigUtil.prefixCurrentOrgNamespace(Constants.REMOTE_SITE_SETTINGS.PHAROS_API_NAME
+                )}
+            );
+        }
+
+        upsert ConfigUtil.PHAROS_SETTINGS;
+
+        autoChartSetting = new Map<String, Object> {
+            'isEnableNotificationCharts' => ConfigUtil.PHAROS_SETTINGS.EnableNotificationCharts__c,
+            'isUpdate' => true
+        };
+
+        return JSON.serialize(autoChartSetting);
+    }
+}
