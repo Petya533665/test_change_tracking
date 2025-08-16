@@ -396,7 +396,6 @@ public class ChartGeneratorImageLambdaClientTest {
         System.assertEquals('Error building occurrence logs chart for Last 7 Days', chartBuildingMap.get('message'));
         System.assertEquals('Unexpected token i in JSON at position 0', chartBuildingMap.get('error'));
         
-        System.debug('New error response format tests passed');
     }
     
     @IsTest
@@ -428,8 +427,6 @@ public class ChartGeneratorImageLambdaClientTest {
         Map<String, Object> differentChartMap = (Map<String, Object>) JSON.deserializeUntyped(differentChartResponse);
         System.assert(differentChartMap.containsKey('OCCURRENCE_LOGS_LAST_30_DAYS'), 'Different chart response should contain OCCURRENCE_LOGS_LAST_30_DAYS');
         System.assertEquals(1, differentChartMap.size(), 'Different chart response should have 1 chart type');
-        
-        System.debug('New success response format tests passed');
     }
     
     @IsTest
@@ -443,12 +440,6 @@ public class ChartGeneratorImageLambdaClientTest {
         
         // Test successful response format
         String successResponse = '{"OCCURRENCE_LAST_7_DAYS":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==","OCCURRENCE_LOGS_LAST_7_DAYS":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}';
-        
-        // These would be tested in integration tests with actual Lambda responses
-        System.debug('Error response parsing methods available for testing');
-        System.debug('Unauthorized error response: ' + unauthorizedErrorResponse);
-        System.debug('Chart building error response: ' + chartBuildingErrorResponse);
-        System.debug('Success response: ' + successResponse);
     }
     
 
@@ -533,8 +524,7 @@ public class ChartGeneratorImageLambdaClientTest {
         };
         
         String validInputJson = JSON.serialize(validInput);
-        System.debug('Valid input format: ' + validInputJson);
-        
+
         // Test invalid input format (missing required fields)
         Map<String, Object> invalidInput = new Map<String, Object>{
             'INVALID_CHART_TYPE' => new Map<String, Object>{
@@ -543,8 +533,7 @@ public class ChartGeneratorImageLambdaClientTest {
         };
         
         String invalidInputJson = JSON.serialize(invalidInput);
-        System.debug('Invalid input format: ' + invalidInputJson);
-        
+
         // Verify the valid input structure
         System.assert(validInput.containsKey('OCCURRENCE_LAST_7_DAYS'), 'Should contain OCCURRENCE_LAST_7_DAYS chart type');
         System.assert(validInput.containsKey('OCCURRENCE_LAST_30_DAYS'), 'Should contain OCCURRENCE_LAST_30_DAYS chart type');
@@ -641,11 +630,6 @@ public class ChartGeneratorImageLambdaClientTest {
     static void testResponseFormatValidation() {
         // Test response format validation
         ChartGeneratorImageLambdaClient client = new ChartGeneratorImageLambdaClient();
-        
-        // Test that the client properly handles the expected response format
-        // This would be tested in integration tests with actual Lambda responses
-        System.debug('Response format validation would be tested with actual Lambda responses');
-        System.debug('Expected format: {"OCCURRENCE_LAST_7_DAYS": "base64image", "OCCURRENCE_LOGS_LAST_7_DAYS": "base64image"}');
     }
     
     @IsTest
@@ -667,10 +651,7 @@ public class ChartGeneratorImageLambdaClientTest {
         };
         
         String chartConfigJson = JSON.serialize(chartConfig);
-        
-        System.debug('Input format: ' + chartConfigJson);
-        System.debug('Expected Lambda response format: ' + mockLambdaResponse);
-        
+
         // Verify the input format matches the expected structure
         System.assert(chartConfig.containsKey('OCCURRENCE_LAST_7_DAYS'), 'Should contain OCCURRENCE_LAST_7_DAYS chart type');
         System.assert(chartConfig.containsKey('OCCURRENCE_LOGS_LAST_7_DAYS'), 'Should contain OCCURRENCE_LOGS_LAST_7_DAYS chart type');
@@ -692,13 +673,29 @@ public class ChartGeneratorImageLambdaClientTest {
         // Test handling of empty responses
         ChartGeneratorImageLambdaClient client = new ChartGeneratorImageLambdaClient();
         
-        // Test with empty response
+        // Test with empty response using mock
+        Test.setMock(HttpCalloutMock.class, new ChartGeneratorMockHttpResponse(getMockEmptyResponse()));
+        
+        // Mock chart configuration
+        Map<String, Object> chartConfig = new Map<String, Object>{
+            'OCCURRENCE_LAST_7_DAYS' => new Map<String, Object>{
+                'SYSTEM_CHART_LOG_OCCURRENCE_BY_ISSUE' => '[{"logCount":3,"date":"24.06.2025"}]'
+            }
+        };
+        
+        String chartConfigJson = JSON.serialize(chartConfig);
+        
+        // Test that empty response throws an exception
+        Test.startTest();
         try {
-            // This would be tested in integration tests
-            System.debug('Empty response handling would be tested with actual Lambda responses');
-        } catch (Exception e) {
-            System.debug('Expected exception: ' + e.getMessage());
+            client.generateChartImagesBasedStringChartConfig(chartConfigJson);
+            System.assert(false, 'Expected exception for empty response');
+        } catch (ChartGeneratorImageLambdaClient.ChartGeneratorException e) {
+            // Expected exception
+            System.assert(e.getMessage().contains('Empty response from Lambda function'), 
+                'Exception message should indicate empty response from Lambda function');
         }
+        Test.stopTest();
     }
     
     @IsTest
@@ -733,13 +730,29 @@ public class ChartGeneratorImageLambdaClientTest {
         // Test handling of invalid JSON responses
         ChartGeneratorImageLambdaClient client = new ChartGeneratorImageLambdaClient();
         
-        // Test with invalid JSON response
+        // Test with invalid JSON response using mock
+        Test.setMock(HttpCalloutMock.class, new ChartGeneratorMockHttpResponse(getMockInvalidJsonResponse()));
+        
+        // Mock chart configuration
+        Map<String, Object> chartConfig = new Map<String, Object>{
+            'OCCURRENCE_LAST_7_DAYS' => new Map<String, Object>{
+                'SYSTEM_CHART_LOG_OCCURRENCE_BY_ISSUE' => '[{"logCount":3,"date":"24.06.2025"}]'
+            }
+        };
+        
+        String chartConfigJson = JSON.serialize(chartConfig);
+        
+        // Test that invalid JSON response throws an exception
+        Test.startTest();
         try {
-            // This would be tested in integration tests
-            System.debug('Invalid JSON response handling would be tested with actual Lambda responses');
-        } catch (Exception e) {
-            System.debug('Expected exception: ' + e.getMessage());
+            client.generateChartImagesBasedStringChartConfig(chartConfigJson);
+            System.assert(false, 'Expected exception for invalid JSON response');
+        } catch (ChartGeneratorImageLambdaClient.ChartGeneratorException e) {
+            // Expected exception
+            System.assert(e.getMessage().contains('Error calling Lambda function'), 
+                'Exception message should indicate Lambda function error');
         }
+        Test.stopTest();
     }
     
     @IsTest
@@ -791,8 +804,6 @@ public class ChartGeneratorImageLambdaClientTest {
         System.assert(String.isNotBlank(chart2), 'OCCURRENCE_LOGS_LAST_7_DAYS should not be blank');
         System.assert(chart1.startsWith('iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAABmJLR0QA/wD/AP+gvaeTAAAgAElEQVR4nOzde3xcVb3///dn70nS'), 'Should be valid base64 image');
         System.assert(chart2.startsWith('iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAABmJLR0QA/wD/AP+gvaeTAAAgAElEQVR4nOzdeXxdVbn/8e+zdpK2'), 'Should be valid base64 image');
-        
-        System.debug('Multiple chart types response test passed');
     }
     
     @IsTest
@@ -821,9 +832,6 @@ public class ChartGeneratorImageLambdaClientTest {
         
         // Test that the response format matches our expected structure
         System.assertEquals(2, responseMap.size(), 'Response should contain exactly 2 chart types');
-        
-        System.debug('Exact Lambda response format test passed');
-        System.debug('Response contains: ' + responseMap.keySet());
     }
     
     @IsTest
@@ -860,25 +868,6 @@ public class ChartGeneratorImageLambdaClientTest {
         System.assert(String.isNotBlank(image1), 'OCCURRENCE_LAST_7_DAYS image should not be blank');
         System.assert(String.isNotBlank(image2), 'OCCURRENCE_LAST_30_DAYS image should not be blank');
         System.assert(String.isNotBlank(image3), 'OCCURRENCE_LOGS_LAST_7_DAYS image should not be blank');
-        
-        // Demonstrate the format mapping
-        System.debug('=== ChartService.Chart Enum to Image Mapping ===');
-        System.debug(chart7DaysKey + ' => image1 (base64 length: ' + image1.length() + ')');
-        System.debug(chart30DaysKey + ' => image2 (base64 length: ' + image2.length() + ')');
-        System.debug(chartLogs7DaysKey + ' => image3 (base64 length: ' + image3.length() + ')');
-        
-        // Test using the actual client methods (would work in real scenario)
-        // client.getBlobImageForChart(ChartService.Chart.OCCURRENCE_LAST_7_DAYS.name()) => image1 as Blob
-        // client.getBlobImageForChart(ChartService.Chart.OCCURRENCE_LAST_30_DAYS.name()) => image2 as Blob
-        // client.getBlobImageForChart(ChartService.Chart.OCCURRENCE_LOGS_LAST_7_DAYS.name()) => image3 as Blob
-        
-        System.debug('=== Usage Examples ===');
-        System.debug('Blob chart7Days = client.getBlobImageForChart(ChartService.Chart.OCCURRENCE_LAST_7_DAYS.name());');
-        System.debug('Blob chart30Days = client.getBlobImageForChart(ChartService.Chart.OCCURRENCE_LAST_30_DAYS.name());');
-        System.debug('String chart7DaysBase64 = client.getBase64ImageForChart(ChartService.Chart.OCCURRENCE_LAST_7_DAYS.name());');
-        System.debug('String chart30DaysBase64 = client.getBase64ImageForChart(ChartService.Chart.OCCURRENCE_LAST_30_DAYS.name());');
-        
-        System.debug('ChartService.Chart enum mapping test passed');
     }
     
     // Mock HTTP response class for testing

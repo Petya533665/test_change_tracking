@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>EnableNotificationCharts__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Enables or disables the display of auto-generated charts in notifications</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Check this box to enable the display of auto charts in notifications</inlineHelpText>
+    <label>Enable Notification Charts</label>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

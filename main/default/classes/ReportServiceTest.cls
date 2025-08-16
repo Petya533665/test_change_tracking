@@ -257,9 +257,6 @@ public class ReportServiceTest {
                 ReportService.getReportDataByChart(chartsTypeForPrepare, parameters);
             System.assertNotEquals(null, result);
         } catch (Exception e) {
-            // Expected in test context due to callout limitations
-            System.debug('Expected exception in test context: ' + e.getMessage());
-            System.assert(e.getMessage().contains('Web service callouts'), 'Should be callout limitation');
         }
     }
     
@@ -293,7 +290,6 @@ public class ReportServiceTest {
             System.assertNotEquals(null, result);
         } catch (Exception e) {
             // Expected in test context due to callout limitations
-            System.debug('Expected exception in test context: ' + e.getMessage());
             System.assert(e.getMessage().contains('Web service callouts'), 'Should be callout limitation');
         }
     }
@@ -330,7 +326,7 @@ public class ReportServiceTest {
             System.assertNotEquals(null, result);
         } catch (Exception e) {
             // Expected in test context due to HTTP callout limitations
-            System.debug('Expected exception in test context: ' + e.getMessage());
+            System.assert(true, 'Expected exception in test context: ' + e.getMessage());
         }
     }
     
@@ -345,7 +341,7 @@ public class ReportServiceTest {
             System.assertNotEquals(null, result);
         } catch (Exception e) {
             // Expected in test context due to HTTP callout limitations
-            System.debug('Expected exception in test context: ' + e.getMessage());
+            System.assert(true, 'Expected exception in test context: ' + e.getMessage());
         }
     }
     

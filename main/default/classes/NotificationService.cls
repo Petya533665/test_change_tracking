@@ -1476,7 +1476,7 @@ public with sharing class NotificationService {
          */
         private Boolean hasAutoChartFieldsInActions() {
             // Check if AutoChart feature is enabled
-            if (!PermissionsUtil.AutoChartEnabled) {
+            if (!AutoChart.isEnabled) {
                 return false;
             }
             
@@ -1680,7 +1680,7 @@ public with sharing class NotificationService {
         @TestVisible  
         private Boolean hasAutoChartFieldsInActionsWithData(List<MonitoringUtil.Action> actions) {
             // Check if AutoChart feature is enabled
-            if (!PermissionsUtil.AutoChartEnabled) {
+            if (!AutoChart.isEnabled) {
                 return false;
             }
             

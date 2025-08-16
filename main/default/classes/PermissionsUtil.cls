@@ -122,7 +122,6 @@ public without sharing class PermissionsUtil {
 	public static final String FP_EVENT_MONITORING_ENABLED = 'EventMonitoringEnabled';
 	public static final String FP_DEBUG_POST_PROCESSING_ENABLED = 'DebugPostProcessingEnabled';
 	public static final String FP_FLOW_LOGGING_ENABLED = 'FlowLoggingEnabled';
-	public static final String FP_AUTO_CHART_ENABLED = 'AutoChartEnabled';
 	public static final String FP_METADATA_CHAT_ENABLED = 'MetadataChatEnabled';
 
 	public static final String FP_CHARGIFY_PRODUCT_EDITION = 'Edition';
@@ -168,8 +167,7 @@ public without sharing class PermissionsUtil {
 		FP_DEBUG_POST_PROCESSING_ENABLED => 25,
 		FP_FLOW_LOGGING_ENABLED => 26,
 		FP_EVENT_MONITORING_ENABLED => 27,
-		FP_METADATA_CHAT_ENABLED => 28,
-        FP_AUTO_CHART_ENABLED => 29
+		FP_METADATA_CHAT_ENABLED => 28
 	};
 
 	public static Map<Integer, Boolean> FeatureMap1 {
@@ -357,11 +355,13 @@ public without sharing class PermissionsUtil {
 
 	public static final String FP_MAX_ISSUES = 'MaxIssues';
 	public static final String FP_MAX_NOTIFICATIONS_24_HR = 'MaxNotifications24hr';
+	public static final String FP_AUTO_CHART_ENABLED = 'AutoChartEnabled';
 
 	// 2 x 8bits = 16bit of 29bit
 	public static final Map<String, Integer> MAP_FEATURE10_INDEX_BY_NAME = new Map<String, Integer> {
 			FP_MAX_ISSUES => 0,
-			FP_MAX_NOTIFICATIONS_24_HR => 1
+			FP_MAX_NOTIFICATIONS_24_HR => 1,
+			FP_AUTO_CHART_ENABLED => 16
 	};
 
 	//{"2":255,"1":255,"0":255}
@@ -403,7 +403,7 @@ public without sharing class PermissionsUtil {
 	public static final Integer DEFAULT_FEATURE_MAP_5_VALUE = 0;
 	public static final Integer DEFAULT_FEATURE_MAP_6_VALUE = 0;
 	public static final Integer MAX_USED_BITS_IN_INTEGER = 29;
-	public static final Integer DEFAULT_FEATURE_MAP_10_VALUE = 1;
+	public static final Integer DEFAULT_FEATURE_MAP_10_VALUE = (1 << 16); // Enable AutoChart
 
 	@TestVisible
 	public static Integer FeatureMap1IntValue {
@@ -566,19 +566,6 @@ public without sharing class PermissionsUtil {
 		}
 		private set;
 	}
-
-	@TestVisible
-	public static Boolean AutoChartEnabled {
-		get {
-			if(AutoChartEnabled == null) {
-				AutoChartEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_AUTO_CHART_ENABLED));
-			}
-			return AutoChartEnabled;
-		}
-		private set;
-	}
-
-
 	
 	public static Boolean IntegrationDebugViewEnabled {
 		get {
@@ -795,7 +782,7 @@ public without sharing class PermissionsUtil {
 			if(DebugJiraRefreshTokensEnabled == null) {
 				DebugJiraRefreshTokensEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_DEBUG_JIRA_REFRESH_TOKENS_ENABLED));
 			}
-			return false;
+			return DebugJiraRefreshTokensEnabled;
 		}
 		private set;
 	}
@@ -957,6 +944,17 @@ public without sharing class PermissionsUtil {
 				MaxNotifications24hr = FeatureMap10.get(MAP_FEATURE10_INDEX_BY_NAME.get(FP_MAX_NOTIFICATIONS_24_HR));
 			}
 			return MaxNotifications24hr;
+		}
+		private set;
+	}
+
+	@TestVisible
+	public static Boolean AutoChartEnabled {
+		get {
+			if(AutoChartEnabled == null) {
+				AutoChartEnabled = (FeatureMap10IntValue & (1 << MAP_FEATURE10_INDEX_BY_NAME.get(FP_AUTO_CHART_ENABLED))) != 0;
+			}
+			return AutoChartEnabled;
 		}
 		private set;
 	}

@@ -4,6 +4,37 @@
     <active>true</active>
     <label>Event</label>
     <picklistValues>
+        <picklist>Log_Level__c</picklist>
+        <values>
+            <fullName>DEBUG</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>ERROR</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>FINE</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>FINER</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>FINEST</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>INFO</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>WARNING</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
         <picklist>pharos__Area__c</picklist>
         <values>
             <fullName>Apex</fullName>

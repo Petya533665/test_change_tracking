@@ -230,7 +230,8 @@ public without sharing class AdminService {
             'EventMonitoringEnabled' => PermissionsUtil.EventMonitoringEnabled,
             'FlowLoggingEnabled' => PermissionsUtil.FlowLoggingEnabled,
             'IssueTrackingEnabled' => PermissionsUtil.IssueTrackingEnabled,
-            'MetadataChatEnabled' => PermissionsUtil.MetadataChatEnabled
+            'MetadataChatEnabled' => PermissionsUtil.MetadataChatEnabled,
+            'AutoChartEnabled' => PermissionsUtil.AutoChartEnabled
         };
         return result;
     }

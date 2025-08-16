@@ -36,7 +36,7 @@
  */
 public with sharing class ChartGeneratorImageLambdaClient {
    
-    private static final String URL_ENDPOINT = 'https://c4awi9macj.execute-api.us-west-1.amazonaws.com/dev/generate-chart';
+    private static final String URL_ENDPOINT = 'https://api.pharos.ai/generate-chart-v2'; 
 
     private Map<String, String> chartImages;
     private LambdaErrorResponse errorResponse;
@@ -68,7 +68,6 @@ public with sharing class ChartGeneratorImageLambdaClient {
     }
 
     public ChartGeneratorImageLambdaClient() {
-        // Default constructor
     }
 
     /**

@@ -65,6 +65,11 @@ public with sharing class Constants {
         private set;
     }
 
+    public static final UserSObject USER_SOBJECT { 
+        get { return USER_SOBJECT == null ? (USER_SOBJECT = new UserSObject()) : USER_SOBJECT; }
+        private set;
+    }
+
     public inherited sharing class GlobalVariable {
         public final String BASE_URL = System.Url.getOrgDomainUrl().toExternalForm();
         public final String NEWLINE_CHARACTERS = '\r\n';
@@ -192,6 +197,10 @@ public with sharing class Constants {
     }
 
     public inherited sharing class RemoteSiteSettings {
+        public final String PHAROS_API_NAME = 'Pharos_ai_API';
+        public final String PHAROS_API_DESCRIPTION = 'Remote site setting for Pharos API function endpoints. Enables callouts to Pharos services.';
+        public final String PHAROS_API_API_URL = 'https://api.pharos.ai/';
+
         public final String GIT_SFDX_API_NAME = 'Pharos_ai_SFDX_API_token_URL';
         public final String GIT_SFDX_API_DESCRIPTION = 'Pharos.ai - SFDX integration URL';
         public final String GIT_SFDX_API_URL = 'https://sfdx.pharos.ai';
@@ -303,6 +312,12 @@ public with sharing class Constants {
             CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8 => false,
             CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS => 0
         };
+    }
+
+    public inherited sharing class UserSObject extends SObjectTypeConstants {
+        private UserSObject() {
+            this.objectType = User.SObjectType;
+        }
     }
     
     public inherited sharing virtual class SObjectTypeConstants {

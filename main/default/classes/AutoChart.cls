@@ -6,6 +6,12 @@
  * - Integration with various messaging platforms
  */
 public with sharing class AutoChart {
+    public static Boolean isEnabled {
+        get {
+            return PermissionsUtil.AutoChartEnabled && ConfigUtil.PHAROS_SETTINGS.EnableNotificationCharts__c;
+        }
+        private set {}
+    }
     
     // AutoChart step enum for 3-step processing
     public enum AutoChartStep {
@@ -413,7 +419,7 @@ public with sharing class AutoChart {
      */
     public static Boolean containsAutoChartFields(MonitoringUtil.Action action) {
         // Check if AutoChart feature is enabled
-        if (!PermissionsUtil.AutoChartEnabled) {
+        if (!AutoChart.isEnabled) {
             return false;
         }
         
@@ -438,7 +444,7 @@ public with sharing class AutoChart {
         List<String> chartTypes = new List<String>();
         
         // Check if AutoChart feature is enabled
-        if (!PermissionsUtil.AutoChartEnabled) {
+        if (!AutoChart.isEnabled) {
             return chartTypes;
         }
         
@@ -474,7 +480,7 @@ public with sharing class AutoChart {
      */
     public static List<String> getChartTypesFromAction(Action__c actionFields) {
         // Check if AutoChart feature is enabled
-        if (!PermissionsUtil.AutoChartEnabled) {
+        if (!AutoChart.isEnabled) {
             return new List<String>();
         }
         
@@ -499,7 +505,7 @@ public with sharing class AutoChart {
         List<NotificationService.ActionIteration> iterations = new List<NotificationService.ActionIteration>();
         
         // Check if AutoChart feature is enabled
-        if (!PermissionsUtil.AutoChartEnabled) {
+        if (!AutoChart.isEnabled) {
             return iterations;
         }
         
