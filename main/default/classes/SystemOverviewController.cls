@@ -526,7 +526,7 @@ public with sharing class SystemOverviewController {
 			Schema.DescribeSObjectResult describeSObjectResult = globalDescribe.get(objectName).getDescribe();
 			String objectType = getObjectType(describeSObjectResult);
 			if (objectType == STANDARD_OBJECTS_TYPE || objectType == CUSTOM_OBJECTS_TYPE) {
-				sObjectOptions.add(new SObjectOption(describeSObjectResult, objectType));
+				sObjectOptions.add(new SObjectOption(describeSObjectResult));
 			}
 		}
 		return sObjectOptions;
@@ -609,16 +609,10 @@ public with sharing class SystemOverviewController {
 		public String label { get; set; }
 		@AuraEnabled
 		public String value { get; set; }
-		@AuraEnabled
-		public String namespacePrefix { get; set; }
-		@AuraEnabled
-		public String type { get; set; }
 		public SObjectOption() {}
-		public SObjectOption(Schema.DescribeSObjectResult describeSObjectResult, String objectType) {
+		public SObjectOption(Schema.DescribeSObjectResult describeSObjectResult) {
 			this.label = describeSObjectResult.label;
 			this.value = describeSObjectResult.name;
-			this.type = objectType;
-			this.namespacePrefix = value.countMatches('__') > 1 ? value.substringBefore('__') : null;
 		}
 	}
 

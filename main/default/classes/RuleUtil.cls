@@ -74,7 +74,8 @@ public with sharing class RuleUtil {
 		JIRA_UPDATE,
 		NOTIFICATION,
 		BROADCAST,
-		AZURE_DEV_OPS
+		AZURE_DEV_OPS,
+        LIMITS
 	}
 	public static final String RULE_TYPE_MONITORING = 'Monitoring';
 	public static final String RULE_TYPE_ARCHIVAL = 'Archival';
@@ -83,6 +84,7 @@ public with sharing class RuleUtil {
 	public static final String RULE_TYPE_NOTIFICATION = 'Notification';
 	public static final String RULE_TYPE_EVENT_MONITORING = 'Event Monitoring';
 	public static final String RULE_TYPE_BROADCAST = 'Broadcast';
+	public static final String RULE_TYPE_LIMITS = 'Limits';
 	public static final Set<String> IGNORE_RULE_TYPES_FOR_MONITORING_EVENTS = new Set<String>{RULE_TYPE_JIRA_UPDATE, RULE_TYPE_NOTIFICATION, RULE_TYPE_BROADCAST};
 	public static final Map<String, RuleType> MAP_RULE_TYPE = new Map<String, RuleType> {
 			RULE_TYPE_MONITORING => RuleType.MONITORING,
@@ -90,7 +92,8 @@ public with sharing class RuleUtil {
 			RULE_TYPE_JIRA_UPDATE => RuleType.JIRA_UPDATE,
 			RULE_TYPE_NOTIFICATION => RuleType.NOTIFICATION,
 			RULE_TYPE_BROADCAST => RuleType.BROADCAST,
-			RULE_TYPE_AZURE_DEV_OPS => RuleType.AZURE_DEV_OPS
+			RULE_TYPE_AZURE_DEV_OPS => RuleType.AZURE_DEV_OPS,
+			RULE_TYPE_LIMITS => RuleType.LIMITS
 	};
 
 	public static final Map<String, Boolean> MAP_RULES_ENABLED = new Map<String, Boolean> {
@@ -277,7 +280,8 @@ public with sharing class RuleUtil {
 			},
 			RULE_TYPE_BROADCAST => new List<String> {
 			},
-			RULE_TYPE_EVENT_MONITORING => new List<String>()
+			RULE_TYPE_EVENT_MONITORING => new List<String>(),
+			RULE_TYPE_LIMITS => new List<String>()
 	};
 	public static final Map<String, String> MAP_ACTION_SUBTYPES = new Map<String, String> {
 			RULE_TYPE_NOTIFICATION => ACTION_SUBTYPE_NOTIFICATION
