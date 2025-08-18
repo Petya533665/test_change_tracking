@@ -799,6 +799,7 @@ public with sharing class ConfigUtil {
     public static final String LOG_CATEGORIES_KEY_MAPPINGS = 'mappings';
 
     public static final String MONITORING_APP_KEY_ENABLED = 'enabled';
+    public static final String MONITORING_APP_KEY_FREQUENCY = 'frequency';
 
     public static final String DELETE_MONITORING_RULE_ACTION_KEY_ACTION_RESULT = 'actionResult';
 

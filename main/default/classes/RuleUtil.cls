@@ -51,6 +51,7 @@ public with sharing class RuleUtil {
 	public static final String KEY_EVENTS = 'events';
 	public static final String KEY_ACTIONS = 'actions';
 	public static final String KEY_ACTION_TYPES = 'actionTypesMap';
+	public static final String KEY_LIMIT_FIELD_NAMES = 'limitFieldNames';
 	public static final String KEY_LOG_FIELDS = 'logFields';
 	public static final String KEY_ISSUE_FIELDS = 'issueFields';
 	public static final String KEY_ISSUE_FIELDS_FOR_UPDATE = 'updateIssueFields';

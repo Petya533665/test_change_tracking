@@ -178,6 +178,8 @@ public with sharing class AdminController {
                 response.data = AdminService.saveSlackSettings(data);
             } else if (method == 'setMonitoringSetting') {
                 response.data = AdminService.setMonitoringSetting(data);
+            } else if (method == 'setLimitsMonitoringSetting') {
+                response.data = AdminService.setLimitsMonitoringSetting(data);
             } else if (method == 'setEventMonitoringSetting') {
                 response.data = AdminService.setEventMonitoringSetting(data);
             } else if (method == 'setBatchErrorTrackingSetting') {
