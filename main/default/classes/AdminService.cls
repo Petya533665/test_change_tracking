@@ -2519,6 +2519,10 @@ public without sharing class AdminService {
         ruleSettings.put(RuleUtil.KEY_ACTION_TYPES, RuleUtil.getActionTypes(ruleType));
         ruleSettings.put(RuleUtil.KEY_RULE_SUBTYPES, SObjectType.Rule__c.fields.Subtype__c.getPicklistValues());
         ruleSettings.put(RuleUtil.KEY_USER_TIMEZONE_OFFSET, getUserTimezoneOffset());
+
+        if (ruleType == RuleUtil.RULE_TYPE_LIMITS) {
+            ruleSettings.put(RuleUtil.KEY_LIMIT_FIELD_NAMES, LimitsService.FIELD_MAP.keySet());
+        }
         return ruleSettings;
     }
 
@@ -2552,6 +2556,14 @@ public without sharing class AdminService {
     public static Logger_Settings__c setMonitoringSetting(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         ConfigUtil.SETTINGS.Monitoring_Enabled__c = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
+        DatabaseUtils.getInstance().performUpsertDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c, true);
+        return ConfigUtil.SETTINGS;
+    }
+
+    public static Logger_Settings__c setLimitsMonitoringSetting(Object data) {
+        Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
+        ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = String.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_FREQUENCY));
         DatabaseUtils.getInstance().performUpsertDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c, true);
         return ConfigUtil.SETTINGS;
     }
