@@ -1397,7 +1397,6 @@ public without sharing class AdminService {
         return data;
     }
 
-    // TODO: Remove if don't use
     public static void stopScheduler(String schedulerJobName) {
         List<CronTrigger> availableCrons = getAvailableCronJobByName(schedulerJobName);
         if (availableCrons.size() == 1) {
@@ -2651,12 +2650,12 @@ public without sharing class AdminService {
             if(rules.get(0).ruleType == MonitoringUtil.RULE_TYPE_MONITORING) {
                 try {
                     DateTime lastProcessedDatetime = DateTime.now();
-                    QBuilder qbCount = MonitoringBatch.getMonitoringLogsQuery(rules.get(0), new Set<String>{'COUNT()'});
+                    QBuilder qbCount = MonitoringService.buildMonitoringLogsQuery(rules.get(0), new Set<String>{'COUNT()'});
                     String qbCountQuery = qbCount.build();
                     Integer countLogs = Database.countQuery(qbCountQuery);
 
                     List<String> logFields = MonitoringUtil.getLogFieldNames(rules);
-                    QBuilder qb = MonitoringBatch.getMonitoringLogsQuery(rules.get(0), new Set<String>(logFields));
+                    QBuilder qb = MonitoringService.buildMonitoringLogsQuery(rules.get(0), new Set<String>(logFields));
                     qb.addLimit(1);
                     String qbQuery = qb.build();
                     List<Log__c> logs = Database.query(qbQuery);

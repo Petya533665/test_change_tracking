@@ -65,11 +65,6 @@ public with sharing class Constants {
         private set;
     }
 
-    public static final UserSObject USER_SOBJECT { 
-        get { return USER_SOBJECT == null ? (USER_SOBJECT = new UserSObject()) : USER_SOBJECT; }
-        private set;
-    }
-
     public inherited sharing class GlobalVariable {
         public final String BASE_URL = System.Url.getOrgDomainUrl().toExternalForm();
         public final String NEWLINE_CHARACTERS = '\r\n';
@@ -157,8 +152,19 @@ public with sharing class Constants {
     }
     
     public inherited sharing class LogSObject extends SObjectTypeConstants {
+        public final String PHAROS_CATEGORY = 'Pharos Error';
+        public final String PHAROS_AREA = 'Pharos';
+        public final String LIMITS;
+        public final String CREATED_AT;
+        public final String CATEGORY;
+        public final String AREA;
+
         private LogSObject() {
             this.objectType = Log__c.SObjectType;
+            this.CREATED_AT = Schema.SObjectType.Log__c.fields.Created_At__c.getName();
+            this.CATEGORY = Schema.SObjectType.Log__c.fields.Category__c.getName();
+            this.AREA = Schema.SObjectType.Log__c.fields.Area__c.getName();
+            this.LIMITS = Schema.SObjectType.Log__c.fields.Limits__c.getName();
         }
     }
 
@@ -312,12 +318,6 @@ public with sharing class Constants {
             CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8 => false,
             CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS => 0
         };
-    }
-
-    public inherited sharing class UserSObject extends SObjectTypeConstants {
-        private UserSObject() {
-            this.objectType = User.SObjectType;
-        }
     }
     
     public inherited sharing virtual class SObjectTypeConstants {

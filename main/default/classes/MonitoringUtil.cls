@@ -10,7 +10,8 @@ public with sharing class MonitoringUtil {
         JIRA_UPDATE,
         NOTIFICATION,
         BROADCAST,
-        AZURE_DEV_OPS
+        AZURE_DEV_OPS,
+        LIMITS
     }
     public static final String RULE_TYPE_MONITORING = 'Monitoring';
     public static final String RULE_TYPE_ARCHIVAL = 'Archival';
@@ -18,6 +19,7 @@ public with sharing class MonitoringUtil {
     public static final String RULE_TYPE_AZURE_DEV_OPS = 'Azure Dev Ops';
     public static final String RULE_TYPE_NOTIFICATION = 'Notification';
     public static final String RULE_TYPE_BROADCAST = 'Broadcast';
+    public static final String RULE_TYPE_LIMITS = 'Limits';
     public static final Set<String> IGNORE_RULE_TYPES_FOR_MONITORING_EVENTS = new Set<String>{RULE_TYPE_JIRA_UPDATE, RULE_TYPE_NOTIFICATION, RULE_TYPE_BROADCAST, RULE_TYPE_AZURE_DEV_OPS};
     public static Map<String, RuleType> ruleTypeMap = new Map<String, RuleType> {
         RULE_TYPE_MONITORING => RuleType.MONITORING,
@@ -25,7 +27,8 @@ public with sharing class MonitoringUtil {
         RULE_TYPE_JIRA_UPDATE => RuleType.JIRA_UPDATE,
         RULE_TYPE_NOTIFICATION => RuleType.NOTIFICATION,
         RULE_TYPE_BROADCAST => RuleType.BROADCAST,
-        RULE_TYPE_AZURE_DEV_OPS => RuleType.AZURE_DEV_OPS
+        RULE_TYPE_AZURE_DEV_OPS => RuleType.AZURE_DEV_OPS,
+        RULE_TYPE_LIMITS => RuleType.LIMITS
     };
 
 
@@ -221,6 +224,7 @@ public with sharing class MonitoringUtil {
     public static final String RULE_SUB_TYPE_FREQUENCY = 'Frequency';
     public static final String RULE_SUB_TYPE_IMPACT = 'Impact';
     public static final String RULE_SUB_TYPE_SPIKE = 'Spike';
+    public static final String RULE_SUB_TYPE_THRESHOLD = 'Threshold';
 
     public static final String RULE_ISSUE_SOBJECT_TYPE_FIELD = Schema.SObjectType.Issue__c.getName();
 
@@ -274,9 +278,23 @@ public with sharing class MonitoringUtil {
         String.valueOf(Trace_Result__c.SObjectType) => new Set<String>(REQUIRED_TRACE_RESULT_RULE_FIELDS)
     };
 
+    public static List<String> getLimitsFields() {
+        List<String> result = new List<String>();
+        
+        // Add all fields from LimitsService.FIELD_MAP with relation prefix
+        for (Schema.DescribeFieldResult fieldDescribe : LimitsService.FIELD_MAP.values()) {
+            result.add('Limits__r.' + fieldDescribe.getLocalName());
+        }
+        return result;
+    }
+
     public static List<String> getSObjectFields(Schema.DescribeSObjectResult dsr, List<MonitoringUtil.MonitoringRule> rules) {
         List<String> result = new List<String>();
         Set<String> filterFields = REQUIRED_SOBJECT_FIELDS_BY_NAME.get(dsr.getName());
+
+        if(dsr.getName() == String.valueOf(Log__c.SObjectType)) {
+            filterFields.addAll(getLimitsFields());
+        }
 
         Map<String, Schema.SObjectField> fieldsMap = dsr.fields.getMap();
         Set<String> logFieldsSet = fieldsMap.keySet();
@@ -347,6 +365,26 @@ public with sharing class MonitoringUtil {
         }
     }
 
+    public static void evaluateLimitsRules(
+        List<Log__c> logs,
+        List<Id> ruleIds,
+        Datetime runDateTime,
+        Map<Id, MonitoringUtil.Event> eventsMap,
+        Logger logger) {
+
+        List<MonitoringRule> rules = getLimitsRules(ruleIds);
+        List<MonitoringRule> toCreateEvents = new List<MonitoringRule>();
+        List<Event__c> newEvents = new List<Event__c>();
+        List<EventAction__c> newEventActions = new List<EventAction__c>();
+
+        applyLimitsRulesFilters(rules, logs, runDateTime, eventsMap);
+        toCreateEvents = filterRulesByTresholds(rules);
+        if (!toCreateEvents.isEmpty()) {
+            newEvents = createEvents(toCreateEvents);
+            newEventActions = createEventActions(toCreateEvents, logger);
+        }
+    }
+
     private static void applyRulesFilters(
             List<MonitoringRule> rules,
             List<Log__c> logs,
@@ -406,13 +444,262 @@ public with sharing class MonitoringUtil {
         }
     }
 
+    private static void applyLimitsRulesFilters(
+        List<MonitoringRule> rules,
+        List<Log__c> logs,
+        DateTime runDatetime,
+        Map<Id, MonitoringUtil.Event> eventsMap) {
+
+        for(MonitoringRule rule : rules) {
+            if(rule.sobjectType != null) continue;
+            
+            // Route to appropriate processor based on rule subtype
+            if(rule.ruleSubType == RULE_SUB_TYPE_SPIKE) {
+                processSpikeRule(rule, logs, runDatetime, eventsMap);
+            } else if(rule.ruleSubType == RULE_SUB_TYPE_THRESHOLD) {
+                processThresholdRule(rule, logs, runDatetime, eventsMap);
+            }
+        }
+    }
+
+    // Helper methods for limits processing
+    private static List<Log__c> filterLogsByTimeInterval(List<Log__c> logs, DateTime start, DateTime endTime) {
+        List<Log__c> filtered = new List<Log__c>();
+        for(Log__c log : logs) {
+            if(log?.Created_At__c >= start && log?.Created_At__c <= endTime) {
+                filtered.add(log);
+            }
+        }
+        return filtered;
+    }
+
+    private static Map<String, List<Decimal>> extractFieldValues(List<Log__c> logs, MonitoringRule rule) {
+        Map<String, List<Decimal>> fieldValues = new Map<String, List<Decimal>>();
+        
+        for(String limitKey : LimitsService.FIELD_MAP.keySet()) {
+            Schema.DescribeFieldResult fieldDescribe = LimitsService.FIELD_MAP.get(limitKey);
+            String fieldName = fieldDescribe.getName();
+            List<Decimal> values = new List<Decimal>();
+            
+            for(Log__c log : logs) {
+                if (log.Limits__r != null) {
+                    Map<String, Object> populated = log.Limits__r.getPopulatedFieldsAsMap();
+                    if (populated != null && populated.containsKey(fieldName)) {
+                        Object value = populated.get(fieldName);
+                        if (value != null) {
+                            try {
+                                values.add(Decimal.valueOf(String.valueOf(value)));
+                            } catch (Exception e) {
+                                // Skip non-numeric values
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if(!values.isEmpty()) {
+                fieldValues.put(fieldName, values);
+            }
+        }
+        
+        return fieldValues;
+    }
+
+    private static Log__c getLatestLog(List<Log__c> logs) {
+        Log__c latest = null;
+        DateTime latestTime = null;
+        
+        for(Log__c log : logs) {
+            if(log?.Created_At__c != null) {
+                if(latestTime == null || log.Created_At__c > latestTime) {
+                    latest = log;
+                    latestTime = log.Created_At__c;
+                }
+            }
+        }
+        
+        return latest;
+    }
+
+    private static Decimal getMinValue(List<Decimal> values) {
+        if(values.isEmpty()) return null;
+        Decimal min = values[0];
+        for(Decimal value : values) {
+            if(value < min) min = value;
+        }
+        return min;
+    }
+
+    private static Decimal getMaxValue(List<Decimal> values) {
+        if(values.isEmpty()) return null;
+        Decimal max = values[0];
+        for(Decimal value : values) {
+            if(value > max) max = value;
+        }
+        return max;
+    }
+
+    // Spike rule processing method
+    private static void processSpikeRule(
+        MonitoringRule rule, 
+        List<Log__c> logs, 
+        DateTime runDatetime, 
+        Map<Id, MonitoringUtil.Event> eventsMap) {
+        
+        // 1. Filter logs within time interval
+        DateTime intervalStart = runDatetime.addMinutes(-Integer.valueOf(rule.eventTypeInterval));
+        List<Log__c> intervalLogs = filterLogsByTimeInterval(logs, intervalStart, runDatetime);
+        
+        if(intervalLogs.size() < 2) {
+            // Need at least 2 data points to detect a spike
+            return;
+        }
+        
+        // 2. Group by monitored fields
+        Map<String, List<Decimal>> fieldValues = extractFieldValues(intervalLogs, rule);
+        
+        // 3. Calculate percentage changes
+        for(String fieldName : fieldValues.keySet()) {
+            List<Decimal> values = fieldValues.get(fieldName);
+            if(values.size() < 2) continue;
+            
+            Decimal minValue = getMinValue(values);
+            Decimal maxValue = getMaxValue(values);
+            
+            if(minValue != null && minValue > 0 && maxValue != null) {
+                Decimal percentageChange = ((maxValue - minValue) / minValue) * 100;
+                
+                // 4. Check against threshold (absolute value for bidirectional detection)
+                if(Math.abs(percentageChange) >= rule.threshold) {
+                    // Mark this field as triggered for the rule
+                    if(rule.groupValues == null) {
+                        rule.groupValues = new Map<Integer, Map<String, Decimal>>();
+                    }
+                    if(!rule.groupValues.containsKey(1)) {
+                        rule.groupValues.put(1, new Map<String, Decimal>());
+                    }
+                    
+                    // Store the percentage change as the group value
+                    rule.groupValues.get(1).put(fieldName, Math.abs(percentageChange));
+                    
+                    // Set groupFieldNames to indicate this is a grouped rule
+                    if(rule.groupFieldNames == null) {
+                        rule.groupFieldNames = new Set<String>();
+                    }
+                    rule.groupFieldNames.add(fieldName);
+                    
+                    // Also store in legacy format for compatibility
+                    if(rule.groupRecordIds == null) {
+                        rule.groupRecordIds = new Map<String, Set<String>>();
+                    }
+                    rule.groupRecordIds.put(fieldName, new Set<String>());
+                    
+                    // Add record IDs from interval logs and count them for rule.value
+                    Set<String> allRecordIds = new Set<String>();
+                    for(Log__c log : intervalLogs) {
+                        if(log.Limits__r != null) {
+                            String limitId = log.Limits__r.Id;
+                            rule.groupRecordIds.get(fieldName).add(limitId);
+                            allRecordIds.add(limitId);
+                        }
+                    }
+                    
+                    // Set rule.value for traditional event creation compatibility
+                    rule.value = allRecordIds.size();
+                    
+                    // Mark that rule was triggered with record ids for criteria
+                    if(rule.recordIds == null) {
+                        rule.recordIds = new Set<String>();
+                    }
+                    rule.recordIds.addAll(allRecordIds);
+                }
+            }
+        }
+    }
+
+    // Threshold rule processing method
+    private static void processThresholdRule(
+        MonitoringRule rule, 
+        List<Log__c> logs, 
+        DateTime runDatetime, 
+        Map<Id, MonitoringUtil.Event> eventsMap) {
+        
+        // 1. Get latest snapshot
+        Log__c latestLog = getLatestLog(logs);
+        if(latestLog?.Limits__r == null) return;
+        
+        // 2. Get org limits
+        Map<String, System.OrgLimit> orgLimits = OrgLimits.getMap();
+        
+        // 3. Calculate current percentages
+        for(String limitKey : LimitsService.FIELD_MAP.keySet()) {
+            Schema.DescribeFieldResult fieldDescribe = LimitsService.FIELD_MAP.get(limitKey);
+            String fieldName = fieldDescribe.getName();
+            
+            // Get current usage from limits record only if field was queried
+            Map<String, Object> populated = latestLog.Limits__r.getPopulatedFieldsAsMap();
+            if (populated == null || !populated.containsKey(fieldName)) {
+                continue;
+            }
+            Object currentUsage = populated.get(fieldName);
+            if(currentUsage == null) continue;
+            
+            // Get org limit
+            System.OrgLimit orgLimit = orgLimits.get(limitKey);
+            if(orgLimit?.getLimit() == null || orgLimit.getLimit() <= 0) continue;
+            
+            try {
+                // Calculate percentage
+                Decimal usage = Decimal.valueOf(String.valueOf(currentUsage));
+                Decimal currentPercentage = (usage / orgLimit.getLimit()) * 100;
+                
+                // 4. Check against threshold
+                if(currentPercentage >= rule.threshold) {
+                    // Mark this field as triggered for the rule
+                    if(rule.groupValues == null) {
+                        rule.groupValues = new Map<Integer, Map<String, Decimal>>();
+                    }
+                    if(!rule.groupValues.containsKey(1)) {
+                        rule.groupValues.put(1, new Map<String, Decimal>());
+                    }
+                    
+                    // Store the current percentage as the group value
+                    rule.groupValues.get(1).put(fieldName, currentPercentage);
+                    
+                    // Set groupFieldNames to indicate this is a grouped rule
+                    if(rule.groupFieldNames == null) {
+                        rule.groupFieldNames = new Set<String>();
+                    }
+                    rule.groupFieldNames.add(fieldName);
+                    
+                    // Also store in legacy format for compatibility
+                    if(rule.groupRecordIds == null) {
+                        rule.groupRecordIds = new Map<String, Set<String>>();
+                    }
+                    rule.groupRecordIds.put(fieldName, new Set<String>{latestLog.Limits__r.Id});
+                    
+                    // Set rule.value and recordIds for traditional event creation compatibility
+                    rule.value = 1; // One record triggered the threshold
+                    if(rule.recordIds == null) {
+                        rule.recordIds = new Set<String>();
+                    }
+                    rule.recordIds.add(latestLog.Limits__r.Id);
+                }
+            } catch(Exception e) {
+                // Skip non-numeric values
+                continue;
+            }
+        }
+    }
 
     private static List<MonitoringRule> filterRulesByTresholds(List<MonitoringRule> rules) {
         List<MonitoringRule> result = new List<MonitoringRule>();
         for(MonitoringRule rule : rules) {
             Boolean ruleResult = false;
 
-            if(!rule.groupFieldNames.isEmpty() || rule.aggregateInterval != null || rule.ruleSubType == RULE_SUB_TYPE_FREQUENCY) {
+            if(!rule.groupFieldNames.isEmpty() || rule.aggregateInterval != null || rule.ruleSubType == RULE_SUB_TYPE_FREQUENCY || rule.ruleType == RULE_TYPE_LIMITS) {
+                
                 for(Integer interval : rule.groupValues.keySet()) {
                     Boolean intervalGroupResult = false;
 
@@ -980,6 +1267,7 @@ public with sharing class MonitoringUtil {
     public static List<MonitoringRule> getRules(List<Id> ruleIds, String ruleType, String sobjectType) {
         List<MonitoringRule> result = new List<MonitoringRule>();
 
+        // Only query database if not already cached
         List<Rule__c> rules = getRuleRecords(ruleIds, ruleType);
         for(Rule__c rule : rules) {
             MonitoringRule mr = new MonitoringRule(rule)
@@ -987,7 +1275,7 @@ public with sharing class MonitoringUtil {
                 .addActions(rule.RuleActions__r);
             addRulesToCache(new List<MonitoringRule>{mr}, ruleType);
 
-            if(rule.SObjectType__c == sobjectType) {
+            if(sobjectType == null || rule.SObjectType__c == sobjectType) {
                 result.add(mr);
             }
         }
@@ -1003,48 +1291,59 @@ public with sharing class MonitoringUtil {
         List<MonitoringRule> result;
 
         Map<Id, MonitoringRule> rulesByType = cachedRules?.get(ruleType);
-        if(!cachedRules?.containsKey(ruleType) && rulesByType == null) {
-            return result;
+        if(!cachedRules?.containsKey(ruleType) || rulesByType == null) {
+            // Cache miss - return null to trigger DB query
+            return null;
         }
-        if(cachedRules?.containsKey(ruleType) && rulesByType == null) {
-            return new List<MonitoringRule>();
-        }
+        
         if(ruleIds == null) {
-            result = cachedRules.get(ruleType)?.values();
+            // Return all cached rules for this type, filtered by sobjectType
+            result = new List<MonitoringRule>();
+            for(MonitoringRule rule : rulesByType.values()) {
+                if(sobjectType == null || rule.sobjectType == sobjectType) {
+                    result.add(rule);
+                }
+            }
         }
         else {
             result = new List<MonitoringRule>();
-            Set<Id> ruleIdsToRetrieve = new Set<Id>();
+            Set<Id> missingRuleIds = new Set<Id>();
 
             for(Id ruleId : ruleIds) {
                 if(rulesByType.containsKey(ruleId)) {
-                    result.add(rulesByType.get(ruleId));
+                    MonitoringRule rule = rulesByType.get(ruleId);
+                    if(sobjectType == null || rule.sobjectType == sobjectType) {
+                        result.add(rule);
+                    }
                 }
                 else {
-                    ruleIdsToRetrieve.add(ruleId);
+                    missingRuleIds.add(ruleId);
                 }
             }
-            if(!ruleIdsToRetrieve.isEmpty()) {
-                List<MonitoringRule> additionalRules = getRules(new List<Id>(ruleIdsToRetrieve), ruleType, sobjectType);
-                result.addAll(additionalRules);
+            
+            // If some rules are missing from cache, return null to trigger full DB query
+            if(!missingRuleIds.isEmpty()) {
+                return null;
             }
         }
         return result;
     }
 
     public static void addRulesToCache(List<MonitoringRule> rules, String ruleType) {
-        Map<Id, MonitoringRule> allExistRules = cachedRules.get(ruleType);
+        Map<Id, MonitoringRule> existingRules = cachedRules.get(ruleType);
+        if(existingRules == null) {
+            existingRules = new Map<Id, MonitoringRule>();
+        }
+        
         if(rules != null && !rules.isEmpty()) {
-            if(allExistRules == null) {
-                allExistRules = new Map<Id, MonitoringRule>();
-            }
             for(MonitoringRule rule : rules) {
-                if(!allExistRules.containsKey(rule.ruleId)) {
-                    allExistRules.put(rule.ruleId, rule);
+                if(rule != null && rule.ruleId != null) {
+                    existingRules.put(rule.ruleId, rule);
                 }
             }
         }
-        cachedRules.put(ruleType, allExistRules);
+        
+        cachedRules.put(ruleType, existingRules);
     }
 
     public static Map<Id, Event> getLastCreatedEventsMap() {
@@ -1098,6 +1397,9 @@ public with sharing class MonitoringUtil {
             limitRules = PermissionsUtil.MaxArchivalRules;
         }
         else if(ruleType == RULE_TYPE_MONITORING) {
+            limitRules = PermissionsUtil.MaxMonitoringRules;
+        }
+        else if(ruleType == RULE_TYPE_LIMITS) {
             limitRules = PermissionsUtil.MaxMonitoringRules;
         }
         else if(ruleType == RULE_TYPE_JIRA_UPDATE || ruleType == RULE_TYPE_AZURE_DEV_OPS) {
@@ -2376,5 +2678,17 @@ public with sharing class MonitoringUtil {
             result.addAll(ids);
         }
         return result;
+    }
+
+    public static List<MonitoringRule> getLimitsRules(List<Id> ruleIds) {
+        // When specific ruleIds are provided, bypass cache to avoid stale/empty cache issues
+        if (ruleIds != null) {
+            return getRules(ruleIds, RULE_TYPE_LIMITS, null);
+        }
+        List<MonitoringRule> rules = getRulesFromCache(null, RULE_TYPE_LIMITS, null);
+        if (rules == null) {
+            rules = getRules(null, RULE_TYPE_LIMITS, null);
+        }
+        return rules;
     }
 }

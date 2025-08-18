@@ -6,6 +6,8 @@ public with sharing class HttpUtils {
 	public static final String HTTP_CONTENT_TYPE_FORM_URLENCODED = 'application/x-www-form-urlencoded';
 	public static final String HTTP_CONTENT_TYPE_JSON_PATCH = 'application/json-patch+json';
 
+	public static final String AUTH_TYPE_BEARER = 'Bearer ';
+
 	public static Map<String, String> getHeadersContentType(String typeValue) {
 		return new Map<String, String>{
 			'Content-Type' => typeValue

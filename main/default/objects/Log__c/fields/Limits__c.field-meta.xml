@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Limits__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>Reference to the Limits record that contains org limits data for the time when this log was created. This provides access to limit usage metrics without storing duplicate data on each log.</description>
+    <externalId>false</externalId>
+    <label>Limits</label>
+    <referenceTo>Limits__c</referenceTo>
+    <relationshipLabel>Logs</relationshipLabel>
+    <relationshipName>Logs</relationshipName>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+</CustomField>
