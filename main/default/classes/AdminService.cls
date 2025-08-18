@@ -1397,6 +1397,7 @@ public without sharing class AdminService {
         return data;
     }
 
+    // TODO: Remove if don't use
     public static void stopScheduler(String schedulerJobName) {
         List<CronTrigger> availableCrons = getAvailableCronJobByName(schedulerJobName);
         if (availableCrons.size() == 1) {

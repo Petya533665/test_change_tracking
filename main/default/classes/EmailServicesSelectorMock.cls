@@ -7,6 +7,7 @@ public with sharing class EmailServicesSelectorMock implements System.StubProvid
         
     private String apexEmailNotificationsEmail;
     private String emailServicesAddressDeveloperName;
+    private Boolean emailServicesAddressIsActive;
     
     private List<Id> apexEmailNotificationIds;
     private List<Id> emailServicesFunctionIds;
@@ -33,6 +34,14 @@ public with sharing class EmailServicesSelectorMock implements System.StubProvid
     public String getEmailServicesAddressDeveloperName() {
         return this.emailServicesAddressDeveloperName ?? ConfigUtil.EMAIL_SERVICES_ADDRESS_DEVELOPER_NAME;
     }
+
+    public void setEmailServicesAddressIsActive(Boolean isActive) {
+        this.emailServicesAddressIsActive = isActive;
+    }
+
+    public Boolean getEmailServicesAddressIsActive() {
+        return this.emailServicesAddressIsActive ?? true;
+    }
     
     public Object handleMethodCall(Object stubbedObject,
                                     String stubbedMethodName,
@@ -47,6 +56,8 @@ public with sharing class EmailServicesSelectorMock implements System.StubProvid
             return this.getPackageAllAddresses();
         } else if (stubbedMethodName.equals('getPackageEmailServicesFunctions')) {
             return this.getPackageEmailServicesFunctions();
+        } else if (stubbedMethodName.equals('getActiveEmailServicesAddressesByFunctionIdsOrderingByCreatedDate')) {
+            return this.getActiveEmailServicesAddressesByFunctionIdsOrderingByCreatedDate();
         } else {
             return null;
         }
@@ -93,7 +104,7 @@ public with sharing class EmailServicesSelectorMock implements System.StubProvid
                         'RunAsUserId' => UserInfo.getUserId(),
                         'LocalPart' => ConfigUtil.EMAIL_SERVICES_ADDRESS_DEVELOPER_NAME.toLowerCase(),
                         'EmailDomainName' => TEST_EMAIL_SERVICES_ADDRESS_EMAIL_DOMAIN_NAME + i,
-                        'IsActive' => true,
+                        'IsActive' => this.getEmailServicesAddressIsActive(),
                         'FunctionId' => emailServicesFunctionIds.get(0)
                     }
                 ),
@@ -104,7 +115,36 @@ public with sharing class EmailServicesSelectorMock implements System.StubProvid
         return emailServicessAddresses;
     }
 
-    public List<EmailServicesFunction> getPackageEmailServicesFunctions() {
+    private List<EmailServicesAddress> getActiveEmailServicesAddressesByFunctionIdsOrderingByCreatedDate() {
+        Boolean isSkipCreationNeeded =
+            this.emailServicesFunctionIds == null 
+            || this.emailServicesFunctionIds.isEmpty() 
+            || this.emailServicesAddressIds == null 
+            || this.emailServicesAddressIds.isEmpty();
+        if (isSkipCreationNeeded) {
+            return new List<EmailServicesAddress>();
+        }
+
+        // use this approach to avoid the error 'Field EmailDomainName is not editable'
+        return new List<EmailServicesAddress>{
+            (EmailServicesAddress) JSON.deserialize(
+                JSON.serialize(
+                    new Map<String, Object>{
+                        'Id' => this.emailServicesAddressIds.get(0),
+                        'DeveloperName' => ConfigUtil.EMAIL_SERVICES_ADDRESS_DEVELOPER_NAME,
+                        'RunAsUserId' => UserInfo.getUserId(),
+                        'LocalPart' => ConfigUtil.EMAIL_SERVICES_ADDRESS_DEVELOPER_NAME.toLowerCase(),
+                        'EmailDomainName' => TEST_EMAIL_SERVICES_ADDRESS_EMAIL_DOMAIN_NAME + 0,
+                        'IsActive' => true,
+                        'FunctionId' => emailServicesFunctionIds.get(0)
+                    }
+                ),
+                EmailServicesAddress.class
+            )
+        };
+    }
+
+    private List<EmailServicesFunction> getPackageEmailServicesFunctions() {
         List<EmailServicesFunction> emailServicesFunctions = new List<EmailServicesFunction>();
         Boolean isSkipCreationNeeded =
             this.emailServicesFunctionIds == null
