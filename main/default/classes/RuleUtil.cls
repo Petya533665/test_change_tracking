@@ -52,6 +52,7 @@ public with sharing class RuleUtil {
 	public static final String KEY_ACTIONS = 'actions';
 	public static final String KEY_ACTION_TYPES = 'actionTypesMap';
 	public static final String KEY_LIMIT_FIELD_NAMES = 'limitFieldNames';
+	public static final String KEY_LIMIT_MONITORING_FREQUENCY = 'limitMonitoringFrequency';
 	public static final String KEY_LOG_FIELDS = 'logFields';
 	public static final String KEY_ISSUE_FIELDS = 'issueFields';
 	public static final String KEY_ISSUE_FIELDS_FOR_UPDATE = 'updateIssueFields';
@@ -101,7 +102,8 @@ public with sharing class RuleUtil {
 			RULE_TYPE_MONITORING => ConfigUtil.SETTINGS.Monitoring_Enabled__c,
 			RULE_TYPE_ARCHIVAL => ConfigUtil.SETTINGS.Archival_Enabled__c,
 			RULE_TYPE_NOTIFICATION => PermissionsUtil.NotificationIntegrationEnabled,
-			RULE_TYPE_EVENT_MONITORING => PermissionsUtil.EventMonitoringEnabled && ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c
+			RULE_TYPE_EVENT_MONITORING => PermissionsUtil.EventMonitoringEnabled && ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c,
+			RULE_TYPE_LIMITS => ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c && ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c != null
 	};
 
 	public static final List<String> RULE_TYPES_FOR_IMPORT_EXPORT = new List<String>{
@@ -267,9 +269,8 @@ public with sharing class RuleUtil {
 					ACTION_TYPE_JIRA_TICKET_COMMENT
 			},
 			RULE_TYPE_AZURE_DEV_OPS => new List<String>{
-				ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
-				ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
-				
+					ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
+					ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
 			},
 			RULE_TYPE_NOTIFICATION => new List<String> {
 					ACTION_TYPE_EMAIL_NOTIFICATION,
@@ -279,10 +280,18 @@ public with sharing class RuleUtil {
 					ACTION_TYPE_JIRA_TICKET_COMMENT,
 					ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
 			},
-			RULE_TYPE_BROADCAST => new List<String> {
-			},
+			RULE_TYPE_BROADCAST => new List<String>(),
 			RULE_TYPE_EVENT_MONITORING => new List<String>(),
-			RULE_TYPE_LIMITS => new List<String>()
+			RULE_TYPE_LIMITS => new List<String> {
+					ACTION_TYPE_EMAIL_NOTIFICATION,
+					ACTION_TYPE_SLACK_NOTIFICATION,
+					ACTION_TYPE_JIRA_NOTIFICATION,
+					ACTION_TYPE_PAGERDUTY_NOTIFICATION,
+					ACTION_TYPE_TEAMS_NOTIFICATION,
+					ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
+					ACTION_TYPE_JIRA_TICKET_COMMENT,
+					ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
+			}
 	};
 	public static final Map<String, String> MAP_ACTION_SUBTYPES = new Map<String, String> {
 			RULE_TYPE_NOTIFICATION => ACTION_SUBTYPE_NOTIFICATION
