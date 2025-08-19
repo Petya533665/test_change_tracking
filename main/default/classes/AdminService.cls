@@ -2523,6 +2523,8 @@ public without sharing class AdminService {
         if (ruleType == RuleUtil.RULE_TYPE_LIMITS) {
             ruleSettings.put(RuleUtil.KEY_LIMIT_FIELD_NAMES, LimitsService.FIELD_MAP.keySet());
             ruleSettings.put(RuleUtil.KEY_LIMIT_MONITORING_FREQUENCY, Integer.valueOf(ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c));
+        } else if (ruleType == RuleUtil.RULE_TYPE_EVENT_MONITORING) {
+            ruleSettings.put(RuleUtil.KEY_EVENT_MONITORING_TYPES, EventMonitoringUtil.getEventTypesWithStatus());
         }
         return ruleSettings;
     }
@@ -2572,6 +2574,8 @@ public without sharing class AdminService {
     public static Event_Monitoring__c setEventMonitoringSetting(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
+        EventMonitoringUtil eventUtil = new EventMonitoringUtil();
+        eventUtil.enableEventTypes(new List<String>(String.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES)).split(',')));
         DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
         return ConfigUtil.EVENT_MONITORING_SETTINGS;
     }

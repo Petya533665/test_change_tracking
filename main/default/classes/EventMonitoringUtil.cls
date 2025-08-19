@@ -559,11 +559,37 @@ public with sharing class EventMonitoringUtil {
         return false;
     }
 
-    public void enableEventType(String eventTypeToEnable) {
+    public void enableEventTypes(List<String> eventTypesToEnable) {
         List<Boolean> enabledMembersFromSettings = getEnabledMembersFromSettings();
-        Integer index = MAP_ENABLED_EVENT_TYPES.get(eventTypeToEnable);
-        if (index != null) {
-            enabledMembersFromSettings[index] = true;
+        for (String eventType : eventTypesToEnable) {
+            Integer index = MAP_ENABLED_EVENT_TYPES.get(eventType);
+            if (index != null) {
+                enabledMembersFromSettings[index] = true;
+            }
+        }
+        List<String> enabledTypes = new List<String>();
+        for (Integer i = 0; i < enabledMembersFromSettings.size(); i++) {
+            if (enabledMembersFromSettings[i]) {
+                enabledTypes.add('1');
+            } else {
+                enabledTypes.add('0');
+            }
+        }
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = String.join(enabledTypes, ',');
+        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+    }
+
+    public void enableEventType(String eventTypeToEnable) {
+        enableEventTypes(new List<String>{eventTypeToEnable});
+    }
+
+    public void disableEventTypes(List<String> eventTypesToDisable) {
+        List<Boolean> enabledMembersFromSettings = getEnabledMembersFromSettings();
+        for (String eventType : eventTypesToDisable) {
+            Integer index = MAP_ENABLED_EVENT_TYPES.get(eventType);
+            if (index != null) {
+                enabledMembersFromSettings[index] = false;
+            }
         }
         List<String> enabledTypes = new List<String>();
         for (Integer i = 0; i < enabledMembersFromSettings.size(); i++) {
@@ -578,21 +604,23 @@ public with sharing class EventMonitoringUtil {
     }
 
     public void disableEventType(String eventTypeToDisable) {
-        List<Boolean> enabledMembersFromSettings = getEnabledMembersFromSettings();
-        Integer index = MAP_ENABLED_EVENT_TYPES.get(eventTypeToDisable);
-        if (index != null) {
-            enabledMembersFromSettings[index] = false;
-        }
-        List<String> enabledTypes = new List<String>();
-        for (Integer i = 0; i < enabledMembersFromSettings.size(); i++) {
-            if (enabledMembersFromSettings[i]) {
-                enabledTypes.add('1');
+        disableEventTypes(new List<String>{eventTypeToDisable});
+    }
+
+    public static Map<String, Boolean> getEventTypesWithStatus() {
+        Map<String, Boolean> result = new Map<String, Boolean>();
+        List<Boolean> enabledStatuses = getEnabledMembersFromSettings();
+        
+        for (String eventType : MAP_ENABLED_EVENT_TYPES.keySet()) {
+            Integer index = MAP_ENABLED_EVENT_TYPES.get(eventType);
+            if (index != null && index < enabledStatuses.size()) {
+                result.put(eventType, enabledStatuses[index]);
             } else {
-                enabledTypes.add('0');
+                result.put(eventType, false);
             }
         }
-        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = String.join(enabledTypes, ',');
-        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        return result;
     }
 
     /**
