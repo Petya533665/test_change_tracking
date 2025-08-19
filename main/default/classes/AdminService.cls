@@ -2519,9 +2519,9 @@ public without sharing class AdminService {
         ruleSettings.put(RuleUtil.KEY_ACTION_TYPES, RuleUtil.getActionTypes(ruleType));
         ruleSettings.put(RuleUtil.KEY_RULE_SUBTYPES, SObjectType.Rule__c.fields.Subtype__c.getPicklistValues());
         ruleSettings.put(RuleUtil.KEY_USER_TIMEZONE_OFFSET, getUserTimezoneOffset());
-        ruleSettings.put(RuleUtil.KEY_LIMIT_FIELD_NAMES, LimitsService.FIELD_MAP.keySet());
 
         if (ruleType == RuleUtil.RULE_TYPE_LIMITS) {
+            ruleSettings.put(RuleUtil.KEY_LIMIT_FIELD_NAMES, LimitsService.FIELD_MAP.keySet());
             ruleSettings.put(RuleUtil.KEY_LIMIT_MONITORING_FREQUENCY, Integer.valueOf(ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c));
         }
         return ruleSettings;
