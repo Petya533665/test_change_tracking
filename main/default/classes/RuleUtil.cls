@@ -51,13 +51,14 @@ public with sharing class RuleUtil {
 	public static final String KEY_EVENTS = 'events';
 	public static final String KEY_ACTIONS = 'actions';
 	public static final String KEY_ACTION_TYPES = 'actionTypesMap';
-	public static final String KEY_LIMIT_FIELD_NAMES = 'limitFieldNames';
-	public static final String KEY_LIMIT_MONITORING_FREQUENCY = 'limitMonitoringFrequency';
 	public static final String KEY_LOG_FIELDS = 'logFields';
 	public static final String KEY_ISSUE_FIELDS = 'issueFields';
 	public static final String KEY_ISSUE_FIELDS_FOR_UPDATE = 'updateIssueFields';
 	public static final String KEY_SERVICE_ENABLE = 'servicesEnable';
 	public static final String KEY_USER_TIMEZONE_OFFSET = 'userTimezoneOffset';
+	public static final String KEY_LIMIT_FIELD_NAMES = 'limitFieldNames';
+	public static final String KEY_LIMIT_MONITORING_FREQUENCY = 'limitMonitoringFrequency';
+	public static final String KEY_EVENT_MONITORING_TYPES = 'eventMonitoringTypes';
 
 	public static final String KEY_SUCCESS = 'success';
 	public static final String KEY_MESSAGE = 'message';
