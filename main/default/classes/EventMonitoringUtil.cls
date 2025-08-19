@@ -607,20 +607,30 @@ public with sharing class EventMonitoringUtil {
         disableEventTypes(new List<String>{eventTypeToDisable});
     }
 
-    public static Map<String, Boolean> getEventTypesWithStatus() {
-        Map<String, Boolean> result = new Map<String, Boolean>();
+    public static List<EventTypeStatus> getEventTypesWithStatus() {
+        List<EventTypeStatus> result = new List<EventTypeStatus>();
         List<Boolean> enabledStatuses = getEnabledMembersFromSettings();
         
         for (String eventType : MAP_ENABLED_EVENT_TYPES.keySet()) {
             Integer index = MAP_ENABLED_EVENT_TYPES.get(eventType);
+            Boolean isActive = false;
             if (index != null && index < enabledStatuses.size()) {
-                result.put(eventType, enabledStatuses[index]);
-            } else {
-                result.put(eventType, false);
+                isActive = enabledStatuses[index];
             }
+            result.add(new EventTypeStatus(eventType, isActive));
         }
         
         return result;
+    }
+
+    public class EventTypeStatus {
+        public String name;
+        public Boolean active;
+        
+        public EventTypeStatus(String name, Boolean active) {
+            this.name = name;
+            this.active = active;
+        }
     }
 
     /**
