@@ -1397,6 +1397,7 @@ public without sharing class AdminService {
         return data;
     }
 
+    // TODO: Remove if don't use
     public static void stopScheduler(String schedulerJobName) {
         List<CronTrigger> availableCrons = getAvailableCronJobByName(schedulerJobName);
         if (availableCrons.size() == 1) {
@@ -2522,7 +2523,7 @@ public without sharing class AdminService {
 
         if (ruleType == RuleUtil.RULE_TYPE_LIMITS) {
             ruleSettings.put(RuleUtil.KEY_LIMIT_FIELD_NAMES, LimitsService.FIELD_MAP.keySet());
-            ruleSettings.put(RuleUtil.KEY_LIMIT_MONITORING_FREQUENCY, Integer.valueOf(ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c));
+            ruleSettings.put(RuleUtil.KEY_LIMIT_MONITORING_FREQUENCY, String.isNotBlank(ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c) ? Integer.valueOf(ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c) : null);
         } else if (ruleType == RuleUtil.RULE_TYPE_EVENT_MONITORING) {
             ruleSettings.put(RuleUtil.KEY_EVENT_MONITORING_TYPES, EventMonitoringUtil.getEventTypesWithStatus());
         }

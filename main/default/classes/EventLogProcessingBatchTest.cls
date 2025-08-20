@@ -436,9 +436,9 @@ private class EventLogProcessingBatchTest {
 
     private static final List<FieldDefinition> DEFAULT_FIELD_DEFINITIONS = new List<FieldDefinition>{
         new FieldDefinition('TIMESTAMP', 'String', '20130715233322.670'),
-        new FieldDefinition('USER_ID', 'String', '005xx000001234AAA'),
+        new FieldDefinition('USER_ID', 'String', '005xx000001234A'),
         new FieldDefinition('ORGANIZATION_ID', 'String', '00D123456789012345'),
-        new FieldDefinition('USER_ID_DERIVED', 'String', '005xx000001234AAA'),
+        new FieldDefinition('USER_ID_DERIVED', 'String', '005xx000001234A'),
         new FieldDefinition('CLIENT_IP', 'String', '192.168.1.1'),
         new FieldDefinition('SESSION_KEY', 'String', 'SESSION-{0}'),
         new FieldDefinition('TIMESTAMP_DERIVED', 'DateTime', '2024-01-01T12:00:00Z'),
@@ -846,8 +846,8 @@ private class EventLogProcessingBatchTest {
         
         String csvData = '"APEX_CODE","List index out of bounds: 0","System.ListException",' +
                         '"Class.TestClass.processData: line 15\\nClass.TestClass.execute: line 5",' +
-                        '"REQ-BATCH-001","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
-                        '"' + formattedTiming + '","' + timestampFormat + '","005xx000001234AAA"';
+                        '"REQ-BATCH-001","00D123456789012345","005xx000001234A","005xx000001234A",' +
+                        '"' + formattedTiming + '","' + timestampFormat + '","005xx000001234A"';
         
         return csvHeader + '\n' + csvData;
     }
@@ -877,20 +877,20 @@ private class EventLogProcessingBatchTest {
         // First exception record
         csvRows.add('"APEX_CODE","List index out of bounds: 0","System.ListException",' +
                     '"Class.TestClass.processData: line 15\\nClass.TestClass.execute: line 5",' +
-                    '"REQ-MIXED-001","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
-                    '"' + formattedTime1 + '","' + timestamp1 + '","005xx000001234AAA"');
+                    '"REQ-MIXED-001","00D123456789012345","005xx000001234A","005xx000001234A",' +
+                    '"' + formattedTime1 + '","' + timestamp1 + '","005xx000001234A"');
         
         // Second exception record
         csvRows.add('"APEX_CODE","Null pointer exception","System.NullPointerException",' +
                     '"Class.AnotherClass.handleData: line 25\\nClass.AnotherClass.run: line 10",' +
-                    '"REQ-MIXED-002","00D123456789012345","005xx000001234BBB","005xx000001234BBB",' +
-                    '"' + formattedTime2 + '","' + timestamp2 + '","005xx000001234BBB"');
+                    '"REQ-MIXED-002","00D123456789012345","005xx000001234B","005xx000001234B",' +
+                    '"' + formattedTime2 + '","' + timestamp2 + '","005xx000001234B"');
         
         // Third exception record
         csvRows.add('"APEX_CODE","DML Exception occurred","System.DmlException",' +
                     '"Class.DataProcessor.updateRecords: line 30\\nClass.DataProcessor.process: line 15",' +
-                    '"REQ-MIXED-003","00D123456789012345","005xx000001234CCC","005xx000001234CCC",' +
-                    '"' + formattedTime3 + '","' + timestamp3 + '","005xx000001234CCC"');
+                    '"REQ-MIXED-003","00D123456789012345","005xx000001234C","005xx000001234C",' +
+                    '"' + formattedTime3 + '","' + timestamp3 + '","005xx000001234C"');
         
         return String.join(csvRows, '\n');
     }
@@ -1301,7 +1301,7 @@ private class EventLogProcessingBatchTest {
         
         String csvData = '"APEX_CODE","List index out of bounds: 0","System.ListException",' +
                         '"Class.TestClass.processData: line 15\\nClass.TestClass.execute: line 5",' +
-                        '"REQ-TEST-001","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
+                        '"REQ-TEST-001","00D123456789012345","005xx000001234A","005xx000001234A",' +
                         '"' + formattedTiming + '","' + timestampFormat + '","TEST-HASH-001"';
         
         return csvHeader + '\n' + csvData;
@@ -1316,7 +1316,7 @@ private class EventLogProcessingBatchTest {
         String timestampFormat = timing.formatGMT('yyyyMMddHHmmss') + '.000'; // Convert to TIMESTAMP format
         String csvData = '"APEX_CODE","Test exception for timing","System.TestException",' +
                         '"Class.TestClass.processData: line 20",' +
-                        '"REQ-TIMING-001","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
+                        '"REQ-TIMING-001","00D123456789012345","005xx000001234A","005xx000001234A",' +
                         '"' + formattedTiming + '","' + timestampFormat + '","TEST-HASH-001"';
         
         return csvHeader + '\n' + csvData;
@@ -1333,7 +1333,7 @@ private class EventLogProcessingBatchTest {
         
         String csvData = '"APEX_CODE","Test exception for fast filter","System.TestException",' +
                         '"Class.TestClass.processData: line 25",' +
-                        '"' + requestId + '","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
+                        '"' + requestId + '","00D123456789012345","005xx000001234A","005xx000001234A",' +
                         '"' + formattedTiming + '","' + timestampFormat + '","FAST-FILTER-HASH-001"';
         
         return csvHeader + '\n' + csvData;
@@ -1363,19 +1363,19 @@ private class EventLogProcessingBatchTest {
         // Create the same exception data that would generate the expected hash
         csvRows.add('"APEX_CODE","' + exceptionMessage + '","System.TestException",' +
                     '"' + stackTrace + '",' +
-                    '"REQ-MIXED-TIMING-001","00D123456789012345","005xx000001234AAA","005xx000001234AAA",' +
+                    '"REQ-MIXED-TIMING-001","00D123456789012345","005xx000001234A","005xx000001234A",' +
                     '"' + log1FormattedTiming + '","' + log1Timestamp + '","' + existingHash + '"');
         
         // Log 2: Should be skipped due to existing Request_Id
         csvRows.add('"APEX_CODE","Exception with existing Request_Id","System.TestException",' +
                     '"Class.TestClass.processData: line 35",' +
-                    '"' + existingRequestId + '","00D123456789012345","005xx000001234BBB","005xx000001234BBB",' +
+                    '"' + existingRequestId + '","00D123456789012345","005xx000001234B","005xx000001234B",' +
                     '"' + log2FormattedTiming + '","' + log2Timestamp + '","MIXED-HASH-002"');
         
         // Log 3: Should be created (new hash and Request_Id)
         csvRows.add('"APEX_CODE","New exception to be created","System.TestException",' +
                     '"Class.TestClass.processData: line 40",' +
-                    '"REQ-MIXED-NEW-001","00D123456789012345","005xx000001234CCC","005xx000001234CCC",' +
+                    '"REQ-MIXED-NEW-001","00D123456789012345","005xx000001234C","005xx000001234C",' +
                     '"' + log3FormattedTiming + '","' + log3Timestamp + '","MIXED-HASH-003"');
         
         return String.join(csvRows, '\n');
@@ -1609,7 +1609,7 @@ private class EventLogProcessingBatchTest {
         // Create 50 test rows
         for (Integer i = 0; i < 50; i++) {
             dataRows.add('REQ-' + String.valueOf(i).leftPad(3, '0') + 
-                        ',00D123456789012345,005xx000001234AAA,20130715233322.670,' +
+                        ',00D123456789012345,005xx000001234A,20130715233322.670,' +
                         String.valueOf(100 + i) + ',Success');
         }
         
@@ -1662,7 +1662,7 @@ private class EventLogProcessingBatchTest {
         // Create 25 test rows
         for (Integer i = 0; i < 25; i++) {
             dataRows.add('REQ-' + String.valueOf(i).leftPad(3, '0') + 
-                        ',00D123456789012345,005xx000001234AAA,20130715233322.670,' +
+                        ',00D123456789012345,005xx000001234A,20130715233322.670,' +
                         String.valueOf(100 + i) + ',Success');
         }
         
