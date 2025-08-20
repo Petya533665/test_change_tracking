@@ -2575,7 +2575,7 @@ public without sharing class AdminService {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
         EventMonitoringUtil eventUtil = new EventMonitoringUtil();
-        eventUtil.enableEventTypes(new List<String>(String.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES)).split(',')));
+        eventUtil.enableEventTypes((List<String>)input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES));
         DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
         return ConfigUtil.EVENT_MONITORING_SETTINGS;
     }
