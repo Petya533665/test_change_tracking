@@ -10109,13 +10109,15 @@ public class JiraNotificationBatchTest {
 		// Create a batch context manager and manually add rate limit events
 		TestRateLimitBatchContextManager batchManager = new TestRateLimitBatchContextManager();
 
+		List<Id> fakeAccountIds = TestDataFactory.getFakeIds(Account.SObjectType, 3);
+
 		// Manually track some rate limit events
-		batchManager.trackSlackAction('record1');
-		batchManager.trackSlackAction('record2');
-		batchManager.trackSlackAction('record3');
-		batchManager.trackSlackRateLimit('record1', 'Slack API rate limit hit. Retry after: 60 seconds', DateTime.now().addSeconds(60));
-		batchManager.trackSlackRateLimit('record2', 'Slack API rate limit hit. Retry after: 30 seconds', DateTime.now().addSeconds(30));
-		batchManager.trackSlackSuccess('record3');
+		batchManager.trackSlackAction(fakeAccountIds.get(0));
+		batchManager.trackSlackAction(fakeAccountIds.get(1));
+		batchManager.trackSlackAction(fakeAccountIds.get(2));
+		batchManager.trackSlackRateLimit(fakeAccountIds.get(0), 'Slack API rate limit hit. Retry after: 60 seconds', DateTime.now().addSeconds(60));
+		batchManager.trackSlackRateLimit(fakeAccountIds.get(1), 'Slack API rate limit hit. Retry after: 30 seconds', DateTime.now().addSeconds(30));
+		batchManager.trackSlackSuccess(fakeAccountIds.get(2));
 
 		// Verify rate limit events are tracked
 		NotificationService.BatchExecutionStats stats = batchManager.getBatchStats();

@@ -65,6 +65,11 @@ public with sharing class Constants {
         private set;
     }
 
+    public static final UserSObject USER_SOBJECT { 
+        get { return USER_SOBJECT == null ? (USER_SOBJECT = new UserSObject()) : USER_SOBJECT; }
+        private set;
+    }
+
     public inherited sharing class GlobalVariable {
         public final String BASE_URL = System.Url.getOrgDomainUrl().toExternalForm();
         public final String NEWLINE_CHARACTERS = '\r\n';
@@ -318,6 +323,12 @@ public with sharing class Constants {
             CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8 => false,
             CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS => 0
         };
+    }
+
+    public inherited sharing class UserSObject extends SObjectTypeConstants {
+        private UserSObject() {
+            this.objectType = User.SObjectType;
+        }
     }
     
     public inherited sharing virtual class SObjectTypeConstants {

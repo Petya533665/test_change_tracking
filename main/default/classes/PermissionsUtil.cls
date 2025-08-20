@@ -394,7 +394,7 @@ public without sharing class PermissionsUtil {
 	public static final Map<String, Integer> MAP_FEATURE10_INDEX_BY_NAME = new Map<String, Integer> {
 			FP_MAX_ISSUES => 0,
 			FP_MAX_NOTIFICATIONS_24_HR => 1,
-			FP_AUTO_CHART_ENABLED => 2
+			FP_AUTO_CHART_ENABLED => 16
 	};
 
 	//{"2":255,"1":255,"0":255}
@@ -439,7 +439,7 @@ public without sharing class PermissionsUtil {
 	public static final Integer DEFAULT_FEATURE_MAP_5_VALUE = 0;
 	public static final Integer DEFAULT_FEATURE_MAP_6_VALUE = 0;
 	public static final Integer MAX_USED_BITS_IN_INTEGER = 29;
-	public static final Integer DEFAULT_FEATURE_MAP_10_VALUE = 1;
+	public static final Integer DEFAULT_FEATURE_MAP_10_VALUE = (1 << 16); // Enable AutoChart
 
 	@TestVisible
 	public static Integer FeatureMap1IntValue {
@@ -766,7 +766,7 @@ public without sharing class PermissionsUtil {
 			if(MaxMonitoringRules == null) {
 				MaxMonitoringRules = FeatureMap2.get(MAP_FEATURE2_INDEX_BY_NAME.get(FP_MAX_MONITORING_RULES));
 			}
-			return 100;
+			return MaxMonitoringRules;
 		}
 		private set;
 	}
@@ -861,7 +861,7 @@ public without sharing class PermissionsUtil {
 			if(EventMonitoringEnabled == null) {
 				EventMonitoringEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_EVENT_MONITORING_ENABLED));
 			}
-			return true;
+			return EventMonitoringEnabled;
 		}
 		private set;
 	}
@@ -1009,7 +1009,7 @@ public without sharing class PermissionsUtil {
 	public static Boolean AutoChartEnabled {
 		get {
 			if(AutoChartEnabled == null) {
-				AutoChartEnabled = FeatureMap10.get(MAP_FEATURE10_INDEX_BY_NAME.get(FP_AUTO_CHART_ENABLED)) == 1;
+				AutoChartEnabled = (FeatureMap10IntValue & (1 << MAP_FEATURE10_INDEX_BY_NAME.get(FP_AUTO_CHART_ENABLED))) != 0;
 			}
 			return AutoChartEnabled;
 		}

@@ -41,6 +41,12 @@ public class Test_AdminController {
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
+            'method' => 'getAzureDevOpsSettings',
+            'data' => ''
+        };
+        AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        payload = new Map<String, Object>{
             'method' => 'resetJiraSettings',
             'data' => ''
         };
@@ -95,13 +101,13 @@ public class Test_AdminController {
         AdminController ctrl = new AdminController();
 
         Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'createEmailService',
+            'method' => 'saveJiraSettings',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
-            'method' => 'saveJiraSettings',
+            'method' => 'saveAzureDevOpsSettings',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -174,12 +180,6 @@ public class Test_AdminController {
 
         payload = new Map<String, Object>{
             'method' => 'getActionRules',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'setArchivalSetting',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -413,12 +413,6 @@ public class Test_AdminController {
 
         payload = new Map<String, Object>{
             'method' => 'getPlatformEventSubscriberConfigAIEvent',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'setBatchErrorTrackingSetting',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -743,18 +737,6 @@ public class Test_AdminController {
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
-        payload = new Map<String, Object>{
-                'method' => 'refreshConnectedOrgToken',
-                'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-                'method' => 'testConnectedOrg',
-                'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
         Test.stopTest();
 
         System.assertNotEquals(null, payload);
@@ -864,18 +846,6 @@ public class Test_AdminController {
         AdminController ctrl = new AdminController();
 
         Map<String, Object> payload = new Map<String, Object>{
-                'method' => 'getQuickStartState',
-                'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-                'method' => 'setQuickStartState',
-                'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
                 'method' => 'getUserInfo',
                 'data' => ''
         };
@@ -918,6 +888,9 @@ public class Test_AdminController {
         System.assertNotEquals(null, ac.packageNamespace);
         System.assertNotEquals(null, AdminController.baseRemoteSiteSettings);
         System.assertNotEquals(null, AdminController.remoteSiteSettingsPayload);
+        System.assertNotEquals(null, AdminController.blurModeUrlParameter);
+        System.assertNotEquals(null, ac.userTimezoneOffset);
+        System.assertNotEquals(null, AdminController.getAdminPageInitEvent());
         Test.stopTest();
     }
 
@@ -1100,6 +1073,38 @@ public class Test_AdminController {
         System.assert(testTemplate.containsKey('body'), 'Returned template should contain a body');
         System.assert(testTemplate.get('subject').contains(eventObjectName), 'Subject template should contain Event__c object name');
         System.assert(testTemplate.get('body').contains(eventObjectName), 'Body template should contain Event__c object name');
+    }
+
+    @IsTest
+    static void test_admin_service_getIssueDefaultEmailActionTemplate() {
+        Map<String, String> testTemplate;
+        Test.startTest();
+        testTemplate = AdminService.getIssueDefaultEmailActionTemplate();
+        Test.stopTest();
+    
+        String issueObjectName = Schema.SObjectType.Issue__c.getName();
+        
+        Assert.areNotEqual(null, testTemplate, 'Returned template should not be null');
+        Assert.isTrue(testTemplate.containsKey('subject'), 'Returned template should contain a subject');
+        Assert.isTrue(testTemplate.containsKey('body'), 'Returned template should contain a body');
+        Assert.isTrue(testTemplate.get('subject').contains(issueObjectName), 'Subject template should contain Issue__c object name');
+        Assert.isTrue(testTemplate.get('body').contains(issueObjectName), 'Body template should contain Issue__c object name');
+    }
+
+    @IsTest
+    static void test_admin_service_getIssueTicketCommentActionTemplate() {
+        Map<String, String> testTemplate;
+        Test.startTest();
+        testTemplate = AdminService.getIssueTicketCommentActionTemplate();
+        Test.stopTest();
+    
+        String issueObjectName = Schema.SObjectType.Issue__c.getName();
+        
+        Assert.areNotEqual(null, testTemplate, 'Returned template should not be null');
+        Assert.isTrue(testTemplate.containsKey('subject'), 'Returned template should contain a subject');
+        Assert.isTrue(testTemplate.containsKey('body'), 'Returned template should contain a body');
+        Assert.isTrue(testTemplate.get('subject') == null);
+        Assert.isTrue(testTemplate.get('body').contains(issueObjectName), 'Body template should contain Issue__c object name');
     }
 
     @IsTest
@@ -2243,6 +2248,116 @@ public class Test_AdminController {
         result = (Map<String, Object>)AdminService.updateConnectedOrg(data);
         Test.stopTest();
         System.assertNotEquals(null, result);
+    }
+
+    @IsTest
+    private static void test_RemoteAction_refreshConnectedOrgToken() {
+        TestDataFactory.createConnectedOrg();
+        TestDataFactory.createConnectedOrgSettings();
+
+        final String NEW_ACCESS_TOKEN = 'new_access_token';
+
+        ConnectedOrgService.AuthTokenResponse authTokenResponse = new ConnectedOrgService.AuthTokenResponse();
+        authTokenResponse.access_token = NEW_ACCESS_TOKEN;
+
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(
+            new Map<String, HttpCalloutMock>{
+                TestDataFactory.CONNECTED_ORG_INSTANCE_URL + ConfigUtil.SF_OAUTH_TOKEN_ENDPOINT =>
+                new TestDataFactory.SingleRequestMock(
+                    200,
+                    'OK',
+                    JSON.serialize(authTokenResponse)
+                )
+            }
+        ));
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'refreshConnectedOrgToken',
+                'data' => new AdminService.ConnectedOrgDTO(ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId().left(15)))
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+
+        AdminService.ConnectedOrgDTO d = (AdminService.ConnectedOrgDTO) JSON.deserialize(
+            JSON.serialize(response.get('data')),
+            AdminService.ConnectedOrgDTO.class
+        );
+
+        Assert.areEqual(NEW_ACCESS_TOKEN, d.accessToken);
+    }
+
+    @IsTest
+    private static void test_RemoteAction_testConnectedOrg_success() {
+        TestDataFactory.createConnectedOrg();
+
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(
+            new Map<String, HttpCalloutMock>{
+                TestDataFactory.CONNECTED_ORG_IDENTITY_URL =>
+                new TestDataFactory.SingleRequestMock(
+                    200,
+                    'OK',
+                    JSON.serialize(new ConnectedOrgService.IdentityDTO())
+                )
+            }
+        ));
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'testConnectedOrg',
+                'data' => new AdminService.ConnectedOrgDTO(ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId().left(15)))
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+
+        Assert.areEqual(ConfigUtil.CONNECTED_ORG_TESTING_KEY_SUCCESS, response.get('data'));
+    }
+
+    @IsTest
+    private static void test_RemoteAction_testConnectedOrg_fail() {
+        TestDataFactory.createConnectedOrg();
+
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(
+            new Map<String, HttpCalloutMock>{
+                TestDataFactory.CONNECTED_ORG_IDENTITY_URL =>
+                new TestDataFactory.SingleRequestMock(
+                    200,
+                    'OK',
+                    '{'
+                )
+            }
+        ));
+        
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'testConnectedOrg',
+                'data' => new AdminService.ConnectedOrgDTO(ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId().left(15)))
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+
+        Assert.areEqual(ConfigUtil.CONNECTED_ORG_TESTING_KEY_FAIL, response.get('data'));
     }
 
     @IsTest
@@ -3396,6 +3511,206 @@ public class Test_AdminController {
         Test.stopTest();
 
         Assert.isTrue((Boolean) response.get('data'));
+    }
+
+    @IsTest
+    static void test_RemoteAction_createEmailService_disableParam() {
+        List<Id> emailServicesFunctionFakeIds = TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1);
+        EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
+            null,
+            TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1),
+            null
+        );
+
+        AdminService.emailServicesSelector = (EmailServicesSelector) Test.createStub(
+            EmailServicesSelector.class,
+            emailServicesSelectorMock
+        );
+        
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(getUpdateEmailServicesFunctionMock(emailServicesFunctionFakeIds.get(0))));
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'createEmailService',
+                'data' => new Map<String, Object>{
+                    ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => false
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.areNotEqual(null, response);
+    }
+
+    @IsTest
+    static void test_RemoteAction_createEmailService_enableParam_WithoutExistingServices() {
+        EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
+            null,
+            null,
+            null
+        );
+
+        AdminService.emailServicesSelector = (EmailServicesSelector) Test.createStub(
+            EmailServicesSelector.class,
+            emailServicesSelectorMock
+        );
+
+        List<Id> emailServicesFunctionFakeIds = TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1);
+        List<Id> emailServicesAddressFakeIds = TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 1);
+
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesFunctionServiceMock.getCreateEmailServicesFunctionMock(emailServicesFunctionFakeIds.get(0)));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesAddressServiceMock.getCreateEmailServicesAddressMock(emailServicesAddressFakeIds.get(0)));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.apexEmailNotificationServiceMock.getCreateApexEmailNotificationMock());
+
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'createEmailService',
+                'data' => new Map<String, Object>{
+                    ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => true
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.areNotEqual(null, response);
+    }
+
+    @IsTest
+    static void test_RemoteAction_createEmailService_enableParam_WithAllExistingServices() { 
+        List<Id> apexEmailNotificationFakeIds = TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 1);
+        List<Id> emailServicesFunctionFakeIds = TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1);
+        List<Id> emailServicesAddressFakeIds = TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 2);
+
+        EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
+            apexEmailNotificationFakeIds,
+            emailServicesFunctionFakeIds,
+            emailServicesAddressFakeIds
+        );
+
+        emailServicesSelectorMock.setEmailServicesAddressIsActive(false);
+
+        AdminService.emailServicesSelector = (EmailServicesSelector) Test.createStub(
+            EmailServicesSelector.class,
+            emailServicesSelectorMock
+        );
+
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        endpoint2TestResp.putAll(getUpdateEmailServicesFunctionMock(emailServicesFunctionFakeIds.get(0)));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesAddressServiceMock.getUpdateEmailServicesAddressMocks(new List<Id>{ emailServicesAddressFakeIds.get(0) }));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesAddressServiceMock.getDeleteEmailServicesAddressMocks(new List<Id>{ emailServicesAddressFakeIds.get(1) }));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.apexEmailNotificationServiceMock.getUpdateApexEmailNotificationMock(apexEmailNotificationFakeIds.get(0)));
+
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'createEmailService',
+                'data' => new Map<String, Object>{
+                    ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => true
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.areNotEqual(null, response);
+    }
+
+    @IsTest
+    private static void test_RemoteAction_getQuickStartState() {
+        Logger_Settings__c loggerSettings = Logger_Settings__c.getOrgDefaults();
+        loggerSettings.Quick_Start_State__c = JSON.serialize(new AdminService.QuickStartStateWrapper());
+        upsert loggerSettings;
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+            
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'getQuickStartState',
+                'data' => ''
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        AdminService.QuickStartStateWrapper responseQuickStartStateWrapper = (AdminService.QuickStartStateWrapper) JSON.deserialize(
+            JSON.serialize(response.get('data')),
+            AdminService.QuickStartStateWrapper.class
+        );
+
+        Assert.isFalse(responseQuickStartStateWrapper.connectApp);
+        Assert.isFalse(responseQuickStartStateWrapper.connectOrg);
+        Assert.isFalse(responseQuickStartStateWrapper.quickTest);
+        Assert.isFalse(responseQuickStartStateWrapper.jira);
+        Assert.isFalse(responseQuickStartStateWrapper.slack);
+        Assert.isFalse(responseQuickStartStateWrapper.teams);
+        Assert.isFalse(responseQuickStartStateWrapper.monitoring);
+        Assert.isFalse(responseQuickStartStateWrapper.monitoringTestInProgress);
+        Assert.isFalse(responseQuickStartStateWrapper.isPassthrough);
+        Assert.isFalse(responseQuickStartStateWrapper.useTeams);
+        Assert.isFalse(responseQuickStartStateWrapper.useSlack);
+    }
+
+    @IsTest
+    private static void test_RemoteAction_setQuickStartState() {
+        Logger_Settings__c loggerSettings = Logger_Settings__c.getOrgDefaults();
+        loggerSettings.Quick_Start_State__c = JSON.serialize(new AdminService.QuickStartStateWrapper());
+        upsert loggerSettings;
+
+        AdminService.QuickStartStateWrapper quickStartStateWrapper = new AdminService.QuickStartStateWrapper();
+        quickStartStateWrapper.connectApp = true;
+        quickStartStateWrapper.connectOrg = true;
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'setQuickStartState',
+                'data' => quickStartStateWrapper
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        AdminService.QuickStartStateWrapper responseQuickStartStateWrapper = (AdminService.QuickStartStateWrapper) JSON.deserialize(
+            JSON.serialize(response.get('data')),
+            AdminService.QuickStartStateWrapper.class
+        );
+
+        Assert.isTrue(responseQuickStartStateWrapper.connectApp);
+        Assert.isTrue(responseQuickStartStateWrapper.connectOrg);
+        Assert.isFalse(responseQuickStartStateWrapper.quickTest);
+        Assert.isFalse(responseQuickStartStateWrapper.jira);
+        Assert.isFalse(responseQuickStartStateWrapper.slack);
+        Assert.isFalse(responseQuickStartStateWrapper.teams);
+        Assert.isFalse(responseQuickStartStateWrapper.monitoring);
+        Assert.isFalse(responseQuickStartStateWrapper.monitoringTestInProgress);
+        Assert.isFalse(responseQuickStartStateWrapper.isPassthrough);
+        Assert.isFalse(responseQuickStartStateWrapper.useTeams);
+        Assert.isFalse(responseQuickStartStateWrapper.useSlack);
     }
 
     @IsTest
