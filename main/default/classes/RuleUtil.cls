@@ -104,7 +104,7 @@ public with sharing class RuleUtil {
 			RULE_TYPE_ARCHIVAL => ConfigUtil.SETTINGS.Archival_Enabled__c,
 			RULE_TYPE_NOTIFICATION => PermissionsUtil.NotificationIntegrationEnabled,
 			RULE_TYPE_EVENT_MONITORING => PermissionsUtil.EventMonitoringEnabled && ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c,
-			RULE_TYPE_LIMITS => PermissionsUtil.LimitsMonitoringEnabled && ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c && ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c != null
+			RULE_TYPE_LIMITS => ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c
 	};
 
 	public static final List<String> RULE_TYPES_FOR_IMPORT_EXPORT = new List<String>{
