@@ -109,11 +109,18 @@ public with sharing class LogServiceScheduler implements Schedulable, Database.A
             'BulkAPIJobBatchScheduler' => ConfigUtil.PHAROS_SETTINGS.Archival_Scheduler_Cron_Exp__c
     };
 
+    private static String buildLimitsBatchFrequencyHours() {
+        String frequency = (String.isNotBlank(ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c)) ? ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c : '0';
+        Boolean isEnabled = PermissionsUtil.LimitsMonitoringEnabled && ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c;
+        return isEnabled ? frequency : '0';
+    }
+
     public static Map<String, String> FREQUENCY_HOURS_DEFAULT = new Map<String, String>{
-            'IssueAverageFrequencyBatch' => '6',
-            'MetricsBatch' => '24',
-            'ErrorEmailReportBatch' => '168',
-            'BulkAPIJobBatchScheduler' => '0'
+        'IssueAverageFrequencyBatch' => '6',
+        'MetricsBatch' => '24',
+        'ErrorEmailReportBatch' => '168',
+        'BulkAPIJobBatchScheduler' => '0',
+        'HourlyLimitsBatch' => buildLimitsBatchFrequencyHours()
     };
 
     private Set<DatabaseUtils.PharosBatchImpl> queueJobs = new Set<DatabaseUtils.PharosBatchImpl>();
