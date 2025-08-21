@@ -861,7 +861,7 @@ public without sharing class PermissionsUtil {
 			if(EventMonitoringEnabled == null) {
 				EventMonitoringEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_EVENT_MONITORING_ENABLED));
 			}
-			return EventMonitoringEnabled;
+			return true;
 		}
 		private set;
 	}

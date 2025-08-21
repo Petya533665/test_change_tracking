@@ -59,6 +59,7 @@
                     default:
                         try {
                             height = stackTrace.length * 310;
+                            console.log(height, stackTrace, stackTrace.length, stackTraceParseResult);
                         } catch (e) {}
                         break;
                 }
