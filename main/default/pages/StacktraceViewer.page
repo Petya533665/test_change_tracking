@@ -56,6 +56,8 @@
                         break;
                     case logCategory === 'Flow':
                     case logCategory === 'Process Builder':
+                        height = 610;
+                        break;
                     default:
                         try {
                             height = stackTrace.length * 310;
