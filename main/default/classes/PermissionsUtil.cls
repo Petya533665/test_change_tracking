@@ -766,7 +766,7 @@ public without sharing class PermissionsUtil {
 			if(MaxMonitoringRules == null) {
 				MaxMonitoringRules = FeatureMap2.get(MAP_FEATURE2_INDEX_BY_NAME.get(FP_MAX_MONITORING_RULES));
 			}
-			return 100;
+			return MaxMonitoringRules;
 		}
 		private set;
 	}
@@ -861,7 +861,7 @@ public without sharing class PermissionsUtil {
 			if(EventMonitoringEnabled == null) {
 				EventMonitoringEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_EVENT_MONITORING_ENABLED));
 			}
-			return true;
+			return EventMonitoringEnabled;
 		}
 		private set;
 	}
