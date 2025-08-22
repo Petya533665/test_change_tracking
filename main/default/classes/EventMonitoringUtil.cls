@@ -508,11 +508,13 @@ public with sharing class EventMonitoringUtil {
         }
         
         // Set thresholds based on filter index
+        ThresholdConfig.EvaluationType evalType = getEvaluationType(filters[0].ComparisonOperator__c);
         for (RuleFilter__c filter : filters) {
+            Object thresholdValue = deserializeThresholdValue(filter.Value__c, evalType);
             if (filter.Index__c == CRITICAL_INDEX) {
-                builder.setCriticalThreshold(filter.Value__c);
+                builder.setCriticalThreshold(thresholdValue);
             } else if (filter.Index__c == WARNING_INDEX) {
-                builder.setWarningThreshold(filter.Value__c);
+                builder.setWarningThreshold(thresholdValue);
             }
         }
         
@@ -584,6 +586,47 @@ public with sharing class EventMonitoringUtil {
      */
     private static ThresholdConfig.EvaluationType getEvaluationType(String evalTypeStr) {
         return ThresholdConfig.EvaluationType.valueOf(evalTypeStr);
+    }
+
+    /**
+     * Serializes threshold values for storage in RuleFilter__c.Value__c
+     * Handles special cases like IS_IN which requires JSON serialization of lists
+     */
+    private static String serializeThresholdValue(Object thresholdValue, ThresholdConfig.EvaluationType evaluationType) {
+        if (thresholdValue == null) {
+            return null;
+        }
+        
+        // For IS_IN evaluation type, serialize List as JSON
+        if (evaluationType == ThresholdConfig.EvaluationType.IS_IN && thresholdValue instanceof List<Object>) {
+            return JSON.serialize(thresholdValue);
+        }
+        
+        // For all other types, use standard string conversion
+        return String.valueOf(thresholdValue);
+    }
+
+    /**
+     * Deserializes threshold values from RuleFilter__c.Value__c
+     * Handles special cases like IS_IN which requires JSON deserialization to lists
+     */
+    private static Object deserializeThresholdValue(String serializedValue, ThresholdConfig.EvaluationType evaluationType) {
+        if (String.isBlank(serializedValue)) {
+            return null;
+        }
+        
+        // For IS_IN evaluation type, deserialize JSON to List
+        if (evaluationType == ThresholdConfig.EvaluationType.IS_IN) {
+            try {
+                return (List<Object>) JSON.deserializeUntyped(serializedValue);
+            } catch (Exception e) {
+                // Fallback to string value if JSON deserialization fails
+                return serializedValue;
+            }
+        }
+        
+        // For all other types, return as string
+        return serializedValue;
     }
 
     /**
@@ -665,27 +708,30 @@ public with sharing class EventMonitoringUtil {
                     
                     // Critical threshold filter
                     if (config.criticalThreshold != null) {
+                        String criticalValue = serializeThresholdValue(config.criticalThreshold, config.evaluationType);
                         allFilters.add(new RuleFilter__c(
                             Rule__c = rule.Id,
                             FieldName__c = metric,
                             ComparisonOperator__c = config.evaluationType.name(),
-                            Value__c = String.valueOf(config.criticalThreshold),
+                            Value__c = criticalValue,
                             Index__c = CRITICAL_INDEX
                         ));
                     }
                     
                     // Warning threshold filter
                     if (config.warningThreshold != null) {
+                        String warningValue = serializeThresholdValue(config.warningThreshold, config.evaluationType);
                         allFilters.add(new RuleFilter__c(
                             Rule__c = rule.Id,
                             FieldName__c = metric,
                             ComparisonOperator__c = config.evaluationType.name(),
-                            Value__c = String.valueOf(config.warningThreshold),
+                            Value__c = warningValue,
                             Index__c = WARNING_INDEX
                         ));
                     }
                     
-                    // Handle NOT_EQUALS evaluation type with empty threshold values
+                    // Handle NOT_EQUALS evaluation type with null threshold values
+                    // For API EXCEPTION_MESSAGE, we want to trigger on any non-null exception message
                     if (config.criticalThreshold == null 
                         && config.warningThreshold == null 
                         && config.evaluationType == ThresholdConfig.EvaluationType.NOT_EQUALS) {
@@ -693,7 +739,7 @@ public with sharing class EventMonitoringUtil {
                             Rule__c = rule.Id,
                             FieldName__c = metric,
                             ComparisonOperator__c = config.evaluationType.name(),
-                            Value__c = config.criticalThreshold != null ? String.valueOf(config.criticalThreshold) : '',
+                            Value__c = '', // Use empty string - any non-empty value will trigger
                             Index__c = CRITICAL_INDEX
                         ));
                     }
@@ -896,6 +942,10 @@ public with sharing class EventMonitoringUtil {
         }
         
         for (String eventType : MAP_ENABLED_EVENT_TYPES.keySet()) {
+            // currently skipping all event types that are not in the DEFAULT_ENABLED_EVENT_TYPES
+            if (!DEFAULT_ENABLED_EVENT_TYPES.contains(eventType)) {
+                continue;
+            }
             Integer index = MAP_ENABLED_EVENT_TYPES.get(eventType);
             Boolean isActive = false;
             if (index != null && index < enabledStatuses.size()) {
@@ -950,6 +1000,10 @@ public with sharing class EventMonitoringUtil {
         // Create maps for new enabled types and their logs limits
         Set<String> newEnabledTypes = new Set<String>();
         Map<String, Integer> newEnabledTypesWithLimits = new Map<String, Integer>();
+        
+        if (eventTypeStatuses == null) {
+            eventTypeStatuses = new List<EventTypeStatus>();
+        }
         
         for (EventTypeStatus status : eventTypeStatuses) {
             if (status.active) {

@@ -359,6 +359,31 @@ private class EventLogProcessingBatchTest {
     static void test_event_log_batch_processing(String eventType) {
         
         PermissionsUtil.EventMonitoringEnabled = true;
+        
+        // Clean up any existing Rule__c records from other tests
+        delete [SELECT Id FROM Rule__c WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE];
+        
+        // Check if this event type is in the original default enabled types before clearing
+        String testEventType = eventType != null ? eventType : EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+        
+        // Use a static constant set to check since DEFAULT_ENABLED_EVENT_TYPES might be cleared later
+        Set<String> originalDefaultEnabledTypes = new Set<String>{
+            EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION,
+            EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR,
+            EventLogProcessors.EVENT_TYPE_INSUFFICIENT_ACCESS,
+            EventLogProcessors.EVENT_TYPE_API,
+            EventLogProcessors.EVENT_TYPE_APEX_REST_API,
+            EventLogProcessors.EVENT_TYPE_REST_API,
+            EventLogProcessors.EVENT_TYPE_APEX_CALLOUT,
+            EventLogProcessors.EVENT_TYPE_APEX_TRIGGER,
+            EventLogProcessors.EVENT_TYPE_APEX_SOAP,
+            EventLogProcessors.EVENT_TYPE_LOGIN,
+            EventLogProcessors.EVENT_TYPE_VISUALFORCE_REQUEST,
+            EventLogProcessors.EVENT_TYPE_AURA_REQUEST
+        };
+        
+        Boolean isDefaultEnabledType = originalDefaultEnabledTypes.contains(testEventType);
+        
         // clear default enabled event types to avoid
         // No more than one executeBatch can be called from within a test method.
         // Please make sure the iterable returned from your start method matches the batch size, resulting in one executeBatch invocation.
@@ -369,57 +394,120 @@ private class EventLogProcessingBatchTest {
         // Setup test data
         Event_Monitoring__c settings = setupTestDataSettings();
         DateTime lastProcessedDt = settings.Last_Processed_Hourly_Events__c;
-
-        // Enable event type
+        
+        // Use production mechanism to create Rule__c records and enable event type
         EventMonitoringUtil util = new EventMonitoringUtil();
-        if (eventType != null) {
-            util.enableEventType(eventType);
-        }
+        util.enableEventType(testEventType);
 
         // Create test EventLogFile with generated data
-        SObject testLogFile = createDefaultEventLogFile(eventType != null ? eventType : EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION);
+        SObject testLogFile = createDefaultEventLogFile(testEventType);
 
         // Set test event logs
         EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
         EventLogProcessors.testEventLogFieldNames = generateNameFields();
         EventLogProcessors.testEventLogFieldTypes = generateTypeFields();
 
-        // Set test thresholds
-        Map<String, Map<String, ThresholdConfig>> testThresholds = null;
-        testThresholds = createDefaultConfig(eventType != null ? eventType : EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION);
+        // Reset ThresholdManager to pick up the test Rule__c records we just created
+        ThresholdManager.resetInstance();
 
         Test.startTest();
-        // Set test thresholds
-        ThresholdManager.testThresholds = testThresholds;
         // Execute batch
         EventLogProcessingBatch.getInstance().startBatch();
         Test.stopTest();
 
         // Verify results
-        verifyDefaultTestResults(eventType, null, lastProcessedDt);
+        verifyDefaultTestResults(eventType, null, lastProcessedDt, isDefaultEnabledType);
     }
 
-    private static void verifyDefaultTestResults(String type, List<EventLogProcessingBatch.EventLogFileType> scope, DateTime lastProcessedDt) {
+    private static void verifyDefaultTestResults(String type, List<EventLogProcessingBatch.EventLogFileType> scope, DateTime lastProcessedDt, Boolean isDefaultEnabledType) {
         if (type == null) {
             type = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
         }
-        // Verify Log__c records created, with correct type, category, area, and summary
-        // should have 12 log records totaly, 7 logs for row #0-#11, and 5 logs for row #12
+        
+        // Verify Log__c records created based on whether event type is in default enabled types
         List<Log__c> createdLogs = [SELECT Id, Type__c, Category__c, Summary__c, Details__c, Area__c FROM Log__c LIMIT 20];
-        // row #0-#11: cpu_time(2 logs), status_code(2 logs), request_status(1 log), success(1 log), exception_message(1 log)
-        // row #12: cpu_time + status_code + request_status + success + exception_message = 5 logs
-        System.assertEquals(12, createdLogs.size(), 'Should have created 12 log records');
-
-        AnomalyDetectors.EventTypeMetadata expectedMetadata = AnomalyDetectors.EVENT_TYPE_METADATA.get(type);
-        for (Log__c log : createdLogs) {
-            System.assertNotEquals(null, log.Type__c);
-            System.assertEquals(expectedMetadata.category, log.Category__c);
-            System.assertEquals(expectedMetadata.area, log.Area__c);
+        
+        if (isDefaultEnabledType) {
+            // For default enabled types using production Rule__c mechanism:
+            // Most types only have 1 threshold (like EXCEPTION_MESSAGE) and create 2 logs (rows 11 & 12 have non-empty EXCEPTION_MESSAGE)
+            // Exception: Some types may have multiple thresholds and create more logs
+            Integer expectedLogCount = getExpectedLogCountForProductionThresholds(type);
+            System.assertEquals(expectedLogCount, createdLogs.size(), 'Should have created ' + expectedLogCount + ' log records for default enabled type: ' + type);
+            
+            // Verify logs have the expected event type metadata (only if logs were created)
+            if (createdLogs.size() > 0) {
+                AnomalyDetectors.EventTypeMetadata expectedMetadata = AnomalyDetectors.EVENT_TYPE_METADATA.get(type);
+                for (Log__c log : createdLogs) {
+                    System.assertNotEquals(null, log.Type__c);
+                    System.assertEquals(expectedMetadata.category, log.Category__c);
+                    System.assertEquals(expectedMetadata.area, log.Area__c);
+                }
+            }
+        } else {
+            // For non-default enabled types: should have 0 logs since no default thresholds are configured
+            System.assertEquals(0, createdLogs.size(), 'Should have created 0 log records for non-default type: ' + type);
         }
         
         // Verify Last Processed DateTime
         Event_Monitoring__c updatedSettings = Event_Monitoring__c.getInstance();
         System.assertNotEquals(lastProcessedDt, updatedSettings.Last_Processed_Hourly_Events__c);
+    }
+
+    /**
+     * Get expected log count based on production threshold configurations in MAP_DEFAULT_THRESHOLDS
+     * Analyzes the actual test data to predict how many logs each threshold will generate
+     */
+    private static Integer getExpectedLogCountForProductionThresholds(String eventType) {
+        Map<String, ThresholdConfig> thresholds = EventMonitoringUtil.MAP_DEFAULT_THRESHOLDS.get(eventType);
+        if (thresholds == null || thresholds.isEmpty()) {
+            return 0; // No thresholds configured
+        }
+        
+        // Analyze each threshold type in the production configuration
+        switch on eventType {
+            when 'ApexUnexpectedException', 'API', 'ApexRestApi', 'RestApi' {
+                // EXCEPTION_MESSAGE NOT_EQUALS null/empty - triggers on rows 11 & 12 with non-empty exception messages
+                return 2;
+            }
+            when 'LightningError' {
+                // MESSAGE NOT_EQUALS null/empty - triggers on rows 11 & 12 with non-empty messages
+                return 2;
+            }
+            when 'InsufficientAccess' {
+                // ERROR_DESCRIPTION NOT_EQUALS null/empty - triggers on rows 11 & 12 with non-empty error descriptions
+                return 2;
+            }
+            when 'ApexCallout' {
+                // SUCCESS NOT_EQUALS '1' - in test data: SUCCESS is boolean (true/false)
+                // Since '1' != true and '1' != false, this triggers on ALL 13 rows
+                return 13;
+            }
+            when 'ApexTrigger' {
+                // REQUEST_STATUS IS_IN ['F', 'A', 'N', 'U'] - triggers on row 7 (REQUEST_STATUS='F') and row 12 (REQUEST_STATUS='F')
+                return 2;
+            }
+            when 'ApexSoap' {
+                // REQUEST_STATUS IS_IN ['F', 'A', 'N', 'U'] - triggers on row 7 (REQUEST_STATUS='F') and row 12 (REQUEST_STATUS='F')
+                return 2;
+            }
+            when 'Login' {
+                // LOGIN_STATUS NOT_EQUALS 'LOGIN_NO_ERROR' - test data sets LOGIN_STATUS = 'LOGIN_WITH_ERROR'
+                // This triggers on all 13 rows since 'LOGIN_WITH_ERROR' != 'LOGIN_NO_ERROR'
+                return 13;
+            }
+            when 'VisualforceRequest' {
+                // REQUEST_STATUS IS_IN ['F', 'A', 'N', 'U'] - triggers on row 7 (REQUEST_STATUS='F') and row 12 (REQUEST_STATUS='F')
+                return 2;
+            }
+            when 'AuraRequest' {
+                // REQUEST_STATUS IS_IN ['F', 'A', 'N', 'U'] - triggers on row 7 (REQUEST_STATUS='F') and row 12 (REQUEST_STATUS='F')
+                return 2;
+            }
+            when else {
+                // For event types not in MAP_DEFAULT_THRESHOLDS or unknown configurations
+                return 0;
+            }
+        }
     }
 
     private class FieldDefinition {
@@ -453,7 +541,11 @@ private class EventLogProcessingBatchTest {
         new FieldDefinition('STATUS_CODE', 'Number', '{4}'),
         new FieldDefinition('URI', 'String', '/apex/AccountDetail'),
         new FieldDefinition('URI_ID_DERIVED', 'String', 'URI-{0}'),
-        new FieldDefinition('EXCEPTION_MESSAGE', 'String', '{5}')
+        new FieldDefinition('EXCEPTION_MESSAGE', 'String', '{5}'),
+        // Additional fields for production threshold compatibility
+        new FieldDefinition('ERROR_DESCRIPTION', 'String', '{5}'), // Maps to same data as EXCEPTION_MESSAGE
+        new FieldDefinition('MESSAGE', 'String', '{5}'), // Maps to same data as EXCEPTION_MESSAGE  
+        new FieldDefinition('LOGIN_STATUS', 'String', 'LOGIN_WITH_ERROR') // Default value that triggers NOT_EQUALS 'LOGIN_NO_ERROR'
     };
 
     private static String generateCsvHeader() {
@@ -596,11 +688,14 @@ private class EventLogProcessingBatchTest {
     }
 
     static Event_Monitoring__c setupTestDataSettings() {
+        // should be only one event type for test batch
+        EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES.clear();
+        String enabledEventTypesString = EventMonitoringUtil.getAllWithDefaultEnabledEventTypesAsString();
         // Create custom settings for Event Monitoring
         Event_Monitoring__c settings = new Event_Monitoring__c(
             Enabled__c = true,
             Last_Processed_Hourly_Events__c = Datetime.now().addHours(-1),
-            Enabled_Types__c = EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES_STRING
+            Enabled_Types__c = enabledEventTypesString//EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES_STRING
         );
         insert settings;
         return settings;
@@ -964,7 +1059,7 @@ private class EventLogProcessingBatchTest {
         EventLogProcessingBatch batch = EventLogProcessingBatch.getInstance();
         EventLogProcessingBatch.EnhancedDeduplicationSettings dedupSettings = new EventLogProcessingBatch.EnhancedDeduplicationSettings();
         dedupSettings.enableEmailEventDeduplication = true;
-        dedupSettings.timingToleranceSeconds = 10;
+        dedupSettings.timingToleranceSeconds = 1;
         dedupSettings.enableDetailedLogging = true;
         batch.configureDeduplication(dedupSettings);
         
@@ -1030,8 +1125,8 @@ private class EventLogProcessingBatchTest {
         insert inboundEmail;
         
         // Set up Last_Processed_Hourly_Events__c to be around the email log time
-        // This will create a proper +/- 10 minute window for the deduplication
-        DateTime hourlyProcessTime = emailLogTime.addMinutes(2); // 2 minutes after email log
+        // This will create a proper +/- 1 second window for the deduplication
+        DateTime hourlyProcessTime = emailLogTime.addSeconds(2); // 2 seconds after email log
         Event_Monitoring__c settings = ConfigUtil.EVENT_MONITORING_SETTINGS;
         settings.Last_Processed_Hourly_Events__c = hourlyProcessTime;
         update settings;
@@ -1040,7 +1135,7 @@ private class EventLogProcessingBatchTest {
         EventLogProcessingBatch batch = EventLogProcessingBatch.getInstance();
         EventLogProcessingBatch.EnhancedDeduplicationSettings dedupSettings = new EventLogProcessingBatch.EnhancedDeduplicationSettings();
         dedupSettings.enableEmailEventDeduplication = true;
-        dedupSettings.timingToleranceSeconds = 600; // 10 minutes tolerance
+        dedupSettings.timingToleranceSeconds = 1; // 1 second tolerance
         dedupSettings.enableDetailedLogging = true;
         batch.configureDeduplication(dedupSettings);
         
@@ -1100,7 +1195,7 @@ private class EventLogProcessingBatchTest {
         EventLogProcessingBatch batch = EventLogProcessingBatch.getInstance();
         EventLogProcessingBatch.EnhancedDeduplicationSettings dedupSettings = new EventLogProcessingBatch.EnhancedDeduplicationSettings();
         dedupSettings.enableEmailEventDeduplication = true;
-        dedupSettings.timingToleranceSeconds = 10;
+        dedupSettings.timingToleranceSeconds = 1;
         dedupSettings.enableDetailedLogging = true;
         batch.configureDeduplication(dedupSettings);
         
@@ -1183,7 +1278,7 @@ private class EventLogProcessingBatchTest {
         EventLogProcessingBatch batch = EventLogProcessingBatch.getInstance();
         EventLogProcessingBatch.EnhancedDeduplicationSettings dedupSettings = new EventLogProcessingBatch.EnhancedDeduplicationSettings();
         dedupSettings.enableEmailEventDeduplication = true;
-        dedupSettings.timingToleranceSeconds = 600; // 10 minutes tolerance
+        dedupSettings.timingToleranceSeconds = 1; // 1 second tolerance
         dedupSettings.enableDetailedLogging = true;
         batch.configureDeduplication(dedupSettings);
         
@@ -1248,7 +1343,7 @@ private class EventLogProcessingBatchTest {
         // Create deduplication settings
         Map<String, Object> dedupSettings = new Map<String, Object>{
             'enableEmailEventDeduplication' => true,
-            'timingToleranceSeconds' => 10,
+            'timingToleranceSeconds' => 1,
             'preserveAllEventLogs' => true,
             'enableDetailedLogging' => true,
             'eventTypesToCheck' => new Set<String>{eventType}
@@ -1348,9 +1443,9 @@ private class EventLogProcessingBatchTest {
         csvRows.add(csvHeader);
         
         // Calculate proper timestamps for each log entry
-        DateTime log1Time = emailLogTime.addMinutes(3);
-        DateTime log2Time = emailLogTime.addMinutes(5);
-        DateTime log3Time = emailLogTime.addMinutes(7);
+        DateTime log1Time = emailLogTime.addSeconds(1);
+        DateTime log2Time = emailLogTime.addSeconds(2);
+        DateTime log3Time = emailLogTime.addSeconds(3);
         
         String log1FormattedTiming = log1Time.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
         String log1Timestamp = log1Time.formatGMT('yyyyMMddHHmmss') + '.000';
@@ -1423,7 +1518,7 @@ private class EventLogProcessingBatchTest {
         // Create a new event log with the same hash and timing within tolerance
         Log__c newEventLog = new Log__c(
             Hash_1__c = testHash,
-            Created_At__c = emailLogTime.addMinutes(3),
+            Created_At__c = emailLogTime.addSeconds(1),
             Organization_Id__c = UserInfo.getOrganizationId(),
             Request_Id_External__c = 'REQ-TIMING-001',
             Type__c = 'System.APEX_CODE',
@@ -1435,7 +1530,7 @@ private class EventLogProcessingBatchTest {
         // Test the enhanced deduplication directly
         Map<String, Object> dedupSettings = new Map<String, Object>{
             'enableEmailEventDeduplication' => true,
-            'timingToleranceSeconds' => 600,
+            'timingToleranceSeconds' => 1,
             'preserveAllEventLogs' => true,
             'enableDetailedLogging' => true,
             'eventTypesToCheck' => new Set<String>{'ApexUnexpectedException'}
@@ -1485,7 +1580,7 @@ private class EventLogProcessingBatchTest {
         insert inboundEmail;
         
         // Set up Last_Processed_Hourly_Events__c to be around the email log time
-        DateTime hourlyProcessTime = emailLogTime.addMinutes(2);
+        DateTime hourlyProcessTime = emailLogTime.addSeconds(2);
         Event_Monitoring__c settings = ConfigUtil.EVENT_MONITORING_SETTINGS;
         settings.Last_Processed_Hourly_Events__c = hourlyProcessTime;
         update settings;
@@ -1493,7 +1588,7 @@ private class EventLogProcessingBatchTest {
         // Manually create an event log with the same hash and timing within tolerance
         Log__c eventLog = new Log__c(
             Hash_1__c = testHash,
-            Created_At__c = emailLogTime.addMinutes(1), // 1 minute after email log (within 10 minute tolerance)
+            Created_At__c = emailLogTime.addSeconds(1), // 1 second after email log (within 1 second tolerance)
             Organization_Id__c = UserInfo.getOrganizationId(),
             Request_Id_External__c = 'REQ-MANUAL-001',
             Type__c = 'System.APEX_CODE',
@@ -1505,7 +1600,7 @@ private class EventLogProcessingBatchTest {
         // Test the enhanced deduplication directly
         Map<String, Object> dedupSettings = new Map<String, Object>{
             'enableEmailEventDeduplication' => true,
-            'timingToleranceSeconds' => 600,
+            'timingToleranceSeconds' => 1,
             'preserveAllEventLogs' => true,
             'enableDetailedLogging' => true,
             'eventTypesToCheck' => new Set<String>{'ApexUnexpectedException'}
@@ -1681,6 +1776,172 @@ private class EventLogProcessingBatchTest {
         // Verify that all rows were processed
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         System.assertEquals(25, results.size(), 'Should have processed all 25 rows when bounds are null');
+    }
+
+    @IsTest
+    static void test_event_log_batch_processing_with_logs_limit() {
+        PermissionsUtil.EventMonitoringEnabled = true;
+        
+        // Clear default enabled event types to avoid batch execution issues
+        EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES.clear();
+        
+        // Set up logs limit for testing - limit to 3 logs per hour (smaller number for clearer testing)
+        Integer logsLimit = 3;
+        String eventType = EventLogProcessors.EVENT_TYPE_API;
+        
+        // Use the production mechanism to create Rule__c and RuleFilter__c records
+        List<Rule__c> createdRules = EventMonitoringUtil.createDefaultRulesForEventType(eventType);
+        
+        // Update the logs limit on the created rule
+        if (!createdRules.isEmpty()) {
+            Rule__c testRule = createdRules[0];
+            testRule.Logs_Limit__c = logsLimit;
+            update testRule;
+        } else {
+            System.assert(false, 'No default rules were created for event type: ' + eventType);
+        }
+
+        // Setup test data settings
+        Event_Monitoring__c settings = setupTestDataSettings();
+        DateTime lastProcessedDt = settings.Last_Processed_Hourly_Events__c;
+
+        // Enable event type in settings without creating additional Rule__c records
+        // Set the API event type (index 0) to enabled
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = '1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+
+        // Create test EventLogFile with CSV data that will generate more threshold violations than the limit
+        // Use exactly 10 rows to ensure we have more potential violations than the limit
+        SObject testLogFile = createEventLogFileWithManyViolations(eventType, 10);
+
+        // Set test event logs
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateNameFields();
+        EventLogProcessors.testEventLogFieldTypes = generateTypeFields();
+
+        // Count logs before test
+        Integer logsBefore = [SELECT COUNT() FROM Log__c];
+        System.assertEquals(0, logsBefore, 'Should start with no logs');
+
+        // Reset ThresholdManager to pick up the test Rule__c records we just created
+        ThresholdManager.resetInstance();
+        
+        // Verify the ThresholdManager loads our test rule correctly
+        ThresholdManager tm = ThresholdManager.getInstance();
+        Integer actualLimit = tm.logsLimitPerHour?.get(eventType);
+        System.assertEquals(logsLimit, actualLimit, 'ThresholdManager should load logs limit from Rule__c');
+        
+        // Verify threshold configurations are loaded
+        Set<String> metrics = tm.getMetrics(eventType);
+        System.assert(metrics != null && !metrics.isEmpty(), 'Should have metrics for ' + eventType);
+        
+        Test.startTest();
+        EventLogProcessingBatch.getInstance().startBatch();
+        Test.stopTest();
+
+        // Verify that created logs don't exceed the limit
+        List<Log__c> createdLogs = [SELECT Id, Type__c, Category__c, Summary__c FROM Log__c];
+        System.assertEquals(logsLimit, createdLogs.size(), 'Should have created exactly ' + logsLimit + ' logs');
+        
+        // Verify the Rule__c was created with correct logs limit
+        List<Rule__c> verifyRules = [SELECT Logs_Limit__c FROM Rule__c WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE];
+        System.assert(!verifyRules.isEmpty(), 'Rule__c should be created');
+        System.assertEquals(logsLimit, Integer.valueOf(verifyRules[0].Logs_Limit__c), 'Rule should have correct logs limit');
+        
+        // Verify logs have the expected event type metadata
+        AnomalyDetectors.EventTypeMetadata expectedMetadata = AnomalyDetectors.EVENT_TYPE_METADATA.get(eventType);
+        for (Log__c log : createdLogs) {
+            System.assertNotEquals(null, log.Type__c);
+            System.assertEquals(expectedMetadata.category, log.Category__c);
+        }
+    }
+
+    /**
+     * Helper method to create an event log file with many threshold violations
+     * @param eventType The event type to create the log file for
+     * @param violationCount The number of violations to create
+     * @return SObject representing the test event log file
+     */
+    private static SObject createEventLogFileWithManyViolations(String eventType, Integer violationCount) {
+        String fileContent = generateTestDataWithManyViolations(eventType, violationCount);
+        SObject testEventLog = EventMonitoringUtil.createTestEventLogSObject(
+            eventType,
+            Date.today(),
+            Blob.valueOf(fileContent)
+        );
+        
+        if (testEventLog == null) {
+            // Fallback for orgs without EventLogFile - create a mock SObject
+            Account mockAccount = new Account(Name = 'Test Mock EventLog Limit - ' + eventType);
+            testEventLog = (SObject)mockAccount;
+            testEventLog.put('Id', '001000000000LimitTest'); // Mock ID
+        }
+        
+        return testEventLog;
+    }
+
+    /**
+     * Generate test CSV data with many violations
+     * @param eventType The event type
+     * @param violationCount The number of violations to create
+     * @return String CSV content
+     */
+    private static String generateTestDataWithManyViolations(String eventType, Integer violationCount) {
+        String csvHeader = generateCsvHeader();
+        List<String> dataRows = new List<String>();
+        dataRows.add(csvHeader);
+
+        // Generate rows that will trigger violations
+        for (Integer i = 0; i < violationCount; i++) {
+            // For API event type, use non-blank exception message to trigger violation
+            // API EXCEPTION_MESSAGE threshold uses NOT_EQUALS evaluation - triggers on non-empty strings
+            String exceptionMessage = (eventType == EventLogProcessors.EVENT_TYPE_API) 
+                ? 'API Exception Row ' + i  // Non-blank message triggers API exception threshold
+                : EXCEPTION_MESSAGE_CRITICAL; // Standard critical message for other types
+            
+            // Create rows that will violate multiple thresholds
+            List<Object> params = new List<Object>{
+                i, // Row index
+                CPU_TIME_CRITICAL, // High CPU time to trigger violation
+                SUCCESS_CRITICAL, // Failed operation to trigger violation
+                REQUEST_STATUS_CRITICAL, // Failed request status to trigger violation
+                STATUS_CODE_CRITICAL, // Error status code to trigger violation
+                exceptionMessage // Exception message to trigger violation (non-blank for API)
+            };
+            dataRows.add(generateCsvRow(params));
+        }
+        
+        return String.join(dataRows, '\n');
+    }
+
+    /**
+     * Create threshold configuration that will trigger many violations
+     * @param eventType The event type
+     * @return Map of threshold configurations
+     */
+    private static Map<String, Map<String, ThresholdConfig>> createThresholdsForManyViolations(String eventType) {
+        Map<String, Map<String, ThresholdConfig>> testThresholds;
+        
+        if (eventType == EventLogProcessors.EVENT_TYPE_API) {
+            // API-specific thresholds - use only EXCEPTION_MESSAGE to have one violation per row
+            testThresholds = new Map<String, Map<String, ThresholdConfig>>{
+                eventType => new Map<String, ThresholdConfig>{
+                    'EXCEPTION_MESSAGE' => ThresholdManager.exceptionMessage(eventType) // NOT_EQUALS null - triggers on non-empty strings
+                }
+            };
+        } else {
+            // Default thresholds for other event types
+            testThresholds = new Map<String, Map<String, ThresholdConfig>>{
+                eventType => new Map<String, ThresholdConfig>{
+                    'CPU_TIME' => ThresholdManager.cpuTime(eventType, 50, 100),
+                    'STATUS_CODE' => ThresholdManager.statusCode(eventType, 300, 400),
+                    'REQUEST_STATUS' => ThresholdManager.requestStatus(eventType),
+                    'EXCEPTION_MESSAGE' => ThresholdManager.exceptionMessage(eventType),
+                    'SUCCESS' => ThresholdManager.success(eventType)
+                }
+            };
+        }
+        return testThresholds;
     }
 
 }

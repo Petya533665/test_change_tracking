@@ -120,7 +120,11 @@ public class ThresholdConfig implements System.Comparable {
         } else if (value instanceof Double) {
             return (Double)value;
         } else if (value instanceof String) {
-            return Double.valueOf(value);
+            try {
+                return Double.valueOf(value);
+            } catch (TypeException e) {
+                throw new ThresholdConfigException('Cannot convert value to Double: ' + value);
+            }
         }
         throw new ThresholdConfigException('Cannot convert value to Double: ' + value);
     }
@@ -146,28 +150,37 @@ public class ThresholdConfig implements System.Comparable {
         
         String fieldType = fieldMetadataConfig?.getFieldType(metric)?.toLowerCase();
         if (fieldType == 'number') {
-            Double doubleValue = (value != null) ? Double.valueOf(value) : null;
-            Double criticalThreshold = (criticalThreshold != null) ? Double.valueOf(criticalThreshold) : null;
-            Double warningThreshold = (warningThreshold != null) ? Double.valueOf(warningThreshold) : null;
+            Double doubleValue = null;
+            Double criticalThresholdDouble = null;
+            Double warningThresholdDouble = null;
+            
+            try {
+                doubleValue = (value != null) ? toDouble(value) : null;
+                criticalThresholdDouble = (criticalThreshold != null) ? toDouble(criticalThreshold) : null;
+                warningThresholdDouble = (warningThreshold != null) ? toDouble(warningThreshold) : null;
+            } catch (ThresholdConfigException e) {
+                // If any value cannot be converted to double, treat as non-numeric and return normal
+                return AnomalySeverity.NORMAL;
+            }
 
             switch on evaluationType {
                 when GREATER_THAN {
                     if (doubleValue == null) return AnomalySeverity.NORMAL;
-                    if (doubleValue >= criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (doubleValue >= warningThreshold) return AnomalySeverity.WARNING;
+                    if (criticalThresholdDouble != null && doubleValue >= criticalThresholdDouble) return AnomalySeverity.CRITICAL;
+                    if (warningThresholdDouble != null && doubleValue >= warningThresholdDouble) return AnomalySeverity.WARNING;
                 }
                 when LESS_THAN {
                     if (doubleValue == null) return AnomalySeverity.NORMAL;
-                    if (doubleValue <= criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (doubleValue <= warningThreshold) return AnomalySeverity.WARNING;
+                    if (criticalThresholdDouble != null && doubleValue <= criticalThresholdDouble) return AnomalySeverity.CRITICAL;
+                    if (warningThresholdDouble != null && doubleValue <= warningThresholdDouble) return AnomalySeverity.WARNING;
                 }
                 when EQUALS {
-                    if (doubleValue == criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (doubleValue == warningThreshold) return AnomalySeverity.WARNING;
+                    if (criticalThresholdDouble != null && doubleValue == criticalThresholdDouble) return AnomalySeverity.CRITICAL;
+                    if (warningThresholdDouble != null && doubleValue == warningThresholdDouble) return AnomalySeverity.WARNING;
                 }
                 when NOT_EQUALS {
-                    if (doubleValue != criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (doubleValue != warningThreshold) return AnomalySeverity.WARNING;
+                    if (criticalThresholdDouble != null && doubleValue != criticalThresholdDouble) return AnomalySeverity.CRITICAL;
+                    if (warningThresholdDouble != null && doubleValue != warningThresholdDouble) return AnomalySeverity.WARNING;
                 }
                 when NOT_NULL {
                     if (doubleValue != null) return AnomalySeverity.CRITICAL;
@@ -194,20 +207,45 @@ public class ThresholdConfig implements System.Comparable {
         }
         else {
             String stringValue = (value != null) ? String.valueOf(value) : null;
-            String criticalThreshold = (criticalThreshold != null) ? String.valueOf(criticalThreshold) : null;
-            String warningThreshold = (warningThreshold != null) ? String.valueOf(warningThreshold) : null;
+            String criticalThresholdString = (this.criticalThreshold != null) ? String.valueOf(this.criticalThreshold) : null;
+            String warningThresholdString = (this.warningThreshold != null) ? String.valueOf(this.warningThreshold) : null;
 
             switch on evaluationType {
                 when EQUALS {
-                    if (stringValue == criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (stringValue == warningThreshold) return AnomalySeverity.WARNING;
+                    if (stringValue == criticalThresholdString) return AnomalySeverity.CRITICAL;
+                    if (stringValue == warningThresholdString) return AnomalySeverity.WARNING;
                 }
                 when NOT_EQUALS {
-                    if (String.isNotBlank(criticalThreshold) && stringValue != criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (String.isNotBlank(warningThreshold) && stringValue != warningThreshold) return AnomalySeverity.WARNING;
+                    if (String.isBlank(criticalThresholdString) && String.isNotBlank(stringValue)) {
+                        return AnomalySeverity.CRITICAL;
+                    }
+                    if (String.isBlank(warningThresholdString) && String.isNotBlank(stringValue)) {
+                        return AnomalySeverity.WARNING;
+                    }
+                    // Handle normal NOT_EQUALS comparison
+                    if (String.isNotBlank(criticalThresholdString) && stringValue != criticalThresholdString) return AnomalySeverity.CRITICAL;
+                    if (String.isNotBlank(warningThresholdString) && stringValue != warningThresholdString) return AnomalySeverity.WARNING;
                 }
                 when NOT_NULL {
                     if (String.isNotBlank(stringValue)) return AnomalySeverity.CRITICAL;
+                }
+                when IS_IN {
+                    if (this.criticalThreshold instanceof List<Object>) {
+                        List<Object> criticalList = (List<Object>) this.criticalThreshold;
+                        for (Object item : criticalList) {
+                            if (stringValue == String.valueOf(item)) {
+                                return AnomalySeverity.CRITICAL;
+                            }
+                        }
+                    }
+                    if (this.warningThreshold instanceof List<Object>) {
+                        List<Object> warningList = (List<Object>) this.warningThreshold;
+                        for (Object item : warningList) {
+                            if (stringValue == String.valueOf(item)) {
+                                return AnomalySeverity.WARNING;
+                            }
+                        }
+                    }
                 }
             }
         }
