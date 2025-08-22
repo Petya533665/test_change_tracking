@@ -1,4 +1,12 @@
 public class AnomalyDetectors {
+    private static ThresholdManager thresholdManagerInstance;
+    
+    private static ThresholdManager getThresholdManagerInstance() {
+        if (thresholdManagerInstance == null) {
+            thresholdManagerInstance = ThresholdManager.getInstance();
+        }
+        return thresholdManagerInstance;
+    }
 
     // Map of event type to anomaly detector class
     public static Map<String, Type> detectorTypes = new Map<String, Type>{ 
@@ -101,12 +109,13 @@ public class AnomalyDetectors {
         public String logOrganizationId { get; private set; }
         public DateTime logTimestamp { get; private set; }
         public String logRequestId { get; private set; }
-        
+        public String logOperation { get; private set; }
 
         public EventAnomaly(String eventType, String metric, 
                            Object value, ThresholdConfig.AnomalySeverity severity,
                            String details, String summary, String stackTrace, String logType,
-                           String logUserId, String logOrganizationId, DateTime logTimestamp, String logRequestId) {
+                           String logUserId, String logOrganizationId, DateTime logTimestamp,
+                           String logRequestId, String logOperation) {
             this.eventType = eventType;
             this.metric = metric;
             this.value = value;
@@ -123,6 +132,7 @@ public class AnomalyDetectors {
             this.logOrganizationId = logOrganizationId;
             this.logTimestamp = logTimestamp;
             this.logRequestId = logRequestId;
+            this.logOperation = logOperation;
         }
     }
 
@@ -229,15 +239,24 @@ public class AnomalyDetectors {
     public abstract class BaseAnomalyDetector implements IAnomalyDetector {
         protected final String eventType;
         protected ThresholdManager thresholdManager;
+        protected Integer logsLimitPerHour;
+        protected Integer currentLogsCount;
 
         protected BaseAnomalyDetector(String eventType) {
             this.eventType = eventType;
-            this.thresholdManager = new ThresholdManager();
+            this.thresholdManager = AnomalyDetectors.getThresholdManagerInstance();
+            this.logsLimitPerHour = thresholdManager.logsLimitPerHour.get(this.eventType);
+            this.currentLogsCount = 0;
         }
 
         public List<EventAnomaly> detectAnomalies(List<EventLogProcessors.IBaseEventData> events, EventLogProcessors.FieldMetadataConfig fieldMetadataConfig) {
             List<EventAnomaly> anomalies = new List<EventAnomaly>();
+            
             for (EventLogProcessors.IBaseEventData event : events) {
+                if (logsLimitPerHour != null && currentLogsCount >= logsLimitPerHour) {
+                    return anomalies;
+                }
+
                 for (String metric : thresholdManager.getMetrics(this.eventType)) {
                     ThresholdConfig config = thresholdManager.getThreshold(this.eventType, metric);
                     Object value = event.getValue(metric);
@@ -255,12 +274,18 @@ public class AnomalyDetectors {
                             generateLogUserId(metric, value, config, event),
                             generateLogOrganizationId(metric, value, config, event),
                             generateLogTimestamp(metric, value, config, event),
-                            generateLogRequestId(metric, value, config, event)
+                            generateLogRequestId(metric, value, config, event),
+                            generateLogOperation(metric, value, config, event)
                         ));
+                        currentLogsCount++;
                     }
                 }
             }
             return anomalies;
+        }
+
+        protected virtual String generateLogOperation(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            return null;
         }
 
         protected virtual String generateLogType(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
@@ -287,10 +312,10 @@ public class AnomalyDetectors {
 
         protected virtual String generateSummary(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
             return String.format(
-                'Event Anomaly: by metric {0}, for event type {1}',
-                new List<String>{
-                    metric,
-                    this.eventType
+                '{0} Error: {1}',
+                new List<Object>{
+                    this.eventType,
+                    value
                 }
             );
         }
@@ -320,16 +345,17 @@ public class AnomalyDetectors {
         protected override String generateDescription(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
             EventLogProcessors.SoapApiEventData soapApiData = (EventLogProcessors.SoapApiEventData)event;
             return String.format(
-                'SOAP API {0} anomaly detected with value {1}. ' +
-                'API Type: {2}, API Version: {3}. ' +
-                'Warning threshold: {4}, Critical threshold: {5}',
+                'API Error: {0}.\n' +
+                'API Type: {1}.\n' +
+                'API Version: {2}.\n' +
+                'Client Name: {3}.\n' +
+                'Method Name: {4}.\n' ,
                 new List<Object>{
-                    metric, 
                     value, 
                     soapApiData.apiType, 
                     soapApiData.apiVersion,
-                    config.warningThreshold, 
-                    config.criticalThreshold
+                    soapApiData.clientName,
+                    soapApiData.methodName
                 }
             );
         }
@@ -340,20 +366,27 @@ public class AnomalyDetectors {
             super(EventLogProcessors.EVENT_TYPE_APEX_CALLOUT);
         }
 
+        protected override String generateLogOperation(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.ApexCalloutData calloutData = (EventLogProcessors.ApexCalloutData)event;
+            return calloutData.uri;
+        }
+
         protected override String generateDescription(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
             EventLogProcessors.ApexCalloutData calloutData = (EventLogProcessors.ApexCalloutData)event;
             return String.format(
-                'Apex Callout {0} anomaly detected with value {1}. ' +
-                'URL: {2}, Method: {3}, Type: {4}. ' +
-                'Warning threshold: {5}, Critical threshold: {6}',
+                'Apex Callout Error: Success: {0}.\n' +
+                'Type: {1}.\n' +
+                'Method: {2}.\n' +
+                'URL: {3}.\n' +
+                'URI: {4}.\n' +
+                'Status Code: {5}.\n',
                 new List<Object>{
-                    metric,
                     value,
-                    calloutData.url,
-                    calloutData.method,
                     calloutData.type,
-                    config.warningThreshold,
-                    config.criticalThreshold
+                    calloutData.method,
+                    calloutData.url,
+                    calloutData.uri,
+                    calloutData.statusCode
                 }
             );
         }
@@ -383,15 +416,29 @@ public class AnomalyDetectors {
             super(EventLogProcessors.EVENT_TYPE_APEX_REST_API);
         }
 
+        protected override String generateLogOperation(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.ApexRestApiEventData restApiData = (EventLogProcessors.ApexRestApiEventData)event;
+            return restApiData.uri;
+        }
+
         protected override String generateDescription(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.ApexRestApiEventData restApiData = (EventLogProcessors.ApexRestApiEventData)event;
             return String.format(
-                'Apex Rest API {0} anomaly detected with value {1}. ' +
-                'Warning threshold: {2}, Critical threshold: {3}',
+                'Apex Rest API Error: {0}.\n' +
+                'Entity Name: {1}.\n' +
+                'Method: {2}.\n' +
+                'URI: {3}.\n' +
+                'Query: {4}.\n' +
+                'Request Status: {5}.\n' +
+                'Status Code: {6}.\n',
                 new List<Object>{
-                    metric,
                     value,
-                    config.warningThreshold,
-                    config.criticalThreshold
+                    restApiData.entityName,
+                    restApiData.method,
+                    restApiData.uri,
+                    restApiData.query,
+                    restApiData.requestStatus,
+                    restApiData.statusCode
                 }
             );
         }
@@ -402,15 +449,27 @@ public class AnomalyDetectors {
             super(EventLogProcessors.EVENT_TYPE_APEX_SOAP);
         }
 
+        protected override String generateLogOperation(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.ApexSoapApiEventData soapApiData = (EventLogProcessors.ApexSoapApiEventData)event;
+            return soapApiData.className + '.' + soapApiData.methodName;
+        }
+
         protected override String generateDescription(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.ApexSoapApiEventData soapApiData = (EventLogProcessors.ApexSoapApiEventData)event;
             return String.format(
-                'Apex SOAP API {0} anomaly detected with value {1}. ' +
-                'Warning threshold: {2}, Critical threshold: {3}',
+                'Apex SOAP API Error: {0}.\n' +
+                'Class Name: {1}.\n' +
+                'Method Name: {2}.\n' +
+                'Query: {3}.\n' +
+                'URI: {4}.\n' +
+                'Request Status: {5}.\n',
                 new List<Object>{
-                    metric,
                     value,
-                    config.warningThreshold,
-                    config.criticalThreshold
+                    soapApiData.className,
+                    soapApiData.methodName,
+                    soapApiData.query,
+                    soapApiData.uri,
+                    soapApiData.requestStatus
                 }
             );
         }
@@ -421,15 +480,25 @@ public class AnomalyDetectors {
             super(EventLogProcessors.EVENT_TYPE_APEX_TRIGGER);
         }
 
+        protected override String generateLogOperation(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.ApexTriggerData triggerData = (EventLogProcessors.ApexTriggerData)event;
+            return triggerData.entityName + '.' + triggerData.triggerName;
+        }
+
         protected override String generateDescription(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.ApexTriggerData triggerData = (EventLogProcessors.ApexTriggerData)event;
             return String.format(
-                'Apex Trigger {0} anomaly detected with value {1}. ' +
-                'Warning threshold: {2}, Critical threshold: {3}',
+                'Apex Trigger Error: {0}.\n' +
+                'Entity Name: {1}.\n' +
+                'Trigger Name: {2}.\n' +
+                'Trigger Type: {3}.\n' +
+                'Request Status: {4}.\n',
                 new List<Object>{
-                    metric,
                     value,
-                    config.warningThreshold,
-                    config.criticalThreshold
+                    triggerData.entityName,
+                    triggerData.triggerName,
+                    triggerData.triggerType,
+                    triggerData.requestStatus
                 }
             );
         }
@@ -523,15 +592,25 @@ public class AnomalyDetectors {
             super(EventLogProcessors.EVENT_TYPE_AURA_REQUEST);
         }
 
+        protected override String generateLogOperation(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.AuraRequestData requestData = (EventLogProcessors.AuraRequestData)event;
+            return requestData.uri;
+        }
+
         protected override String generateDescription(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.AuraRequestData requestData = (EventLogProcessors.AuraRequestData)event;
             return String.format(
-                'Aura Request {0} anomaly detected with value {1}. ' +
-                'Warning threshold: {2}, Critical threshold: {3}',
+                'Aura Request Error: {0}.\n' +
+                'Request Status: {1}.\n' +
+                'URI: {2}.\n' +
+                'Request Method: {3}.\n' +
+                'Action Message: {4}.\n',
                 new List<Object>{
-                    metric,
                     value,
-                    config.warningThreshold,
-                    config.criticalThreshold
+                    requestData.requestStatus,
+                    requestData.uri,
+                    requestData.requestMethod,
+                    requestData.actionMessage
                 }
             );
         }
@@ -698,6 +777,31 @@ public class AnomalyDetectors {
         public InsufficientAccessEventAnomalyDetector() {
             super(EventLogProcessors.EVENT_TYPE_INSUFFICIENT_ACCESS);
         }
+
+        protected override String generateLogOperation(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.InsufficientAccessData errorData = (EventLogProcessors.InsufficientAccessData)event;
+            return errorData.entityType;
+        }
+
+        protected override String generateDescription(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.InsufficientAccessData errorData = (EventLogProcessors.InsufficientAccessData)event;
+            return String.format(
+                'Insufficient Access Error: {0}.\n' +
+                'Error Description: {1}.\n' +
+                'Access Error: {2}.\n' +
+                'Entity Type: {3}.\n' +
+                'Record ID: {4}.\n' +
+                'Requested Access Level: {5}.\n',
+                new List<Object>{
+                    value,
+                    errorData.errorDescription,
+                    errorData.accessError,
+                    errorData.entityType,
+                    errorData.recordId,
+                    errorData.requestedAccessLevel
+                }
+            );
+        }
     }
 
     public class KnowledgeArticleViewEventAnomalyDetector extends BaseAnomalyDetector {
@@ -709,6 +813,42 @@ public class AnomalyDetectors {
     public class LightningErrorEventAnomalyDetector extends BaseAnomalyDetector {
         public LightningErrorEventAnomalyDetector() {
             super(EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR);
+        }
+
+        protected override String generateLogOperation(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.LightningErrorData errorData = (EventLogProcessors.LightningErrorData)event;
+            return errorData.pageUrl;
+        }
+
+        protected override String generateStackTrace(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.LightningErrorData errorData = (EventLogProcessors.LightningErrorData)event;
+            return errorData.stackTrace;
+        }
+
+        protected override String generateDescription(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.LightningErrorData errorData = (EventLogProcessors.LightningErrorData)event;
+            return String.format(
+                'Lightning Error: {0}.\n' +
+                'Page URL: {1}.\n' +
+                'UI Event: {2}.\n' +
+                'Entity Type: {3}.\n' +
+                'Entity ID: {4}.\n' +
+                'Component Name: {5}.\n' +
+                'App Name: {6}.\n' +
+                'Message: {7}.\n' +
+                'Stack Trace: {8}.\n',
+                new List<Object>{
+                    value,
+                    errorData.pageUrl,
+                    errorData.uiEventId,
+                    errorData.pageEntityType,
+                    errorData.pageEntityId,
+                    errorData.componentName,
+                    errorData.appName,
+                    errorData.message,
+                    errorData.stackTrace
+                }
+            );
         }
     }
 
@@ -739,6 +879,33 @@ public class AnomalyDetectors {
     public class LoginEventAnomalyDetector extends BaseAnomalyDetector {
         public LoginEventAnomalyDetector() {
             super(EventLogProcessors.EVENT_TYPE_LOGIN);
+        }
+
+        protected override String generateLogOperation(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.LoginEventData loginData = (EventLogProcessors.LoginEventData)event;
+            return loginData.loginUrl;
+        }
+
+        protected override String generateDescription(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.LoginEventData loginData = (EventLogProcessors.LoginEventData)event;
+            return String.format(
+                'Login Error: {0}.\n' +
+                'Login URL: {1}.\n' +
+                'Login Status: {2}.\n' +
+                'Login Type: {3}.\n' +
+                'API Type: {4}.\n' +
+                'API Version: {5}.\n' +
+                'Request Status: {6}.\n',
+                new List<Object>{
+                    value,
+                    loginData.loginUrl,
+                    loginData.loginStatus,
+                    loginData.loginType,
+                    loginData.apiType,
+                    loginData.apiVersion,
+                    loginData.requestStatus
+                }
+            );
         }
     }
 
@@ -824,6 +991,33 @@ public class AnomalyDetectors {
         public RestApiEventAnomalyDetector() {
             super(EventLogProcessors.EVENT_TYPE_REST_API);
         }
+
+        protected override String generateLogOperation(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.RestApiData restApiData = (EventLogProcessors.RestApiData)event;
+            return restApiData.uri;
+        }
+        
+        protected override String generateDescription(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.RestApiData restApiData = (EventLogProcessors.RestApiData)event;
+            return String.format(
+                'Rest API Error: {0}.\n' +
+                'URI: {1}.\n' +
+                'Method: {2}.\n' +
+                'Query: {3}.\n' +
+                'Entity Name: {4}.\n' +
+                'Request Status: {5}.\n' +
+                'Status Code: {6}.\n',
+                new List<Object>{
+                    value,
+                    restApiData.uri,
+                    restApiData.method,
+                    restApiData.query,
+                    restApiData.entityName,
+                    restApiData.requestStatus,
+                    restApiData.statusCode
+                }
+            );
+        }
     }
 
     public class SandboxEventAnomalyDetector extends BaseAnomalyDetector {
@@ -883,6 +1077,39 @@ public class AnomalyDetectors {
     public class VisualforceRequestEventAnomalyDetector extends BaseAnomalyDetector {
         public VisualforceRequestEventAnomalyDetector() {
             super(EventLogProcessors.EVENT_TYPE_VISUALFORCE_REQUEST);
+        }
+
+        protected override String generateLogOperation(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.VisualforceRequestData requestData = (EventLogProcessors.VisualforceRequestData)event;
+            return requestData.uri;
+        }
+        
+        protected override String generateDescription(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            EventLogProcessors.VisualforceRequestData requestData = (EventLogProcessors.VisualforceRequestData)event;
+            return String.format(
+                'Visualforce Request Error: {0}.\n' +
+                'URI: {1}.\n' +
+                'Request Status: {2}.\n' +
+                'Page Name: {3}.\n' +
+                'Query: {4}.\n' +
+                'Controller Type: {5}.\n' +
+                'HTTP Method: {6}.\n' +
+                'Namespace: {7}.\n' +
+                'Request Status: {8}.\n' +
+                'Request Type: {9}.\n',
+                new List<Object>{
+                    value,
+                    requestData.uri,
+                    requestData.requestStatus,
+                    requestData.pageName,
+                    requestData.query,
+                    requestData.controllerType,
+                    requestData.httpMethod,
+                    requestData.managedPackageNamespace,
+                    requestData.requestStatus,
+                    requestData.requestType
+                }
+            );
         }
     }
 

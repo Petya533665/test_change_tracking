@@ -1,6 +1,7 @@
 public class ThresholdManager {
     private static ThresholdManager instance;
     private Map<String, Map<String, ThresholdConfig>> thresholds;
+    public Map<String, Integer> logsLimitPerHour;
     
 
     public ThresholdManager() {
@@ -13,6 +14,11 @@ public class ThresholdManager {
         }
         return instance;
     }
+    
+    @TestVisible
+    public static void resetInstance() {
+        instance = null;
+    }
 
     // Initialize default thresholds
     private void initializeThresholds() {
@@ -20,14 +26,17 @@ public class ThresholdManager {
 
         if (testThresholds != null) {
             thresholds = testThresholds;
+            
+            // In testThresholds mode, use default logs limits to avoid interference from Rule__c records
+            logsLimitPerHour = new Map<String, Integer>();
+            for (String eventType : EventMonitoringUtil.MAP_DEFAULT_LOGS_LIMIT_PER_HOUR.keySet()) {
+                logsLimitPerHour.put(eventType, EventMonitoringUtil.MAP_DEFAULT_LOGS_LIMIT_PER_HOUR.get(eventType));
+            }
             return;
         }
-
-        for (String eventType : EVENT_TYPE_TO_THRESHOLD_CONFIG.keySet()) {
-            Type thresholdConfigType = EVENT_TYPE_TO_THRESHOLD_CONFIG.get(eventType);
-            ThresholdConfigSetup thresholdConfigSetup = (ThresholdConfigSetup)thresholdConfigType.newInstance();
-            thresholds.putAll(thresholdConfigSetup.getThresholds());
-        }
+        List<Rule__c> rules = EventMonitoringUtil.getActiveEventMonitoringRules();
+        thresholds = EventMonitoringUtil.loadThresholdsFromRules(rules);
+        logsLimitPerHour = EventMonitoringUtil.getLogsLimitPerHour(rules);
     }
 
     public Set<String> getMetrics(String eventType) {
