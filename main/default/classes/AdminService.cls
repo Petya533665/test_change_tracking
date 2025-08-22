@@ -207,8 +207,6 @@ public without sharing class AdminService {
             'PagerDutyIntegrationEnabled' => PermissionsUtil.PagerDutyIntegrationEnabled,
             'SplunkIntegrationEnabled' => PermissionsUtil.SplunkIntegrationEnabled,
             'MonitoringEnabled' => PermissionsUtil.MonitoringEnabled,
-            'LimitsMonitoringEnabled' => PermissionsUtil.LimitsMonitoringEnabled,
-            'EventMonitoringEnabled' => PermissionsUtil.EventMonitoringEnabled,
             'MaxMonitoringRules' => PermissionsUtil.MaxMonitoringRules,
             'ArchivalEnabled' => PermissionsUtil.ArchivalEnabled,
             'MaxArchivalRules' => PermissionsUtil.MaxArchivalRules,
@@ -229,6 +227,7 @@ public without sharing class AdminService {
             'DebugLogServiceEnabled' => PermissionsUtil.DebugLogServiceEnabled,
             'IssueAnalysisEnabled' => PermissionsUtil.IssueAnalysisEnabled,
             'MandatoryErrorReportingEnabled' => PermissionsUtil.MandatoryErrorReportingEnabled,
+            'EventMonitoringEnabled' => PermissionsUtil.EventMonitoringEnabled,
             'FlowLoggingEnabled' => PermissionsUtil.FlowLoggingEnabled,
             'IssueTrackingEnabled' => PermissionsUtil.IssueTrackingEnabled,
             'MetadataChatEnabled' => PermissionsUtil.MetadataChatEnabled,
@@ -2576,8 +2575,11 @@ public without sharing class AdminService {
     public static Event_Monitoring__c setEventMonitoringSetting(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
-        List<String> enabledTypes = (List<String>)JSON.deserialize(JSON.serialize(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES)), List<String>.class);
-        EventMonitoringUtil.setEventTypesStatuses(enabledTypes);
+        List<EventMonitoringUtil.EventTypeStatus> eventTypeStatuses = (List<EventMonitoringUtil.EventTypeStatus>)JSON.deserialize(
+            JSON.serialize(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES)), 
+            List<EventMonitoringUtil.EventTypeStatus>.class
+        );
+        EventMonitoringUtil.setEventTypesStatuses(eventTypeStatuses);
         DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
         return ConfigUtil.EVENT_MONITORING_SETTINGS;
     }
