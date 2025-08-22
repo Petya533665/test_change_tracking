@@ -1023,9 +1023,9 @@ public with sharing class EventMonitoringUtil {
         List<String> typesToDisable = new List<String>();
         
         for (String eventType : newEnabledTypes) {
-            if (!currentlyEnabledTypes.contains(eventType)) {
+            //if (!currentlyEnabledTypes.contains(eventType)) {
                 typesToEnable.put(eventType, newEnabledTypesWithLimits.get(eventType));
-            }
+            //}
         }
         
         for (String eventType : currentlyEnabledTypes) {
