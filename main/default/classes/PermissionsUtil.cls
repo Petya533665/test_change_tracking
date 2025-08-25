@@ -755,7 +755,7 @@ public without sharing class PermissionsUtil {
 			if(LimitsMonitoringEnabled == null) {
 				LimitsMonitoringEnabled = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_LIMITS_MONITORING_ENABLED));
 			}
-			return LimitsMonitoringEnabled;
+			return true;
 		}
 		private set;
 	}
