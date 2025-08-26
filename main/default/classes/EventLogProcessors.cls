@@ -1975,7 +1975,7 @@ public class EventLogProcessors {
         public Integer timeValue { get; private set; }         // TIME: Request duration (ms)
         public Integer statusCode { get; private set; }        // STATUS_CODE: HTTP status code
         public CalloutStatusCode statusCodeEnum { get; private set; }
-        public String success { get; private set; }           // SUCCESS: If callout completed (1/0)
+        public Boolean success { get; private set; }           // SUCCESS: If callout completed (1/0)
         
         // Request information
         public String uri { get; private set; }                // URI: Request URI
@@ -3304,7 +3304,6 @@ public class EventLogProcessors {
         public String entityName { get; private set; }       // ENTITY_NAME: Object accessed
         public Integer numberFields { get; private set; }    // NUMBER_FIELDS: Field count
         public Integer rowsProcessed { get; private set; }   // ROWS_PROCESSED: Row count
-        public String query { get; private set; }            // QUERY: Query string
         
         // Connected App Information
         public String connectedAppId { get; private set; }   // CONNECTED_APP_ID: 15-char app ID
@@ -4160,7 +4159,6 @@ public class EventLogProcessors {
         public String connectedAppId { get; private set; }     // CONNECTED_APP_ID: Connected app's ID
         public String entityName { get; private set; }         // ENTITY_NAME: Accessed API objects
         public String exceptionMessage { get; private set; }   // EXCEPTION_MESSAGE: Error details
-        public String query { get; private set; }              // QUERY: Query string
         
         // Performance metrics
         public Integer cpuTime { get; private set; }           // CPU_TIME: CPU time used (ms)
@@ -5307,7 +5305,7 @@ public class EventLogProcessors {
             data.responseSize = getIntegerField(fields, headerMap, FIELD_RESPONSE_SIZE);
             data.timeValue = getIntegerField(fields, headerMap, FIELD_TIME);
             data.statusCode = getIntegerField(fields, headerMap, FIELD_STATUS_CODE);
-            data.success = getField(fields, headerMap, FIELD_SUCCESS);
+            data.success = getBooleanField(fields, headerMap, FIELD_SUCCESS);
             data.uri = getField(fields, headerMap, FIELD_URI);
             data.uriIdDerived = getField(fields, headerMap, FIELD_URI_ID_DERIVED);
             data.clientIp = getField(fields, headerMap, FIELD_CLIENT_IP);
@@ -6647,7 +6645,6 @@ public class EventLogProcessors {
         protected override IBaseEventData processCsvRow(Map<String, Object> eventData, List<String> fields, Map<String, Integer> headerMap) {
             RestApiData data = new RestApiData(eventData);
             data.method = getField(fields, headerMap, FIELD_METHOD);
-            data.query = getField(fields, headerMap, FIELD_QUERY);
             data.mediaType = getField(fields, headerMap, FIELD_MEDIA_TYPE);
             data.statusCode = getIntegerField(fields, headerMap, FIELD_STATUS_CODE);
             data.entityName = getField(fields, headerMap, FIELD_ENTITY_NAME);
@@ -7989,7 +7986,6 @@ public class EventLogProcessors {
 
         protected override IBaseEventData processCsvRow(Map<String, Object> eventData, List<String> fields, Map<String, Integer> headerMap) {
             ApexRestApiEventData data = new ApexRestApiEventData(eventData);
-            data.query = getField(fields, headerMap, FIELD_QUERY);
             data.requestId = getField(fields, headerMap, FIELD_REQUEST_ID);
             data.userIdDerived = getField(fields, headerMap, FIELD_USER_ID_DERIVED);
             data.method = getField(fields, headerMap, FIELD_METHOD);

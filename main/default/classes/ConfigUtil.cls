@@ -153,7 +153,6 @@ public with sharing class ConfigUtil {
     public static final String API_VERSION = 'v56.0';
     public static final String REMOTE_TOOLING_API_ENDPOINT = '/services/data/'+API_VERSION+'/tooling';
     public static final String TOOLING_API_ENDPOINT = Constants.GLOBAL_VARIABLE.BASE_URL + '/services/data/'+API_VERSION+'/tooling';
-    public static final String ORG_LIMITS_API_ENDPOINT = '/services/data/'+API_VERSION+'/limits';
     public static final String QUERY_REST_API_PATH = '/services/data/'+API_VERSION+'/query?q=';
     public static String getQueryRestApiPath(String version){
         return '/services/data/'+version+'/query?q=';
@@ -799,8 +798,6 @@ public with sharing class ConfigUtil {
     public static final String LOG_CATEGORIES_KEY_MAPPINGS = 'mappings';
 
     public static final String MONITORING_APP_KEY_ENABLED = 'enabled';
-    public static final String MONITORING_APP_KEY_FREQUENCY = 'frequency';
-    public static final String MONITORING_APP_KEY_ENABLED_TYPES = 'enabledTypes';
 
     public static final String DELETE_MONITORING_RULE_ACTION_KEY_ACTION_RESULT = 'actionResult';
 

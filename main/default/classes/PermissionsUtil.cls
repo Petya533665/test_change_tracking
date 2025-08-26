@@ -102,6 +102,8 @@ public without sharing class PermissionsUtil {
 	public static final String FP_SPLUNK_INTEGRATION_ENABLED = 'SplunkIntegrationEnabled';
 	public static final String FP_MONITORING_ENABLED = 'MonitoringEnabled';
 	public static final String FP_LIMITS_MONITORING_ENABLED = 'LimitsMonitoringEnabled';
+	public static final String FP_AUTO_CHART_ENABLED = 'AutoChartEnabled';
+	public static final String FP_FORECAST_ENABLED = 'ForecastEnabled';
 	public static final String FP_ARCHIVAL_ENABLED = 'ArchivalEnabled';
 	public static final String FP_SENSITIVE_DATA_MASK_ENABLED = 'SensitiveDataMaskingEnabled';
 	public static final String FP_FLOW_DEBUG_VIEW_ENABLED = 'FlowDebugViewEnabled';
@@ -171,9 +173,11 @@ public without sharing class PermissionsUtil {
 		FP_METADATA_CHAT_ENABLED => 28
 	};
 
-	// 1bit of 29bit
+	// 3bit of 29bit
 	public static final Map<String, Integer> MAP_FEATURE12_INDEX_BY_NAME = new Map<String, Integer> {
-		FP_LIMITS_MONITORING_ENABLED => 0
+		FP_LIMITS_MONITORING_ENABLED => 0,
+		FP_AUTO_CHART_ENABLED => 1,
+		FP_FORECAST_ENABLED => 2
 	};
 
 	public static Map<Integer, Boolean> FeatureMap1 {
@@ -359,19 +363,21 @@ public without sharing class PermissionsUtil {
 			24=>0, 25=>0, 26=>0,
 			27=>0, 28=>0
 	};
-	// 1bit of 29bit
+
+	// 3bit of 29bit
 	public static final Map<Integer, Integer> DEFAULT_FEATURE_MAP_12_VALUE_MAP = new Map<Integer, Integer>{
-			0=>0, 1=>0,	2=>0,
-			3=>0, 4=>0,	5=>0,
-			6=>0, 7=>0,	8=>0,
-			9=>0, 10=>0, 11=>0,
-			12=>0, 13=>0, 14=>0,
-			15=>0, 16=>0, 17=>0,
-			18=>0, 19=>0, 20=>0,
-			21=>0, 22=>0, 23=>0,
-			24=>0, 25=>0, 26=>0,
-			27=>0, 28=>0
+		0=>0, 1=>0,	2=>1,
+		3=>0, 4=>0,	5=>0,
+		6=>0, 7=>0,	8=>0,
+		9=>0, 10=>0, 11=>0,
+		12=>0, 13=>0, 14=>0,
+		15=>0, 16=>0, 17=>0,
+		18=>0, 19=>0, 20=>0,
+		21=>0, 22=>0, 23=>0,
+		24=>0, 25=>0, 26=>0,
+		27=>0, 28=>0
 	};
+
 	// all TTL params 0 except FP_REQUEST_ENCRYPTED_TOKEN_TTL (2 hours)
 	public static final Map<Integer, Integer> DEFAULT_FEATURE_MAP_4_VALUE_MAP = new Map<Integer, Integer>{
 			0=>0, 1=>0,	2=>0,
@@ -388,13 +394,11 @@ public without sharing class PermissionsUtil {
 
 	public static final String FP_MAX_ISSUES = 'MaxIssues';
 	public static final String FP_MAX_NOTIFICATIONS_24_HR = 'MaxNotifications24hr';
-	public static final String FP_AUTO_CHART_ENABLED = 'AutoChartEnabled';
 
 	// 2 x 8bits = 16bit of 29bit
 	public static final Map<String, Integer> MAP_FEATURE10_INDEX_BY_NAME = new Map<String, Integer> {
 			FP_MAX_ISSUES => 0,
-			FP_MAX_NOTIFICATIONS_24_HR => 1,
-			FP_AUTO_CHART_ENABLED => 16
+			FP_MAX_NOTIFICATIONS_24_HR => 1
 	};
 
 	//{"2":255,"1":255,"0":255}
@@ -439,7 +443,7 @@ public without sharing class PermissionsUtil {
 	public static final Integer DEFAULT_FEATURE_MAP_5_VALUE = 0;
 	public static final Integer DEFAULT_FEATURE_MAP_6_VALUE = 0;
 	public static final Integer MAX_USED_BITS_IN_INTEGER = 29;
-	public static final Integer DEFAULT_FEATURE_MAP_10_VALUE = (1 << 16); // Enable AutoChart
+	public static final Integer DEFAULT_FEATURE_MAP_10_VALUE = 0; // AutoChart moved to FeatureMap12
 
 	@TestVisible
 	public static Integer FeatureMap1IntValue {
@@ -749,13 +753,14 @@ public without sharing class PermissionsUtil {
 		}
 		private set;
 	}
+	
 	@TestVisible
 	public static Boolean LimitsMonitoringEnabled {
 		get {
 			if(LimitsMonitoringEnabled == null) {
 				LimitsMonitoringEnabled = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_LIMITS_MONITORING_ENABLED));
 			}
-			return true;
+			return LimitsMonitoringEnabled;
 		}
 		private set;
 	}
@@ -1009,9 +1014,20 @@ public without sharing class PermissionsUtil {
 	public static Boolean AutoChartEnabled {
 		get {
 			if(AutoChartEnabled == null) {
-				AutoChartEnabled = (FeatureMap10IntValue & (1 << MAP_FEATURE10_INDEX_BY_NAME.get(FP_AUTO_CHART_ENABLED))) != 0;
+				AutoChartEnabled = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_AUTO_CHART_ENABLED));
 			}
 			return AutoChartEnabled;
+		}
+		private set;
+	}
+
+	@TestVisible
+	public static Boolean ForecastEnabled {
+		get {
+			if(ForecastEnabled == null) {
+				ForecastEnabled = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_FORECAST_ENABLED));
+			}
+			return ForecastEnabled;
 		}
 		private set;
 	}

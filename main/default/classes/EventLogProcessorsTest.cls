@@ -160,7 +160,7 @@ private class EventLogProcessorsTest {
                           
         String csvData = 'CALLOUT-123,005xx000001234AAA,POST,REST,https://api.example.com/data,' +
                         '500,1024,2048,750,200,' +
-                        '1,/apex/MyClass.makeCallout,CALLOUT_1,192.168.1.1,abc123,' +
+                        'true,/apex/MyClass.makeCallout,CALLOUT_1,192.168.1.1,abc123,' +
                         'def456,00D123456789012345,2024-01-01T12:00:00Z,' +
                         '20130715233322.670,005xx000001234AAA\n';
         
@@ -193,7 +193,7 @@ private class EventLogProcessorsTest {
         System.assertEquals(2048, calloutData.responseSize);
         System.assertEquals(750, calloutData.timeValue);
         System.assertEquals(200, calloutData.statusCode);
-        System.assertEquals('1', calloutData.success);
+        System.assertEquals(true, calloutData.success);
         System.assertEquals('/apex/MyClass.makeCallout', calloutData.uri);
         System.assertEquals('CALLOUT_1', calloutData.uriIdDerived);
         System.assertEquals('192.168.1.1', calloutData.clientIp);

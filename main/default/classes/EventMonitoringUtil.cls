@@ -38,8 +38,8 @@ public with sharing class EventMonitoringUtil {
         }
         
         // Last Processed Hourly DateTime
-        // DateTime retrieved from database is already in GMT/UTC timezone
-        DateTime lastProcessedHourlyDateTimeGMT = ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c;
+        Datetime lastProcessedHourlyDateTime = ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c;
+        
         // Build dynamic query using QBuilder
         Set<String> selectFields = new Set<String>{
             EVENT_LOG_FILE_ID, EVENT_LOG_FILE_EVENT_TYPE, EVENT_LOG_FILE_LOG_DATE, EVENT_LOG_FILE_LOG_FILE_LENGTH, EVENT_LOG_FILE_LOG_FILE,
@@ -54,7 +54,7 @@ public with sharing class EventMonitoringUtil {
         QBuilder queryBuilder = new QBuilder(getEventLogFileType())
             .selectFields(selectFields)
             .add(QBuilder.condition(EVENT_LOG_FILE_EVENT_TYPE).isIn(eventTypes))
-            .add(QBuilder.condition(EVENT_LOG_FILE_LOG_DATE).isGreaterOrEquals(lastProcessedHourlyDateTimeGMT))
+            .add(QBuilder.condition(EVENT_LOG_FILE_LOG_DATE).isGreaterOrEquals(lastProcessedHourlyDateTime))
             .add(QBuilder.condition(EVENT_LOG_FILE_INTERVAL).equalsTo(INTERVAL_HOURLY))
             .add(QBuilder.orderBy(EVENT_LOG_FILE_LOG_DATE).descending())
             .addLimit(MAX_RECORDS);
@@ -301,24 +301,6 @@ public with sharing class EventMonitoringUtil {
     private static Boolean sequenceFieldAvailable = null;
     private static SObjectType eventLogFileType = null;
 
-    public static final Integer DEFAULT_LOGS_LIMIT_PER_HOUR = 100;
-    public static final Integer DEFAULT_LOGS_LIMIT_PER_HOUR_UNLIMITED = null; // no limit
-
-    public static final Map<String, Integer> MAP_DEFAULT_LOGS_LIMIT_PER_HOUR = new Map<String, Integer>{
-        EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION => DEFAULT_LOGS_LIMIT_PER_HOUR_UNLIMITED,
-        EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR => DEFAULT_LOGS_LIMIT_PER_HOUR,
-        EventLogProcessors.EVENT_TYPE_INSUFFICIENT_ACCESS => DEFAULT_LOGS_LIMIT_PER_HOUR,
-        EventLogProcessors.EVENT_TYPE_API => DEFAULT_LOGS_LIMIT_PER_HOUR,
-        EventLogProcessors.EVENT_TYPE_APEX_REST_API => DEFAULT_LOGS_LIMIT_PER_HOUR,
-        EventLogProcessors.EVENT_TYPE_REST_API => DEFAULT_LOGS_LIMIT_PER_HOUR,
-        EventLogProcessors.EVENT_TYPE_APEX_CALLOUT => DEFAULT_LOGS_LIMIT_PER_HOUR,
-        EventLogProcessors.EVENT_TYPE_APEX_TRIGGER => DEFAULT_LOGS_LIMIT_PER_HOUR,
-        EventLogProcessors.EVENT_TYPE_APEX_SOAP => DEFAULT_LOGS_LIMIT_PER_HOUR,
-        EventLogProcessors.EVENT_TYPE_LOGIN => DEFAULT_LOGS_LIMIT_PER_HOUR,
-        EventLogProcessors.EVENT_TYPE_VISUALFORCE_REQUEST => DEFAULT_LOGS_LIMIT_PER_HOUR,
-        EventLogProcessors.EVENT_TYPE_AURA_REQUEST => DEFAULT_LOGS_LIMIT_PER_HOUR
-    };
-
     public static final Map<String, Map<String, ThresholdConfig>> MAP_DEFAULT_THRESHOLDS = new Map<String, Map<String, ThresholdConfig>>{
         EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION => new Map<String, ThresholdConfig>{
             'EXCEPTION_MESSAGE' => new ThresholdConfig.Builder()
@@ -327,138 +309,26 @@ public with sharing class EventMonitoringUtil {
                 .setEvalType(ThresholdConfig.EvaluationType.NOT_EQUALS)
                 .setCriticalThreshold(null)
                 .build()
-        },
-        EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR => new Map<String, ThresholdConfig>{
-            'MESSAGE' => new ThresholdConfig.Builder()
-                .setEventType(EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR)
-                .setMetric('MESSAGE')
-                .setEvalType(ThresholdConfig.EvaluationType.NOT_EQUALS)
-                .setCriticalThreshold(null)
-                .build()
-        },
-        EventLogProcessors.EVENT_TYPE_INSUFFICIENT_ACCESS => new Map<String, ThresholdConfig>{
-            'ERROR_DESCRIPTION' => new ThresholdConfig.Builder()
-                .setEventType(EventLogProcessors.EVENT_TYPE_INSUFFICIENT_ACCESS)
-                .setMetric('ERROR_DESCRIPTION')
-                .setEvalType(ThresholdConfig.EvaluationType.NOT_EQUALS)
-                .setCriticalThreshold(null)
-                .build()
-        },
-        EventLogProcessors.EVENT_TYPE_API => new Map<String, ThresholdConfig>{
-            'EXCEPTION_MESSAGE' => new ThresholdConfig.Builder()
-                .setEventType(EventLogProcessors.EVENT_TYPE_API)
-                .setMetric('EXCEPTION_MESSAGE')
-                .setEvalType(ThresholdConfig.EvaluationType.NOT_EQUALS)
-                .setCriticalThreshold(null)
-                .build()
-        },
-        EventLogProcessors.EVENT_TYPE_APEX_REST_API => new Map<String, ThresholdConfig>{
-            'EXCEPTION_MESSAGE' => new ThresholdConfig.Builder()
-                .setEventType(EventLogProcessors.EVENT_TYPE_APEX_REST_API)
-                .setMetric('EXCEPTION_MESSAGE')
-                .setEvalType(ThresholdConfig.EvaluationType.NOT_EQUALS)
-                .setCriticalThreshold(null)
-                .build()
-        },
-        EventLogProcessors.EVENT_TYPE_REST_API => new Map<String, ThresholdConfig>{
-            'EXCEPTION_MESSAGE' => new ThresholdConfig.Builder()
-                .setEventType(EventLogProcessors.EVENT_TYPE_REST_API)
-                .setMetric('EXCEPTION_MESSAGE')
-                .setEvalType(ThresholdConfig.EvaluationType.NOT_EQUALS)
-                .setCriticalThreshold(null)
-                .build()
-        },
-        EventLogProcessors.EVENT_TYPE_APEX_CALLOUT => new Map<String, ThresholdConfig>{
-            'SUCCESS' => new ThresholdConfig.Builder()
-                .setEventType(EventLogProcessors.EVENT_TYPE_APEX_CALLOUT)
-                .setMetric('SUCCESS')
-                .setEvalType(ThresholdConfig.EvaluationType.NOT_EQUALS)
-                .setCriticalThreshold('1')
-                .build()
-        },
-        EventLogProcessors.EVENT_TYPE_APEX_TRIGGER => new Map<String, ThresholdConfig>{
-            'REQUEST_STATUS' => new ThresholdConfig.Builder()
-                .setEventType(EventLogProcessors.EVENT_TYPE_APEX_TRIGGER)
-                .setMetric('REQUEST_STATUS')
-                .setEvalType(ThresholdConfig.EvaluationType.IS_IN)
-                .setCriticalThreshold(new List<String>{'F', 'A', 'N', 'U'})
-                .build()
-        },
-        EventLogProcessors.EVENT_TYPE_APEX_SOAP => new Map<String, ThresholdConfig>{
-            'REQUEST_STATUS' => new ThresholdConfig.Builder()
-                .setEventType(EventLogProcessors.EVENT_TYPE_APEX_SOAP)
-                .setMetric('REQUEST_STATUS')
-                .setEvalType(ThresholdConfig.EvaluationType.IS_IN)
-                .setCriticalThreshold(new List<String>{'F', 'A', 'N', 'U'})
-                .build()
-        },
-        EventLogProcessors.EVENT_TYPE_LOGIN => new Map<String, ThresholdConfig>{
-            'LOGIN_STATUS' => new ThresholdConfig.Builder()
-                .setEventType(EventLogProcessors.EVENT_TYPE_LOGIN)
-                .setMetric('LOGIN_STATUS')
-                .setEvalType(ThresholdConfig.EvaluationType.NOT_EQUALS)
-                .setCriticalThreshold('LOGIN_NO_ERROR')
-                .build()
-        },
-        EventLogProcessors.EVENT_TYPE_VISUALFORCE_REQUEST => new Map<String, ThresholdConfig>{
-            'REQUEST_STATUS' => new ThresholdConfig.Builder()
-                .setEventType(EventLogProcessors.EVENT_TYPE_VISUALFORCE_REQUEST)
-                .setMetric('REQUEST_STATUS')
-                .setEvalType(ThresholdConfig.EvaluationType.IS_IN)
-                .setCriticalThreshold(new List<String>{'F', 'A', 'N', 'U'})
-                .build()
-        },
-        EventLogProcessors.EVENT_TYPE_AURA_REQUEST => new Map<String, ThresholdConfig>{
-            'REQUEST_STATUS' => new ThresholdConfig.Builder()
-                .setEventType(EventLogProcessors.EVENT_TYPE_AURA_REQUEST)
-                .setMetric('REQUEST_STATUS')
-                .setEvalType(ThresholdConfig.EvaluationType.IS_IN)
-                .setCriticalThreshold(new List<String>{'F', 'A', 'N', 'U'})
-                .build()
         }
     };
 
-    public static List<Rule__c> getActiveEventMonitoringRules() {
+    /**
+     * Loads threshold configurations from Rule__c and RuleFilter__c records
+     * @return Map<String, Map<String, ThresholdConfig>> - Event type to metric thresholds mapping
+     */
+    public static Map<String, Map<String, ThresholdConfig>> loadThresholdsFromRules() {
+        Map<String, Map<String, ThresholdConfig>> thresholds = new Map<String, Map<String, ThresholdConfig>>();
+        
         // Query active rules with their filters
         List<Rule__c> rules = [
-            SELECT Id, Name, Type__c, Subtype__c, Logs_Limit__c,
-                   (SELECT FieldName__c, ComparisonOperator__c, Value__c, Index__c
+            SELECT Id, Name, Type__c, Subtype__c,
+                   (SELECT FieldName__c, ComparisonOperator__c, Value__c, Index__c 
                     FROM RuleFilters__r 
                     ORDER BY Index__c ASC)
             FROM Rule__c 
             WHERE Type__c = :EVENT_MONITORING_TYPE
                 AND Active__c = true
         ];
-        return rules;
-    }
-
-    public static Map<String, Integer> getLogsLimitPerHour(List<Rule__c> rules) {
-        Map<String, Integer> logsLimitPerHour = new Map<String, Integer>();
-        for (Rule__c rule : rules) {
-            Integer logsLimit = rule.Logs_Limit__c != null ? Integer.valueOf(rule.Logs_Limit__c) : getDefaultLogsLimitForEventType(rule.Subtype__c);
-            logsLimitPerHour.put(rule.Subtype__c, logsLimit);
-        }
-        return logsLimitPerHour;
-    }
-
-    /**
-     * Get default logs limit for specific event type
-     * @param eventType String
-     * @return Integer
-     */
-    private static Integer getDefaultLogsLimitForEventType(String eventType) {
-        if (MAP_DEFAULT_LOGS_LIMIT_PER_HOUR.containsKey(eventType)) {
-            return MAP_DEFAULT_LOGS_LIMIT_PER_HOUR.get(eventType);
-        }
-        return DEFAULT_LOGS_LIMIT_PER_HOUR;
-    }
-
-    /**
-     * Loads threshold configurations from Rule__c and RuleFilter__c records
-     * @return Map<String, Map<String, ThresholdConfig>> - Event type to metric thresholds mapping
-     */
-    public static Map<String, Map<String, ThresholdConfig>> loadThresholdsFromRules(List<Rule__c> rules) {
-        Map<String, Map<String, ThresholdConfig>> thresholds = new Map<String, Map<String, ThresholdConfig>>();
         
         for (Rule__c rule : rules) {
             if (rule.RuleFilters__r.isEmpty()) continue;
@@ -486,6 +356,15 @@ public with sharing class EventMonitoringUtil {
                 thresholds.get(rule.Subtype__c).put(metric, config);
             }
         }
+
+        // add default thresholds if they are not already in the thresholds map
+        if (!MAP_DEFAULT_THRESHOLDS.isEmpty()) {
+            for (String eventType : MAP_DEFAULT_THRESHOLDS.keySet()) {
+                if (!thresholds.containsKey(eventType)) {
+                    thresholds.put(eventType, MAP_DEFAULT_THRESHOLDS.get(eventType));
+                }
+            }
+        }
         
         return thresholds;
     }
@@ -508,13 +387,11 @@ public with sharing class EventMonitoringUtil {
         }
         
         // Set thresholds based on filter index
-        ThresholdConfig.EvaluationType evalType = getEvaluationType(filters[0].ComparisonOperator__c);
         for (RuleFilter__c filter : filters) {
-            Object thresholdValue = deserializeThresholdValue(filter.Value__c, evalType);
             if (filter.Index__c == CRITICAL_INDEX) {
-                builder.setCriticalThreshold(thresholdValue);
+                builder.setCriticalThreshold(filter.Value__c);
             } else if (filter.Index__c == WARNING_INDEX) {
-                builder.setWarningThreshold(thresholdValue);
+                builder.setWarningThreshold(filter.Value__c);
             }
         }
         
@@ -588,197 +465,6 @@ public with sharing class EventMonitoringUtil {
         return ThresholdConfig.EvaluationType.valueOf(evalTypeStr);
     }
 
-    /**
-     * Serializes threshold values for storage in RuleFilter__c.Value__c
-     * Handles special cases like IS_IN which requires JSON serialization of lists
-     */
-    private static String serializeThresholdValue(Object thresholdValue, ThresholdConfig.EvaluationType evaluationType) {
-        if (thresholdValue == null) {
-            return null;
-        }
-        
-        // For IS_IN evaluation type, serialize List as JSON
-        if (evaluationType == ThresholdConfig.EvaluationType.IS_IN && thresholdValue instanceof List<Object>) {
-            return JSON.serialize(thresholdValue);
-        }
-        
-        // For all other types, use standard string conversion
-        return String.valueOf(thresholdValue);
-    }
-
-    /**
-     * Deserializes threshold values from RuleFilter__c.Value__c
-     * Handles special cases like IS_IN which requires JSON deserialization to lists
-     */
-    private static Object deserializeThresholdValue(String serializedValue, ThresholdConfig.EvaluationType evaluationType) {
-        if (String.isBlank(serializedValue)) {
-            return null;
-        }
-        
-        // For IS_IN evaluation type, deserialize JSON to List
-        if (evaluationType == ThresholdConfig.EvaluationType.IS_IN) {
-            try {
-                return (List<Object>) JSON.deserializeUntyped(serializedValue);
-            } catch (Exception e) {
-                // Fallback to string value if JSON deserialization fails
-                return serializedValue;
-            }
-        }
-        
-        // For all other types, return as string
-        return serializedValue;
-    }
-
-    /**
-     * Get default threshold configurations for specific event type
-     * @param eventType String
-     * @return Map<String, ThresholdConfig>
-     */
-    private static Map<String, ThresholdConfig> getDefaultThresholdsForEventType(String eventType) {
-        if (MAP_DEFAULT_THRESHOLDS.containsKey(eventType)) {
-            return MAP_DEFAULT_THRESHOLDS.get(eventType);
-        }
-        return new Map<String, ThresholdConfig>();
-    }
-
-    /**
-     * Creates Rule__c with default threshold configurations for an event type
-     * @param eventType String
-     * @return List<Rule__c> - List of created rules (could be empty if no defaults exist)
-     */
-    public static List<Rule__c> createDefaultRulesForEventType(String eventType) {
-        return createDefaultRulesForEventTypes(new List<String>{eventType});
-    }
-
-    /**
-     * Bulkified method to create Rule__c with default threshold configurations for multiple event types
-     * @param eventTypes List<String>
-     * @return List<Rule__c> - List of created rules
-     */
-    public static List<Rule__c> createDefaultRulesForEventTypes(List<String> eventTypes) {
-        Map<String, Integer> eventTypeLogsLimits = new Map<String, Integer>();
-        for (String eventType : eventTypes) {
-            eventTypeLogsLimits.put(eventType, getDefaultLogsLimitForEventType(eventType));
-        }
-        return createDefaultRulesForEventTypes(eventTypeLogsLimits);
-    }
-
-    /**
-     * Bulkified method to create Rule__c with threshold configurations for multiple event types with custom logs limits
-     * @param eventTypeLogsLimits Map<String, Integer> - Map of event type to logs limit
-     * @return List<Rule__c> - List of created rules
-     */
-    public static List<Rule__c> createDefaultRulesForEventTypes(Map<String, Integer> eventTypeLogsLimits) {
-        List<Rule__c> createdRules = new List<Rule__c>();
-        List<RuleFilter__c> allFilters = new List<RuleFilter__c>();
-        
-        // First, create all Rule__c records
-        List<Rule__c> rulesToInsert = new List<Rule__c>();
-        Map<String, Map<String, ThresholdConfig>> eventTypeThresholds = new Map<String, Map<String, ThresholdConfig>>();
-        
-        for (String eventType : eventTypeLogsLimits.keySet()) {
-            Map<String, ThresholdConfig> defaultThresholds = getDefaultThresholdsForEventType(eventType);
-            
-            if (!defaultThresholds.isEmpty()) {
-                eventTypeThresholds.put(eventType, defaultThresholds);
-                
-                Rule__c rule = new Rule__c(
-                    Name__c = eventType + ' Event Monitoring Rule',
-                    Description__c = 'Default threshold rule for ' + eventType + ' event monitoring',
-                    Type__c = EVENT_MONITORING_TYPE,
-                    Subtype__c = eventType,
-                    Active__c = true,
-                    Logs_Limit__c = eventTypeLogsLimits.get(eventType)
-                );
-                rulesToInsert.add(rule);
-            }
-        }
-        
-        // Bulk insert all rules
-        if (!rulesToInsert.isEmpty()) {
-            insert rulesToInsert;
-            createdRules.addAll(rulesToInsert);
-            
-            // Now create all RuleFilter records
-            for (Rule__c rule : rulesToInsert) {
-                Map<String, ThresholdConfig> defaultThresholds = eventTypeThresholds.get(rule.Subtype__c);
-                
-                for (String metric : defaultThresholds.keySet()) {
-                    ThresholdConfig config = defaultThresholds.get(metric);
-                    
-                    // Critical threshold filter
-                    if (config.criticalThreshold != null) {
-                        String criticalValue = serializeThresholdValue(config.criticalThreshold, config.evaluationType);
-                        allFilters.add(new RuleFilter__c(
-                            Rule__c = rule.Id,
-                            FieldName__c = metric,
-                            ComparisonOperator__c = config.evaluationType.name(),
-                            Value__c = criticalValue,
-                            Index__c = CRITICAL_INDEX
-                        ));
-                    }
-                    
-                    // Warning threshold filter
-                    if (config.warningThreshold != null) {
-                        String warningValue = serializeThresholdValue(config.warningThreshold, config.evaluationType);
-                        allFilters.add(new RuleFilter__c(
-                            Rule__c = rule.Id,
-                            FieldName__c = metric,
-                            ComparisonOperator__c = config.evaluationType.name(),
-                            Value__c = warningValue,
-                            Index__c = WARNING_INDEX
-                        ));
-                    }
-                    
-                    // Handle NOT_EQUALS evaluation type with null threshold values
-                    // For API EXCEPTION_MESSAGE, we want to trigger on any non-null exception message
-                    if (config.criticalThreshold == null 
-                        && config.warningThreshold == null 
-                        && config.evaluationType == ThresholdConfig.EvaluationType.NOT_EQUALS) {
-                        allFilters.add(new RuleFilter__c(
-                            Rule__c = rule.Id,
-                            FieldName__c = metric,
-                            ComparisonOperator__c = config.evaluationType.name(),
-                            Value__c = '', // Use empty string - any non-empty value will trigger
-                            Index__c = CRITICAL_INDEX
-                        ));
-                    }
-                }
-            }
-            
-            // Bulk insert all filters
-            if (!allFilters.isEmpty()) {
-                insert allFilters;
-            }
-        }
-        
-        return createdRules;
-    }
-
-    /**
-     * Deletes all Rule__c records for a specific event type
-     * @param eventType String
-     */
-    public static void deleteRulesForEventType(String eventType) {
-        deleteRulesForEventTypes(new List<String>{eventType});
-    }
-
-    /**
-     * Bulkified method to delete all Rule__c records for multiple event types
-     * @param eventTypes List<String>
-     */
-    public static void deleteRulesForEventTypes(List<String> eventTypes) {
-        List<Rule__c> rulesToDelete = [
-            SELECT Id 
-            FROM Rule__c 
-            WHERE Type__c = :EVENT_MONITORING_TYPE 
-                AND Subtype__c IN :eventTypes
-        ];
-        
-        if (!rulesToDelete.isEmpty()) {
-            delete rulesToDelete;
-        }
-    }
 
     public class FilterField implements Comparable{
         public String value;
@@ -877,14 +563,7 @@ public with sharing class EventMonitoringUtil {
         List<Boolean> enabledMembersFromSettings = getEnabledMembersFromSettings();
         Integer index = MAP_ENABLED_EVENT_TYPES.get(eventTypeToEnable);
         if (index != null) {
-            // Check if it's not already enabled
-            boolean wasEnabled = enabledMembersFromSettings[index];
             enabledMembersFromSettings[index] = true;
-            
-            // Create Rule__c record if not already enabled
-            if (!wasEnabled) {
-                createDefaultRulesForEventType(eventTypeToEnable);
-            }
         }
         List<String> enabledTypes = new List<String>();
         for (Integer i = 0; i < enabledMembersFromSettings.size(); i++) {
@@ -902,14 +581,7 @@ public with sharing class EventMonitoringUtil {
         List<Boolean> enabledMembersFromSettings = getEnabledMembersFromSettings();
         Integer index = MAP_ENABLED_EVENT_TYPES.get(eventTypeToDisable);
         if (index != null) {
-            // Check if it was enabled before disabling
-            boolean wasEnabled = enabledMembersFromSettings[index];
             enabledMembersFromSettings[index] = false;
-            
-            // Delete Rule__c records if it was enabled
-            if (wasEnabled) {
-                deleteRulesForEventType(eventTypeToDisable);
-            }
         }
         List<String> enabledTypes = new List<String>();
         for (Integer i = 0; i < enabledMembersFromSettings.size(); i++) {
@@ -923,148 +595,12 @@ public with sharing class EventMonitoringUtil {
         update ConfigUtil.EVENT_MONITORING_SETTINGS;
     }
 
-    public static List<EventTypeStatus> getEventTypesWithStatus() {
-        List<EventTypeStatus> result = new List<EventTypeStatus>();
-        List<Boolean> enabledStatuses = getEnabledMembersFromSettings();
-        
-        // Get existing rules with logs limits
-        Map<String, Integer> existingLogsLimits = new Map<String, Integer>();
-        List<Rule__c> existingRules = [
-            SELECT Subtype__c, Logs_Limit__c 
-            FROM Rule__c 
-            WHERE Type__c = :EVENT_MONITORING_TYPE
-        ];
-        
-        for (Rule__c rule : existingRules) {
-            if (rule.Logs_Limit__c != null) {
-                existingLogsLimits.put(rule.Subtype__c, Integer.valueOf(rule.Logs_Limit__c));
-            }
-        }
-        
-        for (String eventType : MAP_ENABLED_EVENT_TYPES.keySet()) {
-            // currently skipping all event types that are not in the DEFAULT_ENABLED_EVENT_TYPES
-            if (!DEFAULT_ENABLED_EVENT_TYPES.contains(eventType)) {
-                continue;
-            }
-            Integer index = MAP_ENABLED_EVENT_TYPES.get(eventType);
-            Boolean isActive = false;
-            if (index != null && index < enabledStatuses.size()) {
-                isActive = enabledStatuses[index];
-            }
-            
-            // Get logs limit from existing rule or default
-            Integer logsLimit = existingLogsLimits.containsKey(eventType) 
-                ? existingLogsLimits.get(eventType) 
-                : getDefaultLogsLimitForEventType(eventType);
-                
-            result.add(new EventTypeStatus(eventType, isActive, logsLimit));
-        }
-        
-        return result;
-    }
-
-    public class EventTypeStatus {
-        public String name;
-        public Boolean active;
-        public Integer logsLimit;
-        
-        public EventTypeStatus(String name, Boolean active, Integer logsLimit) {
-            this.name = name;
-            this.active = active;
-            this.logsLimit = logsLimit;
-        }
-    }
-
-    /**
-     * Enable all types that are present in the list and disable all others
-     * Creates Rule__c records for enabled types and deletes them for disabled types
-     */
-    public static void setEventTypesStatuses(List<EventTypeStatus> eventTypeStatuses) {
-        Integer mapSize = MAP_ENABLED_EVENT_TYPES.size();
-        List<String> enabledEventTypesList = new List<String>();
-        
-        for (Integer i = 0; i < mapSize; i++) {
-            enabledEventTypesList.add('0');
-        }
-        
-        // Get currently enabled event types
-        Set<String> currentlyEnabledTypes = new Set<String>();
-        List<Boolean> currentEnabledStatuses = getEnabledMembersFromSettings();
-        for (String eventType : MAP_ENABLED_EVENT_TYPES.keySet()) {
-            Integer index = MAP_ENABLED_EVENT_TYPES.get(eventType);
-            if (index != null && index < currentEnabledStatuses.size() && currentEnabledStatuses[index]) {
-                currentlyEnabledTypes.add(eventType);
-            }
-        }
-        
-        // Create maps for new enabled types and their logs limits
-        Set<String> newEnabledTypes = new Set<String>();
-        Map<String, Integer> newEnabledTypesWithLimits = new Map<String, Integer>();
-        
-        if (eventTypeStatuses == null) {
-            eventTypeStatuses = new List<EventTypeStatus>();
-        }
-        
-        for (EventTypeStatus status : eventTypeStatuses) {
-            if (status.active) {
-                newEnabledTypes.add(status.name);
-                newEnabledTypesWithLimits.put(status.name, status.logsLimit);
-                
-                // Set enabled status in settings
-                Integer index = MAP_ENABLED_EVENT_TYPES.get(status.name);
-                if (index != null && index < mapSize) {
-                    enabledEventTypesList[index] = '1';
-                }
-            }
-        }
-
-        // Collect event types that need rules created or deleted
-        Map<String, Integer> typesToEnable = new Map<String, Integer>();
-        List<String> typesToDisable = new List<String>();
-        
-        for (String eventType : newEnabledTypes) {
-            //if (!currentlyEnabledTypes.contains(eventType)) {
-                typesToEnable.put(eventType, newEnabledTypesWithLimits.get(eventType));
-            //}
-        }
-        
-        for (String eventType : currentlyEnabledTypes) {
-            if (!newEnabledTypes.contains(eventType)) {
-                typesToDisable.add(eventType);
-            }
-        }
-        
-        // Bulk create rules for newly enabled event types with custom logs limits
-        if (!typesToEnable.isEmpty()) {
-            createDefaultRulesForEventTypes(typesToEnable);
-        }
-        
-        // Bulk delete rules for newly disabled event types
-        if (!typesToDisable.isEmpty()) {
-            deleteRulesForEventTypes(typesToDisable);
-        }
-
-        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = String.join(enabledEventTypesList, ',');
-        update ConfigUtil.EVENT_MONITORING_SETTINGS;
-    }
-
     /**
      * Default enabled event types
      * @return Set<String>
      */
     public static Set<String> DEFAULT_ENABLED_EVENT_TYPES = new Set<String>{
-        EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION,
-        EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR,
-        EventLogProcessors.EVENT_TYPE_INSUFFICIENT_ACCESS,
-        EventLogProcessors.EVENT_TYPE_API,
-        EventLogProcessors.EVENT_TYPE_APEX_REST_API,
-        EventLogProcessors.EVENT_TYPE_REST_API,
-        EventLogProcessors.EVENT_TYPE_APEX_CALLOUT,
-        EventLogProcessors.EVENT_TYPE_APEX_TRIGGER,
-        EventLogProcessors.EVENT_TYPE_APEX_SOAP,
-        EventLogProcessors.EVENT_TYPE_LOGIN,
-        EventLogProcessors.EVENT_TYPE_VISUALFORCE_REQUEST,
-        EventLogProcessors.EVENT_TYPE_AURA_REQUEST
+        EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION
     };
 
     public static String DEFAULT_ENABLED_EVENT_TYPES_STRING {

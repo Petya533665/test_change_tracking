@@ -76,7 +76,7 @@ public with sharing class JiraTaskController {
 			} else if (method == 'getJiraEpics') {
 				response.data = AdminService.getJiraEpics(data);
 			} else if (method == 'getJiraSettings') {
-				response.data = AdminService.getJiraSettings();
+				response.data = IntegrationSettings.JIRA.getJiraSettings();
 			} else if (method == 'getCreateMeta') {
 				response.data = AdminService.getCreateMeta(data);
 			} else if (method == 'getJiraProject') {
@@ -90,7 +90,7 @@ public with sharing class JiraTaskController {
 			} else if (method == 'createTask') {
 				response.data = createTask(data);
 			} else if (method == 'getAzureDevOpsSettings') {
-				response.data = AdminService.getAzureDevOpsSettings();
+				response.data = IntegrationSettings.AZURE_DEVOPS.getAzureDevOpsSettings();
 			} else if (method == 'getAzureDevOpsProjects') {
 				response.data = AzureService.getProjects();
 			} else if (method == 'getAzureDevOpsProjectTeams') {
