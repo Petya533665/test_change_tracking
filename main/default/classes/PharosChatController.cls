@@ -38,19 +38,6 @@ public with sharing class PharosChatController {
 
     @AuraEnabled
     public static InitChatResponse initChat() {
-        // Create debug log with type Backend
-        Log__c debugLog = LogBuilder.getInstance()
-            .category('Debug')
-            .type('Backend')
-            .area('Community')
-            .summary('LWC Controller')
-            .details('PharosChatController.initChat method called')
-            .stackTrace(Logger.getInstance().getCurrentStackTrace(0))
-            .build();
-        
-        Logger.getInstance().add(debugLog);
-        Logger.getInstance().flush();
-        
         try {
             String orgId = UserInfo.getOrganizationId();
             String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
