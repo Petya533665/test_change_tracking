@@ -46,8 +46,9 @@ public with sharing class LogListController {
 		public String summary;
 		public Boolean isNew;
 		public DateTime createdAt;
+		public String viewFieldValue;
 
-		public LogElement(Log__c log) {
+		public LogElement(Log__c log, String view) {
 			this.id = log.Id;
 			this.name = log.Name;
 			this.category = log.Category__c;
@@ -55,6 +56,7 @@ public with sharing class LogListController {
 			this.summary = log.Summary__c;
 			this.isNew = log.Is_New__c;
 			this.createdAt = log.Created_At__c;
+			this.viewFieldValue = getViewValue(log, view);
 		}
 	}
 
@@ -265,7 +267,7 @@ public with sharing class LogListController {
 
 		List<LogElement> logElements = new List<LogElement>();
 		for (Log__c log : logs) {
-			logElements.add(new LogElement(log));
+			logElements.add(new LogElement(log, view));
 		}
 		return logElements;
 	}
