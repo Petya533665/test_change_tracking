@@ -56,9 +56,6 @@ public with sharing class RuleUtil {
 	public static final String KEY_ISSUE_FIELDS_FOR_UPDATE = 'updateIssueFields';
 	public static final String KEY_SERVICE_ENABLE = 'servicesEnable';
 	public static final String KEY_USER_TIMEZONE_OFFSET = 'userTimezoneOffset';
-	public static final String KEY_LIMIT_FIELD_NAMES = 'limitFieldNames';
-	public static final String KEY_LIMIT_MONITORING_FREQUENCY = 'limitMonitoringFrequency';
-	public static final String KEY_EVENT_MONITORING_TYPES = 'eventMonitoringTypes';
 
 	public static final String KEY_SUCCESS = 'success';
 	public static final String KEY_MESSAGE = 'message';
@@ -77,8 +74,7 @@ public with sharing class RuleUtil {
 		JIRA_UPDATE,
 		NOTIFICATION,
 		BROADCAST,
-		AZURE_DEV_OPS,
-        LIMITS
+		AZURE_DEV_OPS
 	}
 	public static final String RULE_TYPE_MONITORING = 'Monitoring';
 	public static final String RULE_TYPE_ARCHIVAL = 'Archival';
@@ -87,7 +83,6 @@ public with sharing class RuleUtil {
 	public static final String RULE_TYPE_NOTIFICATION = 'Notification';
 	public static final String RULE_TYPE_EVENT_MONITORING = 'Event Monitoring';
 	public static final String RULE_TYPE_BROADCAST = 'Broadcast';
-	public static final String RULE_TYPE_LIMITS = 'Limits';
 	public static final Set<String> IGNORE_RULE_TYPES_FOR_MONITORING_EVENTS = new Set<String>{RULE_TYPE_JIRA_UPDATE, RULE_TYPE_NOTIFICATION, RULE_TYPE_BROADCAST};
 	public static final Map<String, RuleType> MAP_RULE_TYPE = new Map<String, RuleType> {
 			RULE_TYPE_MONITORING => RuleType.MONITORING,
@@ -95,16 +90,14 @@ public with sharing class RuleUtil {
 			RULE_TYPE_JIRA_UPDATE => RuleType.JIRA_UPDATE,
 			RULE_TYPE_NOTIFICATION => RuleType.NOTIFICATION,
 			RULE_TYPE_BROADCAST => RuleType.BROADCAST,
-			RULE_TYPE_AZURE_DEV_OPS => RuleType.AZURE_DEV_OPS,
-			RULE_TYPE_LIMITS => RuleType.LIMITS
+			RULE_TYPE_AZURE_DEV_OPS => RuleType.AZURE_DEV_OPS
 	};
 
 	public static final Map<String, Boolean> MAP_RULES_ENABLED = new Map<String, Boolean> {
 			RULE_TYPE_MONITORING => ConfigUtil.SETTINGS.Monitoring_Enabled__c,
 			RULE_TYPE_ARCHIVAL => ConfigUtil.SETTINGS.Archival_Enabled__c,
 			RULE_TYPE_NOTIFICATION => PermissionsUtil.NotificationIntegrationEnabled,
-			RULE_TYPE_EVENT_MONITORING => PermissionsUtil.EventMonitoringEnabled && ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c,
-			RULE_TYPE_LIMITS => PermissionsUtil.LimitsMonitoringEnabled && ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c && ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c != null
+			RULE_TYPE_EVENT_MONITORING => PermissionsUtil.EventMonitoringEnabled && ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c
 	};
 
 	public static final List<String> RULE_TYPES_FOR_IMPORT_EXPORT = new List<String>{
@@ -270,8 +263,9 @@ public with sharing class RuleUtil {
 					ACTION_TYPE_JIRA_TICKET_COMMENT
 			},
 			RULE_TYPE_AZURE_DEV_OPS => new List<String>{
-					ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
-					ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
+				ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
+				ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
+				
 			},
 			RULE_TYPE_NOTIFICATION => new List<String> {
 					ACTION_TYPE_EMAIL_NOTIFICATION,
@@ -281,18 +275,9 @@ public with sharing class RuleUtil {
 					ACTION_TYPE_JIRA_TICKET_COMMENT,
 					ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
 			},
-			RULE_TYPE_BROADCAST => new List<String>(),
-			RULE_TYPE_EVENT_MONITORING => new List<String>(),
-			RULE_TYPE_LIMITS => new List<String> {
-					ACTION_TYPE_EMAIL_NOTIFICATION,
-					ACTION_TYPE_SLACK_NOTIFICATION,
-					ACTION_TYPE_JIRA_NOTIFICATION,
-					ACTION_TYPE_PAGERDUTY_NOTIFICATION,
-					ACTION_TYPE_TEAMS_NOTIFICATION,
-					ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
-					ACTION_TYPE_JIRA_TICKET_COMMENT,
-					ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
-			}
+			RULE_TYPE_BROADCAST => new List<String> {
+			},
+			RULE_TYPE_EVENT_MONITORING => new List<String>()
 	};
 	public static final Map<String, String> MAP_ACTION_SUBTYPES = new Map<String, String> {
 			RULE_TYPE_NOTIFICATION => ACTION_SUBTYPE_NOTIFICATION
@@ -2156,6 +2141,7 @@ public with sharing class RuleUtil {
 					'com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons',
 					'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes',
 					'com.atlassian.jira.plugin.system.customfieldtypes:multiselect',
+					'com.atlassian.jira.plugin.system.customfieldtypes:url',
 					'string'
 				},
 				'decimal' => new Set<String>{

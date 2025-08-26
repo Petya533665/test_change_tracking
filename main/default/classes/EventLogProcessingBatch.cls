@@ -3,7 +3,7 @@ public class EventLogProcessingBatch extends DatabaseUtils.PharosBatchImpl imple
     // Configurable settings for enhanced deduplication
     public class EnhancedDeduplicationSettings {
         public Boolean enableEmailEventDeduplication = true;
-        public Integer timingToleranceSeconds = 1;
+        public Integer timingToleranceSeconds = 10;
         public Boolean preserveAllEventLogs = true;
         public Boolean enableDetailedLogging = false;
         public Set<String> eventTypesToCheck = EventLogProcessors.EVENT_TYPES_TO_CHECK_DUPLICATES;

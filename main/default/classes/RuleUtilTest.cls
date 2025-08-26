@@ -1809,7 +1809,7 @@ private class RuleUtilTest {
 		// Create action with incompatible merge field type: string field mapped to URL
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
 			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
-			'{\"customfield_10700\":{\"value\":\"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.' + ConfigUtil.nameSpacePrefix + 'User_Id__c}\",\"schema\":{\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:url\",\"type\":\"url\"},\"required\":false,\"allowedValues\":null,\"name\":\"User ID\"}}'
+			'{\"customfield_10700\":{\"value\":\"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.' + ConfigUtil.nameSpacePrefix + 'Duration__c}\",\"schema\":{\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:url\",\"type\":\"url\"},\"required\":false,\"allowedValues\":null,\"name\":\"Duration\"}}'
 		);
 		
 		Map<String, Object> data = new Map<String, Object>();

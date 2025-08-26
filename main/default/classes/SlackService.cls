@@ -357,16 +357,16 @@ public without sharing class SlackService {
         return false;
     }
 
-    public static SlackChannelsResponse getChannels(String cursor) {
+    public static SlackChannelsResponse getChannels(String channelIdOrCursor) {
         if (ConfigUtil.SLACK_SETTINGS.Slack_API_Token__c == null) {
             throw new SlackServiceException('Slack Token not found');
         }
 
         // check if user input is channelid
-        if(String.isNotBlank(cursor) && !isCursor(cursor)) {
+        if(String.isNotBlank(channelIdOrCursor) && !isCursor(channelIdOrCursor)) {
             try {
                 String b = HttpUtils.get(
-                    ConfigUtil.SLACK_CONVERSATION_INFO_ENDPOINT + '?channel=' + cursor,
+                    ConfigUtil.SLACK_CONVERSATION_INFO_ENDPOINT + '?channel=' + channelIdOrCursor,
                     ConfigUtil.SLACK_API_CONVERSATION_LIST_HEADERS,
                     200
                 );
@@ -390,11 +390,11 @@ public without sharing class SlackService {
         }
 
         // reset cursor if user input is name of channel
-        if(String.isNotBlank(cursor) && !isCursor(cursor)) {
-            cursor = null;
+        if(String.isNotBlank(channelIdOrCursor) && !isCursor(channelIdOrCursor)) {
+            channelIdOrCursor = null;
         }
 
-        String endpoint = String.isNotBlank(cursor) ? (ConfigUtil.SLACK_CONVERSATION_LIST_ENDPOINT + '&cursor=' + cursor) : ConfigUtil.SLACK_CONVERSATION_LIST_ENDPOINT;
+        String endpoint = String.isNotBlank(channelIdOrCursor) ? (ConfigUtil.SLACK_CONVERSATION_LIST_ENDPOINT + '&cursor=' + channelIdOrCursor) : ConfigUtil.SLACK_CONVERSATION_LIST_ENDPOINT;
         String b = HttpUtils.get(
             endpoint,
             ConfigUtil.SLACK_API_CONVERSATION_LIST_HEADERS,

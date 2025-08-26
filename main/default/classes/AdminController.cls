@@ -81,21 +81,21 @@ public with sharing class AdminController {
             } else if (method == 'getConfigurationOverviewData') {
                 response.data = AdminService.getConfigurationOverviewData();
             } else if (method == 'getJiraSettings') {
-                response.data = AdminService.getJiraSettings();
+                response.data = IntegrationSettings.JIRA.getJiraSettings();
             } else if (method == 'getAzureDevOpsSettings') {
-                response.data = AdminService.getAzureDevOpsSettings();
+                response.data = IntegrationSettings.AZURE_DEVOPS.getAzureDevOpsSettings();
             } else if (method == 'deleteConnectedOrg') {
                 response.data = AdminService.deleteConnectedOrg(data);
             } else if (method == 'deleteFakeConnectedOrg') {
                 response.data = AdminService.deleteFakeConnectedOrg();
             } else if (method == 'saveJiraSettings') {
-                response.data = AdminService.saveJiraSettings(data);
+                response.data = IntegrationSettings.JIRA.saveJiraSettings(data);
             } else if (method == 'saveAzureDevOpsSettings') {
-                response.data = AdminService.saveAzureDevOpsSettings(data);
+                response.data = IntegrationSettings.AZURE_DEVOPS.saveAzureDevOpsSettings(data);
             } else if (method == 'resetJiraSettings') {
-                response.data = AdminService.resetJiraSettings();
+                response.data = IntegrationSettings.JIRA.resetJiraSettings();
             } else if (method == 'resetAzureDevOpsSettings') {
-                response.data = AdminService.resetAzureDevOpsSettings();
+                response.data = IntegrationSettings.AZURE_DEVOPS.resetAzureDevOpsSettings();
             } else if (method == 'getJiraProjectUsers') {
                 response.data = AdminService.getJiraProjectUsers(data);
             } else if (method == 'getJiraProjectComponents') {
@@ -141,19 +141,19 @@ public with sharing class AdminController {
             } else if (method == 'getLoggerWrapperInfo') {
                 response.data = AdminService.getLoggerWrapperInfo();
             } else if (method == 'getSplunkSettings') {
-                response.data = AdminService.getSplunkSettings();
+                response.data = IntegrationSettings.SPLUNK.getSplunkSettings();
             } else if (method == 'saveSplunkSettings') {
-                response.data = AdminService.saveSplunkSettings(data);
+                response.data = IntegrationSettings.SPLUNK.saveSplunkSettings(data);
             } else if (method == 'setSplunkSettings') {
-                response.data = AdminService.setSplunkSettings(data);
+                response.data = IntegrationSettings.SPLUNK.setSplunkSettings(data);
             } else if (method == 'validateSplunkEventCollectorConnection') {
-                response.data = AdminService.validateSplunkEventCollectorConnection(data);
+                response.data = IntegrationSettings.SPLUNK.validateSplunkEventCollectorConnection(data);
             } else if (method == 'getOpenAISettings') {
-                response.data = AdminService.getOpenAISettings();
+                response.data = IntegrationSettings.OPEN_AI.getOpenAISettings();
             } else if (method == 'setOpenAISettings') {
-                response.data = AdminService.setOpenAISettings(data);
+                response.data = IntegrationSettings.OPEN_AI.setOpenAISettings(data);
             } else if (method == 'validateOpenAIToken') {
-                response.data = AdminService.validateOpenAIToken(data);
+                response.data = IntegrationSettings.OPEN_AI.validateOpenAIToken(data);
             } else if (method == 'getCreateMeta') {
                 response.data = AdminService.getCreateMeta(data);
             } else if (method == 'getConnectedOrgsInfo') {
@@ -169,17 +169,15 @@ public with sharing class AdminController {
             } else if (method == 'testConnectedOrg') {
                 response.data = AdminService.testConnectedOrg(data);
             } else if (method == 'getSlackSettings') {
-                response.data = AdminService.getSlackSettings();
+                response.data = IntegrationSettings.SLACK.getSlackSettings();
             } else if (method == 'getSlackChannels') {
-                response.data = AdminService.getSlackChannels(data);
+                response.data = IntegrationSettings.SLACK.getSlackChannels(data);
             } else if (method == 'getSlackUsers') {
-                response.data = AdminService.getSlackUsers(data);
+                response.data = IntegrationSettings.SLACK.getSlackUsers(data);
             } else if (method == 'saveSlackSettings') {
-                response.data = AdminService.saveSlackSettings(data);
+                response.data = IntegrationSettings.SLACK.saveSlackSettings(data);
             } else if (method == 'setMonitoringSetting') {
                 response.data = AdminService.setMonitoringSetting(data);
-            } else if (method == 'setLimitsMonitoringSetting') {
-                response.data = AdminService.setLimitsMonitoringSetting(data);
             } else if (method == 'setEventMonitoringSetting') {
                 response.data = AdminService.setEventMonitoringSetting(data);
             } else if (method == 'setBatchErrorTrackingSetting') {
@@ -191,11 +189,11 @@ public with sharing class AdminController {
             } else if (method == 'getErrorReportingOptOut') {
                 response.data = AdminService.getErrorReportingOptOut();
             } else if (method == 'getPagerDutySettings') {
-                response.data = AdminService.getPagerDutySettings();
+                response.data = IntegrationSettings.PAGER_DUTY.getPagerDutySettings();
             } else if (method == 'getPagerDutyServices') {
-                response.data = AdminService.getPagerDutyServices();
+                response.data = IntegrationSettings.PAGER_DUTY.getPagerDutyServices();
             } else if (method == 'savePagerDutySettings') {
-                response.data = AdminService.savePagerDutySettings(data);
+                response.data = IntegrationSettings.PAGER_DUTY.savePagerDutySettings(data);
             } else if (method == 'getLogCategories') {
                 response.data = AdminService.getLogCategories();
             } else if (method == 'setLogRecordTypeMappings') {
@@ -323,21 +321,21 @@ public with sharing class AdminController {
             } else if (method == 'getIsAvailableSingleEmail') {
                 response.data = AdminService.getIsAvailableSingleEmail();
             } else if (method == 'getTeamChannels') {
-                response.data = AdminService.getTeamChannels(String.valueOf(data));
+                response.data = IntegrationSettings.TEAMS.getTeamChannels(String.valueOf(data));
             } else if (method == 'getTeams') {
-                response.data = AdminService.getTeams(String.valueOf(data));
+                response.data = IntegrationSettings.TEAMS.getTeams(String.valueOf(data));
             } else if (method == 'getTeamById') {
-                response.data = AdminService.getTeamById(String.valueOf(data));
+                response.data = IntegrationSettings.TEAMS.getTeamById(String.valueOf(data));
             } else if (method == 'getTeamsSettings') {
-                response.data = AdminService.getTeamsSettings();
+                response.data = IntegrationSettings.TEAMS.getTeamsSettings();
             } else if (method == 'setTeamsSettings') {
-                response.data = AdminService.setTeamsSettings(data);
+                response.data = IntegrationSettings.TEAMS.setTeamsSettings(data);
             } else if (method == 'setGitHubSettings') {
-                response.data = AdminService.setGitHubSettings(data);
+                response.data = IntegrationSettings.GIT_HUB.setGitHubSettings(data);
             } else if (method == 'getGitHubSettings') {
-                response.data = AdminService.getGitHubSettings();
+                response.data = IntegrationSettings.GIT_HUB.getGitHubSettings();
             } else if (method == 'resetGitHubSettings') {
-                response.data = AdminService.resetGitHubSettings();
+                response.data = IntegrationSettings.GIT_HUB.resetGitHubSettings();
             } else if (method == 'validateGitHubConnection') {
                 response.data = GitHubUtils.validateGitHubConnection(data);
             } else if (method == 'setChangeTrackingSettings') {
