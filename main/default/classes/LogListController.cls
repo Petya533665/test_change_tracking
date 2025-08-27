@@ -227,7 +227,7 @@ public with sharing class LogListController {
 			endDateTime = DateTime.valueOf(toDatetime);
 		}
 		
-		String baseQuery = 'SELECT Id, Name, Category__c, Type__c, Summary__c, Is_New__c, Created_At__c ' +
+		String baseQuery = 'SELECT Id, Name, Category__c, Type__c, Summary__c, Is_New__c, Created_At__c, Flow_API_Name__c, Area__c, Apex_Name__c, User_Name__c ' +
 						  'FROM Log__c ' +
 						  'WHERE Created_At__c >= :startDateTime AND Created_At__c <= :endDateTime ';
 		
