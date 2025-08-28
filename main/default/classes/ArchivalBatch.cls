@@ -180,7 +180,7 @@ public with sharing class ArchivalBatch extends DatabaseUtils.PharosBatchImpl im
 				Action__r.EmailCC__c, Action__r.EmailTemplateId__c, Action__r.EmailTo__c,
 				Action__r.JIRAAssignee__c,Action__r.JIRAAssignee_Id__c,  Action__r.JIRAComponents__c,  Action__r.JIRAEpic__c,
 				Action__r.JIRAIssueType__c,  Action__r.JIRALabels__c,  Action__r.JIRAPriority__c,
-				Action__r.JIRAProject__c,  Action__r.SlackChannels__c,  Action__r.Subject__c, Action__r.Iteration__c,
+				Action__r.JIRAProject__c,  Action__r.SlackChannels__c,  Action__r.Subject__c,
 				Event__r.RecordCount__c, Event__r.Criteria__c, Response__c,
 				Event__r.Records__c, Event__r.Grouped_Field_Values__c,
 				Event__r.Rule__r.EventTimeInterval__c, Event__r.CreatedDate,

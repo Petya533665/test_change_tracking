@@ -54,7 +54,7 @@ public with sharing class EventMonitoringUtil {
         QBuilder queryBuilder = new QBuilder(getEventLogFileType())
             .selectFields(selectFields)
             .add(QBuilder.condition(EVENT_LOG_FILE_EVENT_TYPE).isIn(eventTypes))
-            .add(QBuilder.condition(EVENT_LOG_FILE_LOG_DATE).isGreaterOrEquals(lastProcessedHourlyDateTime))
+            .add(QBuilder.condition(EVENT_LOG_FILE_LOG_DATE).isGreaterOrEquals(String.valueOf(lastProcessedHourlyDateTime)))
             .add(QBuilder.condition(EVENT_LOG_FILE_INTERVAL).equalsTo(INTERVAL_HOURLY))
             .add(QBuilder.orderBy(EVENT_LOG_FILE_LOG_DATE).descending())
             .addLimit(MAX_RECORDS);

@@ -263,10 +263,6 @@ public with sharing class ConfigUtil {
     public static final String SLACK_CONVERSATION_INFO_ENDPOINT = 'https://slack.com/api/conversations.info';
     public static final String SLACK_CONVERSATION_LIST_ENDPOINT = 'https://slack.com/api/conversations.list?exclude_archived=true&types=public_channel,private_channel&limit=1000';
     public static final String SLACK_USER_LIST_ENDPOINT = 'https://slack.com/api/users.list?limit=1000';
-    public static final String SLACK_GET_UPLOAD_URL_EXTERNAL_ENDPOINT = 'https://slack.com/api/files.getUploadURLExternal';
-    public static final String SLACK_FILES_COMPLETE_UPLOAD_EXTERNAL_ENDPOINT = 'https://slack.com/api/files.completeUploadExternal';
-
-
 
     // From SplunkService
     public static final String SPLUNK_TOKEN_ENDPOINT = ConfigUtil.SPLUNK_SETTINGS.Splunk_Url__c + '/services/auth/login?output_mode=json';

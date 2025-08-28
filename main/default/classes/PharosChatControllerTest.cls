@@ -31,25 +31,11 @@ public class PharosChatControllerTest {
             ''
         );
 
-        TestDataFactory.SingleRequestMock cspTrustedSitesMock = new TestDataFactory.SingleRequestMock(
-            200,
-            'OK',
-            '{"records": [{"Id": "test-id", "IsActive": true, "DeveloperName": "Pharos_Chat_Websocket", "EndpointUrl": "' + PharosChatController.CHAT_WEBSOCKET_URL + '"}]}'
-        );
-
-        TestDataFactory.SingleRequestMock remoteSiteSettingsMock = new TestDataFactory.SingleRequestMock(
-            200,
-            'OK',
-            '{"records": [{"Id": "test-id", "IsActive": true, "SiteName": "' + Constants.REMOTE_SITE_SETTINGS.AI_NAME + '"  , "EndpointUrl": "' + Constants.REMOTE_SITE_SETTINGS.AI_URL + '"}]}'
-        );
-
         return new Map<String, HttpCalloutMock>{
             ConfigUtil.OPEN_AI_USAGE_ENDPOINT => openAiValidationMock,
             GIT_ENDPOINT => gitValidationMock,
             PharosChatController.CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + UserInfo.getOrganizationId() => namespaceStatusMock,
-            PharosChatController.CHAT_INIT_ENDPOINT => chatInitMock,
-            ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_CSP_TRUSTED_SITES_QUERY => cspTrustedSitesMock,
-            ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_REMOTE_SITE_SETTINGS_QUERY => remoteSiteSettingsMock
+            PharosChatController.CHAT_INIT_ENDPOINT => chatInitMock
         };
     }
 
@@ -133,23 +119,4 @@ public class PharosChatControllerTest {
         System.assertEquals(1, response.errorMessages.size(), 'There should be one error message');
         System.assertEquals(PharosChatController.ERROR_CODE_NOT_INDEXED, response.errorMessages[0], 'Error message should indicate code is not indexed');
     }
-
-    @IsTest
-    static void testInitChat_CSP_Trusted_Site_Not_Ready() {
-        Map<String, HttpCalloutMock> httpMocks = getBaseHttpMocks();
-        TestDataFactory.SingleRequestMock cspTrustedSitesMock = new TestDataFactory.SingleRequestMock(200, 'OK', '{"records": []}');
-        httpMocks.put(ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_CSP_TRUSTED_SITES_QUERY, cspTrustedSitesMock);
-
-        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(httpMocks));
-
-        Test.startTest();
-        PharosChatController.InitChatResponse response = PharosChatController.initChat();
-        Test.stopTest();
-
-        System.assertEquals(false, response.success, 'Chat initialization should fail');
-        System.assertEquals(1, response.errorMessages.size(), 'There should be one error message');
-        System.assertEquals(PharosChatController.ERROR_TRUSTED_SITE_NOT_READY, response.errorMessages[0], 'Error message should indicate CSP Trusted Site is not ready');
-    }
-    
-    
 }

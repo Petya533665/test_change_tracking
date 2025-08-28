@@ -18,7 +18,7 @@ public with sharing class LogPostProcessingService {
 	@TestVisible
 	private static final String AUDIT_TRAIL_SOBJECT = 'SetupAuditTrail';
 	public static final Set<String> USER_FIELDS = new Set<String> {
-		'Id', 'Name', 'ProfileId', 'Profile.Name', 'Profile.UserLicense.Name', 'UserRoleId', 'UserRole.Name'
+		'Id', 'Name'
 	};
 	public static final Set<String> AUDIT_TRAIL_FIELDS = new Set<String>{
 		'Id','Action','CreatedBy.Name','CreatedDate','Display','Section','DelegateUser'
@@ -280,7 +280,7 @@ public with sharing class LogPostProcessingService {
 			}
 			if (corg != null) {
 				LogPostProcessingService.PostProcessingSettings logSettings = new LogPostProcessingService.PostProcessingSettings(log.Post_Processing_Settings__c);
-				if (logSettings.isEnabled(USER_INFO_KEY)) fillUserInfo(log, logger);
+				if (logSettings.isEnabled(USER_INFO_KEY)) fillUserName(log, logger);
 				if (logSettings.isEnabled(OBJECT_INFO_KEY)) fillArea(log, logger);
 				if (logSettings.isEnabled(RELATED_OBJECTS_KEY)) fillRelateObjectType(log, logger);
 				if (logSettings.isEnabled(RELATED_OBJECTS_KEY)) fillRelatedObjects(log, logger);
@@ -317,11 +317,6 @@ public with sharing class LogPostProcessingService {
 						mapStacktraceParseResult.put(String.valueOf(index), log.Stacktrace_Parse_Result__c);
 						PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Stacktrace_Parse_Result__c, String.valueOf(index));
 					}
-				}
-
-				// if namespace is blank and stacktrace parse result is not available, set namespace to unknown
-				if(String.isBlank(log.Namespace__c) && !log.Stack_trace_parse_result_available__c) {
-					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Namespace__c, LogService.NAMESPACE_UNKNOWN);
 				}
 
 				logsForUpdate = new List<Log__c>{log};
@@ -482,21 +477,13 @@ public with sharing class LogPostProcessingService {
 		}
 	}
 
-	public static void fillUserInfo(Log__c log, Logger logger) {
+	public static void fillUserName(Log__c log, Logger logger) {
 		try {
-			UserInfoWrapper userInfoWrapper = getUserInfo(log.User_Id__c);
-			if (userInfoWrapper != null) {
-				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.User_Name__c, userInfoWrapper.userFullName);
-				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Profile_Id__c, userInfoWrapper.profileId);
-				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Profile_Name__c, userInfoWrapper.profileName);
-				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Role_Id__c, userInfoWrapper.roleId);
-				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Role_Name__c, userInfoWrapper.roleName);
-				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Salesforce_License_Type_Name__c, userInfoWrapper.licenseTypeName);
-			}
+			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.User_Name__c, getUserName(log.User_Id__c));
 		}
 		catch (Exception e) {
 			result.addError(e);
-			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getUserInfo');
+			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getUserName');
 		}
 	}
 
@@ -709,24 +696,23 @@ public with sharing class LogPostProcessingService {
 		public List<SObjectDescribeInfo> sobjects;
 	}
 
-	public static UserInfoWrapper getUserInfo(String userId) {
-		UserInfoWrapper userInfoWrapper;
-		if (String.isBlank(userId)) return userInfoWrapper;
+	public static String getUserName(String userId) {
+		String userName = null;
+		if (String.isBlank(userId)) return userName;
 		CacheUtils cacheUtil = new CacheUtils(corg.Name);
 		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
-		Map<String, UserInfoWrapper> userInfoByUserId = cacheObject != null ? (Map<String, UserInfoWrapper>)cacheObject : new Map<String, UserInfoWrapper>();
-		if (userInfoByUserId.containsKey(userId)) {
-			userInfoWrapper = userInfoByUserId.get(userId);
+		Map<String, String> mapUsers = cacheObject != null ? (Map<String, String>)cacheObject : new Map<String, String>();
+		if (mapUsers.containsKey(userId)) {
+			userName = mapUsers.get(userId);
 		} else {
 			List<User> users = getUserNameFromOrg(corg, userId);
 			if (users != null && users.size() == 1) {
-				userInfoWrapper = new UserInfoWrapper(users.get(0));
-				userInfoByUserId.put(userId, userInfoWrapper);
-				cacheUtil.putValue(CacheUtils.KEY_REQUEST_USER_INFO, userInfoByUserId);
+				userName = users[0].Name;
+				mapUsers.put(userId, userName);
+				cacheUtil.putValue(CacheUtils.KEY_REQUEST_USER_INFO, mapUsers);
 			}
 		}
-
-		return userInfoWrapper;
+		return userName;
 	}
 
 	public static List<User> getUserNameFromOrg(Connected_Org__c corg, String userId) {
@@ -1130,26 +1116,6 @@ public with sharing class LogPostProcessingService {
 
 	public class ApexClassWrapper {
 		public String Name;
-	}
-
-	private class UserInfoWrapper {
-		private String userId;
-		private String userFullName;
-		private String profileId;
-		private String profileName;
-		private String roleId;
-		private String roleName;
-		private String licenseTypeName;
-
-		private UserInfoWrapper(User user) {
-			this.userId = user.Id;
-			this.userFullName = user.Name;
-			this.profileId = user.ProfileId;
-			this.profileName = user.Profile.Name;
-			this.roleId = user.UserRoleId;
-			this.roleName = user.UserRole.Name;
-			this.licenseTypeName = user.Profile.UserLicense.Name;
-		}
 	}
 
 	public class LogPostProcessingServiceException extends Exception {}

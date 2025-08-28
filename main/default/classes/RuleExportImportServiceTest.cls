@@ -151,7 +151,7 @@ private class RuleExportImportServiceTest {
         Assert.areEqual(originalRule1.Name__c, wrapperForRule1.rule.Name__c, 'Rule name should match');
         Assert.areEqual(originalRule1.Index__c, wrapperForRule1.rule.Index__c, 'Rule index should match');
         Assert.areEqual(originalRule1.Type__c, wrapperForRule1.rule.Type__c, 'Rule type should match');
-        // Note: SobjectType__c is not queried in exportRules, so we skip this assertion
+        Assert.areEqual(originalRule1.SobjectType__c, wrapperForRule1.rule.SobjectType__c, 'Rule sobject type should match');
         
         // Verify RuleActions
         Assert.areEqual(originalRule1.RuleActions__r.size(), wrapperForRule1.ruleActions.size(), 'Rule TEST_RULE_1 should have correct number of rule actions');
@@ -242,7 +242,7 @@ private class RuleExportImportServiceTest {
             Assert.areEqual(originalRule.Active__c, importedRule.Active__c, 'Rule active status should match for ' + importedRule.Name__c);
             Assert.areEqual(originalRule.Index__c, importedRule.Index__c, 'Rule index should match for ' + importedRule.Name__c);
             Assert.areEqual(originalRule.Type__c, importedRule.Type__c, 'Rule type should match for ' + importedRule.Name__c);
-            // Note: SobjectType__c is not queried in exportRules, so we skip this assertion
+            Assert.areEqual(originalRule.SobjectType__c, importedRule.SobjectType__c, 'Rule sobject type should match for ' + importedRule.Name__c);
             
             // Verify RuleActions (count and content via Action Name)
             Assert.areEqual(originalRule.RuleActions__r.size(), importedRule.RuleActions__r.size(), 

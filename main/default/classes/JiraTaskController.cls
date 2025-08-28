@@ -76,7 +76,7 @@ public with sharing class JiraTaskController {
 			} else if (method == 'getJiraEpics') {
 				response.data = AdminService.getJiraEpics(data);
 			} else if (method == 'getJiraSettings') {
-				response.data = IntegrationSettings.JIRA.getJiraSettings();
+				response.data = AdminService.getJiraSettings();
 			} else if (method == 'getCreateMeta') {
 				response.data = AdminService.getCreateMeta(data);
 			} else if (method == 'getJiraProject') {
@@ -90,7 +90,7 @@ public with sharing class JiraTaskController {
 			} else if (method == 'createTask') {
 				response.data = createTask(data);
 			} else if (method == 'getAzureDevOpsSettings') {
-				response.data = IntegrationSettings.AZURE_DEVOPS.getAzureDevOpsSettings();
+				response.data = AdminService.getAzureDevOpsSettings();
 			} else if (method == 'getAzureDevOpsProjects') {
 				response.data = AzureService.getProjects();
 			} else if (method == 'getAzureDevOpsProjectTeams') {
@@ -101,10 +101,6 @@ public with sharing class JiraTaskController {
 				response.data = AzureService.searchEpics(data);
 			} else if (method == 'getAzureDevOpsProjectTeamMemberWrapper') {
 				response.data = AzureService.getProjectTeamMemberWrapper(data);
-			} else if (method == 'getTeamBoards') {
-                response.data = AzureService.getTeamBoards(data);
-            } else if (method == 'getAzureDevOpsWorkItemTypesWithValidation') {
-                response.data = AzureService.getAzureDevOpsWorkItemTypesWithValidation(data);
 			} else if (method == 'getAzureDevOpsClassificationNodes') {
                 response.data = AzureService.getClassificationNodes(data);
             } else if (method == 'getDefaultAzureDevOpsActionTemplate') {

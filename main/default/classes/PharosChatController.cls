@@ -2,13 +2,11 @@ public with sharing class PharosChatController {
     public static final String CHAT_ENV_URL = 'https://ai.pharos.ai/chat';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
-    public static final String CHAT_WEBSOCKET_URL = 'wss://chat.pharos.ai';
 
     public static final String ERROR_OPENAI_NOT_READY = 'OpenAI token is not configured or is invalid. Please set up OpenAI integration first.';
     public static final String ERROR_GIT_NOT_INTEGRATED = 'Git integration is not configured. Please set up Git integration first.';
     public static final String ERROR_CODE_NOT_INDEXED = 'Codebase is not indexed. Please wait for indexing to complete.';
     public static final String ERROR_INIT_FAILED = 'Chat initialization has failed.';
-    public static final String ERROR_TRUSTED_SITE_NOT_READY = 'CSP Trusted Site is not configured. Please set up CSP Trusted Site first.';
 
     public class InitChatResponse {
         @AuraEnabled public Boolean success;
@@ -23,16 +21,6 @@ public with sharing class PharosChatController {
         public InitChatResponse(String sessionId) {
             this.success = true;
             this.sessionId = sessionId;
-        }
-    }
-
-    public class NamespaceStatusResponse {
-        public Boolean empty;
-        public Boolean indexingInProgress;
-
-        public NamespaceStatusResponse(Boolean empty, Boolean indexingInProgress) {
-            this.empty = empty;
-            this.indexingInProgress = indexingInProgress;
         }
     }
 
@@ -55,7 +43,7 @@ public with sharing class PharosChatController {
         }
     }
 
-    public static NamespaceStatusResponse getNamespaceStatus(String logOrgId) {
+    public static Boolean isCodeIndexed(String logOrgId) {
         try {
             String response = HttpUtils.get(
                     CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + logOrgId,
@@ -63,31 +51,24 @@ public with sharing class PharosChatController {
                     200
             );
             Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(response);
-            return new NamespaceStatusResponse(
-                (Boolean) body.get('empty'),
-                body.containsKey('indexingInProgress') ? (Boolean) body.get('indexingInProgress') : false
-            );
+            return (Boolean) body.get('empty') == false;
         } catch (Exception e) {
-            Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'getNamespaceStatus');
-            return new NamespaceStatusResponse(true, false);
+            Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'isCodeIndexed');
+            return false;
         }
     }
 
     private static List<String> validatePreconditions(String orgId, String openAiKey) {
         List<String> errors = new List<String>();
-        AdminService.MetadataChatSettings settings = AdminService.getMetadataChatSettings();
 
-        if (!settings.openAiConfigured) {
+        if (!ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c || String.isBlank(openAiKey) || !OpenAI.validateToken(openAiKey)) {
             errors.add(ERROR_OPENAI_NOT_READY);
         }
-        if (!settings.gitConfigured) {
+        if (!GitHubUtils.validateGitHubConnectionForChat()) {
             errors.add(ERROR_GIT_NOT_INTEGRATED);
         }
-        if (!settings.codebaseIndexed) {
+        if (!isCodeIndexed(orgId)) {
             errors.add(ERROR_CODE_NOT_INDEXED);
-        }
-        if (!settings.trustedSiteReady) {
-            errors.add(ERROR_TRUSTED_SITE_NOT_READY);
         }
         return errors;
     }
@@ -103,11 +84,6 @@ public with sharing class PharosChatController {
             HttpUtils.getHeadersContentTypeJSON(),
             200
         );
-    }
-
-    @AuraEnabled
-    public static Boolean isMetadataChatEnabled() {
-        return PermissionsUtil.MetadataChatEnabled;
     }
 
     @AuraEnabled
