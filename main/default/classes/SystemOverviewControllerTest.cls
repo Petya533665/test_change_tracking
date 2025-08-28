@@ -130,7 +130,7 @@ private class SystemOverviewControllerTest {
 	@IsTest
 	private static void test_getOrgAtAGlance() {
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		String workflowQuery = 'SELECT Id, Name, Metadata FROM WorkflowRule';
+		String workflowQuery = 'SELECT COUNT(Id) cnt FROM WorkflowRule';
 		endpoint2TestResp.put('https://test_Instance_Url' + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(workflowQuery, 'UTF-8'), getWorkflowRulesMock());
 		Test.startTest();
 		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
@@ -180,54 +180,6 @@ private class SystemOverviewControllerTest {
 		}
 		Test.stopTest();
 	}
-
-	@IsTest
-	static void test_getSObjectOptions() {
-		insert new Account(Name = 'Test Account');
-		List<SystemOverviewController.SObjectOption> allOptions = SystemOverviewController.getSObjectOptions();
-		System.assertNotEquals(null, allOptions);
-		System.assert(allOptions.size() > 0);
-
-		SystemOverviewController.SObjectOption accountOpt = null;
-		for (SystemOverviewController.SObjectOption opt : allOptions) {
-			if (String.valueOf(opt.value) == 'Account') {
-				accountOpt = opt;
-				break;
-			}
-		}
-		System.assertNotEquals(null, accountOpt);
-		SystemOverviewController.SObjectOption zeroOpt = null;
-		for (SystemOverviewController.SObjectOption opt : allOptions) {
-			String apiName = String.valueOf(opt.value);
-			if (apiName == 'Account') continue;
-			try {
-				Integer cnt = (Integer)Database.countQuery('SELECT COUNT() FROM ' + apiName);
-				if (cnt == 0) {
-					zeroOpt = opt;
-					break;
-				}
-			} catch (Exception ignore) {
-			}
-		}
-		System.assertNotEquals(null, zeroOpt);
-		List<SystemOverviewController.SObjectOption> filtered =
-				SystemOverviewController.getFilteredSObjectOptions(new List<SystemOverviewController.SObjectOption>{ accountOpt, zeroOpt });
-		System.assertNotEquals(null, filtered);
-		System.assertEquals(1, filtered.size());
-		System.assertEquals('Account', String.valueOf(filtered[0].value));
-	}
-
-
-	@IsTest
-	static void test_getSObjectFields() {
-		Account a = new Account(Name = 'Test');
-		insert a;
-		Test.startTest();
-		List<SystemOverviewController.ChartDataPercentage> result = SystemOverviewController.getSObjectFields('Account');
-		Test.stopTest();
-		System.assertNotEquals(null, result);
-	}
-
 
 	private static TestDataFactory.SingleRequestMock getLightningComponentBundle() {
 		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(

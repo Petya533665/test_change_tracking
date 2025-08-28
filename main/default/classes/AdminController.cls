@@ -81,21 +81,21 @@ public with sharing class AdminController {
             } else if (method == 'getConfigurationOverviewData') {
                 response.data = AdminService.getConfigurationOverviewData();
             } else if (method == 'getJiraSettings') {
-                response.data = IntegrationSettings.JIRA.getJiraSettings();
+                response.data = AdminService.getJiraSettings();
             } else if (method == 'getAzureDevOpsSettings') {
-                response.data = IntegrationSettings.AZURE_DEVOPS.getAzureDevOpsSettings();
+                response.data = AdminService.getAzureDevOpsSettings();
             } else if (method == 'deleteConnectedOrg') {
                 response.data = AdminService.deleteConnectedOrg(data);
             } else if (method == 'deleteFakeConnectedOrg') {
                 response.data = AdminService.deleteFakeConnectedOrg();
             } else if (method == 'saveJiraSettings') {
-                response.data = IntegrationSettings.JIRA.saveJiraSettings(data);
+                response.data = AdminService.saveJiraSettings(data);
             } else if (method == 'saveAzureDevOpsSettings') {
-                response.data = IntegrationSettings.AZURE_DEVOPS.saveAzureDevOpsSettings(data);
+                response.data = AdminService.saveAzureDevOpsSettings(data);
             } else if (method == 'resetJiraSettings') {
-                response.data = IntegrationSettings.JIRA.resetJiraSettings();
+                response.data = AdminService.resetJiraSettings();
             } else if (method == 'resetAzureDevOpsSettings') {
-                response.data = IntegrationSettings.AZURE_DEVOPS.resetAzureDevOpsSettings();
+                response.data = AdminService.resetAzureDevOpsSettings();
             } else if (method == 'getJiraProjectUsers') {
                 response.data = AdminService.getJiraProjectUsers(data);
             } else if (method == 'getJiraProjectComponents') {
@@ -124,10 +124,6 @@ public with sharing class AdminController {
                 response.data = AzureService.searchEpics(data);
             } else if (method == 'getAzureDevOpsProjectTeamMemberWrapper') {
                 response.data = AzureService.getProjectTeamMemberWrapper(data);
-            } else if (method == 'getTeamBoards') {
-                response.data = AzureService.getTeamBoards(data);
-            } else if (method == 'getAzureDevOpsWorkItemTypesWithValidation') {
-                response.data = AzureService.getAzureDevOpsWorkItemTypesWithValidation(data);
             } else if (method == 'createConnectedApp') {
                 response.data = AdminService.createConnectedApp(data);
             } else if (method == 'getMasks') {
@@ -141,19 +137,19 @@ public with sharing class AdminController {
             } else if (method == 'getLoggerWrapperInfo') {
                 response.data = AdminService.getLoggerWrapperInfo();
             } else if (method == 'getSplunkSettings') {
-                response.data = IntegrationSettings.SPLUNK.getSplunkSettings();
+                response.data = AdminService.getSplunkSettings();
             } else if (method == 'saveSplunkSettings') {
-                response.data = IntegrationSettings.SPLUNK.saveSplunkSettings(data);
+                response.data = AdminService.saveSplunkSettings(data);
             } else if (method == 'setSplunkSettings') {
-                response.data = IntegrationSettings.SPLUNK.setSplunkSettings(data);
+                response.data = AdminService.setSplunkSettings(data);
             } else if (method == 'validateSplunkEventCollectorConnection') {
-                response.data = IntegrationSettings.SPLUNK.validateSplunkEventCollectorConnection(data);
+                response.data = AdminService.validateSplunkEventCollectorConnection(data);
             } else if (method == 'getOpenAISettings') {
-                response.data = IntegrationSettings.OPEN_AI.getOpenAISettings();
+                response.data = AdminService.getOpenAISettings();
             } else if (method == 'setOpenAISettings') {
-                response.data = IntegrationSettings.OPEN_AI.setOpenAISettings(data);
+                response.data = AdminService.setOpenAISettings(data);
             } else if (method == 'validateOpenAIToken') {
-                response.data = IntegrationSettings.OPEN_AI.validateOpenAIToken(data);
+                response.data = AdminService.validateOpenAIToken(data);
             } else if (method == 'getCreateMeta') {
                 response.data = AdminService.getCreateMeta(data);
             } else if (method == 'getConnectedOrgsInfo') {
@@ -169,13 +165,13 @@ public with sharing class AdminController {
             } else if (method == 'testConnectedOrg') {
                 response.data = AdminService.testConnectedOrg(data);
             } else if (method == 'getSlackSettings') {
-                response.data = IntegrationSettings.SLACK.getSlackSettings();
+                response.data = AdminService.getSlackSettings();
             } else if (method == 'getSlackChannels') {
-                response.data = IntegrationSettings.SLACK.getSlackChannels(data);
+                response.data = AdminService.getSlackChannels(data);
             } else if (method == 'getSlackUsers') {
-                response.data = IntegrationSettings.SLACK.getSlackUsers(data);
+                response.data = AdminService.getSlackUsers(data);
             } else if (method == 'saveSlackSettings') {
-                response.data = IntegrationSettings.SLACK.saveSlackSettings(data);
+                response.data = AdminService.saveSlackSettings(data);
             } else if (method == 'setMonitoringSetting') {
                 response.data = AdminService.setMonitoringSetting(data);
             } else if (method == 'setEventMonitoringSetting') {
@@ -189,11 +185,11 @@ public with sharing class AdminController {
             } else if (method == 'getErrorReportingOptOut') {
                 response.data = AdminService.getErrorReportingOptOut();
             } else if (method == 'getPagerDutySettings') {
-                response.data = IntegrationSettings.PAGER_DUTY.getPagerDutySettings();
+                response.data = AdminService.getPagerDutySettings();
             } else if (method == 'getPagerDutyServices') {
-                response.data = IntegrationSettings.PAGER_DUTY.getPagerDutyServices();
+                response.data = AdminService.getPagerDutyServices();
             } else if (method == 'savePagerDutySettings') {
-                response.data = IntegrationSettings.PAGER_DUTY.savePagerDutySettings(data);
+                response.data = AdminService.savePagerDutySettings(data);
             } else if (method == 'getLogCategories') {
                 response.data = AdminService.getLogCategories();
             } else if (method == 'setLogRecordTypeMappings') {
@@ -321,23 +317,23 @@ public with sharing class AdminController {
             } else if (method == 'getIsAvailableSingleEmail') {
                 response.data = AdminService.getIsAvailableSingleEmail();
             } else if (method == 'getTeamChannels') {
-                response.data = IntegrationSettings.TEAMS.getTeamChannels(String.valueOf(data));
+                response.data = AdminService.getTeamChannels(String.valueOf(data));
             } else if (method == 'getTeams') {
-                response.data = IntegrationSettings.TEAMS.getTeams(String.valueOf(data));
+                response.data = AdminService.getTeams(String.valueOf(data));
             } else if (method == 'getTeamById') {
-                response.data = IntegrationSettings.TEAMS.getTeamById(String.valueOf(data));
+                response.data = AdminService.getTeamById(String.valueOf(data));
             } else if (method == 'getTeamsSettings') {
-                response.data = IntegrationSettings.TEAMS.getTeamsSettings();
+                response.data = AdminService.getTeamsSettings();
             } else if (method == 'setTeamsSettings') {
-                response.data = IntegrationSettings.TEAMS.setTeamsSettings(data);
+                response.data = AdminService.setTeamsSettings(data);
             } else if (method == 'setGitHubSettings') {
-                response.data = IntegrationSettings.GIT_HUB.setGitHubSettings(data);
+                response.data = AdminService.setGitHubSettings(data);
             } else if (method == 'getGitHubSettings') {
-                response.data = IntegrationSettings.GIT_HUB.getGitHubSettings();
+                response.data = AdminService.getGitHubSettings();
             } else if (method == 'resetGitHubSettings') {
-                response.data = IntegrationSettings.GIT_HUB.resetGitHubSettings();
+                response.data = AdminService.resetGitHubSettings();
             } else if (method == 'validateGitHubConnection') {
-                response.data = GitHubUtils.validateGitHubConnection(data);
+                response.data = GitHubUtils.validateGitHubConnection();
             } else if (method == 'setChangeTrackingSettings') {
                 response.data = AdminService.setChangeTrackingSettings(data);
             } else if (method == 'getChangeTrackingSettings') {
@@ -398,10 +394,6 @@ public with sharing class AdminController {
                 response.data = AdminService.getMetadataChatSettings();
             } else if (method.equals('setupMetadataChatTrustedSite')) {
                 response.data = AdminService.setupMetadataChatTrustedSite();
-            } else if (method.equals('getAutoChartSetting')) {
-                response.data = AutoChartController.getAutoChartSetting();
-            } else if (method.equals('setAutoChartSetting')) {
-                response.data = AutoChartController.updateAutoChartSetting((String)request.get('data'));
             } else {
                 response.error = 'Action not found';
             }

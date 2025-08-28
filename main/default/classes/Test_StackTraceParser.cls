@@ -980,44 +980,13 @@ public class Test_StackTraceParser {
             .handleError(LogService.class.getName(), '.', null);
         Test.stopTest();
 
-        log = [SELECT Salesforce_Error_Id__c, Flow_API_Name__c, Flow_Version__c, Area__c, Type__c , Hash_1__c, Stacktrace_Parse_Result__c, Namespace__c FROM Log__c WHERE Id = :log.Id LIMIT 1];
+        log = [SELECT Salesforce_Error_Id__c, Flow_API_Name__c, Flow_Version__c, Area__c, Type__c , Hash_1__c, Stacktrace_Parse_Result__c FROM Log__c WHERE Id = :log.Id LIMIT 1];
         system.assertEquals('testgovnopaket1__GovnopaketFlowContact1', log.Flow_API_Name__c);
         system.assertEquals('1', log.Flow_Version__c);
         system.assertEquals('Flow', log.Area__c);
         system.assertEquals('Autolaunched Flow', log.Type__c);
         system.assertNotEquals(null, log.Hash_1__c);
         system.assertNotEquals(null, log.Stacktrace_Parse_Result__c);
-        system.assertEquals('testgovnopaket1', log.Namespace__c);
-    }
-
-    @IsTest
-    private static void testFlowParserFromManagedPackageWithoutNamespace() {
-
-        Test_LogService.initSettings();
-
-        Test.startTest();
-
-        StackTraceParser.corg = ConnectedOrgService.getConnectedOrgById(Test_LogService.CONNECETED_ORG_NAME);
-        String testStubMetadata = String.valueOf(Test_LogService.getTestStub('FLOW_MANAGED_PACKAGE_STACKTRACE_METADATA'));
-        String testStubStacktrace = String.valueOf(Test_LogService.getTestStub('FLOW_MANAGED_PACKAGE_STACKTRACE_WITHOUT_NAMESPACE'));
-        
-        Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(testStubMetadata));
-
-        FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(testStubStacktrace);
-        FlowService.FlowErrorAbbreviateResult abbreviatedHtmlBody = sp.abbreviateStacktraceErrorMessages();
-        Log__c log = LogService.createLogFromEmailBody(testStubStacktrace, 'An error occurred with your "GovnopaketFlowContact1" flow', 'test@test.com', Datetime.now());
-        DatabaseUtils.getInstance().performInsertDML(new List<Log__c>{log}, Schema.SObjectType.Log__c)
-            .handleError(LogService.class.getName(), '.', null);
-        Test.stopTest();
-
-        log = [SELECT Salesforce_Error_Id__c, Flow_API_Name__c, Flow_Version__c, Area__c, Type__c , Hash_1__c, Stacktrace_Parse_Result__c, Namespace__c FROM Log__c WHERE Id = :log.Id LIMIT 1];
-        system.assertEquals('GovnopaketFlowContact1', log.Flow_API_Name__c);
-        system.assertEquals('1', log.Flow_Version__c);
-        system.assertEquals('Flow', log.Area__c);
-        system.assertEquals('Autolaunched Flow', log.Type__c);
-        system.assertNotEquals(null, log.Hash_1__c);
-        system.assertNotEquals(null, log.Stacktrace_Parse_Result__c);
-        system.assertEquals('unknown', log.Namespace__c);
     }
 
     @IsTest
@@ -1282,35 +1251,18 @@ public class Test_StackTraceParser {
 
     private static Map<String, HttpCalloutMock> getUserNameMock() {
         String userId = '0056g000003aA4M';
-        String userFullName = 'Test User';
         Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
         String query = new QBuilder(User.SObjectType)
             .selectFields(LogPostProcessingService.USER_FIELDS)
             .add(QBuilder.condition('Id').equalsTo(userId))
             .addLimit(1)
             .build();
-
-        Profile profile = [SELECT Id, Name, UserLicense.Name FROM Profile WHERE Name = 'System Administrator' LIMIT 1];
-        UserRole userRole = [SELECT Id, Name FROM UserRole LIMIT 1];
-        User user = (User) JSON.deserialize(
-            JSON.serialize(
-                new Map<String, Object>{
-                    'Id' => userId,
-                    'Name' => userFullName,
-                    'ProfileId' => profile.Id,
-                    'Profile' => profile,
-                    'UserRoleId' => userRole.Id,
-                    'UserRole' => userRole
-                }
-            ),
-            User.class
-        );
         
         endpoint2TestResp.put(Test_LogService.CONNECETED_ORG_INSTANCE_URL + ConfigUtil.QUERY_REST_API_PATH + EncodingUtil.urlEncode(query, 'UTF-8'), new TestDataFactory.SingleRequestMock(
             200,
             'OK',
             JSON.serialize(new Map<String, Object>{
-                ConfigUtil.TOOLING_ITEMS_KEY_RECORDS => new List<Object>{ user }
+                ConfigUtil.TOOLING_ITEMS_KEY_RECORDS => new List<Object>()
             })
         ));
         return endpoint2TestResp;
@@ -3006,41 +2958,6 @@ public class Test_StackTraceParser {
         Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(Test_LogService.getTestStub('FLOW_STACKTRACE_MULTIPLE_EDGES_ON_ELEMENT_METADATA')));
 
         Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-        endpoint2TestResp.putAll(createPostProcessingMock('DY_New_Screen_Flow', 'testnewmp', 1, false));
-        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
-        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-        LogTriggerHelper.runPostProcessingBatchInTest = true;
-
-        ErrorEmailHandler testInbound = new ErrorEmailHandler();
-        testInbound.handleInboundEmail(email, env);
-        Test.stopTest();
-
-        Log__c failedFlowLog = [SELECT Id, Stacktrace_Parse_Result__c, Post_Processing_Status__c FROM Log__c WHERE Category__c = 'Flow' LIMIT 1];
-        System.assertNotEquals(null, failedFlowLog.Stacktrace_Parse_Result__c);
-        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, failedFlowLog.Post_Processing_Status__c);
-    }
-
-    @IsTest
-    static void whenUserInfoEnabledInPostProcessingShouldFillUserInfoFields() {
-        PermissionsUtil.RequestUserInfoTTL = 5*60;
-        Test_LogService.initSettings();
-        
-        Messaging.InboundEmail email = new Messaging.InboundEmail() ;
-        Messaging.InboundEnvelope env = new Messaging.InboundEnvelope();
-        
-        List<string> emails = new List<string>{'testemail1@gmail.com'};
-        
-        email.subject = 'An error occurred with your "DY_New_Screen_Flow" flow';
-        email.fromAddress = 'system@salesforce.com';
-        email.toAddresses = emails;
-        email.htmlBody = Test_LogService.getTestStub('FLOW_STACKTRACE_MULTIPLE_EDGES_ON_ELEMENT');
-
-        Test.startTest();
-        StackTraceParser.corg = ConnectedOrgService.getConnectedOrgById(Test_LogService.CONNECETED_ORG_NAME);
-        Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(Test_LogService.getTestStub('FLOW_STACKTRACE_MULTIPLE_EDGES_ON_ELEMENT_METADATA')));
-
-        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
 		endpoint2TestResp.putAll(createPostProcessingMock('DY_New_Screen_Flow', 'testnewmp', 1, false));
 		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
 		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
@@ -3051,25 +2968,8 @@ public class Test_StackTraceParser {
         testInbound.handleInboundEmail(email, env);
         Test.stopTest();
 
-        Log__c log = [
-            SELECT 
-                Stacktrace_Parse_Result__c, Post_Processing_Status__c,
-                User_Id__c, User_Name__c,
-                Role_Id__c, Role_Name__c,
-                Profile_Id__c, Profile_Name__c, Salesforce_License_Type_Name__c
-            FROM Log__c
-            WHERE Category__c = 'Flow'
-            LIMIT 1
-        ];
-        
-        System.assertNotEquals(null, log.Stacktrace_Parse_Result__c);
-        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, log.Post_Processing_Status__c);
-        System.assert(String.isNotBlank(log.User_Id__c));
-        System.assert(String.isNotBlank(log.User_Name__c));
-        System.assert(String.isNotBlank(log.Profile_Id__c));
-        System.assert(String.isNotBlank(log.Profile_Name__c));
-        System.assert(String.isNotBlank(log.Salesforce_License_Type_Name__c));
-        System.assert(String.isNotBlank(log.Role_Id__c));
-        System.assert(String.isNotBlank(log.Role_Name__c));
+        Log__c failedFlowLog = [SELECT Id, Stacktrace_Parse_Result__c, Post_Processing_Status__c FROM Log__c WHERE Category__c = 'Flow' LIMIT 1];
+        System.assertNotEquals(null, failedFlowLog.Stacktrace_Parse_Result__c);
+        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, failedFlowLog.Post_Processing_Status__c);
     }
 }

@@ -222,7 +222,7 @@ global with sharing class LogService {
                 PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Namespace__c, processor.getNamespace());
 
                 // populate default as unknown if not found
-                if(String.isBlank(log.Namespace__c) && !log.Stack_trace_parse_result_available__c) {
+                if(String.isBlank(log.Namespace__c)) {
                     PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Namespace__c, NAMESPACE_UNKNOWN);
                 }
 

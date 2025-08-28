@@ -50,7 +50,7 @@ public with sharing class DevOpsCenterController {
 			methodName = method;
 			Object data = request.get('data');
 			if (method == 'getGitHubSettings') {
-				response.data = IntegrationSettings.GIT_HUB.getGitHubSettings();
+				response.data = AdminService.getGitHubSettings();
 			} else if (method == 'validateDevOpsCenter') {
 				response.data = validateDevOpsCenter();
 			} else {

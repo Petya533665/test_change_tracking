@@ -20,7 +20,6 @@ public class TestDataFactory {
     private static final String CONNECTED_ORG_REFRESH_TOKEN = 'test_Refresh_Token';
     @TestVisible
     private static final String CONNECTED_ORG_INSTANCE_URL = 'https://test_Instance_Url';
-    @TestVisible
     private static final String CONNECTED_ORG_IDENTITY_URL = 'https://test_Identity_Url';
 
     public static final String ASYNC_APEX_JOBS_JSON = '[{' +

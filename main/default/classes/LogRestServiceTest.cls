@@ -187,39 +187,4 @@ private class LogRestServiceTest {
         System.assertEquals(1, [SELECT Id FROM Log__c].size());
     }
 
-    @IsTest
-    static void test_send_logs_passthrough_mode_avoid_callout_loop_exception() {
-        Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId().left(15));
-        corg.Data_Direction__c = 'receiveFrom';
-        update corg;
-        RestRequest req = new RestRequest();
-        RestResponse res = new RestResponse();
-
-        req.requestURI = REST_URI;
-        req.addParameter(ConfigUtil.PARAMS_TYPE, ConfigUtil.TYPE_PASSTHROUGH_MODE);
-        req.httpMethod = 'POST';
-        PassthroughtModeService.IncomingLogData incomingLogData = new PassthroughtModeService.IncomingLogData();
-        incomingLogData.logs = null;
-        incomingLogData.organizationId = UserInfo.getOrganizationId().left(15);
-        incomingLogData.inboundEmail = new Inbound_Email__c();
-        incomingLogData.inboundEmail.From__c = 'test@test.com';
-        incomingLogData.inboundEmail.Subject__c = 'An error occurred with your "some_labels" flow';
-        incomingLogData.inboundEmail.Html_Body__c = String.valueOf(Test_LogService.getTestStub('FLOW_SAME_API_LABELS_ELEMENTS_STACKTRACE'));
-        incomingLogData.inboundEmail.Pharos_Org_ID__c = UserInfo.getOrganizationId().left(15);
-        req.requestBody = Blob.valueOf(JSON.serialize(incomingLogData));
-        RestContext.request = req;
-        RestContext.response = res;
-
-        Test.startTest();
-        LogRestService.doPost();
-        Test.stopTest();
-
-        Integer calloutsAfter = Limits.getCallouts();
-        System.assertEquals(0, calloutsAfter);
-
-        String jsonResponse = res.responseBody.toString();
-        System.assertNotEquals(null, jsonResponse);
-        System.assertEquals(1, [SELECT Id FROM Log__c].size());
-    }
-
 }
