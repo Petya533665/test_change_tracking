@@ -3,7 +3,7 @@
 */
 public with sharing class QCondition {
 
-    public enum ComparisonOperator { EQUALS, NOT_EQUALS, LESS_THAN, LESS_OR_EQUAL, GREATER_THAN, GREATER_OR_EQUAL, IS_LIKE, NOT_LIKE, IS_IN, IS_IN_VARIABLE, NOT_IN, INCLUDES, EXCLUDES , NOP}
+    public enum ComparisonOperator { EQUALS, NOT_EQUALS, LESS_THAN, LESS_OR_EQUAL, GREATER_THAN, GREATER_OR_EQUAL, IS_LIKE, IS_IN, IS_IN_VARIABLE, NOT_IN, INCLUDES, EXCLUDES , NOP}
 
     private ComparisonOperator operatorValue;
 
@@ -94,12 +94,6 @@ public with sharing class QCondition {
         return this;
     }
 
-    public QCondition isNotLike(String value) {
-        this.operatorValue = ComparisonOperator.NOT_LIKE;
-        this.fieldValue = value;
-        return this;
-    }
-
     public QCondition isIn(String value) {
         this.operatorValue = ComparisonOperator.IS_IN_VARIABLE;
         this.fieldValue = value;
@@ -162,8 +156,6 @@ public with sharing class QCondition {
             return field + ' >= ' + fieldValue;
         } else if (operatorValue.equals(ComparisonOperator.IS_LIKE)) {
             return field + ' LIKE ' + fieldValue;
-        } else if (operatorValue.equals(ComparisonOperator.NOT_LIKE)) {
-            return '(NOT ' + field + ' LIKE ' + fieldValue + ')';
         } else if (operatorValue.equals(ComparisonOperator.IS_IN)) {
             return field + ' IN (' + fieldValue + ')';
         } else if (operatorValue.equals(ComparisonOperator.IS_IN_VARIABLE)) {

@@ -739,7 +739,7 @@ public without sharing class PermissionsUtil {
 			if(MaxJiraRules == null) {
 				MaxJiraRules = FeatureMap3.get(MAP_FEATURE3_INDEX_BY_NAME.get(FP_MAX_JIRA_RULES));
 			}
-			return 100;
+			return MaxJiraRules;
 		}
 		private set;
 	}
