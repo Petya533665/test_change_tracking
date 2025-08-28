@@ -11,6 +11,7 @@ public with sharing class LogListController {
 	private static final Integer MAX_QUERY_LIMIT = 5000;
 	private static final Integer LOG_PERIODS_AMOUNT = 30;
 	private static final String DEFAULT_LOGS_SORT = 'Id,DESC';
+	private static final String UNKNOWN_VALUE = 'Unknown'; //TODO: there should be a better way to handle this
 
 	public class RemoteActionResponse {
 		public Object params;
@@ -438,25 +439,25 @@ public with sharing class LogListController {
 	private static String getViewValue(Log__c log, String view) {
 		switch on view {
 			when 'Type' {
-				return log.Type__c != null ? log.Type__c : 'Unknown';
+				return log.Type__c != null ? log.Type__c : UNKNOWN_VALUE;
 			}
 			when 'Area' {
-				return log.Area__c != null ? log.Area__c : 'Unknown';
+				return log.Area__c != null ? log.Area__c : UNKNOWN_VALUE;
 			}
 			when 'User' {
-				return log.User_Name__c != null ? log.User_Name__c : 'Unknown';
+				return log.User_Name__c != null ? log.User_Name__c : UNKNOWN_VALUE;
 			}
 			when 'Fingerprint' {
-				return log.Summary__c != null ? log.Summary__c : 'Unknown';
+				return log.Summary__c != null ? log.Summary__c : UNKNOWN_VALUE;
 			}
 			when 'Operation' {
-				return log.Apex_Name__c != null ? log.Apex_Name__c : 'Unknown';
+				return log.Apex_Name__c != null ? log.Apex_Name__c : UNKNOWN_VALUE;
 			}
 			when 'Flow API Name' {
-				return log.Flow_API_Name__c != null ? log.Flow_API_Name__c : 'Unknown';
+				return log.Flow_API_Name__c != null ? log.Flow_API_Name__c : UNKNOWN_VALUE;
 			}
 			when else {
-				return log.Category__c != null ? log.Category__c : 'Uncategorized';
+				return log.Category__c != null ? log.Category__c : UNKNOWN_VALUE;
 			}
 		}
 	}
@@ -568,13 +569,24 @@ public with sharing class LogListController {
 		
 		// Build condition for each value
 		for (Integer i = 0; i < values.size(); i++) {
+			String currentValue = values[i];
 			String bindVarName = 'filter' + (bindIndex + i);
-			bindVariables.put(bindVarName, values[i]);
 			
-			if (operator == 'equals') {
-				conditions.add(field + ' = :' + bindVarName);
-			} else if (operator == 'not equals to') {
-				conditions.add(field + ' != :' + bindVarName);
+			// Handle "Unknown" as null for equals and not equals operators
+			if ((operator == 'equals' || operator == 'not equals to') && currentValue == UNKNOWN_VALUE) {
+				if (operator == 'equals') {
+					conditions.add(field + ' = null');
+				} else {
+					conditions.add(field + ' != null');
+				}
+			} else {
+				bindVariables.put(bindVarName, currentValue);
+				
+				if (operator == 'equals') {
+					conditions.add(field + ' = :' + bindVarName);
+				} else if (operator == 'not equals to') {
+					conditions.add(field + ' != :' + bindVarName);
+				}
 			}
 		}
 		
@@ -583,6 +595,15 @@ public with sharing class LogListController {
 
 	private static String buildCondition(String field, String operator, String value, String type, Integer bindIndex, Map<String, Object> bindVariables) {
 		String bindVarName = 'filter' + bindIndex;
+		
+		// Handle "Unknown" as null for equals and not equals operators
+		if ((operator == 'equals' || operator == 'not equals to') && value == UNKNOWN_VALUE) {
+			if (operator == 'equals') {
+				return field + ' = null';
+			} else {
+				return field + ' != null';
+			}
+		}
 		
 		switch on operator.toLowerCase() {
 			when 'equals' {
