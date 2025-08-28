@@ -11,7 +11,6 @@ public with sharing class LogListController {
 	private static final Integer MAX_QUERY_LIMIT = 5000;
 	private static final Integer LOG_PERIODS_AMOUNT = 30;
 	private static final String DEFAULT_LOGS_SORT = 'Id,DESC';
-	//TODO: possibility of collision with real value, there should be a better way to handle this
 	private static final String UNKNOWN_VALUE = 'Unknown';
 
 	public class RemoteActionResponse {
@@ -241,43 +240,45 @@ public with sharing class LogListController {
 			endDateTime = DateTime.valueOf(toDatetime);
 		}
 		
-		String baseQuery = 'SELECT Id, Name, Category__c, Type__c, Summary__c, Is_New__c, Created_At__c, Flow_API_Name__c, Area__c, Apex_Name__c, User_Name__c ' +
-						  'FROM Log__c ' +
-						  'WHERE Created_At__c >= :startDateTime AND Created_At__c <= :endDateTime ';
+		QBuilder queryBuilder = new QBuilder('Log__c');
+		queryBuilder.selectFields(new Set<String>{
+			'Id', 'Name', 'Category__c', 'Type__c', 'Summary__c', 'Is_New__c', 
+			'Created_At__c', 'Flow_API_Name__c', 'Area__c', 'Apex_Name__c', 'User_Name__c'
+		});
+		queryBuilder.add(QBuilder.condition('Created_At__c').isGreaterOrEquals(startDateTime));
+		queryBuilder.add(QBuilder.condition('Created_At__c').isLessOrEquals(endDateTime));
 		
 		if (String.isNotBlank(orgId)) {
-			baseQuery += 'AND Organization_Id__c = :orgId ';
+			queryBuilder.add(QBuilder.condition('Organization_Id__c').equalsTo(orgId));
 		}
 
 		if (view == 'Flow API Name') {
-			baseQuery += 'AND Category__c = \'Flow\' ';
+			queryBuilder.add(QBuilder.condition('Category__c').equalsTo('Flow'));
 		}
 		
 		if (String.isNotBlank(lastId)) {
-			baseQuery += 'AND Id < :lastId ';
+			queryBuilder.add(QBuilder.condition('Id').isLessThan(lastId));
 		}
 		
-		Map<String, Object> filterResult = applyFiltersToQuery(baseQuery, filters);
-		String query = (String)filterResult.get('query');
-		Map<String, Object> bindVariables = (Map<String, Object>)filterResult.get('bindVariables');
+		// Apply dynamic filters
+		applyFiltersToQueryBuilder(queryBuilder, filters);
 		
-		String mappedSort = mapLogElementToLogField(sortStr.split(',')[0]) + ' ' + sortStr.split(',')[1];
-		query += ' ORDER BY ' + mappedSort + ' LIMIT :queryLimit';
+		// Add sorting
+		String[] sortParts = sortStr.split(',');
+		String sortField = mapLogElementToLogField(sortParts[0]);
+		String sortDirection = sortParts[1];
 		
-		Map<String, Object> allBindVariables = new Map<String, Object>{
-			'startDateTime' => startDateTime,
-			'endDateTime' => endDateTime,
-			'queryLimit' => queryLimit
-		};
-		if (String.isNotBlank(lastId)) {
-			allBindVariables.put('lastId', lastId);
+		QOrder orderBy = QBuilder.orderBy(sortField);
+		if (sortDirection == 'DESC') {
+			orderBy.descending();
 		}
-		if (String.isNotBlank(orgId)) {
-			allBindVariables.put('orgId', orgId);
-		}
-		allBindVariables.putAll(bindVariables);
+		queryBuilder.add(orderBy);
 		
-		List<Log__c> logs = Database.queryWithBinds(query, allBindVariables, AccessLevel.USER_MODE);
+		// Add limit
+		queryBuilder.addLimit(queryLimit);
+		
+		// Execute query
+		List<Log__c> logs = Database.query(queryBuilder.build());
 
 		List<LogElement> logElements = new List<LogElement>();
 		for (Log__c log : logs) {
@@ -326,41 +327,35 @@ public with sharing class LogListController {
 		String lastId = null;
 		Boolean hasMoreRecords = true;
 		while (hasMoreRecords) {
-			String baseQuery = 'SELECT Id, Category__c, Type__c, Area__c, Apex_Name__c, User_Name__c, Flow_API_Name__c, Created_At__c, Is_New__c, Is_Parent__c, User_Id__c, Related_Object_Type__c, Related_Id__c, Summary__c, Issue__c FROM Log__c ' +
-							  'WHERE Created_At__c >= :startDateTime AND Created_At__c <= :endDateTime ';
+			QBuilder queryBuilder = new QBuilder('Log__c');
+			queryBuilder.selectFields(new Set<String>{
+				'Id', 'Category__c', 'Type__c', 'Area__c', 'Apex_Name__c', 'User_Name__c', 
+				'Flow_API_Name__c', 'Created_At__c', 'Is_New__c', 'Is_Parent__c', 'User_Id__c', 
+				'Related_Object_Type__c', 'Related_Id__c', 'Summary__c', 'Issue__c'
+			});
+			queryBuilder.add(QBuilder.condition('Created_At__c').isGreaterOrEquals(startDateTime));
+			queryBuilder.add(QBuilder.condition('Created_At__c').isLessOrEquals(endDateTime));
 			
 			if (String.isNotBlank(orgId)) {
-				baseQuery += 'AND Organization_Id__c = :orgId ';
+				queryBuilder.add(QBuilder.condition('Organization_Id__c').equalsTo(orgId));
 			}
 
 			if (view == 'Flow API Name') {
-				baseQuery += 'AND Category__c = \'Flow\' ';
+				queryBuilder.add(QBuilder.condition('Category__c').equalsTo('Flow'));
 			}
 			
 			if (lastId != null) {
-				baseQuery += 'AND Id > :lastId ';
+				queryBuilder.add(QBuilder.condition('Id').isGreaterThan(lastId));
 			}
 			
-			Map<String, Object> filterResult = applyFiltersToQuery(baseQuery, filters);
-			String query = (String)filterResult.get('query');
-			Map<String, Object> bindVariables = (Map<String, Object>)filterResult.get('bindVariables');
+			// Apply dynamic filters
+			applyFiltersToQueryBuilder(queryBuilder, filters);
 			
-			query += ' ORDER BY Id LIMIT ' + MAX_QUERY_LIMIT;
+			queryBuilder.add(QBuilder.orderBy('Id').ascending());
+			queryBuilder.addLimit(MAX_QUERY_LIMIT);
 			
-			// Prepare all bind variables
-			Map<String, Object> allBindVariables = new Map<String, Object>{
-				'startDateTime' => startDateTime,
-				'endDateTime' => endDateTime
-			};
-			if (lastId != null) {
-				allBindVariables.put('lastId', lastId);
-			}
-			if (String.isNotBlank(orgId)) {
-				allBindVariables.put('orgId', orgId);
-			}
-			allBindVariables.putAll(bindVariables);
-			
-			List<Log__c> logsBatch = Database.queryWithBinds(query, allBindVariables, AccessLevel.USER_MODE);
+			// Execute query
+			List<Log__c> logsBatch = Database.query(queryBuilder.build());
 			
 			// Count metrics
 			total += logsBatch.size();
@@ -463,25 +458,9 @@ public with sharing class LogListController {
 		}
 	}
 
-	private static Map<String, Object> applyFiltersToQuery(String baseQuery, List<Object> filters) {
-		Map<String, Object> filterResult = buildFilterConditions(filters);
-		String whereClause = (String)filterResult.get('whereClause');
-		Map<String, Object> bindVariables = (Map<String, Object>)filterResult.get('bindVariables');
-		
-		String completeQuery = baseQuery + whereClause;
-		
-		return new Map<String, Object>{
-			'query' => completeQuery,
-			'bindVariables' => bindVariables
-		};
-	}
-
-	private static Map<String, Object> buildFilterConditions(List<Object> filters) {
+	private static void applyFiltersToQueryBuilder(QBuilder queryBuilder, List<Object> filters) {
 		if (filters == null || filters.isEmpty()) {
-			return new Map<String, Object>{
-				'whereClause' => '',
-				'bindVariables' => new Map<String, Object>()
-			};
+			return;
 		}
 		
 		// Convert to Filter objects and group by field name
@@ -500,10 +479,6 @@ public with sharing class LogListController {
 			filtersByField.get(filter.name).add(filter);
 		}
 		
-		List<String> fieldConditions = new List<String>();
-		Map<String, Object> bindVariables = new Map<String, Object>();
-		Integer bindIndex = 0;
-		
 		// Process each field's filters
 		for (String fieldName : filtersByField.keySet()) {
 			List<Filter> fieldFilters = filtersByField.get(fieldName);
@@ -513,54 +488,47 @@ public with sharing class LogListController {
 				continue;
 			}
 			
-			List<String> orConditions = new List<String>();
+			List<QCondition> fieldConditions = new List<QCondition>();
 			
-			// Build OR conditions for the same field
+			// Build conditions for the same field
 			for (Filter filter : fieldFilters) {
 				// Handle multiple values for string filters with equals/not equals operators
 				if (filter.type == 'string' && (filter.operator == 'equals' || filter.operator == 'not equals to')) {
-					List<String> conditions = buildMultipleValueConditions(mappedField, filter.operator, filter.value, bindIndex, bindVariables);
+					List<QCondition> conditions = buildMultipleValueConditions(mappedField, filter.operator, filter.value);
 					if (!conditions.isEmpty()) {
-						orConditions.addAll(conditions);
-						bindIndex += conditions.size();
+						fieldConditions.addAll(conditions);
 					}
 				} else {
-					String condition = buildCondition(mappedField, filter.operator, filter.value, filter.type, bindIndex, bindVariables);
-					if (String.isNotBlank(condition)) {
-						orConditions.add(condition);
-						bindIndex++;
+					QCondition condition = buildQCondition(mappedField, filter.operator, filter.value, filter.type);
+					if (condition != null) {
+						fieldConditions.add(condition);
 					}
 				}
 			}
 			
-			// Combine OR conditions for this field
-			if (!orConditions.isEmpty()) {
-				if (orConditions.size() == 1) {
-					fieldConditions.add(orConditions[0]);
-				} else {
-					fieldConditions.add('(' + String.join(orConditions, ' OR ') + ')');
-				}
+			for (QCondition condition : fieldConditions) {
+				queryBuilder.add(condition);
 			}
 		}
-
-		// Combine all field conditions with AND
-		String whereClause = fieldConditions.isEmpty() ? '' : ' AND ' + String.join(fieldConditions, ' AND ');
-		
-		return new Map<String, Object>{
-			'whereClause' => whereClause,
-			'bindVariables' => bindVariables
-		};
 	}
 
-	private static List<String> buildMultipleValueConditions(String field, String operator, String value, Integer bindIndex, Map<String, Object> bindVariables) {
-		List<String> conditions = new List<String>();
+	private static List<QCondition> buildMultipleValueConditions(String field, String operator, String value) {
+		List<QCondition> conditions = new List<QCondition>();
 		
 		// Split by comma and trim whitespace
 		List<String> values = new List<String>();
+		List<String> unknownValues = new List<String>();
+		List<String> regularValues = new List<String>();
+		
 		for (String val : value.split(',')) {
 			String trimmedVal = val.trim();
 			if (String.isNotBlank(trimmedVal)) {
 				values.add(trimmedVal);
+				if (trimmedVal == UNKNOWN_VALUE) {
+					unknownValues.add(trimmedVal);
+				} else {
+					regularValues.add(trimmedVal);
+				}
 			}
 		}
 		
@@ -568,96 +536,87 @@ public with sharing class LogListController {
 			return conditions;
 		}
 		
-		// Build condition for each value
-		for (Integer i = 0; i < values.size(); i++) {
-			String currentValue = values[i];
-			String bindVarName = 'filter' + (bindIndex + i);
-			
-			// Handle "Unknown" as null for equals and not equals operators
-			if ((operator == 'equals' || operator == 'not equals to') && currentValue == UNKNOWN_VALUE) {
-				if (operator == 'equals') {
-					conditions.add(field + ' = null');
-				} else {
-					conditions.add(field + ' != null');
-				}
+		// Handle "Unknown" values separately (they need to be null checks)
+		if (!unknownValues.isEmpty() && (operator == 'equals' || operator == 'not equals to')) {
+			QCondition unknownCondition = QBuilder.condition(field);
+			if (operator == 'equals') {
+				unknownCondition.isNull();
 			} else {
-				bindVariables.put(bindVarName, currentValue);
-				
-				if (operator == 'equals') {
-					conditions.add(field + ' = :' + bindVarName);
-				} else if (operator == 'not equals to') {
-					conditions.add(field + ' != :' + bindVarName);
-				}
+				unknownCondition.isNotNull();
 			}
+			conditions.add(unknownCondition);
+		}
+		
+		// Handle regular values using IN/NOT IN for efficiency
+		if (!regularValues.isEmpty()) {
+			QCondition condition = QBuilder.condition(field);
+			if (operator == 'equals') {
+				condition.isIn(regularValues);
+			} else if (operator == 'not equals to') {
+				condition.isNotIn(regularValues);
+			}
+			conditions.add(condition);
 		}
 		
 		return conditions;
 	}
 
-	private static String buildCondition(String field, String operator, String value, String type, Integer bindIndex, Map<String, Object> bindVariables) {
-		String bindVarName = 'filter' + bindIndex;
+	private static QCondition buildQCondition(String field, String operator, String value, String type) {
+		QCondition condition = QBuilder.condition(field);
 		
 		// Handle "Unknown" as null for equals and not equals operators
 		if ((operator == 'equals' || operator == 'not equals to') && value == UNKNOWN_VALUE) {
 			if (operator == 'equals') {
-				return field + ' = null';
+				condition.isNull();
 			} else {
-				return field + ' != null';
+				condition.isNotNull();
 			}
+			return condition;
 		}
 		
 		switch on operator.toLowerCase() {
 			when 'equals' {
 				if (type == 'boolean') {
 					Boolean boolValue = Boolean.valueOf(value);
-					bindVariables.put(bindVarName, boolValue);
-					return field + ' = :' + bindVarName;
+					condition.equalsTo(boolValue);
 				} else {
-					bindVariables.put(bindVarName, value);
-					return field + ' = :' + bindVarName;
+					condition.equalsTo(value);
 				}
 			}
 			when 'not equals to' {
 				if (type == 'boolean') {
 					Boolean boolValue = Boolean.valueOf(value);
-					bindVariables.put(bindVarName, boolValue);
-					return field + ' != :' + bindVarName;
+					condition.notEqualsTo(boolValue);
 				} else {
-					bindVariables.put(bindVarName, value);
-					return field + ' != :' + bindVarName;
+					condition.notEqualsTo(value);
 				}
 			}
 			when 'less than' {
-				bindVariables.put(bindVarName, value);
-				return field + ' < :' + bindVarName;
+				condition.isLessThan(value);
 			}
 			when 'greater than' {
-				bindVariables.put(bindVarName, value);
-				return field + ' > :' + bindVarName;
+				condition.isGreaterThan(value);
 			}
 			when 'less or equal' {
-				bindVariables.put(bindVarName, value);
-				return field + ' <= :' + bindVarName;
+				condition.isLessOrEquals(value);
 			}
 			when 'greater or equal' {
-				bindVariables.put(bindVarName, value);
-				return field + ' >= :' + bindVarName;
+				condition.isGreaterOrEquals(value);
 			}
 			when 'contains' {
-				bindVariables.put(bindVarName, '%' + value + '%');
-				return field + ' LIKE :' + bindVarName;
+				condition.isLike('%' + value + '%');
 			}
 			when 'does not contain' {
-				bindVariables.put(bindVarName, '%' + value + '%');
-				return '(NOT ' + field + ' LIKE :' + bindVarName + ')';
+				condition.isNotLike('%' + value + '%');
 			}
 			when 'starts with' {
-				bindVariables.put(bindVarName, value + '%');
-				return field + ' LIKE :' + bindVarName;
+				condition.isLike(value + '%');
 			}
 			when else {
-				return '';
+				return null;
 			}
 		}
+		
+		return condition;
 	}
 }
