@@ -35,7 +35,11 @@ public with sharing class LogListController {
 		'type' => 'Type__c',
 		'summary' => 'Summary__c',
 		'isNew' => 'Is_New__c',
-		'createdAt' => 'Created_At__c'
+		'createdAt' => 'Created_At__c',
+		'area' => 'Area__c',
+		'apexName' => 'Apex_Name__c',
+		'flowApiName' => 'Flow_API_Name__c',
+		'userName' => 'User_Name__c'
 	};
 
 	public class LogElement {
@@ -46,6 +50,10 @@ public with sharing class LogListController {
 		public String summary;
 		public Boolean isNew;
 		public DateTime createdAt;
+		public String area;
+		public String apexName;
+		public String flowApiName;
+		public String userName;
 		public String viewFieldValue;
 
 		public LogElement(Log__c log, String view) {
@@ -56,6 +64,10 @@ public with sharing class LogListController {
 			this.summary = log.Summary__c;
 			this.isNew = log.Is_New__c;
 			this.createdAt = log.Created_At__c;
+			this.area = log.Area__c;
+			this.apexName = log.Apex_Name__c;
+			this.flowApiName = log.Flow_API_Name__c;
+			this.userName = log.User_Name__c;
 			this.viewFieldValue = getViewValue(log, view);
 		}
 	}
