@@ -40,7 +40,8 @@ public with sharing class LogListController {
 		'area' => 'Area__c',
 		'apexName' => 'Apex_Name__c',
 		'flowApiName' => 'Flow_API_Name__c',
-		'userName' => 'User_Name__c'
+		'userName' => 'User_Name__c',
+		'issueName' => 'Issue__r.Name'
 	};
 
 	public class LogElement {
@@ -55,6 +56,8 @@ public with sharing class LogListController {
 		public String apexName;
 		public String flowApiName;
 		public String userName;
+		public String issueId;
+		public String issueName;
 		public String viewFieldValue;
 
 		public LogElement(Log__c log, String view) {
@@ -69,6 +72,8 @@ public with sharing class LogListController {
 			this.apexName = log.Apex_Name__c;
 			this.flowApiName = log.Flow_API_Name__c;
 			this.userName = log.User_Name__c;
+			this.issueId = log.Issue__c;
+			this.issueName = log.Issue__r.Name;
 			this.viewFieldValue = getViewValue(log, view);
 		}
 	}
@@ -242,8 +247,8 @@ public with sharing class LogListController {
 		
 		QBuilder queryBuilder = new QBuilder('Log__c');
 		queryBuilder.selectFields(new Set<String>{
-			'Id', 'Name', 'Category__c', 'Type__c', 'Summary__c', 'Is_New__c', 
-			'Created_At__c', 'Flow_API_Name__c', 'Area__c', 'Apex_Name__c', 'User_Name__c'
+			'Id', 'Name', 'Category__c', 'Type__c', 'Summary__c', 'Is_New__c', 'Created_At__c', 'Flow_API_Name__c', 'Area__c', 'Apex_Name__c',
+			'User_Name__c', 'Issue__c', 'Issue__r.Name'
 		});
 		queryBuilder.add(QBuilder.condition('Created_At__c').isGreaterOrEquals(startDateTime));
 		queryBuilder.add(QBuilder.condition('Created_At__c').isLessOrEquals(endDateTime));
