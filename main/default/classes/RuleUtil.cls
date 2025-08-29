@@ -1653,28 +1653,6 @@ public with sharing class RuleUtil {
 		 * Gets the user-friendly field label for a Salesforce field
 		 */
 		private String getSalesforceFieldLabel(String objectName, String fieldName) {
-			// Handle virtual fields
-			if (isVirtualField(objectName, fieldName)) {
-				try {
-					Schema.SObjectType objectType = ConfigUtil.MAP_GD.get(objectName);
-					if (objectType != null) {
-						Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
-						if (fieldName == 'Link') {
-							return objectDescribe.getLabel() + ' > Link';
-						} else if (fieldName == 'Analysis') {
-							return 'Issue > Advanced Analysis';
-						}
-					}
-				} catch (Exception e) {
-					// Fall through to default handling
-				}
-			}
-			
-			// Handle related object fields
-			if (fieldName.contains('.')) {
-				return getRelatedObjectFieldLabel(objectName, fieldName);
-			}
-			
 			try {
 				// Get the object describe
 				Schema.SObjectType objectType = ConfigUtil.MAP_GD.get(objectName);
@@ -1685,19 +1663,7 @@ public with sharing class RuleUtil {
 				Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
 				Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
 				
-				// Find field by API name first (more efficient)
 				Schema.SObjectField field = fieldMap.get(fieldName);
-				if (field == null) {
-					// Only try to find by label if API name lookup fails
-					for (Schema.SObjectField sField : fieldMap.values()) {
-						Schema.DescribeFieldResult fieldDescribe = sField.getDescribe();
-						if (fieldDescribe.getLabel().equalsIgnoreCase(fieldName)) {
-							field = sField;
-							break;
-						}
-					}
-				}
-				
 				if (field == null) {
 					return objectName + '.' + fieldName;
 				}
@@ -1708,72 +1674,6 @@ public with sharing class RuleUtil {
 				
 				// Return in format: "Object Label > Field Label"
 				return objectLabel + ' > ' + fieldLabel;
-				
-			} catch (Exception e) {
-				// If field lookup fails, return API name format
-				return objectName + '.' + fieldName;
-			}
-		}
-		
-		private String getRelatedObjectFieldLabel(String objectName, String fieldName) {
-			List<String> fieldParts = fieldName.split('\\.');
-			String currentObjectName = objectName;
-			List<String> labels = new List<String>();
-			
-			try {
-				// Get the initial object label
-				Schema.SObjectType objectType = ConfigUtil.MAP_GD.get(currentObjectName);
-				if (objectType != null) {
-					Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
-					labels.add(objectDescribe.getLabel());
-				}
-				
-				for (Integer i = 0; i < fieldParts.size(); i++) {
-					String fieldPart = fieldParts[i];
-					
-					// Get the object describe
-					Schema.SObjectType objType = ConfigUtil.MAP_GD.get(currentObjectName);
-					if (objType == null) {
-						return objectName + '.' + fieldName;
-					}
-
-					Schema.DescribeSObjectResult objDescribe = objType.getDescribe();
-					Map<String, Schema.SObjectField> fieldMap = objDescribe.fields.getMap();
-					
-					// Find field by API name first (more efficient)
-					Schema.SObjectField field = fieldMap.get(fieldPart);
-					if (field == null) {
-						// Only try to find by label if API name lookup fails
-						for (Schema.SObjectField sField : fieldMap.values()) {
-							Schema.DescribeFieldResult fieldDescribe = sField.getDescribe();
-							if (fieldDescribe.getLabel().equalsIgnoreCase(fieldPart)) {
-								field = sField;
-								break;
-							}
-						}
-					}
-					
-					if (field == null) {
-						return objectName + '.' + fieldName;
-					}
-
-					Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
-					labels.add(fieldDescribe.getLabel());
-					
-					// If this is not the last part, get the referenced object for next iteration
-					if (i < fieldParts.size() - 1) {
-						List<Schema.sObjectType> referenceTo = fieldDescribe.getReferenceTo();
-						if (referenceTo.isEmpty()) {
-							return objectName + '.' + fieldName;
-						}
-						
-						// Update current object name for next iteration
-						currentObjectName = referenceTo[0].getDescribe().getName();
-					}
-				}
-				
-				// Return in format: "Object Label > Field Label > Field Label > ..."
-				return String.join(labels, ' > ');
 				
 			} catch (Exception e) {
 				// If field lookup fails, return API name format
@@ -1997,20 +1897,6 @@ public with sharing class RuleUtil {
 		private void validateMergeField(String fieldKey, MergeFieldInfo mergeField, Map<String, Object> fieldData) {
 			String fieldRef = getFieldReference(fieldKey, fieldData);
 			
-			// Check if this is a virtual field by looking it up in merge fields
-			if (isVirtualField(mergeField.objectName, mergeField.fieldName)) {
-				return;
-			}
-			
-			// Handle related object fields (e.g., LastModifiedBy.AboutMe)
-			if (mergeField.fieldName.contains('.')) {
-				validateRelatedObjectField(mergeField, fieldRef);
-			} else {
-				validateDirectField(mergeField, fieldRef);
-			}
-		}
-		
-		private void validateDirectField(MergeFieldInfo mergeField, String fieldRef) {
 			// Validate object exists
 			Schema.SObjectType objectType = ConfigUtil.MAP_GD.get(mergeField.objectName);
 			if (objectType == null) {
@@ -2038,79 +1924,6 @@ public with sharing class RuleUtil {
 			} catch (Exception e) {
 				throw new RuleUtilException(String.format(ERROR_VALIDATING_MERGE_FIELD, new List<String>{mergeField.objectName, mergeField.fieldName, fieldRef, e.getMessage()}));
 			}
-		}
-		
-		private void validateRelatedObjectField(MergeFieldInfo mergeField, String fieldRef) {
-			List<String> fieldParts = mergeField.fieldName.split('\\.');
-			String currentObjectName = mergeField.objectName;
-			
-			try {
-				for (Integer i = 0; i < fieldParts.size(); i++) {
-					String fieldPart = fieldParts[i];
-					Boolean isLastPart = (i == fieldParts.size() - 1);
-					
-					// Validate object exists
-					Schema.SObjectType objectType = ConfigUtil.MAP_GD.get(currentObjectName);
-					if (objectType == null) {
-						throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_OBJECT_NOT_EXISTS, new List<String>{fieldRef, currentObjectName}));
-					}
-					
-					Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
-					Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
-					
-					// Find field by API name first (more efficient)
-					Schema.SObjectField field = fieldMap.get(fieldPart);
-					if (field == null) {
-						// Only try to find by label if API name lookup fails
-						for (Schema.SObjectField sField : fieldMap.values()) {
-							Schema.DescribeFieldResult fieldDescribe = sField.getDescribe();
-							if (fieldDescribe.getLabel().equalsIgnoreCase(fieldPart)) {
-								field = sField;
-								break;
-							}
-						}
-					}
-					
-					if (field == null) {
-						throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_FIELD_NOT_EXISTS, new List<String>{fieldRef, fieldPart, currentObjectName}));
-					}
-					
-					Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
-					
-					// Validate field is accessible
-					if (!fieldDescribe.isAccessible()) {
-						throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_NOT_ACCESSIBLE, new List<String>{fieldRef, fieldPart, currentObjectName}));
-					}
-					
-					// If this is not the last part, it should be a relationship field
-					if (!isLastPart) {
-						List<Schema.sObjectType> referenceTo = fieldDescribe.getReferenceTo();
-						if (referenceTo.isEmpty()) {
-							throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_FIELD_NOT_EXISTS, new List<String>{fieldRef, fieldPart, currentObjectName + ' (not a relationship field)'}));
-						}
-						
-						// Update current object name for next iteration
-						currentObjectName = referenceTo[0].getDescribe().getName();
-					}
-				}
-			} catch (RuleUtilException e) {
-				throw e;
-			} catch (Exception e) {
-				throw new RuleUtilException(String.format(ERROR_VALIDATING_MERGE_FIELD, new List<String>{mergeField.objectName, mergeField.fieldName, fieldRef, e.getMessage()}));
-			}
-		}
-		
-		private Boolean isVirtualField(String objectName, String fieldName) {
-			// Check for known virtual fields without calling expensive getMergeFields()
-			// These are the virtual fields that are added by addCustomMergeFields()
-			if (fieldName == 'Link') {
-				return true;
-			}
-			if (fieldName == 'Analysis' && objectName == 'petriv14__Issue__c') {
-				return true;
-			}
-			
-			return false;
 		}
 
 		/**
@@ -2243,16 +2056,6 @@ public with sharing class RuleUtil {
 		 * Gets the Salesforce field type for a given object and field
 		 */
 		private String getSalesforceFieldType(String objectName, String fieldName) {
-			// Handle virtual fields
-			if (isVirtualField(objectName, fieldName)) {
-				return 'url';
-			}
-			
-			// Handle related object fields
-			if (fieldName.contains('.')) {
-				return getRelatedObjectFieldType(objectName, fieldName);
-			}
-			
 			try {
 				// Get the object describe
 				Schema.SObjectType objectType = ConfigUtil.MAP_GD.get(objectName);
@@ -2263,19 +2066,7 @@ public with sharing class RuleUtil {
 				Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
 				Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
 				
-				// Find field by API name first (more efficient)
 				Schema.SObjectField field = fieldMap.get(fieldName);
-				if (field == null) {
-					// Only try to find by label if API name lookup fails
-					for (Schema.SObjectField sField : fieldMap.values()) {
-						Schema.DescribeFieldResult fieldDescribe = sField.getDescribe();
-						if (fieldDescribe.getLabel().equalsIgnoreCase(fieldName)) {
-							field = sField;
-							break;
-						}
-					}
-				}
-				
 				if (field == null) {
 					return 'string';
 				}
@@ -2314,93 +2105,6 @@ public with sharing class RuleUtil {
 				// If field lookup fails, default to string
 				return 'string';
 			}
-		}
-		
-		private String getRelatedObjectFieldType(String objectName, String fieldName) {
-			List<String> fieldParts = fieldName.split('\\.');
-			String currentObjectName = objectName;
-			
-			try {
-				for (Integer i = 0; i < fieldParts.size(); i++) {
-					String fieldPart = fieldParts[i];
-					Boolean isLastPart = (i == fieldParts.size() - 1);
-					
-					// Get the object describe
-					Schema.SObjectType objectType = ConfigUtil.MAP_GD.get(currentObjectName);
-					if (objectType == null) {
-						return 'string';
-					}
-
-					Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
-					Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
-					
-					// Find field by API name first (more efficient)
-					Schema.SObjectField field = fieldMap.get(fieldPart);
-					if (field == null) {
-						// Only try to find by label if API name lookup fails
-						for (Schema.SObjectField sField : fieldMap.values()) {
-							Schema.DescribeFieldResult fieldDescribe = sField.getDescribe();
-							if (fieldDescribe.getLabel().equalsIgnoreCase(fieldPart)) {
-								field = sField;
-								break;
-							}
-						}
-					}
-					
-					if (field == null) {
-						return 'string';
-					}
-
-					Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
-					
-					// If this is the last part, return the field type
-					if (isLastPart) {
-						Schema.DisplayType displayType = fieldDescribe.getType();
-						
-						// Map Salesforce field types to our runtime types
-						switch on displayType {
-							when INTEGER, LONG {
-								return 'integer';
-							}
-							when DOUBLE, CURRENCY, PERCENT {
-								return 'decimal';
-							}
-							when DATE {
-								return 'date';
-							}
-							when DATETIME {
-								return 'datetime';
-							}
-							when BOOLEAN {
-								return 'boolean';
-							}
-							when URL {
-								return 'url';
-							}
-							when MULTIPICKLIST {
-								return 'multivalue';
-							}
-							when else {
-								return 'string';
-							}
-						}
-					} else {
-						// This is a relationship field, get the referenced object
-						List<Schema.sObjectType> referenceTo = fieldDescribe.getReferenceTo();
-						if (referenceTo.isEmpty()) {
-							return 'string';
-						}
-						
-						// Update current object name for next iteration
-						currentObjectName = referenceTo[0].getDescribe().getName();
-					}
-				}
-			} catch (Exception e) {
-				// If field lookup fails, default to string
-				return 'string';
-			}
-			
-			return 'string';
 		}
 
 
