@@ -101,6 +101,9 @@ public without sharing class PermissionsUtil {
 	public static final String FP_PAGER_DUTY_INTEGRATION_ENABLED = 'PagerDutyIntegrationEnabled';
 	public static final String FP_SPLUNK_INTEGRATION_ENABLED = 'SplunkIntegrationEnabled';
 	public static final String FP_MONITORING_ENABLED = 'MonitoringEnabled';
+	public static final String FP_LIMITS_MONITORING_ENABLED = 'LimitsMonitoringEnabled';
+	public static final String FP_AUTO_CHART_ENABLED = 'AutoChartEnabled';
+	public static final String FP_FORECAST_ENABLED = 'ForecastEnabled';
 	public static final String FP_ARCHIVAL_ENABLED = 'ArchivalEnabled';
 	public static final String FP_SENSITIVE_DATA_MASK_ENABLED = 'SensitiveDataMaskingEnabled';
 	public static final String FP_FLOW_DEBUG_VIEW_ENABLED = 'FlowDebugViewEnabled';
@@ -170,6 +173,13 @@ public without sharing class PermissionsUtil {
 		FP_METADATA_CHAT_ENABLED => 28
 	};
 
+	// 3bit of 29bit
+	public static final Map<String, Integer> MAP_FEATURE12_INDEX_BY_NAME = new Map<String, Integer> {
+		FP_LIMITS_MONITORING_ENABLED => 0,
+		FP_AUTO_CHART_ENABLED => 1,
+		FP_FORECAST_ENABLED => 2
+	};
+
 	public static Map<Integer, Boolean> FeatureMap1 {
 		get {
 			if(FeatureMap1 == null) {
@@ -180,6 +190,20 @@ public without sharing class PermissionsUtil {
 				}
 			}
 			return FeatureMap1;
+		}
+		private set;
+	}
+
+	public static Map<Integer, Boolean> FeatureMap12 {
+		get {
+			if(FeatureMap12 == null) {
+				FeatureMap12 = new Map<Integer, Boolean>();
+				Map<Integer, Integer> bitmap = getBitmapFromInteger(FeatureMap12IntValue);
+				for(Integer i : bitmap.keySet()) {
+					FeatureMap12.put(i, bitmap.get(i) == 1);
+				}
+			}
+			return FeatureMap12;
 		}
 		private set;
 	}
@@ -339,6 +363,21 @@ public without sharing class PermissionsUtil {
 			24=>0, 25=>0, 26=>0,
 			27=>0, 28=>0
 	};
+
+	// 3bit of 29bit
+	public static final Map<Integer, Integer> DEFAULT_FEATURE_MAP_12_VALUE_MAP = new Map<Integer, Integer>{
+		0=>0, 1=>0,	2=>1,
+		3=>0, 4=>0,	5=>0,
+		6=>0, 7=>0,	8=>0,
+		9=>0, 10=>0, 11=>0,
+		12=>0, 13=>0, 14=>0,
+		15=>0, 16=>0, 17=>0,
+		18=>0, 19=>0, 20=>0,
+		21=>0, 22=>0, 23=>0,
+		24=>0, 25=>0, 26=>0,
+		27=>0, 28=>0
+	};
+
 	// all TTL params 0 except FP_REQUEST_ENCRYPTED_TOKEN_TTL (2 hours)
 	public static final Map<Integer, Integer> DEFAULT_FEATURE_MAP_4_VALUE_MAP = new Map<Integer, Integer>{
 			0=>0, 1=>0,	2=>0,
@@ -377,6 +416,8 @@ public without sharing class PermissionsUtil {
 
 	// all boolean params (up to 29 param)
 	public static final String FEATURE_PARAM_MAP_1_NAME = 'FeatureMap1';
+	// all boolean params (up to 29 param)
+	public static final String FEATURE_PARAM_MAP_12_NAME = 'RequestAuditTrailTTL';
 	// all max count params (3 params per 8bit, 255 max)
 	public static final String FEATURE_PARAM_MAP_2_NAME = 'MaxMonitoringRules';
 	// all max count params (3 params per 8bit, 255 max)
@@ -395,13 +436,14 @@ public without sharing class PermissionsUtil {
 	public static final String FEATURE_PARAM_MAP_10_NAME = 'FeatureMap10';
 
 	public static final Integer DEFAULT_FEATURE_MAP_1_VALUE = PermissionsUtil.getIntegerFromBitmap(DEFAULT_FEATURE_MAP_1_VALUE_MAP);
+	public static final Integer DEFAULT_FEATURE_MAP_12_VALUE = PermissionsUtil.getIntegerFromBitmap(DEFAULT_FEATURE_MAP_12_VALUE_MAP);
 	public static final Integer DEFAULT_FEATURE_MAP_2_VALUE = Integer.valueOf(Math.pow(2, 24) - 1);
 	public static final Integer DEFAULT_FEATURE_MAP_3_VALUE = Integer.valueOf(Math.pow(2, 24) - 1);
 	public static final Integer DEFAULT_FEATURE_MAP_4_VALUE = PermissionsUtil.getIntegerFromBitmap(DEFAULT_FEATURE_MAP_4_VALUE_MAP);
 	public static final Integer DEFAULT_FEATURE_MAP_5_VALUE = 0;
 	public static final Integer DEFAULT_FEATURE_MAP_6_VALUE = 0;
 	public static final Integer MAX_USED_BITS_IN_INTEGER = 29;
-	public static final Integer DEFAULT_FEATURE_MAP_10_VALUE = 1;
+	public static final Integer DEFAULT_FEATURE_MAP_10_VALUE = 0;
 
 	@TestVisible
 	public static Integer FeatureMap1IntValue {
@@ -410,6 +452,17 @@ public without sharing class PermissionsUtil {
 				FeatureMap1IntValue = getPackageFeatureInteger(FEATURE_PARAM_MAP_1_NAME, DEFAULT_FEATURE_MAP_1_VALUE);
 			}
 			return FeatureMap1IntValue;
+		}
+		private set;
+	}
+
+	@TestVisible
+	public static Integer FeatureMap12IntValue {
+		get {
+			if(FeatureMap12IntValue == null) {
+				FeatureMap12IntValue = getPackageFeatureInteger(FEATURE_PARAM_MAP_12_NAME, DEFAULT_FEATURE_MAP_12_VALUE);
+			}
+			return FeatureMap12IntValue;
 		}
 		private set;
 	}
@@ -564,7 +617,7 @@ public without sharing class PermissionsUtil {
 		}
 		private set;
 	}
-
+	
 	public static Boolean IntegrationDebugViewEnabled {
 		get {
 			if(IntegrationDebugViewEnabled == null) {
@@ -697,6 +750,17 @@ public without sharing class PermissionsUtil {
 				MonitoringEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_MONITORING_ENABLED));
 			}
 			return MonitoringEnabled;
+		}
+		private set;
+	}
+	
+	@TestVisible
+	public static Boolean LimitsMonitoringEnabled {
+		get {
+			if(LimitsMonitoringEnabled == null) {
+				LimitsMonitoringEnabled = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_LIMITS_MONITORING_ENABLED));
+			}
+			return LimitsMonitoringEnabled;
 		}
 		private set;
 	}
@@ -942,6 +1006,28 @@ public without sharing class PermissionsUtil {
 				MaxNotifications24hr = FeatureMap10.get(MAP_FEATURE10_INDEX_BY_NAME.get(FP_MAX_NOTIFICATIONS_24_HR));
 			}
 			return MaxNotifications24hr;
+		}
+		private set;
+	}
+
+	@TestVisible
+	public static Boolean AutoChartEnabled {
+		get {
+			if(AutoChartEnabled == null) {
+				AutoChartEnabled = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_AUTO_CHART_ENABLED));
+			}
+			return AutoChartEnabled;
+		}
+		private set;
+	}
+
+	@TestVisible
+	public static Boolean ForecastEnabled {
+		get {
+			if(ForecastEnabled == null) {
+				ForecastEnabled = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_FORECAST_ENABLED));
+			}
+			return ForecastEnabled;
 		}
 		private set;
 	}

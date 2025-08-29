@@ -150,6 +150,8 @@ global with sharing class LogService {
 
 
                 Boolean isCustomSkip = false;
+                Boolean isFlowErrorElementPopulated = false;
+
                 List<ICustomErrorInfo> customLogFields = processor.getCustomInfo();
                 if (customLogFields != null) {
                     for (ICustomErrorInfo f : customLogFields) {
@@ -158,6 +160,9 @@ global with sharing class LogService {
                             // skip create log if Flow stacktrace has handled error
                             if (f.getLogFieldName() == CUSTOM_SKIP && f.getValue() == 'true') {
                                 isCustomSkip = true;
+                            // check if FlowErrorElementName is populated, when managed flow generates error, flow error element is not populated
+                            } else if (f.getLogFieldName() == FlowExceptionParser.FLOW_ERROR_ELEMENT_FIELD_NAME) {
+                                isFlowErrorElementPopulated = f.getValue() != null;
                             } else if (f.getLogFieldName() == CUSTOM_POST_PROCESSING && f.getValue() == 'true') {
                                 PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Post_Processing_Status__c, LogPostProcessingService.POST_PROCESSING_STATUS_CUSTOM_NEEDED);
                             } else if (String.valueOf(fieldMap.get(f.getLogFieldName())?.getDescribe().getType()) == FIELD_TYPE_BOOLEAN
@@ -222,7 +227,7 @@ global with sharing class LogService {
                 PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Namespace__c, processor.getNamespace());
 
                 // populate default as unknown if not found
-                if(String.isBlank(log.Namespace__c)) {
+                if(String.isBlank(log.Namespace__c) && !isFlowErrorElementPopulated) {
                     PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Namespace__c, NAMESPACE_UNKNOWN);
                 }
 

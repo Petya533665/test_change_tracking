@@ -8,7 +8,8 @@ private class EventMonitoringUtilTest {
         Rule__c rule = new Rule__c(
             Type__c = EventMonitoringUtil.EVENT_MONITORING_TYPE,
             Subtype__c = EventLogProcessors.EVENT_TYPE_API,
-            Active__c = true
+            Active__c = true,
+            Logs_Limit__c = 1000
         );
         insert rule;
         
@@ -18,14 +19,7 @@ private class EventMonitoringUtilTest {
                 FieldName__c = EventLogProcessors.FIELD_CPU_TIME,
                 ComparisonOperator__c = 'GREATER_THAN',
                 Value__c = '1000',
-                Index__c = EventMonitoringUtil.CRITICAL_INDEX
-            ),
-            new RuleFilter__c(
-                Rule__c = rule.Id,
-                FieldName__c = EventLogProcessors.FIELD_CPU_TIME,
-                ComparisonOperator__c = 'GREATER_THAN',
-                Value__c = '500',
-                Index__c = EventMonitoringUtil.WARNING_INDEX
+                Index__c = EventMonitoringUtil.FILTER_INDEX
             )
         };
         insert filters;
@@ -33,16 +27,19 @@ private class EventMonitoringUtilTest {
         // Act
         Test.startTest();
         Map<String, Map<String, ThresholdConfig>> thresholds = 
-            EventMonitoringUtil.loadThresholdsFromRules();
+            EventMonitoringUtil.loadThresholdsFromRules(EventMonitoringUtil.getActiveEventMonitoringRules());
+        Map<String, Integer> logsLimitPerHour = EventMonitoringUtil.getLogsLimitPerHour(EventMonitoringUtil.getActiveEventMonitoringRules());
         Test.stopTest();
+
+        System.assertEquals(1000, logsLimitPerHour.get(EventLogProcessors.EVENT_TYPE_API));
+        System.assertEquals(null, logsLimitPerHour.get(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION));
         
         // Assert
         System.assert(thresholds.containsKey(EventLogProcessors.EVENT_TYPE_API));
         System.assert(thresholds.get(EventLogProcessors.EVENT_TYPE_API).containsKey(EventLogProcessors.FIELD_CPU_TIME));
         
         ThresholdConfig config = thresholds.get(EventLogProcessors.EVENT_TYPE_API).get(EventLogProcessors.FIELD_CPU_TIME);
-        System.assertEquals('500', config.warningThreshold);
-        System.assertEquals('1000', config.criticalThreshold);
+        System.assertEquals('1000', config.threshold);
         System.assertEquals(ThresholdConfig.EvaluationType.GREATER_THAN, config.evaluationType);
     }
     
@@ -52,8 +49,7 @@ private class EventMonitoringUtilTest {
         ThresholdConfig config = new ThresholdConfig.Builder()
             .setEventType(EventLogProcessors.EVENT_TYPE_API)
             .setMetric(EventLogProcessors.FIELD_CPU_TIME)
-            .setWarningThreshold(500)
-            .setCriticalThreshold(1000)
+            .setThreshold(1000)
             .setEvalType(ThresholdConfig.EvaluationType.GREATER_THAN)
             .build();
             
@@ -73,19 +69,13 @@ private class EventMonitoringUtilTest {
             ORDER BY Index__c ASC
         ];
         
-        System.assertEquals(2, filters.size());
+        System.assertEquals(1, filters.size());
         
         // Verify critical threshold filter
         System.assertEquals(EventLogProcessors.FIELD_CPU_TIME, filters[0].FieldName__c);
         System.assertEquals('GREATER_THAN', filters[0].ComparisonOperator__c);
         System.assertEquals('1000', filters[0].Value__c);
-        System.assertEquals(EventMonitoringUtil.CRITICAL_INDEX, filters[0].Index__c);
-        
-        // Verify warning threshold filter
-        System.assertEquals(EventLogProcessors.FIELD_CPU_TIME, filters[1].FieldName__c);
-        System.assertEquals('GREATER_THAN', filters[1].ComparisonOperator__c);
-        System.assertEquals('500', filters[1].Value__c);
-        System.assertEquals(EventMonitoringUtil.WARNING_INDEX, filters[1].Index__c);
+        System.assertEquals(EventMonitoringUtil.FILTER_INDEX, filters[0].Index__c);
     }
     
     @IsTest
@@ -93,7 +83,7 @@ private class EventMonitoringUtilTest {
         // Arrange
         Rule__c rule = new Rule__c(
             Type__c = EventMonitoringUtil.EVENT_MONITORING_TYPE,
-            Subtype__c = EventLogProcessors.EVENT_TYPE_API,
+            Subtype__c = EventLogProcessors.EVENT_TYPE_WAVE_PERFORMANCE,
             Active__c = false
         );
         insert rule;
@@ -103,18 +93,18 @@ private class EventMonitoringUtilTest {
             FieldName__c = EventLogProcessors.FIELD_CPU_TIME,
             ComparisonOperator__c = 'GREATER_THAN',
             Value__c = '1000',
-            Index__c = EventMonitoringUtil.CRITICAL_INDEX
+            Index__c = EventMonitoringUtil.FILTER_INDEX
         );
         insert filter;
         
         // Act
         Test.startTest();
         Map<String, Map<String, ThresholdConfig>> thresholds = 
-            EventMonitoringUtil.loadThresholdsFromRules();
+            EventMonitoringUtil.loadThresholdsFromRules(EventMonitoringUtil.getActiveEventMonitoringRules());
         Test.stopTest();
         
         // Assert
-        System.assert(!thresholds.containsKey(EventLogProcessors.EVENT_TYPE_API));
+        System.assert(!thresholds.containsKey(EventLogProcessors.EVENT_TYPE_WAVE_PERFORMANCE));
     }
 
     @TestSetup
@@ -489,5 +479,419 @@ private class EventMonitoringUtilTest {
         
         System.assertNotEquals(null, result, 'DEFAULT_ENABLED_EVENT_TYPES_STRING should not be null');
         System.assertNotEquals(null, result2, 'DEFAULT_DISABLED_EVENT_TYPES_STRING should not be null');
+    }
+
+    @IsTest
+    static void testGetEventTypesWithStatus() {
+        // Arrange - Create some test rules
+        List<Rule__c> testRules = new List<Rule__c>{
+            new Rule__c(
+                Type__c = EventMonitoringUtil.EVENT_MONITORING_TYPE,
+                Subtype__c = EventLogProcessors.EVENT_TYPE_API,
+                Active__c = true,
+                Logs_Limit__c = 150
+            ),
+            new Rule__c(
+                Type__c = EventMonitoringUtil.EVENT_MONITORING_TYPE,
+                Subtype__c = EventLogProcessors.EVENT_TYPE_APEX_TRIGGER,
+                Active__c = true,
+                Logs_Limit__c = 200
+            )
+        };
+        insert testRules;
+        
+        // Set some event types as enabled in settings (API=0, APEX_TRIGGER=5)
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = '1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        List<EventMonitoringUtil.EventTypeStatus> result = EventMonitoringUtil.getEventTypesWithStatus();
+        Test.stopTest();
+        
+        // Assert
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.size() > 0, 'Should return event type statuses');
+        
+        // Find API event type status
+        EventMonitoringUtil.EventTypeStatus apiStatus = null;
+        EventMonitoringUtil.EventTypeStatus triggerStatus = null;
+        
+        for (EventMonitoringUtil.EventTypeStatus status : result) {
+            if (status.name == EventLogProcessors.EVENT_TYPE_API) {
+                apiStatus = status;
+            } else if (status.name == EventLogProcessors.EVENT_TYPE_APEX_TRIGGER) {
+                triggerStatus = status;
+            }
+        }
+        
+        // Assert API status
+        System.assertNotEquals(null, apiStatus, 'API event type should be found');
+        System.assertEquals(true, apiStatus.active, 'API should be active');
+        System.assertEquals(150, apiStatus.logsLimit, 'API should have custom logs limit from Rule__c');
+        
+        // Assert Trigger status  
+        System.assertNotEquals(null, triggerStatus, 'Trigger event type should be found');
+        System.assertEquals(true, triggerStatus.active, 'Trigger should be active');
+        System.assertEquals(200, triggerStatus.logsLimit, 'Trigger should have custom logs limit from Rule__c');
+    }
+
+    @IsTest
+    static void testGetEventTypesWithStatusNoExistingRules() {
+        // Arrange - No existing rules, should use default logs limits
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = '1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        List<EventMonitoringUtil.EventTypeStatus> result = EventMonitoringUtil.getEventTypesWithStatus();
+        Test.stopTest();
+        
+        // Assert
+        System.assertNotEquals(null, result, 'Result should not be null');
+        
+        // Find API event type status (should use default logs limit)
+        EventMonitoringUtil.EventTypeStatus apiStatus = null;
+        for (EventMonitoringUtil.EventTypeStatus status : result) {
+            if (status.name == EventLogProcessors.EVENT_TYPE_API) {
+                apiStatus = status;
+                break;
+            }
+        }
+        
+        System.assertNotEquals(null, apiStatus, 'API event type should be found');
+        System.assertEquals(true, apiStatus.active, 'API should be active based on settings');
+        System.assertEquals(100, apiStatus.logsLimit, 'API should have default logs limit');
+    }
+
+    @IsTest
+    static void testSetEventTypesStatusesCreateRules() {
+        // Arrange - Create EventTypeStatus objects to enable some types (use types we know work)
+        List<EventMonitoringUtil.EventTypeStatus> statusesToSet = new List<EventMonitoringUtil.EventTypeStatus>{
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION, true, 250),
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR, true, 300),
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_LOGIN, false, 100)
+        };
+        
+        // Ensure no existing rules
+        System.assertEquals(0, [SELECT COUNT() FROM Rule__c WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE], 'Should start with no rules');
+        
+        Test.startTest();
+        EventMonitoringUtil.setEventTypesStatuses(statusesToSet);
+        Test.stopTest();
+        
+        // Assert rules were created for enabled types
+        List<Rule__c> createdRules = [
+            SELECT Subtype__c, Active__c, Logs_Limit__c, 
+                   (SELECT FieldName__c, ComparisonOperator__c, Value__c, Index__c FROM RuleFilters__r)
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
+            ORDER BY Subtype__c
+        ];
+        
+        System.assertEquals(2, createdRules.size(), 'Should create rules for 2 enabled event types');
+        
+        // Verify rules
+        Rule__c exceptionRule = null;
+        Rule__c lightningRule = null;
+        for (Rule__c rule : createdRules) {
+            if (rule.Subtype__c == EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION) {
+                exceptionRule = rule;
+            } else if (rule.Subtype__c == EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR) {
+                lightningRule = rule;
+            }
+        }
+        
+        System.assertNotEquals(null, exceptionRule, 'Exception rule should be created');
+        System.assertEquals(true, exceptionRule.Active__c, 'Exception rule should be active');
+        System.assertEquals(100, exceptionRule.Logs_Limit__c, 'Exception rule should be capped at DEFAULT_LOGS_LIMIT_PER_HOUR');
+        System.assert(exceptionRule.RuleFilters__r.size() > 0, 'Exception rule should have threshold filters');
+        
+        System.assertNotEquals(null, lightningRule, 'Lightning rule should be created');
+        System.assertEquals(true, lightningRule.Active__c, 'Lightning rule should be active');
+        System.assertEquals(100, lightningRule.Logs_Limit__c, 'Lightning rule should be capped at DEFAULT_LOGS_LIMIT_PER_HOUR');
+        System.assert(lightningRule.RuleFilters__r.size() > 0, 'Lightning rule should have threshold filters');
+        
+        // Verify settings were updated
+        Event_Monitoring__c settings = [SELECT Enabled_Types__c FROM Event_Monitoring__c LIMIT 1];
+        System.assertNotEquals(null, settings.Enabled_Types__c, 'Settings should be updated');
+    }
+
+    @IsTest
+    static void testSetEventTypesStatusesDeleteRules() {
+        // Arrange - Create existing rules first
+        List<Rule__c> existingRules = new List<Rule__c>{
+            new Rule__c(
+                Type__c = EventMonitoringUtil.EVENT_MONITORING_TYPE,
+                Subtype__c = EventLogProcessors.EVENT_TYPE_API,
+                Active__c = true,
+                Logs_Limit__c = 150
+            ),
+            new Rule__c(
+                Type__c = EventMonitoringUtil.EVENT_MONITORING_TYPE,
+                Subtype__c = EventLogProcessors.EVENT_TYPE_APEX_TRIGGER,
+                Active__c = true,
+                Logs_Limit__c = 200
+            )
+        };
+        insert existingRules;
+        
+        // Set initial enabled types
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = '1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        // Now disable one type and modify the other's logs limit
+        List<EventMonitoringUtil.EventTypeStatus> statusesToSet = new List<EventMonitoringUtil.EventTypeStatus>{
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_API, true, 350), // Keep enabled but limit will be capped at 100
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_APEX_TRIGGER, false, 100) // Disable
+        };
+        
+        Test.startTest();
+        EventMonitoringUtil.setEventTypesStatuses(statusesToSet);
+        Test.stopTest();
+        
+        // Assert trigger rule was deleted
+        List<Rule__c> remainingRules = [
+            SELECT Subtype__c, Logs_Limit__c 
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
+        ];
+        
+        System.assertEquals(1, remainingRules.size(), 'Should only have 1 rule remaining');
+        System.assertEquals(EventLogProcessors.EVENT_TYPE_API, remainingRules[0].Subtype__c, 'Should be API rule');
+        System.assertEquals(100, remainingRules[0].Logs_Limit__c, 'API rule should be capped at DEFAULT_LOGS_LIMIT_PER_HOUR');
+    }
+
+    @IsTest
+    static void testSetEventTypesStatusesUpdateExistingRule() {
+        // Setup - Create initial rule with one logs limit
+        List<EventMonitoringUtil.EventTypeStatus> initialStatuses = new List<EventMonitoringUtil.EventTypeStatus>{
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_API, true, 50)
+        };
+        
+        Test.startTest();
+        
+        // First call - create rule with logs limit 50
+        EventMonitoringUtil.setEventTypesStatuses(initialStatuses);
+        
+        // Verify rule was created
+        List<Rule__c> createdRules = [SELECT Id, Subtype__c, Logs_Limit__c FROM Rule__c WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE AND Subtype__c = :EventLogProcessors.EVENT_TYPE_API];
+        System.assertEquals(1, createdRules.size(), 'Should have created one rule');
+        System.assertEquals(50, Integer.valueOf(createdRules[0].Logs_Limit__c), 'Initial logs limit should be 50');
+        Id ruleId = createdRules[0].Id;
+        
+        // Second call - update same event type with different logs limit
+        List<EventMonitoringUtil.EventTypeStatus> updatedStatuses = new List<EventMonitoringUtil.EventTypeStatus>{
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_API, true, 75)
+        };
+        EventMonitoringUtil.setEventTypesStatuses(updatedStatuses);
+        
+        Test.stopTest();
+        
+        // Verify rule was updated, not duplicated
+        List<Rule__c> updatedRules = [SELECT Id, Subtype__c, Logs_Limit__c FROM Rule__c WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE AND Subtype__c = :EventLogProcessors.EVENT_TYPE_API];
+        System.assertEquals(1, updatedRules.size(), 'Should still have only one rule');
+        System.assertEquals(ruleId, updatedRules[0].Id, 'Should be the same rule record');
+        System.assertEquals(75, Integer.valueOf(updatedRules[0].Logs_Limit__c), 'Logs limit should be updated to 75');
+    }
+
+    @IsTest
+    static void testSetEventTypesStatusesLogsLimitOverride() {
+        // Test that logs limit is capped at DEFAULT_LOGS_LIMIT_PER_HOUR (100) when exceeded
+        List<EventMonitoringUtil.EventTypeStatus> statusesWithHighLimit = new List<EventMonitoringUtil.EventTypeStatus>{
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_API, true, 250), // Exceeds limit
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_APEX_TRIGGER, true, 50) // Within limit
+        };
+        
+        Test.startTest();
+        EventMonitoringUtil.setEventTypesStatuses(statusesWithHighLimit);
+        Test.stopTest();
+        
+        // Verify rules were created with correct limits
+        List<Rule__c> createdRules = [
+            SELECT Subtype__c, Logs_Limit__c 
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
+            ORDER BY Subtype__c
+        ];
+        
+        System.assertEquals(2, createdRules.size(), 'Should have created 2 rules');
+        
+        // API rule should be capped at 100
+        Rule__c apiRule = null;
+        Rule__c triggerRule = null;
+        for (Rule__c rule : createdRules) {
+            if (rule.Subtype__c == EventLogProcessors.EVENT_TYPE_API) {
+                apiRule = rule;
+            } else if (rule.Subtype__c == EventLogProcessors.EVENT_TYPE_APEX_TRIGGER) {
+                triggerRule = rule;
+            }
+        }
+        
+        System.assertNotEquals(null, apiRule, 'API rule should exist');
+        System.assertNotEquals(null, triggerRule, 'Trigger rule should exist');
+        System.assertEquals(100, Integer.valueOf(apiRule.Logs_Limit__c), 'API logs limit should be capped at 100');
+        System.assertEquals(50, Integer.valueOf(triggerRule.Logs_Limit__c), 'Trigger logs limit should remain 50');
+    }
+
+    @IsTest
+    static void testSetEventTypesStatusesUpdateWithLogsLimitOverride() {
+        // Setup - Create initial rule 
+        List<EventMonitoringUtil.EventTypeStatus> initialStatuses = new List<EventMonitoringUtil.EventTypeStatus>{
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_API, true, 50)
+        };
+        EventMonitoringUtil.setEventTypesStatuses(initialStatuses);
+        
+        // Get the created rule ID
+        List<Rule__c> createdRules = [SELECT Id FROM Rule__c WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE AND Subtype__c = :EventLogProcessors.EVENT_TYPE_API];
+        Id ruleId = createdRules[0].Id;
+        
+        Test.startTest();
+        
+        // Update with logs limit that exceeds DEFAULT_LOGS_LIMIT_PER_HOUR
+        List<EventMonitoringUtil.EventTypeStatus> updatedStatuses = new List<EventMonitoringUtil.EventTypeStatus>{
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_API, true, 300) // Exceeds 100
+        };
+        EventMonitoringUtil.setEventTypesStatuses(updatedStatuses);
+        
+        Test.stopTest();
+        
+        // Verify rule was updated with capped limit
+        List<Rule__c> updatedRules = [SELECT Id, Logs_Limit__c FROM Rule__c WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE AND Subtype__c = :EventLogProcessors.EVENT_TYPE_API];
+        System.assertEquals(1, updatedRules.size(), 'Should still have only one rule');
+        System.assertEquals(ruleId, updatedRules[0].Id, 'Should be the same rule record');
+        System.assertEquals(100, Integer.valueOf(updatedRules[0].Logs_Limit__c), 'Logs limit should be capped at 100');
+    }
+
+    @IsTest
+    static void testBulkifiedRuleCreation() {
+        // Test creating rules for multiple event types in one operation
+        Map<String, Integer> eventTypesWithLimits = new Map<String, Integer>{
+            EventLogProcessors.EVENT_TYPE_API => 100,
+            EventLogProcessors.EVENT_TYPE_APEX_TRIGGER => 200,
+            EventLogProcessors.EVENT_TYPE_APEX_CALLOUT => 300,
+            EventLogProcessors.EVENT_TYPE_LOGIN => 400
+        };
+        
+        Test.startTest();
+        List<Rule__c> createdRules = EventMonitoringUtil.createDefaultRulesForEventTypes(eventTypesWithLimits);
+        Test.stopTest();
+        
+        // Assert bulkified creation worked
+        System.assertEquals(4, createdRules.size(), 'Should create 4 rules');
+        
+        // Verify rules in database
+        List<Rule__c> dbRules = [
+            SELECT Subtype__c, Logs_Limit__c,
+                   (SELECT Id FROM RuleFilters__r)
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
+            ORDER BY Subtype__c
+        ];
+        
+        System.assertEquals(4, dbRules.size(), 'Should have 4 rules in database');
+        
+        for (Rule__c rule : dbRules) {
+            System.assertEquals(eventTypesWithLimits.get(rule.Subtype__c), Integer.valueOf(rule.Logs_Limit__c), 
+                               'Rule should have correct logs limit: ' + rule.Subtype__c);
+            System.assert(rule.RuleFilters__r.size() > 0, 'Rule should have filters: ' + rule.Subtype__c);
+        }
+    }
+
+    @IsTest
+    static void testBulkifiedRuleDeletion() {
+        // Arrange - Create multiple rules
+        List<Rule__c> rulesToCreate = new List<Rule__c>();
+        List<String> eventTypesToDelete = new List<String>{
+            EventLogProcessors.EVENT_TYPE_API,
+            EventLogProcessors.EVENT_TYPE_APEX_TRIGGER,
+            EventLogProcessors.EVENT_TYPE_LOGIN
+        };
+        
+        for (String eventType : eventTypesToDelete) {
+            rulesToCreate.add(new Rule__c(
+                Type__c = EventMonitoringUtil.EVENT_MONITORING_TYPE,
+                Subtype__c = eventType,
+                Active__c = true,
+                Logs_Limit__c = 100
+            ));
+        }
+        
+        // Add one rule that should NOT be deleted
+        rulesToCreate.add(new Rule__c(
+            Type__c = EventMonitoringUtil.EVENT_MONITORING_TYPE,
+            Subtype__c = EventLogProcessors.EVENT_TYPE_APEX_CALLOUT,
+            Active__c = true,
+            Logs_Limit__c = 100
+        ));
+        
+        insert rulesToCreate;
+        
+        Test.startTest();
+        EventMonitoringUtil.deleteRulesForEventTypes(eventTypesToDelete);
+        Test.stopTest();
+        
+        // Assert only the callout rule remains
+        List<Rule__c> remainingRules = [
+            SELECT Subtype__c 
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
+        ];
+        
+        System.assertEquals(1, remainingRules.size(), 'Should only have 1 rule remaining');
+        System.assertEquals(EventLogProcessors.EVENT_TYPE_APEX_CALLOUT, remainingRules[0].Subtype__c, 
+                           'Should be the callout rule that was not deleted');
+    }
+
+    @IsTest
+    static void testSetEventTypesStatusesWithEmptyList() {
+        // Create some existing rules
+        List<Rule__c> existingRules = new List<Rule__c>{
+            new Rule__c(
+                Type__c = EventMonitoringUtil.EVENT_MONITORING_TYPE,
+                Subtype__c = EventLogProcessors.EVENT_TYPE_API,
+                Active__c = true,
+                Logs_Limit__c = 150
+            )
+        };
+        insert existingRules;
+        
+        // Set initial enabled types
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = '1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+        
+        Test.startTest();
+        // Disable all types by passing empty list
+        EventMonitoringUtil.setEventTypesStatuses(new List<EventMonitoringUtil.EventTypeStatus>());
+        Test.stopTest();
+        
+        // Assert all rules were deleted
+        Integer ruleCount = [SELECT COUNT() FROM Rule__c WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE];
+        System.assertEquals(0, ruleCount, 'All event monitoring rules should be deleted');
+        
+        // Assert settings were updated to all disabled
+        Event_Monitoring__c settings = [SELECT Enabled_Types__c FROM Event_Monitoring__c LIMIT 1];
+        System.assert(settings.Enabled_Types__c.contains('0'), 'Settings should indicate disabled types');
+    }
+
+    @IsTest
+    static void testSingleEventTypeRule() {
+        // Simple test to verify one event type rule creation works
+        List<EventMonitoringUtil.EventTypeStatus> statusesToSet = new List<EventMonitoringUtil.EventTypeStatus>{
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION, true, 200)
+        };
+        
+        Test.startTest();
+        EventMonitoringUtil.setEventTypesStatuses(statusesToSet);
+        Test.stopTest();
+        
+        // Verify rule was created
+        List<Rule__c> createdRules = [
+            SELECT Subtype__c, Logs_Limit__c 
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
+        ];
+        
+        System.assertEquals(1, createdRules.size(), 'Should create 1 rule');
+        System.assertEquals(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION, createdRules[0].Subtype__c, 'Should be Exception rule');
+        System.assertEquals(100, createdRules[0].Logs_Limit__c, 'Should be capped at DEFAULT_LOGS_LIMIT_PER_HOUR');
     }
 }

@@ -1,18 +1,29 @@
 public with sharing class SystemOverviewController {
 
+	private static final String APEX_CLASS_OBJECT_NAME = 'ApexClass';
+	private static final String APEX_TRIGGER_OBJECT_NAME = 'ApexTrigger';
+	private static final String APEX_PAGE_OBJECT_NAME = 'ApexPage';
+	private static final String APEX_COMPONENT_OBJECT_NAME = 'ApexComponent';
+	private static final String LIGHTNING_COMPONENT_BUNDLE_OBJECT_NAME = 'LightningComponentBundle';
+	private static final String AURA_DEFINITION_BUNDLE_OBJECT_NAME = 'AuraDefinitionBundle';
+	private static final String FLOW_DEFINITION_OBJECT_NAME = 'FlowDefinition';
+
 	@TestVisible
 	private static final Map<String, String> CODE_INFO_OBJECTS_MAP = new Map<String, String>{
-			'ApexClass' => 'Apex Class',
-			'ApexTrigger' => 'Apex Trigger',
-			'ApexPage' => 'Apex Page',
-			'ApexComponent' => 'Apex Component',
-			'LightningComponentBundle' => 'LWC',
-			'AuraDefinitionBundle' => 'Aura',
-			'FlowDefinition' => 'Flow'
+			APEX_CLASS_OBJECT_NAME => 'Apex Class',
+			APEX_TRIGGER_OBJECT_NAME => 'Apex Trigger',
+			APEX_PAGE_OBJECT_NAME => 'Apex Page',
+			APEX_COMPONENT_OBJECT_NAME => 'Apex Component',
+			LIGHTNING_COMPONENT_BUNDLE_OBJECT_NAME => 'LWC',
+			AURA_DEFINITION_BUNDLE_OBJECT_NAME => 'Aura',
+			FLOW_DEFINITION_OBJECT_NAME => 'Flow'
 	};
-	private static final Set<String> CODE_INFO_OBJECTS_TOOLING = new Set<String>{'LightningComponentBundle', 'FlowDefinition'};
+	private static final Set<String> CODE_INFO_OBJECTS_TOOLING = new Set<String>{'LightningComponentBundle'};
 	private static final Set<String> CODE_INFO_OBJECTS_MASTER_LABEL = new Set<String>{'LightningComponentBundle', 'AuraDefinitionBundle', 'FlowDefinition'};
 	private static final Set<String> CODE_INFO_OBJECTS_NAME = new Set<String>{'ApexClass', 'ApexTrigger', 'ApexPage', 'ApexComponent'};
+
+	@TestVisible
+	private static final String ORG_AT_A_GLANCE_WORKFLOW_QUERY = 'SELECT Id, Name, Metadata FROM WorkflowRule';
 
 	@TestVisible
 	private static final String CODE_INFO_QUERY = 'SELECT COUNT(Id) count_id, NamespacePrefix namespacePrefix FROM {0} GROUP BY NamespacePrefix';
@@ -55,6 +66,9 @@ public with sharing class SystemOverviewController {
 	private static final String CUSTOM_METADATA_TYPES_TYPE = 'Custom Metadata Types';
 	private static final String BIG_OBJECTS_TYPE = 'Big Objects';
 
+	private static final Set<String> PROCESS_BUILDER_PROCESS_TYPES = new Set<String>{'Workflow', 'CustomEvent', 'InvocableProcess'};
+	private static final Set<String> NOT_FLOW_PROCESS_TYPES = new Set<String>{'Appointments', 'RoutingFlow', 'ManagedContentAuthoringWorkflow'};
+
 	@AuraEnabled
 	public static String getNameSpacePrefix() {
 		return ConfigUtil.nameSpacePrefix;
@@ -92,64 +106,64 @@ public with sharing class SystemOverviewController {
 
 	@AuraEnabled
 	public static List<CodeInfo> getCodeInfo() {
-		List<CodeInfo> lstCodeInfo = new List<CodeInfo>();
+		List<CodeInfo> codeInfos = new List<CodeInfo>();
 		for (String objectName : CODE_INFO_OBJECTS_MAP.keySet()) {
-			CodeInfo codeInfo = new CodeInfo();
-			codeInfo.name = objectName;
-			codeInfo.label = CODE_INFO_OBJECTS_MAP.get(objectName);
-			String query = String.format(CODE_INFO_QUERY, new List<String>{objectName});
-			if (CODE_INFO_OBJECTS_TOOLING.contains(objectName)) {
-				List<Object> objects = getToolingAPIObjects(query);
-				for (Object obj : objects) {
-					Map<String, Object> objectMap = (Map<String, Object>)obj;
-					codeInfo.namespacePrefix = (String)objectMap.get('namespacePrefix');
-					codeInfo.count = (Integer)objectMap.get('count_id');
+			if (objectName == FLOW_DEFINITION_OBJECT_NAME) {
+				List<FlowDefinitionView> flowDefinitionViews = getFlowDefinitionView().get('flow');
+				Map<String, Integer> namespacePrefixCount = new Map<String, Integer>();
+				for (FlowDefinitionView flowDefinitionView : flowDefinitionViews) {
+					namespacePrefixCount.put(flowDefinitionView.NamespacePrefix, namespacePrefixCount.containsKey(flowDefinitionView.NamespacePrefix) ? namespacePrefixCount.get(flowDefinitionView.NamespacePrefix) + 1 : 1);
+				}
+				for (String key : namespacePrefixCount.keySet()) {
+					codeInfos.add(new CodeInfo(objectName, key, namespacePrefixCount.get(key)));
 				}
 			} else {
-				List<AggregateResult> aggregateResults = Database.query(query);
-				for (AggregateResult aggregateResult : aggregateResults) {
-					codeInfo.namespacePrefix = (String)aggregateResult.get('namespacePrefix');
-					codeInfo.count = (Integer)aggregateResult.get('count_id');
+				String query = String.format(CODE_INFO_QUERY, new List<String>{objectName});
+				if (objectName == LIGHTNING_COMPONENT_BUNDLE_OBJECT_NAME) {
+					List<Object> objects = getToolingAPIObjects(query);
+					for (Object obj : objects) {
+						Map<String, Object> objectMap = (Map<String, Object>)obj;
+						codeInfos.add(new CodeInfo(objectName, (String)objectMap.get('namespacePrefix'), (Integer)objectMap.get('count_id')));
+					}
+				} else {
+					List<AggregateResult> aggregateResults = Database.query(query);
+					for (AggregateResult aggregateResult : aggregateResults) {
+						codeInfos.add(new CodeInfo(objectName, (String)aggregateResult.get('namespacePrefix'), (Integer)aggregateResult.get('count_id')));
+					}
 				}
 			}
-			lstCodeInfo.add(codeInfo);
 		}
-		return lstCodeInfo;
+		return codeInfos;
 	}
+
 
 	@AuraEnabled
 	public static List<CodeInfoDetail> getCodeInfoDetails(String objectName) {
 		List<CodeInfoDetail> codeInfoDetails = new List<CodeInfoDetail>();
-		String query;
-		if (objectName == 'FlowDefinition') {
-			query = CODE_INFO_DETAILS_FLOW_QUERY;
-		} else if (objectName == 'LightningComponentBundle' || objectName == 'AuraDefinitionBundle') {
-			query = String.format(CODE_INFO_DETAILS_LIGHTNING_QUERY, new List<String>{objectName});
-		} else {
-			query = String.format(CODE_INFO_DETAILS_QUERY, new List<String>{objectName});
-		}
-		if (CODE_INFO_OBJECTS_TOOLING.contains(objectName)) {
-			List<Object> objects = getToolingAPIObjects(query);
-			for (Object obj : objects) {
-				Map<String, Object> objectMap = (Map<String, Object>)obj;
-				CodeInfoDetail codeInfoDetail = new CodeInfoDetail();
-				codeInfoDetail.name = objectName;
-				codeInfoDetail.label = CODE_INFO_OBJECTS_MAP.get(objectName);
-				codeInfoDetail.fullName = (String)objectMap.get('MasterLabel');
-				codeInfoDetail.namespacePrefix = (String)objectMap.get('NamespacePrefix');
-				codeInfoDetail.apiVersion = String.valueOf(objectMap.get('ApiVersion'));
-				codeInfoDetails.add(codeInfoDetail);
+		if (objectName == FLOW_DEFINITION_OBJECT_NAME) {
+			List<FlowDefinitionView> flowDefinitionViews = getFlowDefinitionView().get('flow');
+			for (FlowDefinitionView flowDefinitionView : flowDefinitionViews) {
+				codeInfoDetails.add(new CodeInfoDetail(objectName, flowDefinitionView.NamespacePrefix, flowDefinitionView.Label, String.valueOf(flowDefinitionView.ApiVersion)));
 			}
 		} else {
-			List<SObject> sObjects = Database.query(query);
-			for (SObject sObj : sObjects) {
-				CodeInfoDetail codeInfoDetail = new CodeInfoDetail();
-				codeInfoDetail.name = objectName;
-				codeInfoDetail.label = CODE_INFO_OBJECTS_MAP.get(objectName);
-				codeInfoDetail.fullName = objectName == 'AuraDefinitionBundle' ? (String)sObj.get('MasterLabel') : (String)sObj.get('Name');
-				codeInfoDetail.namespacePrefix = (String)sObj.get('NamespacePrefix');
-				codeInfoDetail.apiVersion = String.valueOf(sObj.get('ApiVersion'));
-				codeInfoDetails.add(codeInfoDetail);
+			String query;
+			if (objectName == 'LightningComponentBundle' || objectName == 'AuraDefinitionBundle') {
+				query = String.format(CODE_INFO_DETAILS_LIGHTNING_QUERY, new List<String>{objectName});
+			} else {
+				query = String.format(CODE_INFO_DETAILS_QUERY, new List<String>{objectName});
+			}
+			if (CODE_INFO_OBJECTS_TOOLING.contains(objectName)) {
+				List<Object> objects = getToolingAPIObjects(query);
+				for (Object obj : objects) {
+					Map<String, Object> objectMap = (Map<String, Object>)obj;
+					codeInfoDetails.add(new CodeInfoDetail(objectName, (String)objectMap.get('NamespacePrefix'), (String)objectMap.get('MasterLabel'), String.valueOf(objectMap.get('ApiVersion'))));
+				}
+			} else {
+				List<SObject> sObjects = Database.query(query);
+				for (SObject sObj : sObjects) {
+					String fullName = objectName == 'AuraDefinitionBundle' ? (String)sObj.get('MasterLabel') : (String)sObj.get('Name');
+					codeInfoDetails.add(new CodeInfoDetail(objectName, (String)sObj.get('NamespacePrefix'), fullName, String.valueOf(sObj.get('ApiVersion'))));
+				}
 			}
 		}
 		return codeInfoDetails;
@@ -162,6 +176,29 @@ public with sharing class SystemOverviewController {
 				corg == null ? ConfigUtil.USER_SESSION_ID : ConnectedOrgService.getConnectedOrgAccessToken(corg),
 				query,
 				ConfigUtil.TOOLING_QUERY_API_ENDPOINT);
+	}
+
+	private static Map<String, List<FlowDefinitionView>> getFlowDefinitionView() {
+		List<FlowDefinitionView> flows = new List<FlowDefinitionView>();
+		List<FlowDefinitionView> process = new List<FlowDefinitionView>();
+		List<FlowDefinitionView> flowDefinitionViews = [
+				SELECT Id, ApiName, Label, ApiVersion, ProcessType, NamespacePrefix, InstalledPackageName, ManageableState
+				FROM FlowDefinitionView
+				WHERE IsActive = TRUE
+		];
+		for (FlowDefinitionView flowDefinitionView : flowDefinitionViews) {
+			if ((flowDefinitionView.ManageableState == 'installed' && flowDefinitionView.InstalledPackageName != null) || flowDefinitionView.ManageableState == 'unmanaged') {
+				if (PROCESS_BUILDER_PROCESS_TYPES.contains(flowDefinitionView.ProcessType)) {
+					process.add(flowDefinitionView);
+				} else if (!NOT_FLOW_PROCESS_TYPES.contains(flowDefinitionView.ProcessType)) {
+					flows.add(flowDefinitionView);
+				}
+			}
+		}
+		Map<String, List<FlowDefinitionView>> flowDefinitionViewsByTypes = new Map<String, List<FlowDefinitionView>>();
+		flowDefinitionViewsByTypes.put('flow', flows);
+		flowDefinitionViewsByTypes.put('processes', process);
+		return flowDefinitionViewsByTypes;
 	}
 
 	@AuraEnabled
@@ -180,12 +217,7 @@ public with sharing class SystemOverviewController {
 
 	public static String getObjectType(Schema.DescribeSObjectResult describeSObjectResult) {
 		if (!describeSObjectResult.isAccessible()
-				|| !describeSObjectResult.isCreateable()
-				|| !describeSObjectResult.isDeletable()
-				|| !describeSObjectResult.isUpdateable()
-				|| !describeSObjectResult.isQueryable()
-				|| !describeSObjectResult.isSearchable()
-				|| describeSObjectResult.isDeprecatedAndHidden()) {
+				|| !describeSObjectResult.isQueryable()) {
 			return null;
 		}
 		if (describeSObjectResult.isCustom()) {
@@ -193,25 +225,33 @@ public with sharing class SystemOverviewController {
 				return CUSTOM_SETTINGS_TYPE;
 			} else if (describeSObjectResult.name.endsWith('__mdt')) {
 				return CUSTOM_METADATA_TYPES_TYPE;
-			} else if (describeSObjectResult.name.endsWith('__b')) {
+			}
+		}
+		if (!describeSObjectResult.isCreateable()
+				|| !describeSObjectResult.isDeletable()
+				|| !describeSObjectResult.isUpdateable()
+				|| describeSObjectResult.isDeprecatedAndHidden()) {
+			return null;
+		}
+		if (describeSObjectResult.isCustom()) {
+			if (describeSObjectResult.name.endsWith('__b')) {
 				return BIG_OBJECTS_TYPE;
 			} else {
 				return CUSTOM_OBJECTS_TYPE;
 			}
-		} else {
-			if (describeSObjectResult.name.startsWith('Setup') ||
-					describeSObjectResult.name.startsWith('Auth') ||
-					describeSObjectResult.name.startsWith('Permission') ||
-					describeSObjectResult.name.endsWith('Share') ||
-					describeSObjectResult.name.endsWith('History') ||
-					describeSObjectResult.name.endsWith('Feed') ||
-					describeSObjectResult.name.endsWith('Event') ||
-					describeSObjectResult.name.endsWith('EventStore') ||
-					describeSObjectResult.name.endsWith('__b') ||
-					describeSObjectResult.name.contains('Config') ||
-					describeSObjectResult.name.contains('Setting')) {
-				return null;
-			}
+		}
+		if (describeSObjectResult.name.startsWith('Setup') ||
+				describeSObjectResult.name.startsWith('Auth') ||
+				describeSObjectResult.name.startsWith('Permission') ||
+				describeSObjectResult.name.endsWith('Share') ||
+				describeSObjectResult.name.endsWith('History') ||
+				describeSObjectResult.name.endsWith('Feed') ||
+				describeSObjectResult.name.endsWith('Event') ||
+				describeSObjectResult.name.endsWith('EventStore') ||
+				describeSObjectResult.name.endsWith('__b') ||
+				describeSObjectResult.name.contains('Config') ||
+				describeSObjectResult.name.contains('Setting')) {
+			return null;
 		}
 		return STANDARD_OBJECTS_TYPE;
 	}
@@ -238,12 +278,12 @@ public with sharing class SystemOverviewController {
 		for (User user : users) {
 			ChartDataCount chartDataCount = new ChartDataCount(user);
 			for (String permission : RISKY_PERMISSIONS.keySet()) {
-				chartDataCount.addStackingCount(user.Profile.Name, PROFILE_TYPE, permission, Boolean.valueOf(user.Profile.get(RISKY_PERMISSION_FIELDS.get(permission))) ? 1 : 0);
+				chartDataCount.addStackingCount(user.Profile.Name, user.Profile.Name, PROFILE_TYPE, permission, Boolean.valueOf(user.Profile.get(RISKY_PERMISSION_FIELDS.get(permission))) ? 1 : 0);
 			}
 			chartDataCounts.add(chartDataCount);
 		}
 		List<PermissionSetAssignment> assignments = [
-				SELECT AssigneeId, Assignee.Name, Assignee.Profile.Name, PermissionSet.Name,
+				SELECT AssigneeId, Assignee.Name, Assignee.Profile.Name, PermissionSet.Name, PermissionSet.Label,
 						PermissionSet.PermissionsModifyAllData, PermissionSet.PermissionsViewAllData,
 						PermissionSet.PermissionsResetPasswords, PermissionSet.PermissionsDataExport,
 						PermissionSet.PermissionsManageSharing, PermissionSet.PermissionsManageRoles,
@@ -261,7 +301,7 @@ public with sharing class SystemOverviewController {
 		for (PermissionSetAssignment psa : assignments) {
 			ChartDataCount chartDataCount = findOrCreateChartDataCount(chartDataCounts, psa);
 			for (String permission : RISKY_PERMISSIONS.keySet()) {
-				chartDataCount.addStackingCount(psa.PermissionSet.Name, PERMISSION_SET_TYPE, permission, Boolean.valueOf(psa.PermissionSet.get(RISKY_PERMISSION_FIELDS.get(permission))) ? 1 : 0);
+				chartDataCount.addStackingCount(psa.PermissionSet.Name, psa.PermissionSet.Label, PERMISSION_SET_TYPE, permission, Boolean.valueOf(psa.PermissionSet.get(RISKY_PERMISSION_FIELDS.get(permission))) ? 1 : 0);
 			}
 		}
 		return chartDataCounts;
@@ -363,8 +403,6 @@ public with sharing class SystemOverviewController {
 		}
 		return counts;
 	}
-	
-	private static final Set<String> PROCESS_BUILDER_TYPES = new Set<String>{'Workflow', 'CustomEvent', 'InvocableProcess'};
 
 	public static Map<String, Integer> getProcessBuilderCounts(Set<String> objectNames) {
 		Map<String, Integer> counts = new Map<String, Integer>();
@@ -404,7 +442,7 @@ public with sharing class SystemOverviewController {
 	private static Map<String, Integer> getFlowCounts(Set<String> objectNames) {
 		Map<String, Integer> counts = new Map<String, Integer>();
 		for (String objectName : objectNames) {
-			Integer count = [SELECT COUNT() FROM FlowDefinitionView WHERE IsActive = TRUE AND ProcessType NOT IN :PROCESS_BUILDER_TYPES AND TriggerObjectOrEventId = :objectName];
+			Integer count = [SELECT COUNT() FROM FlowDefinitionView WHERE IsActive = TRUE AND ProcessType NOT IN :PROCESS_BUILDER_PROCESS_TYPES AND TriggerObjectOrEventId = :objectName];
 			counts.put(objectName, count);
 		}
 		return counts;
@@ -452,31 +490,22 @@ public with sharing class SystemOverviewController {
 			}
 		}
 		orgAtAGlance.workflows = 0;
-		String query = 'SELECT COUNT(Id) cnt FROM WorkflowRule';
-		List<Object> objects = SystemOverviewController.getToolingAPIObjects(query);
-		for (Object obj : objects) {
-			Map<String, Object> resultMap = (Map<String, Object>) obj;
-			Integer count = Integer.valueOf(resultMap.get('cnt'));
-			orgAtAGlance.workflows += count;
-		}
-		orgAtAGlance.processes = 0;
-		orgAtAGlance.flows = 0;
-		List<FlowDefinitionView> flowDefinitionViews = [
-				SELECT Id, ProcessType
-				FROM FlowDefinitionView
-				WHERE IsActive = TRUE
-		];
-		for (FlowDefinitionView flowDefinitionView : flowDefinitionViews) {
-			if (flowDefinitionView.ProcessType == 'Workflow'
-					|| flowDefinitionView.ProcessType == 'CustomEvent'
-					|| flowDefinitionView.ProcessType == 'InvocableProcess') {
-				orgAtAGlance.processes++;
-			} else if (flowDefinitionView.ProcessType != 'Appointments'
-					&& flowDefinitionView.ProcessType != 'RoutingFlow'
-					&& flowDefinitionView.ProcessType != 'ManagedContentAuthoringWorkflow') {
-				orgAtAGlance.flows++;
+		String query = ORG_AT_A_GLANCE_WORKFLOW_QUERY;
+		List<Object> rows = SystemOverviewController.getToolingAPIObjects(query);
+
+		Integer activeWorkflows = 0;
+		for (Object row : rows) {
+			Map<String, Object> m = (Map<String, Object>) row;
+			Map<String, Object> md = (Map<String, Object>) m.get('Metadata');
+			if (md != null && (Boolean) md.get('active') == true) {
+				activeWorkflows++;
 			}
 		}
+		orgAtAGlance.workflows = activeWorkflows;
+
+		Map<String, List<FlowDefinitionView>> flowDefinitionViewsByTypes = getFlowDefinitionView();
+		orgAtAGlance.processes = flowDefinitionViewsByTypes.get('processes').size();
+		orgAtAGlance.flows = flowDefinitionViewsByTypes.get('flow').size();
 
 		orgAtAGlance.triggers = 0;
 		Integer triggerCount = [SELECT COUNT() FROM ApexTrigger WHERE Status = 'Active'];
@@ -526,7 +555,7 @@ public with sharing class SystemOverviewController {
 			Schema.DescribeSObjectResult describeSObjectResult = globalDescribe.get(objectName).getDescribe();
 			String objectType = getObjectType(describeSObjectResult);
 			if (objectType == STANDARD_OBJECTS_TYPE || objectType == CUSTOM_OBJECTS_TYPE) {
-				sObjectOptions.add(new SObjectOption(describeSObjectResult));
+				sObjectOptions.add(new SObjectOption(describeSObjectResult, objectType));
 			}
 		}
 		return sObjectOptions;
@@ -609,20 +638,17 @@ public with sharing class SystemOverviewController {
 		public String label { get; set; }
 		@AuraEnabled
 		public String value { get; set; }
+		@AuraEnabled
+		public String namespacePrefix { get; set; }
+		@AuraEnabled
+		public String type { get; set; }
 		public SObjectOption() {}
-		public SObjectOption(Schema.DescribeSObjectResult describeSObjectResult) {
+		public SObjectOption(Schema.DescribeSObjectResult describeSObjectResult, String objectType) {
 			this.label = describeSObjectResult.label;
 			this.value = describeSObjectResult.name;
+			this.type = objectType;
+			this.namespacePrefix = value.countMatches('__') > 1 ? value.substringBefore('__') : null;
 		}
-	}
-
-	public class SObjectEmptyFields {
-		@AuraEnabled
-		public String label;
-		@AuraEnabled
-		public String name;
-		@AuraEnabled
-		public List<ChartDataPercentage> chartDataPercentages;
 	}
 
 	public class UsersInfo {
@@ -645,6 +671,13 @@ public with sharing class SystemOverviewController {
 		public String namespacePrefix;
 		@AuraEnabled
 		public Integer count;
+		public CodeInfo() {}
+		public CodeInfo(String name, String namespacePrefix, Integer count) {
+			this.name = name;
+			this.label = CODE_INFO_OBJECTS_MAP.get(name);
+			this.namespacePrefix = namespacePrefix;
+			this.count = count;
+		}
 	}
 
 	public class CodeInfoDetail {
@@ -658,6 +691,14 @@ public with sharing class SystemOverviewController {
 		public String apiVersion;
 		@AuraEnabled
 		public String namespacePrefix;
+		public CodeInfoDetail() {}
+		public CodeInfoDetail(String name, String namespacePrefix, String fullName, String apiVersion) {
+			this.name = name;
+			this.label = CODE_INFO_OBJECTS_MAP.get(name);
+			this.namespacePrefix = namespacePrefix;
+			this.fullName = fullName;
+			this.apiVersion = apiVersion;
+		}
 	}
 
 	public class ChartDataPercentage {
@@ -750,13 +791,13 @@ public with sharing class SystemOverviewController {
 		public ChartDataCount(PermissionSetAssignment psa) {
 			this.id = psa.AssigneeId.to15();
 			this.name = psa.Assignee.Name;
-			this.label = psa.PermissionSet.Name;
+			this.label = psa.PermissionSet.Label;
 			this.subName = psa.Assignee.Profile.Name;
 			this.stackingCounts = new List<ChartDataStackingCount>();
 		}
 
-		public void addStackingCount(String name, String type, String subName, Integer count) {
-			this.stackingCounts.add(new ChartDataStackingCount(name, type, subName, count));
+		public void addStackingCount(String name, String label, String type, String subName, Integer count) {
+			this.stackingCounts.add(new ChartDataStackingCount(name, label, type, subName, count));
 		}
 	}
 
@@ -764,14 +805,17 @@ public with sharing class SystemOverviewController {
 		@AuraEnabled
 		public String name;
 		@AuraEnabled
+		public String label;
+		@AuraEnabled
 		public String type;
 		@AuraEnabled
 		public String subName;
 		@AuraEnabled
 		public Integer count;
 
-		public ChartDataStackingCount(String name, String type, String subName, Integer count) {
+		public ChartDataStackingCount(String name, String label, String type, String subName, Integer count) {
 			this.name = name;
+			this.label = label;
 			this.type = type;
 			this.subName = subName;
 			this.count = count;

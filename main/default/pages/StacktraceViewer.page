@@ -45,18 +45,22 @@
             if (!stackTraceParseResultAvailable) {
                 height = 20;
             } else {
-                switch (logCategory) {
-                    case 'Bulk API':
+                const stackTrace = JSON.parse(stackTraceParseResult);
+                const isIntegration = stackTrace.hasOwnProperty('request') && stackTrace.hasOwnProperty('response');
+                switch (true) {
+                    case isIntegration :
+                        height = 610;
+                        break;
+                    case logCategory === 'Bulk API':
                         height = 600;
                         break;
-                    case 'Flow':
-                    case 'Process Builder':
-                    case 'Integration':
+                    case logCategory === 'Flow':
+                    case logCategory === 'Process Builder':
                         height = 610;
                         break;
                     default:
                         try {
-                            height = JSON.parse(stackTraceParseResult).length * 310;
+                            height = stackTrace.length * 310;
                         } catch (e) {}
                         break;
                 }

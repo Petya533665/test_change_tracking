@@ -73,7 +73,11 @@ public with sharing class PassthroughtModeService {
         else if (data.inboundEmail != null) {
             PermissionsUtil.putSObjectField(data.inboundEmail, Schema.SObjectType.Inbound_Email__c.fields.Id, null);
             PermissionsUtil.putSObjectField(data.inboundEmail, Schema.SObjectType.Inbound_Email__c.fields.Pharos_Org_ID__c, data.organizationId);
-            ErrorEmailHandler.processEmail(new List<Inbound_Email__c>{data.inboundEmail}, data.organizationId);
+            // Becouse of the passthrough mode, we need to set the isRoutedFromPassthroughMode to true,
+            // to avoid System.CalloutException: Callout loop not allowed in ErrorEmailHandler
+            // Salesforce A  ----Callout----> Salesforce B  ----Callout----> Webservice (Error happened here)
+            // Post processing logic will be executed in regular async job (LogPostProcessingBatch).
+            ErrorEmailHandler.processEmail(new List<Inbound_Email__c>{data.inboundEmail}, data.organizationId, null, null, null, true);
         }
         else if (data.contentVersionWrapper != null) {
             ContentVersion contentVersion = data.contentVersionWrapper.contentVersion;

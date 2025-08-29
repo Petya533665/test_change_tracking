@@ -195,7 +195,8 @@ global with sharing virtual class FlowExceptionParser implements IErrorParser {
             new FlowApiNameField(this.getFlowApiName()),
             new RelatedObjectsField(this.getRelatedObjects()),
             new InterviewGUIDField(this.getInterviewGUID()),
-            new DurationField(this.getDuration())
+            new DurationField(this.getDuration()),
+            new FlowErrorElementField(this.getFlowErrorElement())
         };
         if(isLogLevelFieldAvailable()) {
             customFields.add(new LogLevelField(DEFAULT_LOG_LEVEL));
@@ -213,6 +214,20 @@ global with sharing virtual class FlowExceptionParser implements IErrorParser {
         }
         public String getLogFieldName() {
             return Schema.sObjectType.Log__c.fields.Flow_API_Name__c.getName();
+        }
+    }
+
+    public static final String FLOW_ERROR_ELEMENT_FIELD_NAME = 'FlowErrorElementName';
+    public class FlowErrorElementField implements  ICustomErrorInfo {
+        public String flowErrorElement;
+        public FlowErrorElementField(String value) {
+            this.flowErrorElement = value;
+        }
+        public String getValue() {
+            return this.flowErrorElement;
+        }
+        public String getLogFieldName() {
+            return FLOW_ERROR_ELEMENT_FIELD_NAME;
         }
     }
 

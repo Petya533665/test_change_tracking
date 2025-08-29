@@ -41,6 +41,12 @@ public class Test_AdminController {
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
+            'method' => 'getAzureDevOpsSettings',
+            'data' => ''
+        };
+        AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        payload = new Map<String, Object>{
             'method' => 'resetJiraSettings',
             'data' => ''
         };
@@ -95,13 +101,13 @@ public class Test_AdminController {
         AdminController ctrl = new AdminController();
 
         Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'createEmailService',
+            'method' => 'saveJiraSettings',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
-            'method' => 'saveJiraSettings',
+            'method' => 'saveAzureDevOpsSettings',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -174,12 +180,6 @@ public class Test_AdminController {
 
         payload = new Map<String, Object>{
             'method' => 'getActionRules',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'setArchivalSetting',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -335,12 +335,6 @@ public class Test_AdminController {
         AdminController ctrl = new AdminController();
 
         Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'setSplunkSettings',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
             'method' => 'getQSAnotherConnectedOrg',
             'data' => ''
         };
@@ -413,12 +407,6 @@ public class Test_AdminController {
 
         payload = new Map<String, Object>{
             'method' => 'getPlatformEventSubscriberConfigAIEvent',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'setBatchErrorTrackingSetting',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -743,18 +731,6 @@ public class Test_AdminController {
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
-        payload = new Map<String, Object>{
-                'method' => 'refreshConnectedOrgToken',
-                'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-                'method' => 'testConnectedOrg',
-                'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
         Test.stopTest();
 
         System.assertNotEquals(null, payload);
@@ -864,18 +840,6 @@ public class Test_AdminController {
         AdminController ctrl = new AdminController();
 
         Map<String, Object> payload = new Map<String, Object>{
-                'method' => 'getQuickStartState',
-                'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-                'method' => 'setQuickStartState',
-                'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
                 'method' => 'getUserInfo',
                 'data' => ''
         };
@@ -918,6 +882,9 @@ public class Test_AdminController {
         System.assertNotEquals(null, ac.packageNamespace);
         System.assertNotEquals(null, AdminController.baseRemoteSiteSettings);
         System.assertNotEquals(null, AdminController.remoteSiteSettingsPayload);
+        System.assertNotEquals(null, AdminController.blurModeUrlParameter);
+        System.assertNotEquals(null, ac.userTimezoneOffset);
+        System.assertNotEquals(null, AdminController.getAdminPageInitEvent());
         Test.stopTest();
     }
 
@@ -1103,169 +1070,44 @@ public class Test_AdminController {
     }
 
     @IsTest
+    static void test_admin_service_getIssueDefaultEmailActionTemplate() {
+        Map<String, String> testTemplate;
+        Test.startTest();
+        testTemplate = AdminService.getIssueDefaultEmailActionTemplate();
+        Test.stopTest();
+    
+        String issueObjectName = Schema.SObjectType.Issue__c.getName();
+        
+        Assert.areNotEqual(null, testTemplate, 'Returned template should not be null');
+        Assert.isTrue(testTemplate.containsKey('subject'), 'Returned template should contain a subject');
+        Assert.isTrue(testTemplate.containsKey('body'), 'Returned template should contain a body');
+        Assert.isTrue(testTemplate.get('subject').contains(issueObjectName), 'Subject template should contain Issue__c object name');
+        Assert.isTrue(testTemplate.get('body').contains(issueObjectName), 'Body template should contain Issue__c object name');
+    }
+
+    @IsTest
+    static void test_admin_service_getIssueTicketCommentActionTemplate() {
+        Map<String, String> testTemplate;
+        Test.startTest();
+        testTemplate = AdminService.getIssueTicketCommentActionTemplate();
+        Test.stopTest();
+    
+        String issueObjectName = Schema.SObjectType.Issue__c.getName();
+        
+        Assert.areNotEqual(null, testTemplate, 'Returned template should not be null');
+        Assert.isTrue(testTemplate.containsKey('subject'), 'Returned template should contain a subject');
+        Assert.isTrue(testTemplate.containsKey('body'), 'Returned template should contain a body');
+        Assert.isTrue(testTemplate.get('subject') == null);
+        Assert.isTrue(testTemplate.get('body').contains(issueObjectName), 'Body template should contain Issue__c object name');
+    }
+
+    @IsTest
     static void test_getDefaultTeamsActionTemplate() {
         Map<String, String> testTemplate;
         Test.startTest();
         testTemplate = AdminService.getDefaultTeamsActionTemplate();
         Test.stopTest();
         System.assertNotEquals(null, testTemplate);
-    }
-
-    @IsTest
-    static void test_getTeamsSettings() {
-        AdminService.TeamsSettings settings;
-        Test.startTest();
-        settings = AdminService.getTeamsSettings();
-        Test.stopTest();
-        System.assertNotEquals(null, settings.oAuthEndpoint);
-    }
-
-    @IsTest
-    static void test_getGitHubSettings() {
-        AdminService.GitHubSettings settings;
-        Test.startTest();
-        settings = AdminService.getGitHubSettings();
-        Test.stopTest();
-        System.assertNotEquals(null, settings.oAuthEndpoint);
-    }
-
-    @IsTest
-    static void test_setGitHubSettings() {
-        AdminService.GitHubSettings settings;
-        Test.startTest();
-        settings = AdminService.getGitHubSettings();
-        settings.enabled = true;
-        AdminService.setGitHubSettings(settings);
-        Test.stopTest();
-        System.assertEquals(true, ConfigUtil.GIT_API_SETTINGS.Enabled__c);
-    }
-
-    @IsTest
-    static void test_setGitHubSettingsWithResetByRepoOrBranchName() {
-        ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
-        ConfigUtil.GIT_API_SETTINGS.Username__c = GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME;
-        ConfigUtil.GIT_API_SETTINGS.Token__c = GitHubCommitBatchTest.TEST_GIT_API_TOKEN;
-        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = UserInfo.getUserId();
-        upsert ConfigUtil.GIT_API_SETTINGS;
-
-        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserReposByNameEndpoint(GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME,GitHubCommitBatchTest.TEST_GIT_API_EXT_REPONAME), GitHubCommitBatchTest.getGitAPIUserReposByNameMock());
-        endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserExtRepoBranchesByNameEndpoint(), GitHubCommitBatchTest.getGitAPIUserExtRepoBranchesByNameMock());
-
-		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
-		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-        Test.startTest();
-        Map<String, Object> inputSettings = new Map<String, Object>{
-            'repositoryUrl' => GitHubCommitBatchTest.TEST_GIT_API_EXT_REPOSITORY_URL,
-            'branchName' => GitHubCommitBatchTest.TEST_GIT_API_EXT_BRANCH_NAME
-        };
-        AdminService.setGitHubSettings(inputSettings);
-        Test.stopTest();
-        System.assertEquals(null, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c);
-    }
-
-    @IsTest
-    static void test_setGitHubSettings_ValidateRepositoryName() {
-        ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
-        ConfigUtil.GIT_API_SETTINGS.Username__c = GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME;
-        ConfigUtil.GIT_API_SETTINGS.Token__c = GitHubCommitBatchTest.TEST_GIT_API_TOKEN;
-        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = UserInfo.getUserId();
-        upsert ConfigUtil.GIT_API_SETTINGS;
-
-        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserReposByNameEndpoint(GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME, GitHubCommitBatchTest.TEST_GIT_API_EXT_REPONAME), getGitAPIUserReposByNameNotFoundMock());
-        endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserExtRepoBranchesByNameEndpoint(),getGitAPIUserExtRepoBranchesByNameNotFoundMock());
-
-		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
-		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-        Test.startTest();
-        Map<String, Object> inputSettings = new Map<String, Object>{
-            'repositoryUrl' => GitHubCommitBatchTest.TEST_GIT_API_EXT_REPOSITORY_URL,
-            'branchName' => GitHubCommitBatchTest.TEST_GIT_API_EXT_BRANCH_NAME
-        };
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'setGitHubSettings',
-            'data' => inputSettings
-        };
-        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-        
-        Map<String, Object> respAction = (Map<String, Object>)JSON.deserializeUntyped(response);
-        Map<String, Object> data = (Map<String, Object>)respAction.get('data');
-        System.assertNotEquals(null, data);
-
-        AdminService.GitHubSettings settings = (AdminService.GitHubSettings)JSON.deserialize(JSON.serialize(data), AdminService.GitHubSettings.class);
-        System.assertNotEquals(null, settings);
-        System.assertEquals(AdminService.GIT_API_REPOSITORY_NAME_NOT_FOUND, settings.reponameError);
-        System.assertEquals(null, settings.branchNameError);
-    }
-
-    @IsTest
-    static void test_setGitHubSettings_ValidateBranchName() {
-        ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
-        ConfigUtil.GIT_API_SETTINGS.Username__c = GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME;
-        ConfigUtil.GIT_API_SETTINGS.Token__c = GitHubCommitBatchTest.TEST_GIT_API_TOKEN;
-        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = UserInfo.getUserId();
-        upsert ConfigUtil.GIT_API_SETTINGS;
-
-        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserReposByNameEndpoint(GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME, GitHubCommitBatchTest.TEST_GIT_API_EXT_REPONAME), GitHubCommitBatchTest.getGitAPIUserReposByNameMock());
-        endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserExtRepoBranchesByNameEndpoint(),getGitAPIUserExtRepoBranchesByNameNotFoundMock());
-
-		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
-		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-        Test.startTest();
-        Map<String, Object> inputSettings = new Map<String, Object>{
-            'repositoryUrl' => GitHubCommitBatchTest.TEST_GIT_API_EXT_REPOSITORY_URL,
-            'branchName' => GitHubCommitBatchTest.TEST_GIT_API_EXT_BRANCH_NAME
-        };
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'setGitHubSettings',
-            'data' => inputSettings
-        };
-        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-        
-        Map<String, Object> respAction = (Map<String, Object>)JSON.deserializeUntyped(response);
-        Map<String, Object> data = (Map<String, Object>)respAction.get('data');
-        System.assertNotEquals(null, data);
-
-        AdminService.GitHubSettings settings = (AdminService.GitHubSettings)JSON.deserialize(JSON.serialize(data), AdminService.GitHubSettings.class);
-        System.assertNotEquals(null, settings);
-        System.assertEquals(null, settings.reponameError);
-        System.assertEquals(AdminService.GIT_API_BRANCH_NAME_NOT_FOUND, settings.branchNameError);
-    }
-
-    private static TestDataFactory.SingleRequestMock getGitAPIUserReposByNameNotFoundMock() {
-		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
-			404,
-			'OK',
-			'some error message'
-		);
-		return singleRequestMock;
-	}
-
-    private static TestDataFactory.SingleRequestMock getGitAPIUserExtRepoBranchesByNameNotFoundMock() {
-		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
-			404,
-			'OK',
-			'some error message'
-		);
-		return singleRequestMock;
-	}
-
-    @IsTest
-    static void test_resetGitHubSettings() {
-        AdminService.GitHubSettings settings;
-        Test.startTest();
-        settings = AdminService.resetGitHubSettings();
-        Test.stopTest();
-        System.assertEquals(false, ConfigUtil.GIT_API_SETTINGS.Enabled__c);
-        System.assertEquals(null, ConfigUtil.GIT_API_SETTINGS.Token__c);
-        System.assertEquals(null, ConfigUtil.GIT_API_SETTINGS.oauth_Token__c);
     }
 
     @IsTest
@@ -2246,6 +2088,116 @@ public class Test_AdminController {
     }
 
     @IsTest
+    private static void test_RemoteAction_refreshConnectedOrgToken() {
+        TestDataFactory.createConnectedOrg();
+        TestDataFactory.createConnectedOrgSettings();
+
+        final String NEW_ACCESS_TOKEN = 'new_access_token';
+
+        ConnectedOrgService.AuthTokenResponse authTokenResponse = new ConnectedOrgService.AuthTokenResponse();
+        authTokenResponse.access_token = NEW_ACCESS_TOKEN;
+
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(
+            new Map<String, HttpCalloutMock>{
+                TestDataFactory.CONNECTED_ORG_INSTANCE_URL + ConfigUtil.SF_OAUTH_TOKEN_ENDPOINT =>
+                new TestDataFactory.SingleRequestMock(
+                    200,
+                    'OK',
+                    JSON.serialize(authTokenResponse)
+                )
+            }
+        ));
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'refreshConnectedOrgToken',
+                'data' => new AdminService.ConnectedOrgDTO(ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId().left(15)))
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+
+        AdminService.ConnectedOrgDTO d = (AdminService.ConnectedOrgDTO) JSON.deserialize(
+            JSON.serialize(response.get('data')),
+            AdminService.ConnectedOrgDTO.class
+        );
+
+        Assert.areEqual(NEW_ACCESS_TOKEN, d.accessToken);
+    }
+
+    @IsTest
+    private static void test_RemoteAction_testConnectedOrg_success() {
+        TestDataFactory.createConnectedOrg();
+
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(
+            new Map<String, HttpCalloutMock>{
+                TestDataFactory.CONNECTED_ORG_IDENTITY_URL =>
+                new TestDataFactory.SingleRequestMock(
+                    200,
+                    'OK',
+                    JSON.serialize(new ConnectedOrgService.IdentityDTO())
+                )
+            }
+        ));
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'testConnectedOrg',
+                'data' => new AdminService.ConnectedOrgDTO(ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId().left(15)))
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+
+        Assert.areEqual(ConfigUtil.CONNECTED_ORG_TESTING_KEY_SUCCESS, response.get('data'));
+    }
+
+    @IsTest
+    private static void test_RemoteAction_testConnectedOrg_fail() {
+        TestDataFactory.createConnectedOrg();
+
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(
+            new Map<String, HttpCalloutMock>{
+                TestDataFactory.CONNECTED_ORG_IDENTITY_URL =>
+                new TestDataFactory.SingleRequestMock(
+                    200,
+                    'OK',
+                    '{'
+                )
+            }
+        ));
+        
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'testConnectedOrg',
+                'data' => new AdminService.ConnectedOrgDTO(ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId().left(15)))
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+
+        Test.stopTest();
+
+        Assert.areEqual(ConfigUtil.CONNECTED_ORG_TESTING_KEY_FAIL, response.get('data'));
+    }
+
+    @IsTest
     private static void test_admin_service_deleteConnectedOrg() {
         Boolean result;
         TestDataFactory.createConnectedOrg();
@@ -2260,45 +2212,6 @@ public class Test_AdminController {
         result = (Boolean)AdminService.deleteConnectedOrg(data);
         Test.stopTest();
         System.assertEquals(true, result);
-    }
-
-    @IsTest
-    private static void test_admin_service_saveSlackSettings() {
-        String result;
-
-        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(getRemoteSiteSettingsMock());
-        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
-        
-        AdminService.SlackSettings data = new AdminService.SlackSettings();
-        data.slackEnabled = true;
-        data.slackToken = 'sometoken';
-        data.slackChannelId = 'somechannelid';
-        data.oAuthEndpoint = 'https://slack.com';
-        Test.startTest();
-        result = (String)AdminService.saveSlackSettings(data);
-        Test.stopTest();
-        System.assertEquals(Constants.UI.RESULT_SUCCESS, result);
-    }
-
-    @IsTest
-    private static void test_admin_service_savePagerDutySettings() {
-        String result;
-
-        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(getRemoteSiteSettingsMock());
-        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
-        
-        AdminService.PagerDutySettings data = new AdminService.PagerDutySettings();
-        data.enabled = true;
-        data.token = 'sometoken';
-        data.serviceId = 'someserviceid';
-        data.serviceId = 'someservicekey';
-        data.userEmail = 'someemail@gmail.com';
-        Test.startTest();
-        result = (String)AdminService.savePagerDutySettings(data);
-        Test.stopTest();
-        System.assertEquals(Constants.UI.RESULT_SUCCESS, result);
     }
 
     @IsTest
@@ -2317,54 +2230,6 @@ public class Test_AdminController {
         result = (List<Map<String, String>>)AdminService.getIssueFieldsForJiraMapping();
         Test.stopTest();
         System.assertNotEquals(null, result);
-    }
-
-    @IsTest
-    private static void test_admin_service_getAzureDevOpsSettings() {
-        AdminService.AzureDevOpsSettings result;
-        Test.startTest();
-        result = (AdminService.AzureDevOpsSettings)AdminService.getAzureDevOpsSettings();
-        AdminService.resetAzureDevOpsSettings();
-        Test.stopTest();
-        System.assertNotEquals(null, result);
-        System.assertNotEquals(null, result.oAuthEndpoint);
-    }
-
-    @IsTest
-    private static void test_admin_service_resetJiraSettings() {
-        String result;
-        Test.startTest();
-        result = (String)AdminService.resetJiraSettings();
-        Test.stopTest();
-        System.assertEquals(Constants.UI.RESULT_SUCCESS, result);
-    }
-
-    @IsTest
-    private static void test_admin_service_resetAzureDevOpsSettings() {
-        String result;
-        Test.startTest();
-        result = (String)AdminService.resetAzureDevOpsSettings();
-        Test.stopTest();
-        System.assertEquals(Constants.UI.RESULT_SUCCESS, result);
-    }
-
-    @IsTest
-    private static void test_admin_service_saveAzureDevOpsSettings() {
-        String result;
-        AdminService.AzureDevOpsSettings data = new AdminService.AzureDevOpsSettings(new Azure_Dev_Ops_API_Settings__c());
-        data.autoJiraTaskLabelsFromHashes = true;
-        data.autoRelateTicketsWithSimilarErrors = true;
-        data.createUniqueTicketsByOrg = true;
-        data.automaticallyUpdateIssuePriority = true;
-        data.automaticallyUpdateTicketPriority = true;
-        data.synchronizeCompletedStatus = true;
-        data.synchronizeDuplicateTicketsAndIssues = true;
-        data.synchronizeRelatedTicketsAndIssues = true;
-
-        Test.startTest();
-        result = (String)AdminService.saveAzureDevOpsSettings(data);
-        Test.stopTest();
-        System.assertEquals(Constants.UI.RESULT_SUCCESS, result);
     }
 
     @IsTest
@@ -2391,53 +2256,6 @@ public class Test_AdminController {
         result = (AdminService.DebugLogServiceSettings)AdminService.getDebugLogServiceSettings();
         Test.stopTest();
         System.assertNotEquals(null, result);
-    }
-
-    @IsTest
-    private static void test_admin_service_getSlackUsers() {
-        SlackService.SlackUsersResponse result;
-
-        ConfigUtil.SLACK_SETTINGS.Slack_API_Token__c = 'someTestToken';
-        upsert ConfigUtil.SLACK_SETTINGS;
-
-        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(getSlackUsersMock());
-        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-        Test.startTest();
-        result = (SlackService.SlackUsersResponse)AdminService.getSlackUsers(null);
-        Test.stopTest();
-        System.assertNotEquals(null, result);
-        System.assertEquals(true, result.ok);
-        System.assertNotEquals(null, result.members);
-        System.assertNotEquals(null, result.response_metadata);
-        System.assertEquals('nextCursor', result.response_metadata.next_cursor);
-        System.assertEquals('someUserName1', result.members.get(0).name);
-        System.assertEquals('someUserName2', result.members.get(1).name);
-    }
-
-    private static Map<String, HttpCalloutMock> getSlackUsersMock() {
-        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
-        Map<String, Object> data = new Map<String, Object>();
-
-        SlackService.SlackUsersResponse wrapper1 = new SlackService.SlackUsersResponse();
-        SlackService.SlackUser user1 = new SlackService.SlackUser();
-        user1.id = 'someSlackId1';
-        user1.name = 'someUserName1';
-        SlackService.SlackUser user2 = new SlackService.SlackUser();
-        user2.id = 'someSlackId2';
-        user2.name = 'someUserName2';
-        wrapper1.members = new List<SlackService.SlackUser>{user1, user2};
-        wrapper1.ok = true;
-        wrapper1.response_metadata = new SlackService.SlackChannelsResponseMetadata();
-        wrapper1.response_metadata.next_cursor = 'nextCursor';
-
-        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
-            200,
-            'OK',
-            JSON.serialize(wrapper1)
-        );
-        result.put(ConfigUtil.SLACK_USER_LIST_ENDPOINT, singleRequestMock);
-        return result;
     }
 
     @IsTest
@@ -2636,246 +2454,7 @@ public class Test_AdminController {
         return result;
     }
 
-    @IsTest
-    private static void test_save_jira_settings_api_from_cloud_settings() {
-        System.assertEquals(true, JiraService.isCloudJiraInstance(), 'should be cloud from init setup');
-        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
-
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'saveJiraSettings',
-            'data' => new Map<String, Object>{
-                'baseUrl' => JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT,
-                'username' => 'someusername',
-                'apiToken' => 'sometoken',
-                'apiform' => ''
-            }
-        };
-        // setup mocks
-        JiraService.JIRA_API_URL = JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT;
-        ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c = JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT;
-        ConfigUtil.JIRA_SETTINGS.Jira_Username__c = 'someusername';
-        ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c = 'sometoken';
-        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_HOSTED, JiraService.getJIRAServiceAuthType(), 'should be hosted api');
-        System.assertEquals(true, JiraService.getService().getProjectsEndpoint().contains(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT), 'mocks should be configured to new api url' + JiraService.getService().getProjectsEndpoint());
-
-        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
-        mocks.putAll(getRemoteSiteSettingsMock(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT));
-        mocks.putAll(JiraNotificationBatchTest.createJiraMocks());
-        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
-        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
-
-        // after mocks setup should be CLOUD from init setup
-        JiraService.JIRA_API_URL = null;
-        ConfigUtil.JIRA_SETTINGS = null;
-        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
-
-
-        Test.startTest();
-        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-
-        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(response);
-        String error = (String)mapResponse.get('error');
-        System.assertEquals(null, error);
-
-        System.assertEquals(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT, ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c);
-        System.assertEquals('someusername', ConfigUtil.JIRA_SETTINGS.Jira_Username__c);
-        System.assertEquals('sometoken', ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c);
-    }
-    
-    @IsTest
-    private static void test_save_jira_settings_pat_from_cloud_settings() {
-        System.assertEquals(true, JiraService.isCloudJiraInstance(), 'should be cloud from init setup');
-        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
-
-        String newHostedJiraEndpoint = 'https://someurl.com';
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'saveJiraSettings',
-            'data' => new Map<String, Object>{
-                'baseUrl' => newHostedJiraEndpoint,
-                'apiToken' => 'sometoken',
-                'apiform' => ''
-            }
-        };
-
-        // setup mocks
-        JiraService.JIRA_API_URL = newHostedJiraEndpoint;
-        ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c = newHostedJiraEndpoint;
-        ConfigUtil.JIRA_SETTINGS.Jira_Username__c = null;
-        ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c = 'sometoken';
-        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_PAT, JiraService.getJIRAServiceAuthType(), 'should be PAT');
-        System.assertEquals(true, JiraService.getService().getProjectsEndpoint().contains(newHostedJiraEndpoint), 'mocks should be configured to new api url' + JiraService.getService().getProjectsEndpoint());
-
-        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
-        mocks.putAll(getRemoteSiteSettingsMock(newHostedJiraEndpoint));
-        mocks.putAll(getJiraSettingsMock(false));
-        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
-        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
-       
-        // after mocks setup should be CLOUD from init setup
-        JiraService.JIRA_API_URL = null;
-        ConfigUtil.JIRA_SETTINGS = null;
-        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
-        
-        Test.startTest();
-        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-
-        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(response);
-        String error = (String)mapResponse.get('error');
-        System.assertEquals(null, error);
-
-        System.assertEquals('https://someurl.com', ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c);
-        System.assertEquals(null, ConfigUtil.JIRA_SETTINGS.Jira_Username__c);
-        System.assertEquals('sometoken', ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c);
-        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_PAT, JiraService.getJIRAServiceAuthType(), 'should be PAT');
-    }
-
-    @IsTest
-    private static void test_save_jira_settings_pat_from_empty_settings() {
-        System.assertEquals(true, JiraService.isCloudJiraInstance(), 'should be cloud from init setup');
-        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_CLOUD, JiraService.getJIRAServiceAuthType(), 'should be CLOUD');
-
-        // clear cloud config
-        Jira_Settings__c jiraSettings = Jira_Settings__c.getOrgDefaults();
-		jiraSettings.Jira_Base_Url__c = null;
-		jiraSettings.Jira_API_Url__c = null;
-		jiraSettings.Jira_Username__c = null;
-		update jiraSettings;
-        ConfigUtil.JIRA_SETTINGS = null;
-
-        System.assertEquals(null, JiraService.getJIRAServiceAuthType(), 'should be null');
-
-
-        String newHostedJiraEndpoint = 'https://someurl.com';
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'saveJiraSettings',
-            'data' => new Map<String, Object>{
-                'baseUrl' => newHostedJiraEndpoint,
-                'apiToken' => 'sometoken',
-                'apiform' => ''
-            }
-        };
-
-        // setup mocks
-        JiraService.JIRA_API_URL = newHostedJiraEndpoint;
-        ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c = newHostedJiraEndpoint;
-        ConfigUtil.JIRA_SETTINGS.Jira_Username__c = null;
-        ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c = 'sometoken';
-        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_PAT, JiraService.getJIRAServiceAuthType(), 'should be PAT');
-        System.assertEquals(true, JiraService.getService().getProjectsEndpoint().contains(newHostedJiraEndpoint), 'mocks should be configured to new api url' + JiraService.getService().getProjectsEndpoint());
-
-        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
-        mocks.putAll(getRemoteSiteSettingsMock(newHostedJiraEndpoint));
-        mocks.putAll(getJiraSettingsMock(false));
-        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
-        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
-       
-        // after mocks setup should be empty
-        JiraService.JIRA_API_URL = null;
-        ConfigUtil.JIRA_SETTINGS = null;
-        System.assertEquals(null, JiraService.getJIRAServiceAuthType(), 'should be null');
-        
-        Test.startTest();
-        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-
-        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(response);
-        String error = (String)mapResponse.get('error');
-        System.assertEquals(null, error);
-
-        System.assertEquals('https://someurl.com', ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c);
-        System.assertEquals(null, ConfigUtil.JIRA_SETTINGS.Jira_Username__c);
-        System.assertEquals('sometoken', ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c);
-        System.assertEquals(JiraService.JIRA_SERVICE_AUTH_TYPE.JIRA_PAT, JiraService.getJIRAServiceAuthType(), 'should be PAT');
-    }
-
-    @IsTest
-    private static void test_save_jira_settings_cloud() {
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'saveJiraSettings',
-            'data' => new Map<String, Object>{
-                'oauthToken' => 'sometoken',
-                'cloudform' => ''
-            }
-        };
-        Test.startTest();
-        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-
-        System.assertEquals(null, ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c);
-        System.assertEquals(null, ConfigUtil.JIRA_SETTINGS.Jira_Username__c);
-        System.assertEquals(null, ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c);
-    }
-
-    @IsTest
-    private static void test_save_jira_settings_settings() {
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'saveJiraSettings',
-            'data' => new Map<String, Object>{
-                'autoJiraTaskLabelsFromHashes' => true,
-                'autoRelateTicketsWithSimilarErrors' => true,
-                'createUniqueTicketsByOrg' => false
-            }
-        };
-        Test.startTest();
-        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-
-        System.assertEquals(null, ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c);
-        System.assertEquals(null, ConfigUtil.JIRA_SETTINGS.Jira_Username__c);
-        System.assertEquals(null, ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c);
-        System.assertEquals(true, ConfigUtil.JIRA_SETTINGS.Auto_Generate_Similarity_Labels__c);
-        System.assertEquals(true, ConfigUtil.JIRA_SETTINGS.Auto_Relate_Tickets_With_Similar_Errors__c);
-        System.assertEquals(false, ConfigUtil.JIRA_SETTINGS.Create_Unique_Tickets_by_Org__c);
-    }
-
     private static final String JIRA_MOCK_REST_ENDPOINT = 'https://test.atlassian.net';
-    private static JiraNotificationBatchTest.SingleRequestMock getProjectsMock(Boolean isCloud) {
-		List<JiraService.JiraProject> projects = new List<JiraService.JiraProject>();
-		JiraService.JiraProject testProject = new JiraService.JiraProject();
-		testProject.id = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
-		testProject.key = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
-
-		JiraService.JiraProjectIssueField jiraField = new JiraService.JiraProjectIssueField();
-		jiraField.required = false;
-		jiraField.name = JiraNotificationBatchTest.JIRA_MOCK_EPICK_NAME;
-		jiraField.key = JiraNotificationBatchTest.JIRA_MOCK_EPICK_ID;
-
-		List<JiraService.JiraProjectIssueType> issueTypes = new List<JiraService.JiraProjectIssueType>();
-		JiraService.JiraProjectIssueType testIssueType = new JiraService.JiraProjectIssueType();
-		testIssueType.id = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
-		testIssueType.name = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_NAME;
-		testIssueType.fields = new Map<String, JiraService.JiraProjectIssueField>{JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID => jiraField};
-
-		issueTypes.add(testIssueType);
-		testProject.issueTypes = issueTypes;
-		projects.add(testProject);
-
-        JiraService.JiraProjectList listResp = new JiraService.JiraProjectList();
-        listResp.projects = projects;
-
-		JiraNotificationBatchTest.SingleRequestMock getProjectsRespMock = new JiraNotificationBatchTest.SingleRequestMock(
-			200,
-			'OK',
-			isCloud ? JSON.serialize(listResp) : JSON.serialize(projects)
-		);
-		return getProjectsRespMock;
-	}
-
-    private static Map<String, HttpCalloutMock> getJiraSettingsMock(Boolean isCloud) {
-		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		endpoint2TestResp.put(JiraService.getService().getProjectsEndpoint(), getProjectsMock(isCloud));
-		endpoint2TestResp.put(JiraService.getService().getProjectEndpoint(JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID), JiraNotificationBatchTest.getProjectMock());
-		endpoint2TestResp.put(JiraService.getService().getProjectIssueTypesEndpoint(JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID), JiraNotificationBatchTest.getProjectIssueTypesMock());
-		endpoint2TestResp.put(JiraService.getService().getProjectIssueFieldsEndpoint(JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID, JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID), JiraNotificationBatchTest.getProjectIssueFieldsMock());
-		endpoint2TestResp.put(JiraService.getService().getPrioritySchemesEndpoint(), JiraNotificationBatchTest.createPrioritySchemesMock());
-		endpoint2TestResp.put(JiraService.getService().getPrioritiesEndpoint(), JiraNotificationBatchTest.createPrioritiesMock());
-		return endpoint2TestResp;
-	}
 
     @TestSetup
     private static void testSetup() {
@@ -2886,37 +2465,6 @@ public class Test_AdminController {
 		insert jiraSettings;
         String oauthToken = AdminService.generateRandomString(1000);
         JiraService.putApiTokenToSettings(oauthToken, true, null);
-    }
-    @IsTest
-    private static void test_save_jira_settings_cloud_settings() {
-        Map<String, HttpCalloutMock> endpoint2TestResp = getJiraSettingsMock(true);
-		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
-		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'saveJiraSettings',
-            'data' => new Map<String, Object>{
-                'baseUrl' => JIRA_MOCK_REST_ENDPOINT,
-                'username' => JiraService.JIRA_CLOUD_OAUTH_USERNAME,
-                'oauthToken' => AdminService.generateRandomString(1000),
-                'autoJiraTaskLabelsFromHashes' => true,
-                'autoRelateTicketsWithSimilarErrors' => true,
-                'createUniqueTicketsByOrg' => false
-            }
-        };
-        Test.startTest();
-        String response = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-
-        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(response);
-        String error = (String)mapResponse.get('error');
-        System.assertEquals(null, error);
-
-        System.assertEquals(JiraService.JIRA_CLOUD_OAUTH_USERNAME, ConfigUtil.JIRA_SETTINGS.Jira_Username__c);
-        System.assertEquals(null, ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c);
-        System.assertEquals(true, ConfigUtil.JIRA_SETTINGS.Auto_Generate_Similarity_Labels__c);
-        System.assertEquals(true, ConfigUtil.JIRA_SETTINGS.Auto_Relate_Tickets_With_Similar_Errors__c);
-        System.assertEquals(false, ConfigUtil.JIRA_SETTINGS.Create_Unique_Tickets_by_Org__c);
     }
 
     @IsTest
@@ -2947,224 +2495,14 @@ public class Test_AdminController {
     }
 
     @IsTest
-    private static void test_get_slack_channel_by_name_failed_by_bad_json() {
-        String resp;
-        String query = SLACK_CHANNEL_NAME;
-        TestDataFactory.createSlackSettings();
-
-        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(getSlackChannelsByQueryFailedByBadJSON(query));
-        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-        Test.startTest();
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'getSlackChannels',
-            'data' => query
-        };
-        resp = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-
-        System.assertNotEquals(null, resp);
-        Map<String, Object> respAction = (Map<String, Object>)JSON.deserializeUntyped(resp);
-        Map<String, Object> data = (Map<String, Object>)respAction.get('data');
-        System.assertEquals(null, data);
-        String error = (String)respAction.get('error');
-        System.assertNotEquals(null, error);
-        System.assertEquals(true, error.contains('Unexpected character'));
-    }
-
-    private static Map<String, HttpCalloutMock> getSlackChannelsByQueryFailedByBadJSON(String query) {
-        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
-        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
-            200,
-            'OK',
-            '<!DOCTYPE html><html><body><h1>some server error</h1></body>'
-        );
-        String endpoint = ConfigUtil.SLACK_CONVERSATION_INFO_ENDPOINT + '?channel=' + query;
-        result.put(endpoint, singleRequestMock);
-        return result;
-    }
-
-    @IsTest
-    private static void test_get_slack_channel_by_name_failed_by_jira_rate_limit_error() {
-        String resp;
-        String query = SLACK_CHANNEL_NAME;
-        TestDataFactory.createSlackSettings();
-
-        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(getSlackChannelsByQueryFailedByToManyRequests(query));
-        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-        Test.startTest();
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'getSlackChannels',
-            'data' => query
-        };
-        resp = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-
-        System.assertNotEquals(null, resp);
-        Map<String, Object> respAction = (Map<String, Object>)JSON.deserializeUntyped(resp);
-        Map<String, Object> data = (Map<String, Object>)respAction.get('data');
-        System.assertEquals(null, data);
-        String error = (String)respAction.get('error');
-        System.assertNotEquals(null, error);
-        System.assertEquals(true, error.contains('429'));
-        System.assertEquals(true, error.contains('Too many requests'));
-    }
-
-    private static Map<String, HttpCalloutMock> getSlackChannelsByQueryFailedByToManyRequests(String query) {
-        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
-        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
-            429,
-            'OK',
-            'Too many requests'
-        );
-        String endpoint = ConfigUtil.SLACK_CONVERSATION_INFO_ENDPOINT + '?channel=' + query;
-        result.put(endpoint, singleRequestMock);
-        return result;
-    }
-
-    @IsTest
-    private static void test_get_slack_channels_by_query_found_success() {
-        test_get_slack_channels_by_query_success(true);
-    }
-
-    @IsTest
-    private static void test_get_slack_channels_by_query_not_found_success() {
-        test_get_slack_channels_by_query_success(false);
-    }
-
-    private static void test_get_slack_channels_by_query_success(Boolean foundChannelSuccess) {
-        String resp;
-        String query = SLACK_CHANNEL_NAME;
-        TestDataFactory.createSlackSettings();
-
-        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(getSlackChannelsByQuery(query, foundChannelSuccess));
-        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-        Test.startTest();
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'getSlackChannels',
-            'data' => query
-        };
-        resp = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-
-        System.assertNotEquals(null, resp);
-        Map<String, Object> respAction = (Map<String, Object>)JSON.deserializeUntyped(resp);
-        Map<String, Object> data = (Map<String, Object>)respAction.get('data');
-        System.assertNotEquals(null, data);
-
-        SlackService.SlackChannelsResponse methodReps = (SlackService.SlackChannelsResponse)JSON.deserialize(JSON.serialize(data), SlackService.SlackChannelsResponse.class);
-        System.assertEquals(true, methodReps.ok);
-
-        if(foundChannelSuccess) {
-            System.assertNotEquals(true, methodReps.channels.isEmpty());
-            System.assertEquals(SLACK_CHANNEL_ID, methodReps.channels.get(0).id);
-            System.assertEquals(SLACK_CHANNEL_NAME, methodReps.channels.get(0).name);
-        }
-        else {
-            System.assertEquals(true, methodReps.channels.isEmpty());
-        }
-    }
-
-    private static Map<String, HttpCalloutMock> getSlackChannelsByQuery(String query, Boolean foundChannelSuccess) {
-        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
-
-        SlackService.SlackChannelResponse resp = new SlackService.SlackChannelResponse();
-        resp.ok = true;
-
-        SlackService.SlackChannel channel1 = new SlackService.SlackChannel();
-        channel1.id = SLACK_CHANNEL_ID;
-        channel1.name = SLACK_CHANNEL_NAME;
-        resp.channel = foundChannelSuccess ? channel1 : null;
-
-        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
-            200,
-            'OK',
-            JSON.serialize(resp)
-        );
-        String endpoint = ConfigUtil.SLACK_CONVERSATION_INFO_ENDPOINT + '?channel=' + query;
-        result.put(endpoint, singleRequestMock);
-        return result;
-    }
-
-    @IsTest
-    private static void test_get_slack_channels_retrieve_all_success() {
-        test_get_slack_channels_retrieve_success(SLACK_CHANNEL_EMPTY_CURSOR);
-    }
-
-    @IsTest
-    private static void test_get_slack_channels_retrieve_by_cursor_success() {
-        test_get_slack_channels_retrieve_success(SLACK_CHANNEL_NEXT_CURSOR);
-    }
-
-    private static final String SLACK_CHANNEL_ID = 'C1AD0CDA4';
-    private static final String SLACK_CHANNEL_NAME = 'Test Pharos Channel';
-    private static final String SLACK_CHANNEL_NEXT_CURSOR = 'dGVhbTpDUlBKVzFRVEM=';
-    private static final String SLACK_CHANNEL_EMPTY_CURSOR = null;
-
-
-    private static void test_get_slack_channels_retrieve_success(String cursor) {
-        String resp;
-        TestDataFactory.createSlackSettings();
-
-        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(getSlackChannelsByCursor(cursor));
-        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-        Test.startTest();
-        Map<String, Object> payload = new Map<String, Object>{
-            'method' => 'getSlackChannels',
-            'data' => cursor
-        };
-        resp = AdminController.remoteActionHandler(JSON.serialize(payload));
-        Test.stopTest();
-
-        System.assertNotEquals(null, resp);
-        Map<String, Object> respAction = (Map<String, Object>)JSON.deserializeUntyped(resp);
-        Map<String, Object> data = (Map<String, Object>)respAction.get('data');
-        System.assertNotEquals(null, data);
-
-        SlackService.SlackChannelsResponse methodReps = (SlackService.SlackChannelsResponse)JSON.deserialize(JSON.serialize(data), SlackService.SlackChannelsResponse.class);
-        System.assertEquals(true, methodReps.ok);
-        System.assertNotEquals(true, methodReps.channels.isEmpty());
-        System.assertEquals(SLACK_CHANNEL_ID, methodReps.channels.get(0).id);
-        System.assertEquals(SLACK_CHANNEL_NAME, methodReps.channels.get(0).name);
-        System.assertNotEquals(null, methodReps.response_metadata.next_cursor);
-    }
-
-    private static Map<String, HttpCalloutMock> getSlackChannelsByCursor(String cursor) {
-        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
-
-        SlackService.SlackChannelsResponse resp = new SlackService.SlackChannelsResponse();
-        resp.channels = new List<SlackService.SlackChannel>();
-        resp.ok = true;
-        resp.response_metadata = new SlackService.SlackChannelsResponseMetadata();
-        resp.response_metadata.next_cursor = SLACK_CHANNEL_NEXT_CURSOR;
-
-        SlackService.SlackChannel channel1 = new SlackService.SlackChannel();
-        channel1.id = SLACK_CHANNEL_ID;
-        channel1.name = SLACK_CHANNEL_NAME;
-        resp.channels.add(channel1);
-
-        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
-            200,
-            'OK',
-            JSON.serialize(resp)
-        );
-        String endpoint = String.isNotBlank(cursor) ? (ConfigUtil.SLACK_CONVERSATION_LIST_ENDPOINT + '&cursor=' + cursor) : ConfigUtil.SLACK_CONVERSATION_LIST_ENDPOINT;
-        result.put(endpoint, singleRequestMock);
-        return result;
-    }
-
-    @IsTest
     private static void testParseGitRepositoryUrl() {
         String testString = 'https://github.com/dima2024test/1.901private.git';
-        List<String> res = AdminService.getOwnerAndRepositoryNameFromUrl(testString);
+        List<String> res = GitHubUtils.getOwnerAndRepositoryNameFromUrl(testString);
         System.assertEquals('dima2024test', res.get(0));
         System.assertEquals('1.901private', res.get(1));
 
         testString = 'https://github.com/dima20---..git24test/1---9.01.gitprivate.git';
-        res = AdminService.getOwnerAndRepositoryNameFromUrl(testString);
+        res = GitHubUtils.getOwnerAndRepositoryNameFromUrl(testString);
         System.assertEquals('dima20---..git24test', res.get(0));
         System.assertEquals('1---9.01.gitprivate', res.get(1));
     }
@@ -3396,6 +2734,206 @@ public class Test_AdminController {
         Test.stopTest();
 
         Assert.isTrue((Boolean) response.get('data'));
+    }
+
+    @IsTest
+    static void test_RemoteAction_createEmailService_disableParam() {
+        List<Id> emailServicesFunctionFakeIds = TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1);
+        EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
+            null,
+            TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1),
+            null
+        );
+
+        AdminService.emailServicesSelector = (EmailServicesSelector) Test.createStub(
+            EmailServicesSelector.class,
+            emailServicesSelectorMock
+        );
+        
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(getUpdateEmailServicesFunctionMock(emailServicesFunctionFakeIds.get(0))));
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'createEmailService',
+                'data' => new Map<String, Object>{
+                    ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => false
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.areNotEqual(null, response);
+    }
+
+    @IsTest
+    static void test_RemoteAction_createEmailService_enableParam_WithoutExistingServices() {
+        EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
+            null,
+            null,
+            null
+        );
+
+        AdminService.emailServicesSelector = (EmailServicesSelector) Test.createStub(
+            EmailServicesSelector.class,
+            emailServicesSelectorMock
+        );
+
+        List<Id> emailServicesFunctionFakeIds = TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1);
+        List<Id> emailServicesAddressFakeIds = TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 1);
+
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesFunctionServiceMock.getCreateEmailServicesFunctionMock(emailServicesFunctionFakeIds.get(0)));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesAddressServiceMock.getCreateEmailServicesAddressMock(emailServicesAddressFakeIds.get(0)));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.apexEmailNotificationServiceMock.getCreateApexEmailNotificationMock());
+
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'createEmailService',
+                'data' => new Map<String, Object>{
+                    ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => true
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.areNotEqual(null, response);
+    }
+
+    @IsTest
+    static void test_RemoteAction_createEmailService_enableParam_WithAllExistingServices() { 
+        List<Id> apexEmailNotificationFakeIds = TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 1);
+        List<Id> emailServicesFunctionFakeIds = TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1);
+        List<Id> emailServicesAddressFakeIds = TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 2);
+
+        EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
+            apexEmailNotificationFakeIds,
+            emailServicesFunctionFakeIds,
+            emailServicesAddressFakeIds
+        );
+
+        emailServicesSelectorMock.setEmailServicesAddressIsActive(false);
+
+        AdminService.emailServicesSelector = (EmailServicesSelector) Test.createStub(
+            EmailServicesSelector.class,
+            emailServicesSelectorMock
+        );
+
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        endpoint2TestResp.putAll(getUpdateEmailServicesFunctionMock(emailServicesFunctionFakeIds.get(0)));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesAddressServiceMock.getUpdateEmailServicesAddressMocks(new List<Id>{ emailServicesAddressFakeIds.get(0) }));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesAddressServiceMock.getDeleteEmailServicesAddressMocks(new List<Id>{ emailServicesAddressFakeIds.get(1) }));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.apexEmailNotificationServiceMock.getUpdateApexEmailNotificationMock(apexEmailNotificationFakeIds.get(0)));
+
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'createEmailService',
+                'data' => new Map<String, Object>{
+                    ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => true
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.areNotEqual(null, response);
+    }
+
+    @IsTest
+    private static void test_RemoteAction_getQuickStartState() {
+        Logger_Settings__c loggerSettings = Logger_Settings__c.getOrgDefaults();
+        loggerSettings.Quick_Start_State__c = JSON.serialize(new AdminService.QuickStartStateWrapper());
+        upsert loggerSettings;
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+            
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'getQuickStartState',
+                'data' => ''
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        AdminService.QuickStartStateWrapper responseQuickStartStateWrapper = (AdminService.QuickStartStateWrapper) JSON.deserialize(
+            JSON.serialize(response.get('data')),
+            AdminService.QuickStartStateWrapper.class
+        );
+
+        Assert.isFalse(responseQuickStartStateWrapper.connectApp);
+        Assert.isFalse(responseQuickStartStateWrapper.connectOrg);
+        Assert.isFalse(responseQuickStartStateWrapper.quickTest);
+        Assert.isFalse(responseQuickStartStateWrapper.jira);
+        Assert.isFalse(responseQuickStartStateWrapper.slack);
+        Assert.isFalse(responseQuickStartStateWrapper.teams);
+        Assert.isFalse(responseQuickStartStateWrapper.monitoring);
+        Assert.isFalse(responseQuickStartStateWrapper.monitoringTestInProgress);
+        Assert.isFalse(responseQuickStartStateWrapper.isPassthrough);
+        Assert.isFalse(responseQuickStartStateWrapper.useTeams);
+        Assert.isFalse(responseQuickStartStateWrapper.useSlack);
+    }
+
+    @IsTest
+    private static void test_RemoteAction_setQuickStartState() {
+        Logger_Settings__c loggerSettings = Logger_Settings__c.getOrgDefaults();
+        loggerSettings.Quick_Start_State__c = JSON.serialize(new AdminService.QuickStartStateWrapper());
+        upsert loggerSettings;
+
+        AdminService.QuickStartStateWrapper quickStartStateWrapper = new AdminService.QuickStartStateWrapper();
+        quickStartStateWrapper.connectApp = true;
+        quickStartStateWrapper.connectOrg = true;
+
+        Map<String, Object> response = new Map<String, Object>();
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'setQuickStartState',
+                'data' => quickStartStateWrapper
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        AdminService.QuickStartStateWrapper responseQuickStartStateWrapper = (AdminService.QuickStartStateWrapper) JSON.deserialize(
+            JSON.serialize(response.get('data')),
+            AdminService.QuickStartStateWrapper.class
+        );
+
+        Assert.isTrue(responseQuickStartStateWrapper.connectApp);
+        Assert.isTrue(responseQuickStartStateWrapper.connectOrg);
+        Assert.isFalse(responseQuickStartStateWrapper.quickTest);
+        Assert.isFalse(responseQuickStartStateWrapper.jira);
+        Assert.isFalse(responseQuickStartStateWrapper.slack);
+        Assert.isFalse(responseQuickStartStateWrapper.teams);
+        Assert.isFalse(responseQuickStartStateWrapper.monitoring);
+        Assert.isFalse(responseQuickStartStateWrapper.monitoringTestInProgress);
+        Assert.isFalse(responseQuickStartStateWrapper.isPassthrough);
+        Assert.isFalse(responseQuickStartStateWrapper.useTeams);
+        Assert.isFalse(responseQuickStartStateWrapper.useSlack);
     }
 
     @IsTest
@@ -4207,5 +3745,1078 @@ public class Test_AdminController {
             }
                 
         }
+    }
+
+    // ========================================
+    // AZURE DEVOPS TEST CASES
+    // ========================================
+
+    @IsTest
+    static void test_azure_devops_get_organization_processes_work_item_types() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test with mock data
+        List<AzureService.AzureDevOpsProcessWorkItemType> result = AzureService.getOrganizationProcessesWorkItemTypes('test-org', 'test-process');
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(0, result.size(), 'Should return mock work item types');
+    }
+
+    @IsTest
+    static void test_azure_devops_get_organization_processes_work_item_types_with_validation() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test with validation parameters
+        List<AzureService.AzureDevOpsProcessWorkItemType> result = AzureService.getOrganizationProcessesWorkItemTypesWithValidation(
+            'test-org', 'test-process', 'test-project', 'test-team', 'test-board'
+        );
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(0, result.size(), 'Should return mock work item types with validation');
+    }
+
+    @IsTest
+    static void test_azure_devops_get_azure_dev_ops_work_item_types_with_validation() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test the underlying method directly with organization parameter
+        String organization = 'test-org';
+        String projectId = 'test-project';
+        String teamId = 'test-team';
+        String boardId = 'test-board';
+
+        // Get process ID for the project
+        List<AzureService.AzureDevOpsProjectProperty> projectProperties = AzureService.getOrganizationProjectProperties(organization, projectId);
+        String processId = null;
+        for (AzureService.AzureDevOpsProjectProperty prop : projectProperties) {
+            if (prop.name == AzureService.AZURE_DEVOPS_PROCESS_TEMPLATE_TYPE) {
+                processId = prop.value;
+                break;
+            }
+        }
+
+        // Test the validation method directly
+        List<AzureService.AzureDevOpsProcessWorkItemType> result = AzureService.getOrganizationProcessesWorkItemTypesWithValidation(organization, processId, projectId, teamId, boardId);
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(0, result.size(), 'Should return mock work item types');
+    }
+
+    @IsTest
+    static void test_azure_devops_get_team_boards() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test getting team boards
+        List<AzureService.AzureDevOpsBoardReference> result = AzureService.getTeamBoards('test-org', 'test-project', 'test-team');
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(0, result.size(), 'Should return mock team boards');
+    }
+
+    @IsTest
+    static void test_azure_devops_get_project_teams() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test getting project teams directly with organization parameter
+        String organization = 'test-org';
+        String projectId = 'test-project';
+
+        List<AzureService.AzureDevOpsTeam> result = AzureService.getProjectTeams(organization, projectId);
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(0, result.size(), 'Should return mock project teams');
+    }
+
+    @IsTest
+    static void test_azure_devops_get_project_team_member_wrapper() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsTeamMembersMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test getting team members directly with organization parameter
+        String organization = 'test-org';
+        String projectId = 'test-project';
+        String teamId = 'test-team';
+        String skip = '0';
+
+        AzureService.AzureDevOpsTeamMemberWrapper result = AzureService.getProjectTeamMemberWrapper(organization, projectId, teamId, skip);
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.count, 'Team member count should not be null');
+    }
+
+    @IsTest
+    static void test_azure_devops_get_work_item_types() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test getting work item types directly with organization parameter
+        String organization = 'test-org';
+        String projectId = 'test-project';
+
+        List<AzureService.AzureDevOpsWorkItemType> result = AzureService.getWorkItemTypes(organization, projectId);
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(0, result.size(), 'Should return mock work item types');
+    }
+
+    @IsTest
+    static void test_azure_devops_validate_work_item_type_configuration() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test configuration validation
+        AzureService.AzureDevOpsConfigurationValidationResult result = AzureService.validateWorkItemTypeConfiguration(
+            'test-org', 'test-project', 'test-process', 'test-team', 'test-board'
+        );
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.isValid, 'isValid should not be null');
+        System.assertNotEquals(null, result.filteredWorkItemTypes, 'filteredWorkItemTypes should not be null');
+    }
+
+    @IsTest
+    static void test_azure_devops_validate_team_access() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test team access validation - this method is private, so we test through the main validation method
+        AzureService.AzureDevOpsConfigurationValidationResult result = AzureService.validateWorkItemTypeConfiguration(
+            'test-org', 'test-project', 'test-process', 'test-team', 'test-board'
+        );
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.teamAccessValidation, 'teamAccessValidation should not be null');
+    }
+
+    @IsTest
+    static void test_azure_devops_validate_board_configuration() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test board configuration validation - this method is private, so we test through the main validation method
+        AzureService.AzureDevOpsConfigurationValidationResult result = AzureService.validateWorkItemTypeConfiguration(
+            'test-org', 'test-project', 'test-process', 'test-team', 'test-board'
+        );
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.boardConfigurationValidation, 'boardConfigurationValidation should not be null');
+    }
+
+    @IsTest
+    static void test_azure_devops_is_work_item_type_allowed_in_board() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test work item type board filtering - this method is private, so we test through the main validation method
+        AzureService.AzureDevOpsConfigurationValidationResult result = AzureService.validateWorkItemTypeConfiguration(
+            'test-org', 'test-project', 'test-process', 'test-team', 'test-board'
+        );
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.filteredWorkItemTypes, 'filteredWorkItemTypes should not be null');
+    }
+
+    @IsTest
+    static void test_azure_devops_is_work_item_type_hidden_by_backlog_visibility() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test backlog visibility filtering - this method is private, so we test through the main validation method
+        AzureService.AzureDevOpsConfigurationValidationResult result = AzureService.validateWorkItemTypeConfiguration(
+            'test-org', 'test-project', 'test-process', 'test-team', 'test-board'
+        );
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.teamAccessValidation, 'teamAccessValidation should not be null');
+    }
+
+    @IsTest
+    static void test_azure_devops_is_work_item_type_hidden_by_team_settings() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test team settings filtering - this method is private, so we test through the main validation method
+        AzureService.AzureDevOpsConfigurationValidationResult result = AzureService.validateWorkItemTypeConfiguration(
+            'test-org', 'test-project', 'test-process', 'test-team', 'test-board'
+        );
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.teamAccessValidation, 'teamAccessValidation should not be null');
+    }
+
+    @IsTest
+    static void test_azure_devops_is_work_item_type_in_category() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test category checking - this method is private, so we test through the main validation method
+        AzureService.AzureDevOpsConfigurationValidationResult result = AzureService.validateWorkItemTypeConfiguration(
+            'test-org', 'test-project', 'test-process', 'test-team', 'test-board'
+        );
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.filteredWorkItemTypes, 'filteredWorkItemTypes should not be null');
+    }
+
+    @IsTest
+    static void test_azure_devops_apply_custom_filtering() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test custom filtering - this method is private, so we test through the main validation method
+        AzureService.AzureDevOpsConfigurationValidationResult result = AzureService.validateWorkItemTypeConfiguration(
+            'test-org', 'test-project', 'test-process', 'test-team', 'test-board'
+        );
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.filteredWorkItemTypes, 'filteredWorkItemTypes should not be null');
+    }
+
+    @IsTest
+    static void test_azure_devops_get_organization_project_properties() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test getting project properties
+        List<AzureService.AzureDevOpsProjectProperty> result = AzureService.getOrganizationProjectProperties('test-org', 'test-project');
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(0, result.size(), 'Should return mock project properties');
+    }
+
+    @IsTest
+    static void test_azure_devops_remote_action_handler() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        mocks.putAll(getAzureDevOpsTeamMembersMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test Azure DevOps remote action methods
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getAzureDevOpsWorkItemTypesWithValidation',
+            'data' => new Map<String, Object>{
+                'projectId' => 'test-project',
+                'teamId' => 'test-team',
+                'boardId' => 'test-board'
+            }
+        };
+
+        String result = AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+
+        // Test getting project teams
+        payload = new Map<String, Object>{
+            'method' => 'getProjectTeams',
+            'data' => new Map<String, Object>{
+                'projectId' => 'test-project'
+            }
+        };
+
+        result = AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+
+        // Test getting team members
+        payload = new Map<String, Object>{
+            'method' => 'getProjectTeamMemberWrapper',
+            'data' => new Map<String, Object>{
+                'projectId' => 'test-project',
+                'teamId' => 'test-team',
+                'skip' => '0'
+            }
+        };
+
+        result = AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+
+        // Test getting work item types
+        payload = new Map<String, Object>{
+            'method' => 'getWorkItemTypes',
+            'data' => new Map<String, Object>{
+                'projectId' => 'test-project'
+            }
+        };
+
+        result = AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+    }
+
+    @IsTest
+    static void test_azure_devops_constants() {
+        Test.startTest();
+
+        // Test that all constants are properly defined
+        System.assertNotEquals(null, AzureService.WORK_ITEM_TYPE_BUG, 'BUG constant should be defined'); 
+        System.assertNotEquals(null, AzureService.BUGS_BEHAVIOR_AS_TASKS, 'BUGS_BEHAVIOR_AS_TASKS constant should be defined');
+        System.assertNotEquals(null, AzureService.BUGS_BEHAVIOR_OFF, 'BUGS_BEHAVIOR_OFF constant should be defined');
+
+        Test.stopTest();
+    }
+
+    @IsTest
+    static void test_azure_devops_error_handling() {
+        Test.startTest();
+
+        // Test error handling with invalid parameters
+        Map<String, Object> data = new Map<String, Object>{
+            'projectId' => null,
+            'teamId' => null
+        };
+
+        List<AzureService.AzureDevOpsProcessWorkItemType> result = AzureService.getAzureDevOpsWorkItemTypesWithValidation(data);
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null even with invalid parameters');
+        System.assertEquals(0, result.size(), 'Should return empty list with invalid parameters');
+    }
+
+    @IsTest
+    static void test_azure_devops_parameter_constants() {
+        Test.startTest();
+
+        // Test parameter constants
+        System.assertNotEquals(null, AzureService.PARAM_PROJECT_ID, 'PROJECT_ID parameter should be defined');
+        System.assertNotEquals(null, AzureService.PARAM_TEAM_ID, 'TEAM_ID parameter should be defined');
+        System.assertNotEquals(null, AzureService.PARAM_BOARD_ID, 'BOARD_ID parameter should be defined');
+
+        Test.stopTest();
+    }
+
+    @IsTest
+    static void test_azure_devops_json_field_constants() {
+        Test.startTest();
+
+        // Test JSON field constants
+        System.assertNotEquals(null, AzureService.JSON_FIELD_COLUMNS, 'COLUMNS JSON field should be defined');
+        System.assertNotEquals(null, AzureService.JSON_FIELD_STATE_MAPPINGS, 'STATE_MAPPINGS JSON field should be defined');
+        System.assertNotEquals(null, AzureService.JSON_FIELD_ALLOWED_MAPPINGS, 'ALLOWED_MAPPINGS JSON field should be defined');
+        System.assertNotEquals(null, AzureService.JSON_FIELD_ID, 'ID JSON field should be defined');
+        System.assertNotEquals(null, AzureService.JSON_FIELD_NAME, 'NAME JSON field should be defined');
+        System.assertNotEquals(null, AzureService.JSON_FIELD_BUGS_BEHAVIOR, 'BUGS_BEHAVIOR JSON field should be defined');
+
+        Test.stopTest();
+    }
+
+    @IsTest
+    static void test_azure_devops_board_mapping_constants() {
+        Test.startTest();
+
+        // Test board mapping constants
+        System.assertNotEquals(null, AzureService.BOARD_MAPPING_INCOMING, 'INCOMING board mapping should be defined');
+        System.assertNotEquals(null, AzureService.BOARD_MAPPING_IN_PROGRESS, 'IN_PROGRESS board mapping should be defined');
+        System.assertNotEquals(null, AzureService.BOARD_MAPPING_OUTGOING, 'OUTGOING board mapping should be defined');
+
+        Test.stopTest();
+    }
+
+    @IsTest
+    static void test_azure_devops_work_item_type_field_constants() {
+        Test.startTest();
+
+        // Test work item type field constants
+        System.assertNotEquals(null, AzureService.WORK_ITEM_TYPE_FIELD_ASSIGNED_TO, 'ASSIGNED_TO field should be defined');
+        System.assertNotEquals(null, AzureService.WORK_ITEM_TYPE_FIELD_TITLE, 'TITLE field should be defined');
+        System.assertNotEquals(null, AzureService.WORK_ITEM_TYPE_FIELD_DESCRIPTION, 'DESCRIPTION field should be defined');
+        System.assertNotEquals(null, AzureService.WORK_ITEM_TYPE_FIELD_PRIORITY, 'PRIORITY field should be defined');
+        System.assertNotEquals(null, AzureService.WORK_ITEM_TYPE_FIELD_TAG, 'TAG field should be defined');
+        System.assertNotEquals(null, AzureService.WORK_ITEM_TYPE_FIELD_ITERATION, 'ITERATION field should be defined');
+        System.assertNotEquals(null, AzureService.WORK_ITEM_TYPE_FIELD_AREA, 'AREA field should be defined');
+        System.assertNotEquals(null, AzureService.WORK_ITEM_TYPE_FIELD_RELATED_LINK, 'RELATED_LINK field should be defined');
+        System.assertNotEquals(null, AzureService.WORK_ITEM_TYPE_FIELD_RELATED_CHILD_LINK, 'RELATED_CHILD_LINK field should be defined');
+        System.assertNotEquals(null, AzureService.WORK_ITEM_TYPE_FIELD_RELATED_PARENT_LINK, 'RELATED_PARENT_LINK field should be defined');
+
+        Test.stopTest();
+    }
+
+    @IsTest
+    static void test_azure_devops_api_endpoint_constants() {
+        Test.startTest();
+
+        // Test API endpoint constants
+        System.assertNotEquals(null, AzureService.AZURE_DEVOPS_REST_API_PROJECT_PROPERTIES, 'PROJECT_PROPERTIES API endpoint should be defined');
+        System.assertNotEquals(null, AzureService.AZURE_DEVOPS_REST_API_TEAMS, 'TEAMS API endpoint should be defined');
+        System.assertNotEquals(null, AzureService.AZURE_DEVOPS_REST_API_TEAM_MEMBERS, 'TEAM_MEMBERS API endpoint should be defined');
+        System.assertNotEquals(null, AzureService.AZURE_DEVOPS_REST_API_TEAM_SETTINGS, 'TEAM_SETTINGS API endpoint should be defined');
+        System.assertNotEquals(null, AzureService.AZURE_DEVOPS_REST_API_BOARDS, 'BOARDS API endpoint should be defined');
+        System.assertNotEquals(null, AzureService.AZURE_DEVOPS_REST_API_BOARD_SETTINGS, 'BOARD_SETTINGS API endpoint should be defined');
+
+        Test.stopTest();
+    }
+
+    @IsTest
+    static void test_azure_devops_comprehensive_validation() {
+        // Setup HTTP mocks
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getAzureDevOpsProcessesMock());
+        mocks.putAll(getAzureDevOpsWorkItemTypesMock());
+        mocks.putAll(getAzureDevOpsProjectPropertiesMock());
+        mocks.putAll(getAzureDevOpsTeamsMock());
+        mocks.putAll(getAzureDevOpsTeamSettingsMock());
+        mocks.putAll(getAzureDevOpsBoardsMock());
+        mocks.putAll(getAzureDevOpsBoardSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Test.startTest();
+
+        // Test comprehensive validation with all components
+        String organization = 'test-org';
+        String projectId = 'test-project';
+        String processId = 'test-process';
+        String teamId = 'test-team';
+        String boardId = 'test-board';
+
+        // Test validation with all parameters
+        AzureService.AzureDevOpsConfigurationValidationResult result = AzureService.validateWorkItemTypeConfiguration(
+            organization, projectId, processId, teamId, boardId
+        );
+
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Validation result should not be null');
+        System.assertNotEquals(null, result.isValid, 'isValid should not be null');
+        System.assertNotEquals(null, result.totalWorkItemTypes, 'totalWorkItemTypes should not be null');
+        System.assertNotEquals(null, result.filteredWorkItemTypeCount, 'filteredWorkItemTypeCount should not be null');
+        System.assertNotEquals(null, result.filteredWorkItemTypes, 'filteredWorkItemTypes should not be null');
+        System.assertNotEquals(null, result.teamAccessValidation, 'teamAccessValidation should not be null');
+        System.assertNotEquals(null, result.boardConfigurationValidation, 'boardConfigurationValidation should not be null');
+    }
+
+    @isTest
+    static void test_splitTeamIdAndBoardId() {
+        String teamIdAndBoardId = 'teamId;boardId';
+        String teamId = RuleUtil.getAzureDevOpsTeamId(teamIdAndBoardId);
+        String boardId = RuleUtil.getAzureDevOpsBoardId(teamIdAndBoardId);
+        System.assertEquals('teamId', teamId);
+        System.assertEquals('boardId', boardId);
+
+        teamIdAndBoardId = 'teamId';
+        teamId = RuleUtil.getAzureDevOpsTeamId(teamIdAndBoardId);
+        boardId = RuleUtil.getAzureDevOpsBoardId(teamIdAndBoardId);
+        System.assertEquals('teamId', teamId);
+        System.assertEquals(null, boardId);
+
+        teamIdAndBoardId = '';
+        teamId = RuleUtil.getAzureDevOpsTeamId(teamIdAndBoardId);
+        boardId = RuleUtil.getAzureDevOpsBoardId(teamIdAndBoardId);
+        System.assertEquals(null, teamId);
+        System.assertEquals(null, boardId);
+
+        teamIdAndBoardId = null;
+        teamId = RuleUtil.getAzureDevOpsTeamId(teamIdAndBoardId);
+        boardId = RuleUtil.getAzureDevOpsBoardId(teamIdAndBoardId);
+        System.assertEquals(null, teamId);
+        System.assertEquals(null, boardId);
+    }
+
+    // ========================================
+    // AZURE DEVOPS HTTP MOCK METHODS
+    // ========================================
+
+    private static Map<String, HttpCalloutMock> getAzureDevOpsProcessesMock() {
+        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
+
+        // Mock processes response
+        Map<String, Object> processesResponse = new Map<String, Object>{
+            'count' => 1,
+            'value' => new List<Object>{
+                new Map<String, Object>{
+                    'typeId' => 'test-process-id',
+                    'name' => 'Test Process',
+                    'description' => 'Test Process Description',
+                    'isDefault' => true,
+                    'type' => 'system'
+                }
+            }
+        };
+
+        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(processesResponse)
+        );
+
+        String endpoint = 'https://dev.azure.com/test-org/_apis/process/processes?api-version=7.0';
+        result.put(endpoint, singleRequestMock);
+
+        return result;
+    }
+
+    private static Map<String, HttpCalloutMock> getAzureDevOpsWorkItemTypesMock() {
+        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
+
+        // Mock work item types response
+        Map<String, Object> workItemTypesResponse = new Map<String, Object>{
+            'count' => 3,
+            'value' => new List<Object>{
+                new Map<String, Object>{
+                    'name' => 'User Story',
+                    'referenceName' => 'System.UserStory',
+                    'description' => 'User Story work item type',
+                    'color' => '009688',
+                    'icon' => 'icon_story',
+                    'customization' => 'inherited',
+                    'inherits' => 'System.UserStory',
+                    'isDefault' => true,
+                    'isDisabled' => false,
+                    'url' => 'https://dev.azure.com/test-org/_apis/work/processes/test-process/workitemtypes/System.UserStory'
+                },
+                new Map<String, Object>{
+                    'name' => 'Bug',
+                    'referenceName' => 'System.Bug',
+                    'description' => 'Bug work item type',
+                    'color' => 'cc293d',
+                    'icon' => 'icon_bug',
+                    'customization' => 'inherited',
+                    'inherits' => 'System.Bug',
+                    'isDefault' => false,
+                    'isDisabled' => false,
+                    'url' => 'https://dev.azure.com/test-org/_apis/work/processes/test-process/workitemtypes/System.Bug'
+                },
+                new Map<String, Object>{
+                    'name' => 'Task',
+                    'referenceName' => 'System.Task',
+                    'description' => 'Task work item type',
+                    'color' => 'ff8c00',
+                    'icon' => 'icon_task',
+                    'customization' => 'inherited',
+                    'inherits' => 'System.Task',
+                    'isDefault' => false,
+                    'isDisabled' => false,
+                    'url' => 'https://dev.azure.com/test-org/_apis/work/processes/test-process/workitemtypes/System.Task'
+                }
+            }
+        };
+
+        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(workItemTypesResponse)
+        );
+
+        String endpoint = 'https://dev.azure.com/test-org/_apis/work/processes/test-process/workitemtypes?api-version=7.0';
+        result.put(endpoint, singleRequestMock);
+
+        // Mock work item types for test-process-id (used in the test)
+        String testProcessIdEndpoint = 'https://dev.azure.com/test-org/_apis/work/processes/test-process-id/workitemtypes?api-version=7.0';
+        result.put(testProcessIdEndpoint, singleRequestMock);
+
+        // Mock project work item types
+        String projectEndpoint = 'https://dev.azure.com/test-org/test-project/_apis/wit/workitemtypes?api-version=7.0';
+        result.put(projectEndpoint, singleRequestMock);
+
+        // Mock project work item types (different class structure)
+        Map<String, Object> projectWorkItemTypesResponse = new Map<String, Object>{
+            'count' => 3,
+            'value' => new List<Object>{
+                new Map<String, Object>{
+                    'name' => 'User Story',
+                    'referenceName' => 'System.UserStory',
+                    'description' => 'User Story work item type',
+                    'isDisabled' => false
+                },
+                new Map<String, Object>{
+                    'name' => 'Bug',
+                    'referenceName' => 'System.Bug',
+                    'description' => 'Bug work item type',
+                    'isDisabled' => false
+                },
+                new Map<String, Object>{
+                    'name' => 'Task',
+                    'referenceName' => 'System.Task',
+                    'description' => 'Task work item type',
+                    'isDisabled' => false
+                }
+            }
+        };
+
+        TestDataFactory.SingleRequestMock projectWorkItemTypesMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(projectWorkItemTypesResponse)
+        );
+
+        String projectWorkItemTypesEndpoint = 'https://dev.azure.com/test-org/test-project/_apis/wit/workitemtypes?api-version=7.0';
+        result.put(projectWorkItemTypesEndpoint, projectWorkItemTypesMock);
+
+        return result;
+    }
+
+    private static Map<String, HttpCalloutMock> getAzureDevOpsProjectPropertiesMock() {
+        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
+
+        // Mock project properties response
+        Map<String, Object> propertiesResponse = new Map<String, Object>{
+            'count' => 2,
+            'value' => new List<Object>{
+                new Map<String, Object>{
+                    'name' => 'System.ProcessTemplateType',
+                    'value' => 'test-process-id'
+                },
+                new Map<String, Object>{
+                    'name' => 'System.ProcessId',
+                    'value' => 'test-process-id'
+                }
+            }
+        };
+
+        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(propertiesResponse)
+        );
+
+        String endpoint = 'https://dev.azure.com/test-org/_apis/projects/test-project/properties?api-version=7.0-preview.1';
+        result.put(endpoint, singleRequestMock);
+
+        return result;
+    }
+
+    private static Map<String, HttpCalloutMock> getAzureDevOpsTeamsMock() {
+        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
+
+        // Mock teams response
+        Map<String, Object> teamsResponse = new Map<String, Object>{
+            'count' => 2,
+            'value' => new List<Object>{
+                new Map<String, Object>{
+                    'id' => 'test-team-id-1',
+                    'name' => 'Test Team 1',
+                    'url' => 'https://dev.azure.com/test-org/test-project/_apis/teams/test-team-id-1',
+                    'description' => 'Test Team 1 Description',
+                    'identityUrl' => 'https://dev.azure.com/test-org/test-project/_apis/teams/test-team-id-1',
+                    'projectName' => 'test-project',
+                    'projectId' => 'test-project-id'
+                },
+                new Map<String, Object>{
+                    'id' => 'test-team-id-2',
+                    'name' => 'Test Team 2',
+                    'url' => 'https://dev.azure.com/test-org/test-project/_apis/teams/test-team-id-2',
+                    'description' => 'Test Team 2 Description',
+                    'identityUrl' => 'https://dev.azure.com/test-org/test-project/_apis/teams/test-team-id-2',
+                    'projectName' => 'test-project',
+                    'projectId' => 'test-project-id'
+                }
+            }
+        };
+
+        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(teamsResponse)
+        );
+
+        String endpoint = 'https://dev.azure.com/test-org/_apis/projects/test-project/teams?api-version=7.0';
+        result.put(endpoint, singleRequestMock);
+
+        return result;
+    }
+
+    private static Map<String, HttpCalloutMock> getAzureDevOpsTeamSettingsMock() {
+        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
+
+        // Mock team settings response
+        Map<String, Object> teamSettingsResponse = new Map<String, Object>{
+            'bugsBehavior' => 'AsRequirements',
+            'workingDays' => new List<String>{'monday', 'tuesday', 'wednesday', 'thursday', 'friday'},
+            'defaultIterationMacro' => '@currentIteration',
+            'backlogVisibilities' => new Map<String, Object>{
+                'Microsoft.EpicCategory' => true,
+                'Microsoft.FeatureCategory' => true,
+                'Microsoft.RequirementCategory' => true
+            }
+        };
+
+        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(teamSettingsResponse)
+        );
+
+        String endpoint = 'https://dev.azure.com/test-org/test-project/test-team/_apis/work/teamsettings?api-version=7.0';
+        result.put(endpoint, singleRequestMock);
+
+        return result;
+    }
+
+    private static Map<String, HttpCalloutMock> getAzureDevOpsBoardsMock() {
+        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
+
+        // Mock boards response
+        Map<String, Object> boardsResponse = new Map<String, Object>{
+            'count' => 2,
+            'value' => new List<Object>{
+                new Map<String, Object>{
+                    'id' => 'test-board-id-1',
+                    'name' => 'Test Board 1',
+                    'url' => 'https://dev.azure.com/test-org/test-project/test-team/_apis/work/boards/test-board-id-1'
+                },
+                new Map<String, Object>{
+                    'id' => 'test-board-id-2',
+                    'name' => 'Test Board 2',
+                    'url' => 'https://dev.azure.com/test-org/test-project/test-team/_apis/work/boards/test-board-id-2'
+                }
+            }
+        };
+
+        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(boardsResponse)
+        );
+
+        String endpoint = 'https://dev.azure.com/test-org/test-project/test-team/_apis/work/boards?api-version=7.0';
+        result.put(endpoint, singleRequestMock);
+
+        return result;
+    }
+
+    private static Map<String, HttpCalloutMock> getAzureDevOpsBoardSettingsMock() {
+        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
+
+        // Mock board settings response
+        Map<String, Object> boardSettingsResponse = new Map<String, Object>{
+            'id' => 'test-board-id-1',
+            'name' => 'Test Board 1',
+            'url' => 'https://dev.azure.com/test-org/test-project/test-team/_apis/work/boards/test-board-id-1',
+            'columns' => new List<Object>{
+                new Map<String, Object>{
+                    'id' => 'column-1',
+                    'name' => 'New',
+                    'itemLimit' => 0,
+                    'stateMappings' => new Map<String, String>{
+                        'User Story' => 'New',
+                        'Bug' => 'New',
+                        'Task' => 'New'
+                    },
+                    'columnType' => 'incoming'
+                },
+                new Map<String, Object>{
+                    'id' => 'column-2',
+                    'name' => 'Active',
+                    'itemLimit' => 5,
+                    'stateMappings' => new Map<String, String>{
+                        'User Story' => 'Active',
+                        'Bug' => 'Active',
+                        'Task' => 'Active'
+                    },
+                    'columnType' => 'inProgress'
+                },
+                new Map<String, Object>{
+                    'id' => 'column-3',
+                    'name' => 'Closed',
+                    'itemLimit' => 0,
+                    'stateMappings' => new Map<String, String>{
+                        'User Story' => 'Closed',
+                        'Bug' => 'Closed',
+                        'Task' => 'Closed'
+                    },
+                    'columnType' => 'outgoing'
+                }
+            },
+            'allowedMappings' => new Map<String, Object>{
+                'Incoming' => new Map<String, List<String>>{
+                    'User Story' => new List<String>{'New'},
+                    'Bug' => new List<String>{'New'},
+                    'Task' => new List<String>{'New'}
+                },
+                'InProgress' => new Map<String, List<String>>{
+                    'User Story' => new List<String>{'Active', 'New'},
+                    'Bug' => new List<String>{'Active', 'New'},
+                    'Task' => new List<String>{'Active', 'New'}
+                },
+                'Outgoing' => new Map<String, List<String>>{
+                    'User Story' => new List<String>{'Closed'},
+                    'Bug' => new List<String>{'Closed'},
+                    'Task' => new List<String>{'Closed'}
+                }
+            }
+        };
+
+        TestDataFactory.SingleRequestMock boardSettingsMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(boardSettingsResponse)
+        );
+
+        String endpoint = 'https://dev.azure.com/test-org/test-project/test-team/_apis/work/boards/test-board-id-1?api-version=7.0';
+        result.put(endpoint, boardSettingsMock);
+
+        // Mock board columns response
+        Map<String, Object> boardColumnsResponse = new Map<String, Object>{
+            'count' => 3,
+            'value' => new List<Object>{
+                new Map<String, Object>{
+                    'id' => 'column-1',
+                    'name' => 'New',
+                    'itemLimit' => 0,
+                    'columnType' => 'incoming',
+                    'workItemTypes' => new List<String>{'User Story', 'Bug', 'Task'}
+                },
+                new Map<String, Object>{
+                    'id' => 'column-2',
+                    'name' => 'Active',
+                    'itemLimit' => 5,
+                    'columnType' => 'inProgress',
+                    'workItemTypes' => new List<String>{'User Story', 'Bug', 'Task'}
+                },
+                new Map<String, Object>{
+                    'id' => 'column-3',
+                    'name' => 'Closed',
+                    'itemLimit' => 0,
+                    'columnType' => 'outgoing',
+                    'workItemTypes' => new List<String>{'User Story', 'Bug', 'Task'}
+                }
+            }
+        };
+
+        TestDataFactory.SingleRequestMock boardColumnsMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(boardColumnsResponse)
+        );
+
+        String boardColumnsEndpoint = 'https://dev.azure.com/test-org/test-project/test-team/_apis/work/boards/test-board-id-1/columns?api-version=7.0';
+        result.put(boardColumnsEndpoint, boardColumnsMock);
+
+        return result;
+    }
+
+    private static Map<String, HttpCalloutMock> getAzureDevOpsTeamMembersMock() {
+        Map<String, HttpCalloutMock> result = new Map<String, HttpCalloutMock>();
+
+        // Mock team members response
+        Map<String, Object> teamMembersResponse = new Map<String, Object>{
+            'count' => 2,
+            'value' => new List<Object>{
+                new Map<String, Object>{
+                    'identity' => new Map<String, Object>{
+                        'id' => 'test-user-id-1',
+                        'displayName' => 'Test User 1',
+                        'uniqueName' => 'testuser1@test.com',
+                        'url' => 'https://dev.azure.com/test-org/_apis/Identities/test-user-id-1',
+                        'imageUrl' => 'https://dev.azure.com/test-org/_apis/GraphProfile/MemberAvatars/test-user-id-1',
+                        'links' => null
+                    },
+                    'isTeamAdmin' => true
+                },
+                new Map<String, Object>{
+                    'identity' => new Map<String, Object>{
+                        'id' => 'test-user-id-2',
+                        'displayName' => 'Test User 2',
+                        'uniqueName' => 'testuser2@test.com',
+                        'url' => 'https://dev.azure.com/test-org/_apis/Identities/test-user-id-2',
+                        'imageUrl' => 'https://dev.azure.com/test-org/_apis/GraphProfile/MemberAvatars/test-user-id-2',
+                        'links' => null
+                    },
+                    'isTeamAdmin' => false
+                }
+            }
+        };
+
+        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(teamMembersResponse)
+        );
+
+        String endpoint = 'https://dev.azure.com/test-org/_apis/projects/test-project/teams/test-team/members?api-version=7.0';
+        result.put(endpoint, singleRequestMock);
+
+        return result;
     }
 }

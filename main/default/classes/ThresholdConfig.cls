@@ -9,24 +9,16 @@ public class ThresholdConfig implements System.Comparable {
         IS_IN
     }
 
-    public enum AnomalySeverity {
-        NORMAL,
-        WARNING,
-        CRITICAL
-    }
-
     public String eventType { get; private set; }
     public String metric { get; private set; }
-    public Object warningThreshold { get; private set; }
-    public Object criticalThreshold { get; private set; }
+    public Object threshold { get; private set; }
     public EvaluationType evaluationType { get; private set; }
 
-    // Constructor with various numeric types
-    public ThresholdConfig(String eventType, String metric, Object warning, Object critical, EvaluationType evalType) {
+    // Constructor with threshold only
+    public ThresholdConfig(String eventType, String metric, Object thresholdValue, EvaluationType evalType) {
         this.eventType = eventType;
         this.metric = metric;
-        this.warningThreshold = warning;
-        this.criticalThreshold = critical;
+        this.threshold = thresholdValue;
         this.evaluationType = evalType;
         validateConfig();
     }
@@ -46,22 +38,22 @@ public class ThresholdConfig implements System.Comparable {
         // Validate thresholds based on evaluation type
         switch on evaluationType {
             when NOT_NULL {
-                if (warningThreshold != null || criticalThreshold != null) {
+                if (threshold != null) {
                     throw new ThresholdConfigException('NOT_NULL evaluation type does not accept thresholds');
                 }
             }
             when IS_IN {
-                if (!(warningThreshold instanceof List<Object> || criticalThreshold instanceof List<Object>)) {
-                    throw new ThresholdConfigException('IS_IN evaluation type requires List thresholds');
+                if (!(threshold instanceof List<Object>)) {
+                    throw new ThresholdConfigException('IS_IN evaluation type requires List threshold');
                 }
             }
             when NOT_EQUALS {
                 // NOT_EQUALS can have null thresholds - no validation needed
             }
             when else {
-                // For all other types, at least one threshold must be specified
-                if (warningThreshold == null && criticalThreshold == null) {
-                    throw new ThresholdConfigException('At least one threshold must be specified for ' + evaluationType + ' evaluation type');
+                // For all other types, threshold must be specified
+                if (threshold == null) {
+                    throw new ThresholdConfigException('Threshold must be specified for ' + evaluationType + ' evaluation type');
                 }
             }
         }
@@ -82,34 +74,13 @@ public class ThresholdConfig implements System.Comparable {
             return true;
         }
 
-        // Skip if either threshold is null
-        if (warningThreshold == null || criticalThreshold == null) {
+        // Skip if threshold is null
+        if (threshold == null) {
             return true;
         }
 
-        try {
-            // Convert thresholds to comparable values
-            Double warningValue = toDouble(warningThreshold);
-            Double criticalValue = toDouble(criticalThreshold);
-
-            switch on evaluationType {
-                when GREATER_THAN {
-                    // For GREATER_THAN, warning should be less than critical
-                    return warningValue <= criticalValue;
-                }
-                when LESS_THAN {
-                    // For LESS_THAN, warning should be greater than critical
-                    return warningValue >= criticalValue;
-                }
-                when else {
-                    return false;
-                }
-            }
-        }
-        catch (Exception e) {
-            // If conversion fails, assume it's a non-numeric comparison
-            return true;
-        }
+        // With only threshold, no range validation needed
+        return true;
     }
 
     private Double toDouble(Object value) {
@@ -120,7 +91,11 @@ public class ThresholdConfig implements System.Comparable {
         } else if (value instanceof Double) {
             return (Double)value;
         } else if (value instanceof String) {
-            return Double.valueOf(value);
+            try {
+                return Double.valueOf(value);
+            } catch (TypeException e) {
+                throw new ThresholdConfigException('Cannot convert value to Double: ' + value);
+            }
         }
         throw new ThresholdConfigException('Cannot convert value to Double: ' + value);
     }
@@ -133,7 +108,7 @@ public class ThresholdConfig implements System.Comparable {
         return thisKey.compareTo(otherKey);
     }
 
-    public AnomalySeverity evaluateValue(Object value, EventLogProcessors.FieldMetadataConfig fieldMetadataConfig) {
+    public Boolean evaluateValue(Object value, EventLogProcessors.FieldMetadataConfig fieldMetadataConfig) {
         if(fieldMetadataConfig == null) {
             throw new ThresholdConfigException('FieldMetadataConfig is required to evaluate value');
         }
@@ -146,83 +121,94 @@ public class ThresholdConfig implements System.Comparable {
         
         String fieldType = fieldMetadataConfig?.getFieldType(metric)?.toLowerCase();
         if (fieldType == 'number') {
-            Double doubleValue = (value != null) ? Double.valueOf(value) : null;
-            Double criticalThreshold = (criticalThreshold != null) ? Double.valueOf(criticalThreshold) : null;
-            Double warningThreshold = (warningThreshold != null) ? Double.valueOf(warningThreshold) : null;
+            Double doubleValue = null;
+            Double thresholdDouble = null;
+            
+            try {
+                doubleValue = (value != null) ? toDouble(value) : null;
+                thresholdDouble = (threshold != null) ? toDouble(threshold) : null;
+            } catch (ThresholdConfigException e) {
+                // If any value cannot be converted to double, treat as non-numeric and return false
+                return false;
+            }
 
             switch on evaluationType {
                 when GREATER_THAN {
-                    if (doubleValue == null) return AnomalySeverity.NORMAL;
-                    if (doubleValue >= criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (doubleValue >= warningThreshold) return AnomalySeverity.WARNING;
+                    if (doubleValue == null) return false;
+                    if (thresholdDouble != null && doubleValue >= thresholdDouble) return true;
                 }
                 when LESS_THAN {
-                    if (doubleValue == null) return AnomalySeverity.NORMAL;
-                    if (doubleValue <= criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (doubleValue <= warningThreshold) return AnomalySeverity.WARNING;
+                    if (doubleValue == null) return false;
+                    if (thresholdDouble != null && doubleValue <= thresholdDouble) return true;
                 }
                 when EQUALS {
-                    if (doubleValue == criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (doubleValue == warningThreshold) return AnomalySeverity.WARNING;
+                    if (thresholdDouble != null && doubleValue == thresholdDouble) return true;
                 }
                 when NOT_EQUALS {
-                    if (doubleValue != criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (doubleValue != warningThreshold) return AnomalySeverity.WARNING;
+                    if (thresholdDouble != null && doubleValue != thresholdDouble) return true;
                 }
                 when NOT_NULL {
-                    if (doubleValue != null) return AnomalySeverity.CRITICAL;
+                    if (doubleValue != null) return true;
                 }
             }
         }
         else if (fieldType == 'boolean') {
             Boolean booleanValue = (value != null) ? Boolean.valueOf(value) : null;
-            Boolean criticalThreshold = (criticalThreshold != null) ? Boolean.valueOf(criticalThreshold) : null;
-            Boolean warningThreshold = (warningThreshold != null) ? Boolean.valueOf(warningThreshold) : null;
+            Boolean thresholdBoolean = (threshold != null) ? Boolean.valueOf(threshold) : null;
             switch on evaluationType {
                 when EQUALS {
-                    if (booleanValue == criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (booleanValue == warningThreshold) return AnomalySeverity.WARNING;
+                    if (booleanValue == thresholdBoolean) return true;
                 }
                 when NOT_EQUALS {
-                    if (booleanValue != criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (booleanValue != warningThreshold) return AnomalySeverity.WARNING;
+                    if (booleanValue != thresholdBoolean) return true;
                 }
             }
         }
         else if (fieldType == 'datetime') {
-            return AnomalySeverity.NORMAL;
+            return false;
         }
         else {
             String stringValue = (value != null) ? String.valueOf(value) : null;
-            String criticalThreshold = (criticalThreshold != null) ? String.valueOf(criticalThreshold) : null;
-            String warningThreshold = (warningThreshold != null) ? String.valueOf(warningThreshold) : null;
+            String thresholdString = (this.threshold != null) ? String.valueOf(this.threshold) : null;
 
             switch on evaluationType {
                 when EQUALS {
-                    if (stringValue == criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (stringValue == warningThreshold) return AnomalySeverity.WARNING;
+                    if (stringValue == thresholdString) return true;
                 }
                 when NOT_EQUALS {
-                    if (String.isNotBlank(criticalThreshold) && stringValue != criticalThreshold) return AnomalySeverity.CRITICAL;
-                    if (String.isNotBlank(warningThreshold) && stringValue != warningThreshold) return AnomalySeverity.WARNING;
+                    // Handle special case: NOT_EQUALS with empty string threshold means "trigger on any non-empty value"
+                    if ((thresholdString == null || thresholdString == '') && String.isNotBlank(stringValue)) {
+                        return true;
+                    }
+                    // Handle normal NOT_EQUALS comparison
+                    if (String.isNotBlank(thresholdString) && stringValue != thresholdString) return true;
                 }
                 when NOT_NULL {
-                    if (String.isNotBlank(stringValue)) return AnomalySeverity.CRITICAL;
+                    if (String.isNotBlank(stringValue)) return true;
+                }
+                when IS_IN {
+                    if (this.threshold instanceof List<Object>) {
+                        List<Object> thresholdList = (List<Object>) this.threshold;
+                        for (Object item : thresholdList) {
+                            if (stringValue == String.valueOf(item)) {
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         }
-        return AnomalySeverity.NORMAL;
+        return false;
     }
 
     // Custom string representation
     public override String toString() {
         return String.format(
-            'ThresholdConfig[{0}.{1}] Warning: {2}, Critical: {3}, Type: {4}',
+            'ThresholdConfig[{0}.{1}] Threshold: {2}, Type: {3}',
             new List<Object>{
                 eventType,
                 metric,
-                warningThreshold,
-                criticalThreshold,
+                threshold,
                 evaluationType
             }
         );
@@ -235,8 +221,7 @@ public class ThresholdConfig implements System.Comparable {
     public class Builder {
         private String eventType;
         private String metric;
-        private Object warningThreshold;
-        private Object criticalThreshold;
+        private Object threshold;
         private EvaluationType evaluationType;
 
         public Builder setEventType(String eventType) {
@@ -249,13 +234,8 @@ public class ThresholdConfig implements System.Comparable {
             return this;
         }
 
-        public Builder setWarningThreshold(Object warning) {
-            this.warningThreshold = warning;
-            return this;
-        }
-
-        public Builder setCriticalThreshold(Object critical) {
-            this.criticalThreshold = critical;
+        public Builder setThreshold(Object thresholdValue) {
+            this.threshold = thresholdValue;
             return this;
         }
 
@@ -273,8 +253,7 @@ public class ThresholdConfig implements System.Comparable {
             ThresholdConfig config = new ThresholdConfig(
                 eventType,
                 metric,
-                warningThreshold,
-                criticalThreshold,
+                threshold,
                 evaluationType
             );
             config.validateConfig();

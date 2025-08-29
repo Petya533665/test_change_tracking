@@ -18,7 +18,7 @@ public with sharing class LogPostProcessingService {
 	@TestVisible
 	private static final String AUDIT_TRAIL_SOBJECT = 'SetupAuditTrail';
 	public static final Set<String> USER_FIELDS = new Set<String> {
-		'Id', 'Name'
+		'Id', 'Name', 'ProfileId', 'Profile.Name', 'Profile.UserLicense.Name', 'UserRoleId', 'UserRole.Name'
 	};
 	public static final Set<String> AUDIT_TRAIL_FIELDS = new Set<String>{
 		'Id','Action','CreatedBy.Name','CreatedDate','Display','Section','DelegateUser'
@@ -46,6 +46,7 @@ public with sharing class LogPostProcessingService {
 	public static final String PENDING_JOBS_KEY = 'pendingJobs';
 	public static final String TOTAL_ACTIVE_SESSION_KEY = 'totalActiveSession';
 	public static final String INSTALLED_PACKAGES_KEY = 'installedPackages';
+	public static final String ORG_LIMITS_KEY = 'orgLimits';
 
 	public static final Map<String, String> SETTINGS_ABBREVIATION = new Map<String, String>{
 			STACK_TRACE_KEY => 'ST',
@@ -57,7 +58,8 @@ public with sharing class LogPostProcessingService {
 			AUDIT_TRAIL_KEY => 'AT',
 			PENDING_JOBS_KEY => 'PJ',
 			TOTAL_ACTIVE_SESSION_KEY => 'TAS',
-			INSTALLED_PACKAGES_KEY => 'IP'
+			INSTALLED_PACKAGES_KEY => 'IP',
+			ORG_LIMITS_KEY => 'OL'
 	};
 
 	public class PostProcessingSettings {
@@ -83,7 +85,8 @@ public with sharing class LogPostProcessingService {
 		LogPostProcessingService.SETTINGS_ABBREVIATION.get(LogPostProcessingService.AUDIT_TRAIL_KEY),
 		LogPostProcessingService.SETTINGS_ABBREVIATION.get(LogPostProcessingService.PENDING_JOBS_KEY),
 		LogPostProcessingService.SETTINGS_ABBREVIATION.get(LogPostProcessingService.TOTAL_ACTIVE_SESSION_KEY),
-		LogPostProcessingService.SETTINGS_ABBREVIATION.get(LogPostProcessingService.INSTALLED_PACKAGES_KEY)
+		LogPostProcessingService.SETTINGS_ABBREVIATION.get(LogPostProcessingService.INSTALLED_PACKAGES_KEY),
+		LogPostProcessingService.SETTINGS_ABBREVIATION.get(LogPostProcessingService.ORG_LIMITS_KEY)
 	});
 
 	public static final Integer MAX_ENV_INFO_TIME_WINDOW_HRS = -48;
@@ -244,7 +247,64 @@ public with sharing class LogPostProcessingService {
 				Post_Processing_Settings__c,
 				Is_Parent__c,
 				Parent__c,
-				Interview_GUID_External__c
+				Interview_GUID_External__c,
+				Created_Timestamp__c,
+				Limits__c,
+				Limits__r.ActiveScratchOrgs__c,
+				Limits__r.AnalyticsExternalDataSizeMB__c,
+				Limits__r.ConcurrentAsyncGetReportInstances__c,
+				Limits__r.ConcurrentEinsteinDataInsightsStory__c,
+				Limits__r.ConcurrentEinsteinDiscoveryStory__c,
+				Limits__r.ConcurrentSyncReportRuns__c,
+				Limits__r.CreateCustom__c,
+				Limits__r.DailyAnalyticsDataflowJobExecutions__c,
+				Limits__r.DailyAnalyticsUploadedFilesSizeMB__c,
+				Limits__r.DailyFunctionsApiCallLimit__c,
+				Limits__r.DailyApiRequests__c,
+				Limits__r.DailyAsyncApexExecutions__c,
+				Limits__r.DailyAsyncApexTests__c,
+				Limits__r.DailyBulkApiBatches__c,
+				Limits__r.DailyBulkV2QueryFileStorageMB__c,
+				Limits__r.DailyBulkV2QueryJobs__c,
+				Limits__r.DailyDeliveredPlatformEvents__c,
+				Limits__r.DailyDurableGenericStreamingApiEvents__c,
+				Limits__r.DailyDurableStreamingApiEvents__c,
+				Limits__r.DailyEinsteinDataInsightsStoryCreation__c,
+				Limits__r.DailyEinsteinDiscoveryOptJobRuns__c,
+				Limits__r.DailyEinsteinDiscoveryPredictAPICalls__c,
+				Limits__r.DailyEinsteinDiscoveryPredictionsByCDC__c,
+				Limits__r.DailyEinsteinDiscoveryStoryCreation__c,
+				Limits__r.DailyGenericStreamingApiEvents__c,
+				Limits__r.DailyMetadataRetrievesWithDeps__c,
+				Limits__r.DailyScratchOrgs__c,
+				Limits__r.DailyStandardVolumePlatformEvents__c,
+				Limits__r.DailyStreamingApiEvents__c,
+				Limits__r.DailyWorkflowEmails__c,
+				Limits__r.DataStorageMB__c,
+				Limits__r.DurableStreamingApiConcurrentClients__c,
+				Limits__r.FileStorageMB__c,
+				Limits__r.HourlyAsyncReportRuns__c,
+				Limits__r.HourlyDashboardRefreshes__c,
+				Limits__r.HourlyDashboardResults__c,
+				Limits__r.HourlyDashboardStatuses__c,
+				Limits__r.HourlyLongTermIdMapping__c,
+				Limits__r.HourlyManagedContentPublicRequests__c,
+				Limits__r.HourlyODataCallout__c,
+				Limits__r.HourlyPublishedPlatformEvents__c,
+				Limits__r.HourlyPubStdVolPlatformEvents__c,
+				Limits__r.HourlyShortTermIdMapping__c,
+				Limits__r.HourlySyncReportRuns__c,
+				Limits__r.HourlyTimeBasedWorkflow__c,
+				Limits__r.MassEmail__c,
+				Limits__r.MonthlyEinsteinDiscoveryStoryCreation__c,
+				Limits__r.MonthlyPlatformEventsUsageEntitlement__c,
+				Limits__r.Package2VersionCreates__c,
+				Limits__r.Package2VersionCreatesWithoutValidation__c,
+				Limits__r.PermissionSets__c,
+				Limits__r.PlatformEventTriggersParallel__c,
+				Limits__r.PrivateConnectOutboundCalloutMB__c,
+				Limits__r.SingleEmail__c,
+				Limits__r.StreamingApiConcurrentClients__c
 			FROM Log__c
 			WHERE Id IN :logs
 		];
@@ -280,7 +340,7 @@ public with sharing class LogPostProcessingService {
 			}
 			if (corg != null) {
 				LogPostProcessingService.PostProcessingSettings logSettings = new LogPostProcessingService.PostProcessingSettings(log.Post_Processing_Settings__c);
-				if (logSettings.isEnabled(USER_INFO_KEY)) fillUserName(log, logger);
+				if (logSettings.isEnabled(USER_INFO_KEY)) fillUserInfo(log, logger);
 				if (logSettings.isEnabled(OBJECT_INFO_KEY)) fillArea(log, logger);
 				if (logSettings.isEnabled(RELATED_OBJECTS_KEY)) fillRelateObjectType(log, logger);
 				if (logSettings.isEnabled(RELATED_OBJECTS_KEY)) fillRelatedObjects(log, logger);
@@ -292,6 +352,7 @@ public with sharing class LogPostProcessingService {
 				if (logSettings.isEnabled(TOTAL_ACTIVE_SESSION_KEY)) fillTotalActiveSession(log, logger);
 				if (logSettings.isEnabled(INSTALLED_PACKAGES_KEY)) fillInstalledPackages(log, logger);
 				if (logSettings.isEnabled(STACK_TRACE_KEY)) fillStackTrace(log, orchestratorLog, logger);
+				if (logSettings.isEnabled(ORG_LIMITS_KEY)) fillOrgLimitsEnhanced(log, logger);
 				if (String.isBlank(log.Parent__c) && String.isNotBlank(log.Interview_GUID_External__c)) fillParent(log, logger);
 
 				// TEST EXCEPTION SIMULATION - CIRCULAR DEPENDENCY ERROR
@@ -317,6 +378,11 @@ public with sharing class LogPostProcessingService {
 						mapStacktraceParseResult.put(String.valueOf(index), log.Stacktrace_Parse_Result__c);
 						PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Stacktrace_Parse_Result__c, String.valueOf(index));
 					}
+				}
+
+				// if namespace is blank and stacktrace parse result is not available, set namespace to unknown
+				if(String.isBlank(log.Namespace__c) && !log.Stack_trace_parse_result_available__c) {
+					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Namespace__c, LogService.NAMESPACE_UNKNOWN);
 				}
 
 				logsForUpdate = new List<Log__c>{log};
@@ -353,6 +419,18 @@ public with sharing class LogPostProcessingService {
 		return doLogPostProcessing(new List<Log__c>{log}, logger).get(0);
 	}
 
+	public static void fillOrgLimitsEnhanced(Log__c log, Logger logger) {
+		try {
+			List<Log__c> logs = new List<Log__c>{log};
+			LimitsService.createLimitsForLogs(logs, false, true, logger);
+			PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Limits__c, logs.get(0).Limits__c);
+		}
+		catch (Exception e) {
+			result.addError(e);
+			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.fillOrgLimitsEnhanced');
+		}
+		
+	}
 	public static final String ERROR_MESSAGE_FLOW_NOT_FOUND = 'WebService returned a SOAP Fault: type and fullNames must be specified for items to read';
 
 	public static void fillStackTrace(Log__c log, Log__c orchestratorLogUpdate, Logger logger) {
@@ -477,13 +555,21 @@ public with sharing class LogPostProcessingService {
 		}
 	}
 
-	public static void fillUserName(Log__c log, Logger logger) {
+	public static void fillUserInfo(Log__c log, Logger logger) {
 		try {
-			PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.User_Name__c, getUserName(log.User_Id__c));
+			UserInfoWrapper userInfoWrapper = getUserInfo(log.User_Id__c);
+			if (userInfoWrapper != null) {
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.User_Name__c, userInfoWrapper.userFullName);
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Profile_Id__c, userInfoWrapper.profileId);
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Profile_Name__c, userInfoWrapper.profileName);
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Role_Id__c, userInfoWrapper.roleId);
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Role_Name__c, userInfoWrapper.roleName);
+				PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Salesforce_License_Type_Name__c, userInfoWrapper.licenseTypeName);
+			}
 		}
 		catch (Exception e) {
 			result.addError(e);
-			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getUserName');
+			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.getUserInfo');
 		}
 	}
 
@@ -696,23 +782,24 @@ public with sharing class LogPostProcessingService {
 		public List<SObjectDescribeInfo> sobjects;
 	}
 
-	public static String getUserName(String userId) {
-		String userName = null;
-		if (String.isBlank(userId)) return userName;
+	public static UserInfoWrapper getUserInfo(String userId) {
+		UserInfoWrapper userInfoWrapper;
+		if (String.isBlank(userId)) return userInfoWrapper;
 		CacheUtils cacheUtil = new CacheUtils(corg.Name);
 		Object cacheObject = cacheUtil.getValue(CacheUtils.KEY_REQUEST_USER_INFO);
-		Map<String, String> mapUsers = cacheObject != null ? (Map<String, String>)cacheObject : new Map<String, String>();
-		if (mapUsers.containsKey(userId)) {
-			userName = mapUsers.get(userId);
+		Map<String, UserInfoWrapper> userInfoByUserId = cacheObject != null ? (Map<String, UserInfoWrapper>)cacheObject : new Map<String, UserInfoWrapper>();
+		if (userInfoByUserId.containsKey(userId)) {
+			userInfoWrapper = userInfoByUserId.get(userId);
 		} else {
 			List<User> users = getUserNameFromOrg(corg, userId);
 			if (users != null && users.size() == 1) {
-				userName = users[0].Name;
-				mapUsers.put(userId, userName);
-				cacheUtil.putValue(CacheUtils.KEY_REQUEST_USER_INFO, mapUsers);
+				userInfoWrapper = new UserInfoWrapper(users.get(0));
+				userInfoByUserId.put(userId, userInfoWrapper);
+				cacheUtil.putValue(CacheUtils.KEY_REQUEST_USER_INFO, userInfoByUserId);
 			}
 		}
-		return userName;
+
+		return userInfoWrapper;
 	}
 
 	public static List<User> getUserNameFromOrg(Connected_Org__c corg, String userId) {
@@ -1116,6 +1203,26 @@ public with sharing class LogPostProcessingService {
 
 	public class ApexClassWrapper {
 		public String Name;
+	}
+
+	private class UserInfoWrapper {
+		private String userId;
+		private String userFullName;
+		private String profileId;
+		private String profileName;
+		private String roleId;
+		private String roleName;
+		private String licenseTypeName;
+
+		private UserInfoWrapper(User user) {
+			this.userId = user.Id;
+			this.userFullName = user.Name;
+			this.profileId = user.ProfileId;
+			this.profileName = user.Profile.Name;
+			this.roleId = user.UserRoleId;
+			this.roleName = user.UserRole.Name;
+			this.licenseTypeName = user.Profile.UserLicense.Name;
+		}
 	}
 
 	public class LogPostProcessingServiceException extends Exception {}
