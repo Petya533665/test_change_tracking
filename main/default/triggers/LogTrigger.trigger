@@ -4,6 +4,7 @@ trigger LogTrigger on Log__c (after insert, before insert, before update, after 
         LogTriggerHelper.populateDefaults(Trigger.new);
         LogTriggerHelper.populateRelatedObjects(Trigger.new);
         LogService.copyLogFlagsFields(Trigger.new);
+        LogTriggerHandler.onBeforeInsert(Trigger.new);
     }
 
     if(Trigger.isBefore && (Trigger.isInsert || Trigger.isUpdate)) {

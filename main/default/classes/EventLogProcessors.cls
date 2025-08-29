@@ -1,5 +1,5 @@
 public class EventLogProcessors {
-    // Test variables
+    // Test variables 
     // These are used to test the EventLogProcessors class, to help evaluate metrics
     // EventLogFieldNames and EventLogFieldTypes is readonly fields on EvnetLogFile
     // They are not used in production
@@ -199,18 +199,18 @@ public class EventLogProcessors {
     /**
      * Batch Event Data Processor
      * 
-     * This class is used to process a batch of event data results and detect anomalies.
-     * It uses the AnomalyDetector to detect anomalies and logs them using the Logger.
+     * This class is used to process a batch of event data results and find matches.
+     * It uses the EventMonitoringProcessors to find matches and logs them using the Logger.
      */
     public class BatchEventDataProcessor implements IBatchProcessor {
-        private final AnomalyDetectors.IAnomalyDetector detector;
+        private final EventMonitoringProcessors.IEventLogProcessor eventLogProcessor;
         private Logger logger;
         
         public BatchEventDataProcessor(
-            AnomalyDetectors.IAnomalyDetector detector,
+            EventMonitoringProcessors.IEventLogProcessor eventLogProcessor,
             Logger logger
         ) {
-            this.detector = detector;
+            this.eventLogProcessor = eventLogProcessor;
             this.logger = logger;
         }
 
@@ -220,35 +220,12 @@ public class EventLogProcessors {
             if (batchResults == null || batchResults.isEmpty()) return;
             
             try {
-                // Detect anomalies for the batch
-                List<AnomalyDetectors.EventAnomaly> anomalies = detector.detectAnomalies(batchResults, fieldMetadataConfig);
+                // Get Log__c records directly from event processor
+                List<Log__c> logRecords = eventLogProcessor.findMatches(batchResults, fieldMetadataConfig);
 
-                // Process detected anomalies - removed deduplication logic to avoid SOQL in loop
-                for (AnomalyDetectors.EventAnomaly anomaly : anomalies) {
-                    LogBuilder logBuilder = LogBuilder.getInstance()
-                        .type(anomaly.logType)
-                        .category(anomaly.logCategory)
-                        .summary(anomaly.summary)
-                        .details(anomaly.details)
-                        .stackTrace(anomaly.logStackTrace)
-                        .area(anomaly.logArea)
-                        .attribute(Schema.sObjectType.Log__c.fields.User_Id__c.getName(), anomaly.logUserId)
-                        .attribute(Schema.sObjectType.Log__c.fields.Organization_Id__c.getName(), anomaly.logOrganizationId)
-                        .attribute(Schema.sObjectType.Log__c.fields.Created_At__c.getName(), anomaly.logTimestamp)
-                        .attribute(Schema.sObjectType.Log__c.fields.Request_Id_External__c.getName(), anomaly.logRequestId);
-                    
-                    if (anomaly.severity == ThresholdConfig.AnomalySeverity.CRITICAL) {
-                        logBuilder.createIssue();
-                    }
-
-                    // Check if this event type needs duplicate checking - but don't perform it here
-                    // The deduplication will be handled at the batch level after all CSV processing is complete
-                    if (EVENT_TYPES_TO_CHECK_DUPLICATES.contains(anomaly.eventType)) {
-                        // add trace point for calculate hash1 to use later in the deduplication check
-                        this.logger.add(logBuilder.tracePoint().build());
-                    }
-                    else {
-                        this.logger.add(logBuilder.build());
+                if (logRecords != null && !logRecords.isEmpty()) {
+                    for (Log__c logRecord : logRecords) {
+                        this.logger.add(logRecord);
                     }
                 }
             }
@@ -370,17 +347,6 @@ public class EventLogProcessors {
 
         public virtual Integer getChunkSize() {
             return 10;
-        }
-
-        /**
-         * Batch Process EventLogFile
-         * 
-         * @deprecated Use batchProcessLogFileSObject instead for safe SObject access
-         * This method is kept for backward compatibility but delegates to the safe SObject version
-         */
-        public virtual void batchProcessLogFile(SObject logFile, IBatchProcessor batchProcessor) {
-            // Delegate to the safe SObject version
-            batchProcessLogFileSObject(logFile, batchProcessor);
         }
 
         /**
@@ -1947,6 +1913,9 @@ public class EventLogProcessors {
         
         // Timestamp information
         public DateTime timestampDerived { get; private set; }     // TIMESTAMP_DERIVED: ISO8601 time
+        
+        // Hash for deduplication testing
+        public String hash1 { get; private set; }                  // HASH_1: Pre-calculated hash for test deduplication
 
         public ApexUnexpectedExceptionData(Map<String, Object> eventData) {
             super(eventData);
@@ -1975,7 +1944,7 @@ public class EventLogProcessors {
         public Integer timeValue { get; private set; }         // TIME: Request duration (ms)
         public Integer statusCode { get; private set; }        // STATUS_CODE: HTTP status code
         public CalloutStatusCode statusCodeEnum { get; private set; }
-        public Boolean success { get; private set; }           // SUCCESS: If callout completed (1/0)
+        public String success { get; private set; }           // SUCCESS: If callout completed (1/0)
         
         // Request information
         public String uri { get; private set; }                // URI: Request URI
@@ -3304,6 +3273,7 @@ public class EventLogProcessors {
         public String entityName { get; private set; }       // ENTITY_NAME: Object accessed
         public Integer numberFields { get; private set; }    // NUMBER_FIELDS: Field count
         public Integer rowsProcessed { get; private set; }   // ROWS_PROCESSED: Row count
+        public String query { get; private set; }            // QUERY: Query string
         
         // Connected App Information
         public String connectedAppId { get; private set; }   // CONNECTED_APP_ID: 15-char app ID
@@ -4159,6 +4129,7 @@ public class EventLogProcessors {
         public String connectedAppId { get; private set; }     // CONNECTED_APP_ID: Connected app's ID
         public String entityName { get; private set; }         // ENTITY_NAME: Accessed API objects
         public String exceptionMessage { get; private set; }   // EXCEPTION_MESSAGE: Error details
+        public String query { get; private set; }              // QUERY: Query string
         
         // Performance metrics
         public Integer cpuTime { get; private set; }           // CPU_TIME: CPU time used (ms)
@@ -5084,6 +5055,8 @@ public class EventLogProcessors {
             data.userId = getField(fields, headerMap, FIELD_USER_ID);
             data.userIdDerived = getField(fields, headerMap, FIELD_USER_ID_DERIVED);
             data.timestampDerived = getDateTimeField(fields, headerMap, FIELD_TIMESTAMP_DERIVED);
+            data.hash1 = getField(fields, headerMap, 'HASH_1');
+            
             return data;
         }
     }
@@ -5305,7 +5278,7 @@ public class EventLogProcessors {
             data.responseSize = getIntegerField(fields, headerMap, FIELD_RESPONSE_SIZE);
             data.timeValue = getIntegerField(fields, headerMap, FIELD_TIME);
             data.statusCode = getIntegerField(fields, headerMap, FIELD_STATUS_CODE);
-            data.success = getBooleanField(fields, headerMap, FIELD_SUCCESS);
+            data.success = getField(fields, headerMap, FIELD_SUCCESS);
             data.uri = getField(fields, headerMap, FIELD_URI);
             data.uriIdDerived = getField(fields, headerMap, FIELD_URI_ID_DERIVED);
             data.clientIp = getField(fields, headerMap, FIELD_CLIENT_IP);
@@ -6645,6 +6618,7 @@ public class EventLogProcessors {
         protected override IBaseEventData processCsvRow(Map<String, Object> eventData, List<String> fields, Map<String, Integer> headerMap) {
             RestApiData data = new RestApiData(eventData);
             data.method = getField(fields, headerMap, FIELD_METHOD);
+            data.query = getField(fields, headerMap, FIELD_QUERY);
             data.mediaType = getField(fields, headerMap, FIELD_MEDIA_TYPE);
             data.statusCode = getIntegerField(fields, headerMap, FIELD_STATUS_CODE);
             data.entityName = getField(fields, headerMap, FIELD_ENTITY_NAME);
@@ -7986,6 +7960,7 @@ public class EventLogProcessors {
 
         protected override IBaseEventData processCsvRow(Map<String, Object> eventData, List<String> fields, Map<String, Integer> headerMap) {
             ApexRestApiEventData data = new ApexRestApiEventData(eventData);
+            data.query = getField(fields, headerMap, FIELD_QUERY);
             data.requestId = getField(fields, headerMap, FIELD_REQUEST_ID);
             data.userIdDerived = getField(fields, headerMap, FIELD_USER_ID_DERIVED);
             data.method = getField(fields, headerMap, FIELD_METHOD);

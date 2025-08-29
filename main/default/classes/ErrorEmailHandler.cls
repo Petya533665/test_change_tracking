@@ -74,12 +74,25 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
     }
 
     public static void processEmail(List<Inbound_Email__c> inboundEmails) {
-        processEmail(inboundEmails, null, null, null, null);
+        processEmail(inboundEmails, null, null, null, null, false);
     }
     public static void processEmail(List<Inbound_Email__c> inboundEmails, String incomeOrganizationId) {
-        processEmail(inboundEmails, incomeOrganizationId, null, null, null);
+        processEmail(inboundEmails, incomeOrganizationId, null, null, null, false);
     }
-    public static void processEmail(List<Inbound_Email__c> inboundEmails, String incomeOrganizationId, DateTime createdAtDateTime, Messaging.inboundEmail email, FlowService.FlowErrorAbbreviateResult abbreviateResult) {
+    public static void processEmail(List<Inbound_Email__c> inboundEmails,
+                                    String incomeOrganizationId,
+                                    DateTime createdAtDateTime,
+                                    Messaging.inboundEmail email,
+                                    FlowService.FlowErrorAbbreviateResult abbreviateResult) {
+        processEmail(inboundEmails, incomeOrganizationId, createdAtDateTime, email, abbreviateResult, false);
+    }
+    public static void processEmail(List<Inbound_Email__c> inboundEmails,
+                                    String incomeOrganizationId,
+                                    DateTime createdAtDateTime,
+                                    Messaging.inboundEmail email,
+                                    FlowService.FlowErrorAbbreviateResult abbreviateResult,
+                                    Boolean isRoutedFromPassthroughMode) {
+                                       
         Inbound_Email__c inboundEmail = inboundEmails.get(0);
 
         List<Log__c> logsToAsyncJob = new List<Log__c>();
@@ -108,8 +121,9 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                             }
                             // process large stacktrace
                             // and all flow error to determinate fault path and skip create logs if this error is fault path
-                            else if (log?.Stacktrace__c?.length() > ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD
-                                || log.Category__c == FlowExceptionParser.FLOW_CATEGORY) {
+                            else if (!isRoutedFromPassthroughMode
+                                && (log?.Stacktrace__c?.length() > ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD
+                                    || log.Category__c == FlowExceptionParser.FLOW_CATEGORY)) {
                                 
                                 // enable post processing for stacktrace only
                                 log.Post_Processing_Settings__c = LogPostProcessingService.POST_PROCESSING_SETTINGS_STACKTRACE_ONLY;
@@ -131,8 +145,9 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                         }
                         // process large stacktrace
                         // and all flow error to determinate fault path and skip create logs if this error is fault path
-                        else if (log?.Stacktrace__c?.length() > ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD
-                            || log.Category__c == FlowExceptionParser.FLOW_CATEGORY) {
+                        else if (!isRoutedFromPassthroughMode 
+                            && (log?.Stacktrace__c?.length() > ErrorEmailHandler.MAX_LENGTH_LONG_TEXT_AREA_FIELD
+                                || log.Category__c == FlowExceptionParser.FLOW_CATEGORY)) {
 
                             // enable post processing for stacktrace only
                             log.Post_Processing_Settings__c = LogPostProcessingService.POST_PROCESSING_SETTINGS_STACKTRACE_ONLY;

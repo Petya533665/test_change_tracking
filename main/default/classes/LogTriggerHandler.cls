@@ -1,5 +1,10 @@
 public with sharing class LogTriggerHandler {
 
+	public static void onBeforeInsert(List<Log__c> newLogs) {
+		// For triggers, only process local org limits
+		LimitsService.createLimitsForLogs(newLogs, true, false, null);
+	}
+
 	public static void onAfterInsert(List<Log__c> newLogs) {
 		issueTracker(newLogs, null);
 	}
@@ -47,5 +52,7 @@ public with sharing class LogTriggerHandler {
 		}
 		return false;
 	}
+
+
 
 }

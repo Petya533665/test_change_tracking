@@ -1,4 +1,5 @@
 public with sharing class TraceScheduleController {
+    // Updated to support AutoTrace functionality
 
     private ApexPages.StandardSetController setController;
 
@@ -129,7 +130,6 @@ public with sharing class TraceScheduleController {
         try {
             Map<String, Object> request = (Map<String, Object>)JSON.deserializeUntyped(input);
             response.params = request;
-
             String method = (String)request.get('method');
             methodName = method;
             Object data = request.get('data');
@@ -151,6 +151,16 @@ public with sharing class TraceScheduleController {
                 response.data = getTraceRequestsByTraceScheduleId(data);
             } else if (method == 'deactivateTraceSchedule') {
                 response.data = deactivateTraceSchedule(data);
+            } else if (method.equals('setForecastSetting')) {
+                response.data = HoltwintersForecastController.updateForecastSetting((String)request.get('data'));
+            } else if (method.equals('getLogsCountByDayLargeDataset')) {
+                response.data = HoltwintersForecastController.getLogsCountByDayLargeDataset((String)request.get('data'));
+            } else if (method.equals('getUserIdToDateTime')) {
+                response.data = HoltwintersForecastController.getUserIdToDateTime((String)request.get('data'));
+            } else if (method.equals('createAutoTraceRequests')) {
+                response.data = HoltwintersForecastController.createAutoTraceRequests((String)request.get('data'));
+            } else if (method.equals('getIsEnabledHoltwinters')) {
+                response.data = HoltwintersForecastController.getIsEnabledHoltwinters();
             } else {
                 response.error = 'Action not found';
             }
@@ -309,7 +319,7 @@ public with sharing class TraceScheduleController {
                 traceRequestsToDelete.add(traceRequest);
             }
             output.put('result', DatabaseUtils.getInstance().performDeleteDML(traceRequestsToDelete, Schema.SObjectType.Trace_Request__c)
-                    .handleError(TraceScheduleController.class.getName(), '.deleteTraceRequests').deleteResults);
+                .handleError(TraceScheduleController.class.getName(), '.deleteTraceRequests').deleteResults);
         }
         return output;
     }
@@ -321,18 +331,29 @@ public with sharing class TraceScheduleController {
             String organizationId = (String)input.get(ORGANIZATION_ID);
             Date startDate = Date.valueOf((String)input.get(START_DATE)).addDays(-1);
             Date endDate = Date.valueOf((String)input.get(END_DATE)).addDays(1);
-            List<Trace_Request__c> traceRequests = [SELECT Id, Name, Parent__c, Status__c, Schedule__c, Start_Date__c, End_Date__c, Trace_Schedule__c, Issue__c, Traced_Entity_Id__c FROM Trace_Request__c WHERE Issue__c != NULL
-            AND End_Date__c >= :startDate AND Start_Date__c <= :endDate];
+            List<Trace_Request__c> traceRequests = [
+                SELECT Id, Name, Parent__c, Status__c, Schedule__c, Start_Date__c, End_Date__c, Trace_Schedule__c, Issue__c, Traced_Entity_Id__c, Type__c 
+                FROM Trace_Request__c 
+                WHERE Issue__c != NULL AND End_Date__c >= :startDate AND Start_Date__c <= :endDate
+            ];
             Set<String> issueIds = new Set<String>();
             for (Trace_Request__c traceRequest : traceRequests) {
                 issueIds.add(traceRequest.Issue__c);
             }
-            List<Issue__c> issues = [SELECT Id, Log__r.Organization_Id__c FROM Issue__c WHERE Id IN :issueIds AND Log__r.Organization_Id__c != NULL];
+            List<Issue__c> issues = [
+                SELECT Id, Log__r.Organization_Id__c
+                FROM Issue__c
+                WHERE Id IN :issueIds AND Log__r.Organization_Id__c != NULL
+            ];
             issueIds = new Set<String>();
             for (Issue__c issue : issues) {
                 if (organizationId.left(15) == issue.Log__r.Organization_Id__c.left(15)) issueIds.add(issue.Id);
             }
-            traceRequests = [SELECT Id, Name, Parent__c, Status__c, Schedule__c, Start_Date__c, End_Date__c, Trace_Schedule__c, Issue__c, Traced_Entity_Id__c FROM Trace_Request__c WHERE Issue__c IN :issueIds];
+            traceRequests = [
+                SELECT Id, Name, Parent__c, Status__c, Schedule__c, Start_Date__c, End_Date__c, Trace_Schedule__c, Issue__c, Traced_Entity_Id__c, Type__c 
+                FROM Trace_Request__c 
+                WHERE Issue__c IN :issueIds
+            ];
             output.put('traceRequests', !traceRequests.isEmpty() ? getTraceRequests(traceRequests) : new List<TraceRequest>());
         }
         return output;
@@ -341,7 +362,11 @@ public with sharing class TraceScheduleController {
     public static Map<String, Object> getTraceRequestsByTraceScheduleId(Object data) {
         Map<String, Object> output = new Map<String, Object>();
         String traceScheduleId = (String)JSON.deserializeUntyped(JSON.serialize(data));
-        List<Trace_Request__c> traceRequests = [SELECT Id, Name, Parent__c, Status__c, Schedule__c, Start_Date__c, End_Date__c, Trace_Schedule__c, Issue__c, Traced_Entity_Id__c FROM Trace_Request__c WHERE Trace_Schedule__c = :traceScheduleId];
+        List<Trace_Request__c> traceRequests = [
+            SELECT Id, Name, Parent__c, Status__c, Schedule__c, Start_Date__c, End_Date__c, Trace_Schedule__c, Issue__c, Traced_Entity_Id__c, Type__c 
+            FROM Trace_Request__c 
+            WHERE Trace_Schedule__c = :traceScheduleId
+        ];
         output.put('traceRequests', traceRequests.isEmpty() ? new List<TraceRequest>() : getTraceRequests(traceRequests));
         return output;
     }
@@ -446,6 +471,7 @@ public with sharing class TraceScheduleController {
         public String name;
         public String parent;
         public String status;
+        public String type;
         public String traceSchedule;
         public String schedule;
         public String tracedEntityId;
@@ -460,6 +486,7 @@ public with sharing class TraceScheduleController {
             this.name = traceRequest.Name;
             this.parent = traceRequest.Parent__c;
             this.status = traceRequest.Status__c;
+            this.type = traceRequest.Type__c;
             this.traceSchedule = traceRequest.Trace_Schedule__c;
             this.schedule = traceRequest.Schedule__c;
             this.tracedEntityId = traceRequest.Traced_Entity_Id__c;
@@ -472,6 +499,7 @@ public with sharing class TraceScheduleController {
             this.name = traceRequest.Name;
             this.parent = traceRequest.Parent__c;
             this.status = traceRequest.Status__c;
+            this.type = traceRequest.Type__c;
             this.traceSchedule = traceRequest.Trace_Schedule__c;
             this.schedule = traceRequest.Schedule__c;
             this.tracedEntityId = traceRequest.Traced_Entity_Id__c;
@@ -485,6 +513,7 @@ public with sharing class TraceScheduleController {
                     Id = id,
                     Parent__c = parent,
                     Status__c = status,
+                    Type__c = type,
                     Trace_Schedule__c = traceSchedule,
                     Schedule__c = schedule,
                     Traced_Entity_Id__c = tracedEntityId,

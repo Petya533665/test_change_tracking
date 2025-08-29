@@ -75,6 +75,7 @@ public without sharing class JiraService {
         String getJiraIssueByKeyRaw(String taskKey, Logger logger);
 
         String getCreateIssueCommentEndpoint(String taskKey);
+        String getCreateIssueAttachmentEndpoint(String taskKey);
         String getCreateIssueEndpoint();
         String getProjectsEndpoint();
         String getProjectEndpoint(String projectOrKeyId);
@@ -106,6 +107,9 @@ public without sharing class JiraService {
         Map<String, DateTime> getResolutionDatetimeByTaskKey(List<String> taskKeys, Logger logger);
         void putJiraTaskPriority(String taskKey, String taskPriorityName);
         void putJiraTaskProperties(String issueKey, Id recordId);
+        void createNewTicketComment(String comment, String issueKey);
+        String addAttachment(Blob fileBlob, String fileName, String issueKey);
+        String addCommentToIssueWithAttachments(String message, String issueKey, ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient);
         Object transformCustomFieldValue(String rawValue, JiraProjectIssueField field, Logger logger);
         Boolean isJiraCustomFieldHasAllowedType(JiraProjectIssueField field);
     }
@@ -401,6 +405,7 @@ public without sharing class JiraService {
     public static final String API_PROJECT_COMPONENT = '/component';
     public static final String API_ISSUE_CREATE_META = '/issue/createmeta';
     public static final String API_ISSUE_CREATE_COMMENT = '/comment';
+    public static final String API_ISSUE_CREATE_ATTACHMENTS = '/attachments';
     public static final String API_ISSUE_CREATE_META_ISSUE_TYPES = '/issue/createmeta/{0}/issuetypes';
     public static final String API_ISSUE_LINK = '/issueLink';
     public static final String API_ISSUE = '/issue/';
@@ -463,9 +468,9 @@ public without sharing class JiraService {
         }
 
         public virtual String getProjectIssueFieldsEndpoint(String projectOrKeyId, String issueType, Integer startAt, Integer maxResults) {
-            return getProjectIssueTypesEndpoint(projectOrKeyId) 
-                + '/' + issueType 
-                + '?' + API_PAGINATION_MAX_RESULTS + '=' + (maxResults != null ? String.valueOf(maxResults) : API_PAGINATION_MAX_RESULTS_DEFAULT_VALUE) 
+            return getProjectIssueTypesEndpoint(projectOrKeyId)
+                + '/' + issueType
+                + '?' + API_PAGINATION_MAX_RESULTS + '=' + (maxResults != null ? String.valueOf(maxResults) : API_PAGINATION_MAX_RESULTS_DEFAULT_VALUE)
                 + '&' + API_PAGINATION_START_AT + '=' + (startAt != null ? String.valueOf(startAt) : API_PAGINATION_START_AT_DEFAULT_VALUE);
         }
 
@@ -495,6 +500,10 @@ public without sharing class JiraService {
 
         public virtual String getExpandedIssueEndpoint(String issueKey) {
             return getIssueEndpoint(issueKey + API_ISSUE_EXPANDED_PARAMETER);
+        }
+
+        public virtual String getCreateIssueAttachmentEndpoint(String issueKey) {
+            return API_REST_BASE + API_ISSUE + issueKey + API_ISSUE_CREATE_ATTACHMENTS;
         }
 
         public virtual String getCreateIssueCommentEndpoint(String issueKey) {
@@ -637,24 +646,24 @@ public without sharing class JiraService {
             Integer maxResults = Integer.valueOf(API_PAGINATION_MAX_RESULTS_DEFAULT_VALUE);
             Integer callCount = 0;
             Boolean hasMoreData = true;
-            
+
             while (hasMoreData && callCount < API_PAGINATION_MAX_CALLS) {
                 String b = getApiData(getProjectIssueFieldsEndpoint(projectOrKeyId, issueType, startAt, maxResults));
                 JiraProjectIssueTypeFieldsWrapper wrapper = (JiraProjectIssueTypeFieldsWrapper)JSON.deserialize(b, JiraProjectIssueTypeFieldsWrapper.class);
-                
+
                 if (wrapper != null && wrapper.getFields() != null && !wrapper.getFields().isEmpty()) {
                     result.addAll(wrapper.getFields());
-                    
+
                     // Check if we have more data based on total count
                     hasMoreData = (startAt + wrapper.getFields().size()) < wrapper.total;
                     startAt += maxResults;
                 } else {
                     hasMoreData = false;
                 }
-                
+
                 callCount++;
             }
-            
+
             return result;
         }
 
@@ -704,11 +713,11 @@ public without sharing class JiraService {
             if (field?.schema?.custom == null) {
                 return false;
             }
-            
+
             // Use the plugin pattern to determine if field type is supported
             return getSupportedFieldTypes().contains(field.schema.custom);
         }
-        
+
         public virtual Set<String> getSupportedFieldTypes() {
             return FIELD_TRANSFORMERS.keySet();
         }
@@ -724,9 +733,9 @@ public without sharing class JiraService {
                     JiraFieldValidationResult validationResult = transformer.validateInput(rawValue);
                     if (!validationResult.isValid) {
                         logger?.add(logger.getInternalError(
-                            new JiraServiceException('Invalid field value: ' + validationResult.errorMessage), 
-                            null, 
-                            JiraService.class.getName(), 
+                            new JiraServiceException('Invalid field value: ' + validationResult.errorMessage),
+                            null,
+                            JiraService.class.getName(),
                             'transformCustomFieldValue'
                         ));
                         return rawValue; // Return original value if validation fails
@@ -811,6 +820,61 @@ public without sharing class JiraService {
 
         public virtual JiraIssue searchIssueByHash3(String label, String projectOrKeyId) {
             return searchIssueByLabel('\'h3_' + label + '\'', projectOrKeyId);
+        }
+
+        public virtual void createNewTicketComment(String comment, String issueKey) {
+
+            String b = HttpUtils.post(
+                JiraService.getService().getCreateIssueCommentEndpoint(issueKey),
+                comment,
+                JiraService.JIRA_HEADERS,
+                201
+            );
+        }
+
+        public virtual String addCommentToIssueWithAttachments(String message, String issueKey, ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient) {
+            if (chartGeneratorImageLambdaClient != null && chartGeneratorImageLambdaClient.hasCharts()) {
+                for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
+                    if (chart != null && String.isNotBlank(chart)) {
+                        ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
+
+                        if (chartEnum != null) {
+                            Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
+                            String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                            addAttachment(chartBlob, fileName, issueKey);
+                            message += '\n!' + fileName + '!';
+                        } else {
+                            // Chart type not found in enum
+                        }
+                    }
+                }
+            }
+            return message;
+        }
+
+
+
+        public virtual String addAttachment(Blob fileBlob, String fileName, String issueKey) {
+            String boundary = '----WebKitFormBoundary' + System.currentTimeMillis();
+
+            Map<String, String> headers = new Map<String, String>(JiraService.JIRA_HEADERS);
+            headers.put('Content-Type', 'application/octet-stream');
+            headers.put('X-Atlassian-Token', 'no-check');
+            headers.put('Content-Type', 'multipart/form-data; boundary=' + boundary);
+
+
+            String endpoint = JiraService.getService().getCreateIssueAttachmentEndpoint(issueKey);
+
+            Blob bodyBlob = HttpUtils.getMultipartFormData(boundary, fileBlob, fileName);
+
+            String bb = HttpUtils.postputBlobBody(
+                endpoint,
+                bodyBlob,
+                headers,
+                200
+            );
+
+            return fileName;
         }
 
         private virtual JiraIssue searchIssueByLabel(String label, String projectOrKeyId) {
@@ -1227,7 +1291,7 @@ public without sharing class JiraService {
         // "true"
         public String value;
         // "10100"
-        public String id; 
+        public String id;
         // false/true
         public Boolean disabled;
     }
@@ -1680,7 +1744,7 @@ public without sharing class JiraService {
     // Base transformer class with common functionality
     public abstract class BaseJiraFieldTransformer implements JiraFieldTransformer {
         public abstract Object transform(String rawValue);
-        
+
         public virtual JiraFieldValidationResult validateInput(String rawValue) {
             if (String.isBlank(rawValue)) {
                 return new JiraFieldValidationResult(false, 'Value cannot be blank');
@@ -1692,10 +1756,10 @@ public without sharing class JiraService {
             if (String.isBlank(rawValue)) {
                 return null;
             }
-            
+
             try {
                 DateTime dt = null;
-                
+
                 // Try ISO format first (2023-04-13T19:03:25.153Z)
                 if (rawValue.contains('T') && rawValue.contains('Z')) {
                     dt = (DateTime)JSON.deserialize('"' + rawValue + '"', DateTime.class);
@@ -1704,8 +1768,8 @@ public without sharing class JiraService {
                 else if (Pattern.matches('\\d{4}-\\d{2}-\\d{2}', rawValue)) {
                     List<String> parts = rawValue.split('-');
                     dt = DateTime.newInstance(
-                        Integer.valueOf(parts[0]), 
-                        Integer.valueOf(parts[1]), 
+                        Integer.valueOf(parts[0]),
+                        Integer.valueOf(parts[1]),
                         Integer.valueOf(parts[2])
                     );
                 }
@@ -1714,21 +1778,21 @@ public without sharing class JiraService {
                     String[] dateTimeParts = rawValue.split(' ');
                     String[] dateParts = dateTimeParts[0].split('-');
                     String[] timeParts = dateTimeParts[1].split(':');
-                    
+
                     if (dateParts.size() == 3 && timeParts.size() >= 2) {
                         Integer hour = Integer.valueOf(timeParts[0]);
                         Integer minute = Integer.valueOf(timeParts[1]);
                         Integer second = timeParts.size() > 2 ? Integer.valueOf(timeParts[2]) : 0;
-                        
+
                         dt = DateTime.newInstance(
-                            Integer.valueOf(dateParts[0]), 
-                            Integer.valueOf(dateParts[1]), 
+                            Integer.valueOf(dateParts[0]),
+                            Integer.valueOf(dateParts[1]),
                             Integer.valueOf(dateParts[2]),
                             hour, minute, second
                         );
                     }
                 }
-                
+
                 if (dt != null) {
                     if (includeTime) {
                         return dt.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss.SSS\'+0000\'');
@@ -1736,11 +1800,11 @@ public without sharing class JiraService {
                         return dt.formatGmt('yyyy-MM-dd');
                     }
                 }
-                
+
             } catch (Exception e) {
                 // Return null if parsing fails
             }
-            
+
             return rawValue; // Return original if all parsing fails
         }
     }
@@ -1762,7 +1826,7 @@ public without sharing class JiraService {
             if (String.isBlank(rawValue)) {
                 return new JiraFieldValidationResult(false, 'Multi-checkbox value cannot be blank');
             }
-            
+
             List<String> values = rawValue.split(',');
             for (String value : values) {
                 if (String.isBlank(value?.trim())) {
@@ -1790,7 +1854,7 @@ public without sharing class JiraService {
             if (String.isBlank(rawValue)) {
                 return new JiraFieldValidationResult(false, 'Multi-select value cannot be blank');
             }
-            
+
             List<String> values = rawValue.split(',');
             for (String value : values) {
                 if (String.isBlank(value?.trim())) {
@@ -1839,14 +1903,14 @@ public without sharing class JiraService {
             if (String.isBlank(rawValue)) {
                 return new JiraFieldValidationResult(false, 'Date value cannot be blank');
             }
-            
+
             // Validate date format
-            if (!Pattern.matches('\\d{4}-\\d{2}-\\d{2}', rawValue) && 
-                !rawValue.contains('T') && 
+            if (!Pattern.matches('\\d{4}-\\d{2}-\\d{2}', rawValue) &&
+                !rawValue.contains('T') &&
                 !rawValue.contains(' ')) {
                 return new JiraFieldValidationResult(false, 'Invalid date format. Expected: YYYY-MM-DD, YYYY-MM-DD HH:mm:ss, or ISO format');
             }
-            
+
             return new JiraFieldValidationResult(true);
         }
     }
@@ -1861,14 +1925,14 @@ public without sharing class JiraService {
             if (String.isBlank(rawValue)) {
                 return new JiraFieldValidationResult(false, 'DateTime value cannot be blank');
             }
-            
+
             // Validate datetime format
-            if (!rawValue.contains('T') && 
-                !rawValue.contains(' ') && 
+            if (!rawValue.contains('T') &&
+                !rawValue.contains(' ') &&
                 !Pattern.matches('\\d{4}-\\d{2}-\\d{2}', rawValue)) {
                 return new JiraFieldValidationResult(false, 'Invalid datetime format. Expected: YYYY-MM-DD HH:mm:ss, YYYY-MM-DD, or ISO format');
             }
-            
+
             return new JiraFieldValidationResult(true);
         }
     }
@@ -1887,7 +1951,7 @@ public without sharing class JiraService {
             if (String.isBlank(rawValue)) {
                 return new JiraFieldValidationResult(false, 'Number value cannot be blank');
             }
-            
+
             try {
                 Decimal.valueOf(rawValue);
                 return new JiraFieldValidationResult(true);
@@ -1931,12 +1995,12 @@ public without sharing class JiraService {
             if (String.isBlank(rawValue)) {
                 return new JiraFieldValidationResult(false, 'URL value cannot be blank');
             }
-            
+
             // Basic URL validation
             if (!rawValue.startsWith('http://') && !rawValue.startsWith('https://')) {
                 return new JiraFieldValidationResult(false, 'URL must start with http:// or https://');
             }
-            
+
             return new JiraFieldValidationResult(true);
         }
     }

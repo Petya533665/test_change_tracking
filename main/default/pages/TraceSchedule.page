@@ -26,7 +26,8 @@
                 lexOrigin: '{!lexOrigin}',
                 userTimezoneOffset: '{!userTimezoneOffset}',
                 userTimezone: '{!userTimezone}',
-                orgId: '{!orgId}'
+                orgId: '{!orgId}',
+                issueId: '{!$CurrentPage.parameters.issueId}' 
             };
         </script>
         <apex:outputText rendered="{!ISNULL(traceScheduleId)}">

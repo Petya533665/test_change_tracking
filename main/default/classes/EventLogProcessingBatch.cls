@@ -3,9 +3,8 @@ public class EventLogProcessingBatch extends DatabaseUtils.PharosBatchImpl imple
     // Configurable settings for enhanced deduplication
     public class EnhancedDeduplicationSettings {
         public Boolean enableEmailEventDeduplication = true;
-        public Integer timingToleranceSeconds = 10;
+        public Integer timingToleranceSeconds = 1;
         public Boolean preserveAllEventLogs = true;
-        public Boolean enableDetailedLogging = false;
         public Set<String> eventTypesToCheck = EventLogProcessors.EVENT_TYPES_TO_CHECK_DUPLICATES;
         
         // New chunking settings
@@ -268,8 +267,6 @@ public class EventLogProcessingBatch extends DatabaseUtils.PharosBatchImpl imple
         String eventType = enabledMembers[0].type;
         return EventMonitoringUtil.getEventLogs(eventType);
     }
-    
-
 
     /**
      * Start the batch uses iterator to get the enabled event types
@@ -316,11 +313,11 @@ public class EventLogProcessingBatch extends DatabaseUtils.PharosBatchImpl imple
                 
                 if (logFile == null) continue;
                 
-                // Create processor and detector for this chunk
+                // Create processor and event processor for this chunk  
                 EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(eventType);
-                AnomalyDetectors.IAnomalyDetector detector = AnomalyDetectors.createDetector(eventType);
+                EventMonitoringProcessors.IEventLogProcessor eventProcessor = EventMonitoringProcessors.createProcessor(eventType);
                 EventLogProcessors.BatchEventDataProcessor batchProcessor = 
-                    new EventLogProcessors.BatchEventDataProcessor(detector, this.logger);
+                    new EventLogProcessors.BatchEventDataProcessor(eventProcessor, this.logger);
                 
                 // Process the specific chunk with start and end row boundaries
                 processor.batchProcessLogFileSObject(logFile, batchProcessor, chunk.startRow, chunk.endRow);
@@ -329,8 +326,7 @@ public class EventLogProcessingBatch extends DatabaseUtils.PharosBatchImpl imple
                 processEnhancedDeduplication(eventType);
                 
             } catch (Exception e) {
-                String logFileId = chunk.logFileId != null ? chunk.logFileId : 'Unknown';
-                this.logger.add(this.logger.getInternalError(e, logFileId, EventLogProcessingBatch.class.getName(), 'Error processing log file chunk'));
+                this.logger.add(this.logger.getInternalError(e, chunk?.logFileId, EventLogProcessingBatch.class.getName(), 'Error processing log file chunk'));
             }
         }
 
@@ -403,7 +399,6 @@ public class EventLogProcessingBatch extends DatabaseUtils.PharosBatchImpl imple
                 'enableEmailEventDeduplication' => dedupSettings.enableEmailEventDeduplication,
                 'timingToleranceSeconds' => dedupSettings.timingToleranceSeconds,
                 'preserveAllEventLogs' => dedupSettings.preserveAllEventLogs,
-                'enableDetailedLogging' => dedupSettings.enableDetailedLogging,
                 'eventTypesToCheck' => dedupSettings.eventTypesToCheck
             };
             

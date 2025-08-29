@@ -53,7 +53,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         Test.startTest();
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -111,7 +111,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_API);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -160,7 +160,7 @@ private class EventLogProcessorsTest {
                           
         String csvData = 'CALLOUT-123,005xx000001234AAA,POST,REST,https://api.example.com/data,' +
                         '500,1024,2048,750,200,' +
-                        'true,/apex/MyClass.makeCallout,CALLOUT_1,192.168.1.1,abc123,' +
+                        '1,/apex/MyClass.makeCallout,CALLOUT_1,192.168.1.1,abc123,' +
                         'def456,00D123456789012345,2024-01-01T12:00:00Z,' +
                         '20130715233322.670,005xx000001234AAA\n';
         
@@ -172,7 +172,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_APEX_CALLOUT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -193,7 +193,7 @@ private class EventLogProcessorsTest {
         System.assertEquals(2048, calloutData.responseSize);
         System.assertEquals(750, calloutData.timeValue);
         System.assertEquals(200, calloutData.statusCode);
-        System.assertEquals(true, calloutData.success);
+        System.assertEquals('1', calloutData.success);
         System.assertEquals('/apex/MyClass.makeCallout', calloutData.uri);
         System.assertEquals('CALLOUT_1', calloutData.uriIdDerived);
         System.assertEquals('192.168.1.1', calloutData.clientIp);
@@ -226,7 +226,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_APEX_EXECUTION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -284,7 +284,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_APEX_REST_API);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -348,7 +348,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_APEX_SOAP);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -404,7 +404,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_APEX_TRIGGER);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -455,7 +455,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -501,7 +501,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_API_TOTAL_USAGE);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -553,7 +553,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_ASYNCHRONOUS_REPORT_RUN);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -612,7 +612,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_BLOCKED_REDIRECT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -651,7 +651,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_BULK_API);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -702,7 +702,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_AURA_REQUEST);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -753,7 +753,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_BULK_API_REQUEST);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -806,7 +806,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_BULK_API_2);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -853,7 +853,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CHANGE_SET_OPERATION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -894,7 +894,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONCURRENT_LONG_RUNNING_APEX_LIMIT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -933,7 +933,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONSOLE);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -981,7 +981,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONTENT_DISTRIBUTION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1017,7 +1017,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONTENT_DOCUMENT_LINK);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1056,7 +1056,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONTENT_TRANSFER);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1098,7 +1098,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CONTINUATION_CALLOUT_SUMMARY);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1137,7 +1137,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CORS_VIOLATION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1171,7 +1171,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_CSP_VIOLATION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1217,7 +1217,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_DASHBOARD);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1265,7 +1265,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_DATABASE_SAVE);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1302,7 +1302,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_DOCUMENT_ATTACHMENT_DOWNLOADS);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1339,7 +1339,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_EXTERNAL_CUSTOM_APEX_CALLOUT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1389,7 +1389,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_EXTERNAL_CROSS_ORG_CALLOUT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1442,7 +1442,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_EXTERNAL_DATA_SOURCE_CALLOUT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1502,7 +1502,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_EXTERNAL_ODATA_CALLOUT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1558,7 +1558,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_FLOW_EXECUTION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1598,7 +1598,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_GROUP_MEMBERSHIP);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1642,7 +1642,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_HOSTNAME_REDIRECTS);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1684,7 +1684,7 @@ private class EventLogProcessorsTest {
         // Process the test data
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_INSECURE_EXTERNAL_ASSETS);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         
         // Verify results
@@ -1733,7 +1733,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_INSUFFICIENT_ACCESS);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -1778,7 +1778,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_KNOWLEDGE_ARTICLE_VIEW);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -1835,7 +1835,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -1916,7 +1916,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_LIGHTNING_INTERACTION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -1996,7 +1996,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_LIGHTNING_LOGGER);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2071,7 +2071,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_LIGHTNING_PAGE_VIEW);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2155,7 +2155,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_LIGHTNING_PERFORMANCE);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2222,7 +2222,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_LOGIN);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2284,7 +2284,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_LOGIN_AS);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2334,7 +2334,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_LOGOUT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2385,7 +2385,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_METADATA_API_OPERATION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2433,7 +2433,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_MULTIBLOCK_REPORT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2481,7 +2481,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_NAMED_CREDENTIAL);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2533,7 +2533,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_ONE_COMMERCE_USAGE);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2602,7 +2602,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_PACKAGE_INSTALL);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2652,7 +2652,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_PERMISSION_UPDATE);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2696,7 +2696,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_PLATFORM_ENCRYPTION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2746,7 +2746,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_PRICING);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2797,7 +2797,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_QUEUED_EXECUTION);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2851,7 +2851,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_REPORT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2912,7 +2912,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_REPORT_EXPORT);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -2963,7 +2963,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_REST_API);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3021,7 +3021,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_SANDBOX);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3059,7 +3059,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_SEARCH);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3096,7 +3096,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_SEARCH_CLICK);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3140,7 +3140,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_SITES);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3199,7 +3199,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_TIME_BASED_WORKFLOW);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3248,7 +3248,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_TRANSACTION_SECURITY);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3315,7 +3315,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_UI_TELEMETRY_NAVIGATION_TIMING);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3426,7 +3426,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_UI_TELEMETRY_RESOURCE_TIMING);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3533,7 +3533,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_URI);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3604,7 +3604,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.VisualforceRequestProcessor processor = (EventLogProcessors.VisualforceRequestProcessor)EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_VISUALFORCE_REQUEST);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3672,7 +3672,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_WAVE_CHANGE);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         
@@ -3745,7 +3745,7 @@ private class EventLogProcessorsTest {
         Test.startTest();
         EventLogProcessors.EventLogProcessor processor = EventLogProcessors.createProcessor(EventLogProcessors.EVENT_TYPE_WAVE_DOWNLOAD);
         TestBatchProcessor batchProcessor = new TestBatchProcessor();
-        processor.batchProcessLogFile(logFile, batchProcessor);
+        processor.batchProcessLogFileSObject(logFile, batchProcessor);
         List<EventLogProcessors.IBaseEventData> results = batchProcessor.processedRecords;
         Test.stopTest();
         

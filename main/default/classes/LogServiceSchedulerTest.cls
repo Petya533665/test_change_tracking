@@ -21,6 +21,7 @@ private class LogServiceSchedulerTest {
 		Test.startTest();
 		test_startJobs(LogServiceScheduler.SCHEDULER_MODE.SCHEDULER_MODE_1);
 		System.assertEquals(DatabaseUtils.startJobs, new Set<String>{
+				'HourlyLimitsBatch',
 				'LogServiceBatch',
 				'ManageTokensBatch',
 				'EventLogProcessingBatch',
