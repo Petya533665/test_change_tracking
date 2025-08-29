@@ -234,10 +234,10 @@ public with sharing class LogListController {
 		DateTime startDateTime = DateTime.now().addDays(-30);
 		DateTime endDateTime = DateTime.now();
 		if (String.isNotBlank(fromDatetime)) {
-			startDateTime = DateTime.valueOf(fromDatetime);
+			startDateTime = DateTime.valueOfGmt(fromDatetime);
 		}
 		if (String.isNotBlank(toDatetime)) {
-			endDateTime = DateTime.valueOf(toDatetime);
+			endDateTime = DateTime.valueOfGmt(toDatetime);
 		}
 		
 		QBuilder queryBuilder = new QBuilder('Log__c');
@@ -298,10 +298,10 @@ public with sharing class LogListController {
 		DateTime startDateTime = DateTime.now().addDays(-30);
 		DateTime endDateTime = DateTime.now();
 		if (String.isNotBlank(fromDatetime)) {
-			startDateTime = DateTime.valueOf(fromDatetime);
+			startDateTime = DateTime.valueOfGmt(fromDatetime);
 		}
 		if (String.isNotBlank(toDatetime)) {
-			endDateTime = DateTime.valueOf(toDatetime);
+			endDateTime = DateTime.valueOfGmt(toDatetime);
 		}
 		
 		Long totalMillis = endDateTime.getTime() - startDateTime.getTime();
