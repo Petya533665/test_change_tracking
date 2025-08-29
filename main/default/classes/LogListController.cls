@@ -7,6 +7,13 @@ public with sharing class LogListController {
 		set;
 	}
 
+	public Integer userTimezoneOffset {
+        get {
+            return AdminService.getUserTimezoneOffset();
+        }
+        set;
+    }
+
 	private static final Integer DEFAULT_LOGS_QUERY_LIMIT = 100;
 	private static final Integer MAX_QUERY_LIMIT = 5000;
 	private static final Integer LOG_PERIODS_AMOUNT = 50;
@@ -72,7 +79,7 @@ public with sharing class LogListController {
 			this.apexName = log.Apex_Name__c;
 			this.flowApiName = log.Flow_API_Name__c;
 			this.userName = log.User_Name__c;
-			this.issueId = log.Issue__c;
+			this.issueId = log.Issue__r.Id;
 			this.issueName = log.Issue__r.Name;
 			this.viewFieldValue = getViewValue(log, view);
 		}
@@ -239,16 +246,16 @@ public with sharing class LogListController {
 		DateTime startDateTime = DateTime.now().addDays(-30);
 		DateTime endDateTime = DateTime.now();
 		if (String.isNotBlank(fromDatetime)) {
-			startDateTime = DateTime.valueOfGmt(fromDatetime);
+			startDateTime = DateTime.valueOf(fromDatetime);
 		}
 		if (String.isNotBlank(toDatetime)) {
-			endDateTime = DateTime.valueOfGmt(toDatetime);
+			endDateTime = DateTime.valueOf(toDatetime);
 		}
 		
 		QBuilder queryBuilder = new QBuilder('Log__c');
 		queryBuilder.selectFields(new Set<String>{
 			'Id', 'Name', 'Category__c', 'Type__c', 'Summary__c', 'Is_New__c', 'Created_At__c', 'Flow_API_Name__c', 'Area__c', 'Apex_Name__c',
-			'User_Name__c', 'Issue__c', 'Issue__r.Name'
+			'User_Name__c', 'Issue__r.Id', 'Issue__r.Name'
 		});
 		queryBuilder.add(QBuilder.condition('Created_At__c').isGreaterOrEquals(startDateTime));
 		queryBuilder.add(QBuilder.condition('Created_At__c').isLessOrEquals(endDateTime));
@@ -303,10 +310,10 @@ public with sharing class LogListController {
 		DateTime startDateTime = DateTime.now().addDays(-30);
 		DateTime endDateTime = DateTime.now();
 		if (String.isNotBlank(fromDatetime)) {
-			startDateTime = DateTime.valueOfGmt(fromDatetime);
+			startDateTime = DateTime.valueOf(fromDatetime);
 		}
 		if (String.isNotBlank(toDatetime)) {
-			endDateTime = DateTime.valueOfGmt(toDatetime);
+			endDateTime = DateTime.valueOf(toDatetime);
 		}
 		
 		Long totalMillis = endDateTime.getTime() - startDateTime.getTime();
