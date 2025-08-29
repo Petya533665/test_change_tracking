@@ -707,7 +707,7 @@ public without sharing class PermissionsUtil {
 			if(MaxMonitoringRules == null) {
 				MaxMonitoringRules = FeatureMap2.get(MAP_FEATURE2_INDEX_BY_NAME.get(FP_MAX_MONITORING_RULES));
 			}
-			return MaxMonitoringRules;
+			return 100;
 		}
 		private set;
 	}
