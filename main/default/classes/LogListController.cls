@@ -9,7 +9,7 @@ public with sharing class LogListController {
 
 	private static final Integer DEFAULT_LOGS_QUERY_LIMIT = 100;
 	private static final Integer MAX_QUERY_LIMIT = 5000;
-	private static final Integer LOG_PERIODS_AMOUNT = 30;
+	private static final Integer LOG_PERIODS_AMOUNT = 50;
 	private static final String DEFAULT_LOGS_SORT = 'Id,DESC';
 	private static final String UNKNOWN_VALUE = 'Unknown';
 
