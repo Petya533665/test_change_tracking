@@ -101,10 +101,10 @@ public with sharing class LogListController {
 	}
 
 	public class LogsPerPeriodData {
-		public String timePoint;
+		public DateTime timePoint;
 		public Map<String, Integer> groupCounts;
 
-		public LogsPerPeriodData(String timePoint) {
+		public LogsPerPeriodData(DateTime timePoint) {
 			this.timePoint = timePoint;
 			this.groupCounts = new Map<String, Integer>();
 		}
@@ -324,7 +324,7 @@ public with sharing class LogListController {
 		for (Integer i = 0; i < LOG_PERIODS_AMOUNT; i++) {
 			DateTime periodStart = startDateTime.addSeconds((Integer)((i * periodMillis) / 1000));
 			String periodKey = String.valueOf(periodStart);
-			logsPerPeriodMap.put(periodKey, new LogsPerPeriodData(periodKey));
+			logsPerPeriodMap.put(periodKey, new LogsPerPeriodData(periodStart));
 		}
 		
 		// Initialize metrics
