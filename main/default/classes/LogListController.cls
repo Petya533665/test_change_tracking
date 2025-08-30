@@ -320,12 +320,15 @@ public with sharing class LogListController {
 		Long periodMillis = totalMillis / LOG_PERIODS_AMOUNT;
 		Map<String, LogsPerPeriodData> logsPerPeriodMap = new Map<String, LogsPerPeriodData>();
 		
-		// Initialize all periods
+		// Initialize all periods including start and end times
 		for (Integer i = 0; i < LOG_PERIODS_AMOUNT; i++) {
 			DateTime periodStart = startDateTime.addSeconds((Integer)((i * periodMillis) / 1000));
 			String periodKey = String.valueOf(periodStart);
 			logsPerPeriodMap.put(periodKey, new LogsPerPeriodData(periodStart));
 		}
+		
+		// Add endDateTime as a period to capture logs at the very end
+		logsPerPeriodMap.put(String.valueOf(endDateTime), new LogsPerPeriodData(endDateTime));
 		
 		// Initialize metrics
 		Integer total = 0;
@@ -393,12 +396,27 @@ public with sharing class LogListController {
 				// Calculate which period this log belongs to
 				Long logMillis = log.Created_At__c.getTime() - startDateTime.getTime();
 				Integer periodIndex = (Integer)(logMillis / periodMillis);
-				if (periodIndex >= LOG_PERIODS_AMOUNT) periodIndex = LOG_PERIODS_AMOUNT - 1; // Ensure we don't exceed LOG_PERIODS_AMOUNT periods
-				if (periodIndex < 0) continue;
 				
-				// Create period key
-				DateTime periodStart = startDateTime.addSeconds((Integer)((periodIndex * periodMillis) / 1000));
-				String periodKey = String.valueOf(periodStart);
+				String periodKey;
+				if (periodIndex >= LOG_PERIODS_AMOUNT) {
+					// Log is beyond the calculated periods, assign to endDateTime period
+					periodKey = String.valueOf(endDateTime);
+				} else if (periodIndex < 0) {
+					continue;
+				} else {
+					// Create period key for regular periods
+					DateTime periodStart = startDateTime.addSeconds((Integer)((periodIndex * periodMillis) / 1000));
+					periodKey = String.valueOf(periodStart);
+					
+					// If this is the last calculated period and the log is very close to endDateTime, 
+					// assign it to endDateTime period instead
+					if (periodIndex == LOG_PERIODS_AMOUNT - 1) {
+						Long timeToEnd = endDateTime.getTime() - log.Created_At__c.getTime();
+						if (timeToEnd <= periodMillis) {
+							periodKey = String.valueOf(endDateTime);
+						}
+					}
+				}
 				
 				// Get the appropriate field value based on view
 				String viewValue = getViewValue(log, view);
