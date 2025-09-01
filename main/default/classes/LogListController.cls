@@ -439,14 +439,6 @@ public with sharing class LogListController {
 				lastId = logsBatch[logsBatch.size() - 1].Id;
 			}
 		}
-		
-		// Filter out periods with empty groupCounts
-		List<LogsPerPeriodData> chartData = new List<LogsPerPeriodData>();
-		for (LogsPerPeriodData periodData : logsPerPeriodMap.values()) {
-			if (!periodData.groupCounts.isEmpty()) {
-				chartData.add(periodData);
-			}
-		}
 
 		List<LogChartDataMetric> metrics = new List<LogChartDataMetric>();
 		metrics.add(new LogChartDataMetric('Total', total));
@@ -457,7 +449,7 @@ public with sharing class LogListController {
 		metrics.add(new LogChartDataMetric('Is Parent', isParent));
 
 		LogChartDataResponse response = new LogChartDataResponse();
-		response.chartData = chartData;
+		response.chartData = logsPerPeriodMap.values();
 		response.metrics = metrics;
 		return response;
 	}
