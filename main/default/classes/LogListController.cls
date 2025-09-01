@@ -318,6 +318,11 @@ public with sharing class LogListController {
 		
 		Long totalMillis = endDateTime.getTime() - startDateTime.getTime();
 		Long periodMillis = totalMillis / LOG_PERIODS_AMOUNT;
+		
+		// Add padding to endDateTime (1/5 of period length) to capture logs near the boundary
+		Long paddingSeconds = (periodMillis / 5) / 1000;
+		DateTime paddedEndDateTime = endDateTime.addSeconds((Integer)paddingSeconds);
+		
 		Map<String, LogsPerPeriodData> logsPerPeriodMap = new Map<String, LogsPerPeriodData>();
 		
 		// Initialize all periods including start and end times
@@ -327,8 +332,8 @@ public with sharing class LogListController {
 			logsPerPeriodMap.put(periodKey, new LogsPerPeriodData(periodStart));
 		}
 		
-		// Add endDateTime as a period to capture logs at the very end
-		logsPerPeriodMap.put(String.valueOf(endDateTime), new LogsPerPeriodData(endDateTime));
+		// Add padded endDateTime as a period to capture logs at the very end
+		logsPerPeriodMap.put(String.valueOf(paddedEndDateTime), new LogsPerPeriodData(paddedEndDateTime));
 		
 		// Initialize metrics
 		Integer total = 0;
@@ -399,23 +404,14 @@ public with sharing class LogListController {
 				
 				String periodKey;
 				if (periodIndex >= LOG_PERIODS_AMOUNT) {
-					// Log is beyond the calculated periods, assign to endDateTime period
-					periodKey = String.valueOf(endDateTime);
+					// Log is beyond the calculated periods, assign to padded endDateTime period
+					periodKey = String.valueOf(paddedEndDateTime);
 				} else if (periodIndex < 0) {
 					continue;
 				} else {
 					// Create period key for regular periods
 					DateTime periodStart = startDateTime.addSeconds((Integer)((periodIndex * periodMillis) / 1000));
 					periodKey = String.valueOf(periodStart);
-					
-					// If this is the last calculated period and the log is very close to endDateTime, 
-					// assign it to endDateTime period instead
-					if (periodIndex == LOG_PERIODS_AMOUNT - 1) {
-						Long timeToEnd = endDateTime.getTime() - log.Created_At__c.getTime();
-						if (timeToEnd <= periodMillis) {
-							periodKey = String.valueOf(endDateTime);
-						}
-					}
 				}
 				
 				// Get the appropriate field value based on view
