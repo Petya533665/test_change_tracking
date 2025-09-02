@@ -72,13 +72,12 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     }
 
     private List<Log__c> getUniqueLogs(String lastProcessedId) {
-        String uniqueIdsQuery = 'SELECT MIN(Id) minId FROM Log__c WHERE Hash_1__c != null';
+        DateTime lastHour = DateTime.now().addHours(-1);
+        String uniqueIdsQuery = 'SELECT MIN(Id) minId FROM Log__c WHERE Hash_1__c != null AND CreatedDate >= :lastHour';
         if (String.isNotBlank(lastProcessedId)) {
             uniqueIdsQuery += ' AND Id > \'' + lastProcessedId + '\'';
         }
         uniqueIdsQuery += ' GROUP BY Hash_1__c ORDER BY MIN(Id) ASC LIMIT 1000';
-        
-        DateTime lastHour = DateTime.now().addHours(-1);
         
         // Execute the first query to get unique IDs
         List<AggregateResult> uniqueIds = Database.query(uniqueIdsQuery);
