@@ -26,13 +26,15 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     }
 
     public Database.QueryLocator start(Database.BatchableContext batchableContext) {
-        // Get all unique logs at once
-        List<Log__c> allUniqueLogs = getUniqueLogs(lastProcessedId);
-        
-        // Store the logs for processing in execute method
+        // Get all unique logs at once and store them for execute method
+        List<Log__c> allUniqueLogs = getUniqueLogs(lastProcessedId); 
         this.allUniqueLogs = allUniqueLogs;
         
         // Return a simple query that will be processed in chunks
+        if (allUniqueLogs == null || allUniqueLogs.isEmpty()) {
+            return Database.getQueryLocator('SELECT Id FROM Log__c WHERE Id = null LIMIT 0');
+        }
+        
         QBuilder qb = new QBuilder(Log__c.SObjectType)
             .selectFields(new Set<String>{'Id'})
             .add(QBuilder.condition('Id').isIn(new List<Id>(new Map<Id, Log__c>(allUniqueLogs).keySet())))
@@ -49,12 +51,11 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         try {
             Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId());
             
-            // Send all unique logs in a single Lambda call
-            String logsJSON = JSON.serialize(allUniqueLogs);
+            List<Map<String, Object>> cleanedLogs = transformLogsForAWS(allUniqueLogs);
+            String logsJSON = JSON.serialize(cleanedLogs);
             AWSChatServiceResponse response = startAwsChatService(corg, logsJSON);
             
             if (response != null && response.success) {
-                // Update last processed ID to the highest ID from all logs
                 setLastProcessedId(allUniqueLogs.get(allUniqueLogs.size() - 1).Id);
             }
             
@@ -71,14 +72,12 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     }
 
     private List<Log__c> getUniqueLogs(String lastProcessedId) {
-        // First get unique Hash_1__c values and their minimum IDs using raw SOQL
         String uniqueIdsQuery = 'SELECT MIN(Id) minId FROM Log__c WHERE Hash_1__c != null AND CreatedDate >= :lastHour';
         if (String.isNotBlank(lastProcessedId)) {
             uniqueIdsQuery += ' AND Id > \'' + lastProcessedId + '\'';
         }
         uniqueIdsQuery += ' GROUP BY Hash_1__c ORDER BY MIN(Id) ASC LIMIT 1000';
         
-        // Calculate last hour timestamp
         DateTime lastHour = DateTime.now().addHours(-1);
         
         // Execute the first query to get unique IDs
@@ -88,7 +87,6 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             logIds.add((Id)ar.get('minId'));
         }
         
-        // If no unique IDs found, return empty list
         if (logIds.isEmpty()) {
             return new List<Log__c>();
         }
@@ -98,12 +96,12 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             'Id', 'Name', 'Hash_1__c', 'Summary__c', 'Details__c', 'Type__c', 'Category__c', 'Area__c'
         };
         
-        QBuilder mainQb = new QBuilder(Log__c.SObjectType)
+        QBuilder qb = new QBuilder(Log__c.SObjectType)
             .selectFields(fields)
             .add(QBuilder.condition('Id').isIn(new List<Id>(logIds)))
             .add(QBuilder.orderBy('Id').ascending());
         
-        List<Log__c> result = Database.query(mainQb.build());
+        List<Log__c> result = Database.query(qb.build());
         
         return result;
     }
@@ -114,6 +112,22 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         if (String.isNotBlank(lastProcessedId)) {
             this.lastProcessedId = lastProcessedId;
         }
+    }
+
+    private List<Map<String, Object>> transformLogsForAWS(List<Log__c> logs) {
+        List<Map<String, Object>> cleanedLogs = new List<Map<String, Object>>();
+        for (Log__c log : logs) {
+            Map<String, Object> cleanedLog = new Map<String, Object>();
+            cleanedLog.put('id', log.Id);
+            cleanedLog.put('name', log.Name);
+            cleanedLog.put('hash1', log.Hash_1__c);
+            cleanedLog.put('summary', log.Summary__c);
+            cleanedLog.put('details', log.Details__c);
+            cleanedLog.put('category', log.Category__c);
+            cleanedLog.put('area', log.Area__c);
+            cleanedLogs.add(cleanedLog);
+        }
+        return cleanedLogs;
     }
 
     public AWSChatServiceResponse startAwsChatService(Connected_Org__c corg, String logsJSON) {
