@@ -55,7 +55,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             String logsJSON = JSON.serialize(cleanedLogs);
             AWSChatServiceResponse response = startAwsChatService(corg, logsJSON);
             
-            if (response != null && response.success) {
+            if (response != null && response.statusCode == 200) {
                 setLastProcessedId(allUniqueLogs.get(allUniqueLogs.size() - 1).Id);
             }
             
@@ -72,7 +72,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     }
 
     private List<Log__c> getUniqueLogs(String lastProcessedId) {
-        String uniqueIdsQuery = 'SELECT MIN(Id) minId FROM Log__c WHERE Hash_1__c != null AND CreatedDate >= :lastHour';
+        String uniqueIdsQuery = 'SELECT MIN(Id) minId FROM Log__c WHERE Hash_1__c != null';
         if (String.isNotBlank(lastProcessedId)) {
             uniqueIdsQuery += ' AND Id > \'' + lastProcessedId + '\'';
         }
@@ -91,7 +91,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             return new List<Log__c>();
         }
         
-        // Second query to get the full records using QBuilder
+        // Second query to get the full records
         Set<String> fields = new Set<String>{
             'Id', 'Name', 'Hash_1__c', 'Summary__c', 'Details__c', 'Type__c', 'Category__c', 'Area__c'
         };
@@ -154,10 +154,8 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     }
 
     public class AWSChatServiceResponse {
-        public Boolean success;
-        public String name;
-        public String message;
-        public String stack;
+        public Integer statusCode;
+        public String body;
     
         public AWSChatServiceResponse(){}
     }
