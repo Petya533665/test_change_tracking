@@ -3,12 +3,12 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     private static final String INDEX_MANAGER_LOGS_ENDPOINT = INDEX_MANAGER_ENDPOINT + '/logs';
     
     private static final Integer MAX_AWS_REQUEST_SIZE = 10*1024*1024; //10MB
-    private static final Integer ESTIMATED_MAX_LOG_SIZE = 4*1024; //4KB
+    private static final Integer ESTIMATED_MAX_LOG_SIZE = 5*1024; //5KB
     private static final Integer MAX_LOGS_PER_BATCH = MAX_AWS_REQUEST_SIZE / ESTIMATED_MAX_LOG_SIZE;
-    private static final Integer MAX_DETAILS_LENGTH = 3072;
+    private static final Integer MAX_DETAILS_LENGTH = 4096;
     
     private static ChatIndexBatch instance = null;
-    public DateTime startDate = DateTime.now().addYears(-1);
+    public DateTime startDate = DateTime.now().addHours(-1);
 
     public static ChatIndexBatch getInstance() {
         if (instance == null) {
