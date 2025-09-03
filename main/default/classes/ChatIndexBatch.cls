@@ -72,7 +72,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     }
 
     private List<Log__c> getUniqueLogs(String lastProcessedId) {
-        DateTime lastHour = DateTime.now().addHours(-1);
+        DateTime lastHour = DateTime.now().addYears(-3);
         QBuilder uniqueIdsQb = new QBuilder(Log__c.SObjectType)
             .selectFields(new Set<String>{'MIN(Id) minId'})
             .add(QBuilder.condition('Hash_1__c').isNotNull())
@@ -97,7 +97,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         
         // Second query to get the full records of unique logs
         Set<String> fields = new Set<String>{
-            'Id', 'Name', 'Hash_1__c', 'Summary__c', 'Details__c', 'Type__c', 'Category__c', 'Area__c'
+            'Id', 'Name', 'Hash_1__c', 'Summary__c', 'Details__c', 'Type__c', 'Category__c', 'Area__c', 'Created_At__c'
         };
         
         QBuilder qb = new QBuilder(Log__c.SObjectType)
