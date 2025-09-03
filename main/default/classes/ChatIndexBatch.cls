@@ -72,7 +72,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     }
 
     private List<Log__c> getUniqueLogs(String lastProcessedId) {
-        DateTime lastHour = DateTime.now().addYears(-2); //TODO: Change to 1 hour
+        DateTime lastHour = DateTime.now().addHours(-1);
         QBuilder uniqueIdsQb = new QBuilder(Log__c.SObjectType)
             .selectFields(new Set<String>{'MIN(Id) minId'})
             .add(QBuilder.condition('Hash_1__c').isNotNull())
