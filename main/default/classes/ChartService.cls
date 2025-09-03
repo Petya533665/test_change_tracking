@@ -1,7 +1,16 @@
 public with sharing class ChartService {
 
 	private final ChartServiceInterface strategy;
-//fsfsdfsfsa
+//fsdfdsfdsf
+//fsdfdsfdsf
+
+//fsdfdsfdsf
+
+//fsdfdsfdsf
+//fsdfdsfdsf
+//fsdfdsfdsf
+//fsdfdsfdsf
+
 	public enum Chart {
 		OCCURRENCE,
 		OCCURRENCE_LAST_7_DAYS,
