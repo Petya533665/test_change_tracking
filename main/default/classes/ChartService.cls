@@ -1,15 +1,6 @@
 public with sharing class ChartService {
 
 	private final ChartServiceInterface strategy;
-//fsdfdsfdsf
-//fsdfdsfdsf
-
-//fsdfdsfdsf
-
-//fsdfdsfdsf
-//fsdfdsfdsf
-//fsdfdsfdsf
-//fsdfdsfdsf
 
 	public enum Chart {
 		OCCURRENCE,
