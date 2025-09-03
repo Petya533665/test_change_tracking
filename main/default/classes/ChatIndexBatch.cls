@@ -142,13 +142,25 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
                 Map<String, String> headers = GitHubUtils.authHeaders();
                 headers.putAll(HttpUtils.getHeadersContentTypeJSON());
 
+                System.debug('++++endpoint: ' + INDEX_MANAGER_LOGS_ENDPOINT);
+                System.debug('++++request: ' + JSON.serialize(request));
+                System.debug('++++headers: ' + headers);
+                
                 String response = HttpUtils.post(
                     INDEX_MANAGER_LOGS_ENDPOINT,
                     JSON.serialize(request),
                     headers,
-                    200
+                    201
                 );
-                result = (AWSChatServiceResponse)JSON.deserialize(response, AWSChatServiceResponse.class);
+                
+                System.debug('++++response: ' + response);
+                if (String.isNotBlank(response)) {
+                    result = (AWSChatServiceResponse)JSON.deserialize(response, AWSChatServiceResponse.class);
+                } else {
+                    result = new AWSChatServiceResponse();
+                    result.statusCode = 500;
+                    result.body = 'Empty response from Lambda service';
+                }
             }
         }
         catch(Exception e) {
