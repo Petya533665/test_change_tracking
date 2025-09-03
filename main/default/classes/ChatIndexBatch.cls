@@ -73,13 +73,13 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
 
     private List<Log__c> getUniqueLogs(String lastProcessedId) {
         DateTime lastHour = DateTime.now().addHours(-1);
-        String uniqueIdsQuery = 'SELECT MIN(Id) minId FROM Log__c WHERE Hash_1__c != null AND CreatedDate >= :lastHour';
+        String uniqueIdsQuery = 'SELECT MIN(Id) minId FROM Log__c WHERE Hash_1__c != null AND CreatedDate >= ' + lastHour.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss.SSS\'Z\'');
         if (String.isNotBlank(lastProcessedId)) {
             uniqueIdsQuery += ' AND Id > \'' + lastProcessedId + '\'';
         }
         uniqueIdsQuery += ' GROUP BY Hash_1__c ORDER BY MIN(Id) ASC LIMIT 1000';
         
-        // Execute the first query to get unique IDs
+        // Execute the first query to get IDs of unique logs
         List<AggregateResult> uniqueIds = Database.query(uniqueIdsQuery);
         Set<Id> logIds = new Set<Id>();
         for (AggregateResult ar : uniqueIds) {
@@ -90,7 +90,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             return new List<Log__c>();
         }
         
-        // Second query to get the full records
+        // Second query to get the full records of unique logs
         Set<String> fields = new Set<String>{
             'Id', 'Name', 'Hash_1__c', 'Summary__c', 'Details__c', 'Type__c', 'Category__c', 'Area__c'
         };
