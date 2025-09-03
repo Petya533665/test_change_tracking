@@ -2,9 +2,13 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     private static final String INDEX_MANAGER_ENDPOINT = Constants.REMOTE_SITE_SETTINGS.AI_URL + '/index';
     private static final String INDEX_MANAGER_LOGS_ENDPOINT = INDEX_MANAGER_ENDPOINT + '/logs';
     
+    private static final Integer MAX_AWS_REQUEST_SIZE = 10*1024*1024; //10MB
+    private static final Integer ESTIMATED_MAX_LOG_SIZE = 4*1024; //4KB
+    private static final Integer MAX_LOGS_PER_BATCH = MAX_AWS_REQUEST_SIZE / ESTIMATED_MAX_LOG_SIZE;
+    private static final Integer MAX_DETAILS_LENGTH = 3072;
+    
     private static ChatIndexBatch instance = null;
-    private String lastProcessedId = null;
-    private List<Log__c> allUniqueLogs = null;
+    public DateTime startDate = DateTime.now().addYears(-1);
 
     public static ChatIndexBatch getInstance() {
         if (instance == null) {
@@ -15,6 +19,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
 
     private ChatIndexBatch(Logger logger) {
         super(logger);
+        BATCH_SCOPE = MAX_LOGS_PER_BATCH;
     }
 
     public override void startBatch() {
@@ -22,45 +27,38 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     }
 
     public override Integer getIterationsCount() {
-        return 1;
+        // Calculate total iterations based on unique hashes and batch size
+        List<AggregateResult> hashCounts = [
+            SELECT COUNT_DISTINCT(Hash_1__c) uniqueCount
+            FROM Log__c 
+            WHERE Hash_1__c != NULL 
+            AND CreatedDate >= :startDate
+        ];
+        Integer totalUniqueHashes = hashCounts.isEmpty() ? 0 : (Integer)hashCounts[0].get('uniqueCount');
+        return Math.ceil(totalUniqueHashes / MAX_LOGS_PER_BATCH).intValue();
     }
 
     public Database.QueryLocator start(Database.BatchableContext batchableContext) {
-        // Get all unique logs at once and store them for execute method
-        List<Log__c> allUniqueLogs = getUniqueLogs(lastProcessedId); 
-        this.allUniqueLogs = allUniqueLogs;
-        
-        // Return a simple query that will be processed in chunks
-        if (allUniqueLogs == null || allUniqueLogs.isEmpty()) {
-            return Database.getQueryLocator('SELECT Id FROM Log__c WHERE Id = null LIMIT 0');
-        }
-        
-        QBuilder qb = new QBuilder(Log__c.SObjectType)
-            .selectFields(new Set<String>{'Id'})
-            .add(QBuilder.condition('Id').isIn(new List<Id>(new Map<Id, Log__c>(allUniqueLogs).keySet())))
-            .addLimit(1); // Only need one record to trigger execute
-        
-        return Database.getQueryLocator(qb.build());
+        // Get ids of unique logs
+        QBuilder uniqueIdsQb = new QBuilder(Log__c.SObjectType)
+        .selectFields(new Set<String>{'MIN(Id)'})
+        .add(QBuilder.condition('Hash_1__c').isNotNull())
+        .add(QBuilder.condition('CreatedDate').isGreaterOrEquals(startDate));
+        String uniqueIdsQuery = uniqueIdsQb.build() + ' GROUP BY Hash_1__c ORDER BY MIN(Id) DESC';
+        return Database.getQueryLocator(uniqueIdsQuery);
     }
 
     public void execute(Database.BatchableContext info, List<SObject> scope) {
-        if (scope == null || scope.isEmpty() || allUniqueLogs == null || allUniqueLogs.isEmpty()) {
+        if (scope == null || scope.isEmpty() || !PermissionsUtil.MetadataChatEnabled) {
             return;
         }
         
         try {
             Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId());
             
-            List<Map<String, Object>> cleanedLogs = transformLogsForAWS(allUniqueLogs);
-            String logsJSON = JSON.serialize(cleanedLogs);
-            AWSChatServiceResponse response = startAwsChatService(corg, logsJSON);
-            
-            if (response != null && response.statusCode == 200) {
-                setLastProcessedId(allUniqueLogs.get(allUniqueLogs.size() - 1).Id);
-            }
-            
-            // Clear the logs to prevent multiple calls
-            allUniqueLogs = null;
+            List<Map<String, Object>> transformedLogs = getLogsForAWS(scope);
+            String logsJSON = JSON.serialize(transformedLogs);
+            startAwsChatService(corg, logsJSON);
         }
         catch (Exception e) {
             loggerInstance?.addInternalError(e, ChatIndexBatch.class.getName(), ':execute');
@@ -71,109 +69,58 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         this.loggerInstance?.flush();
     }
 
-    private List<Log__c> getUniqueLogs(String lastProcessedId) {
-        DateTime lastHour = DateTime.now().addYears(-3);
-        QBuilder uniqueIdsQb = new QBuilder(Log__c.SObjectType)
-            .selectFields(new Set<String>{'MIN(Id) minId'})
-            .add(QBuilder.condition('Hash_1__c').isNotNull())
-            .add(QBuilder.condition('CreatedDate').isGreaterOrEquals(lastHour));     
-            
-        if (String.isNotBlank(lastProcessedId)) {
-            uniqueIdsQb.add(QBuilder.condition('Id').isGreaterThan(lastProcessedId));
-        }
-        
-        String uniqueIdsQuery = uniqueIdsQb.build() + ' GROUP BY Hash_1__c ORDER BY MIN(Id) ASC LIMIT 1000';
-        
-        // Execute the first query to get IDs of unique logs
-        List<AggregateResult> uniqueIds = Database.query(uniqueIdsQuery);
+    private List<Map<String, Object>> getLogsForAWS(List<SObject> scope) {
         Set<Id> logIds = new Set<Id>();
-        for (AggregateResult ar : uniqueIds) {
-            logIds.add((Id)ar.get('minId'));
+        for (SObject record : scope) {
+            logIds.add(record.Id);
         }
         
-        if (logIds.isEmpty()) {
-            return new List<Log__c>();
-        }
-        
-        // Second query to get the full records of unique logs
         Set<String> fields = new Set<String>{
             'Id', 'Name', 'Hash_1__c', 'Summary__c', 'Details__c', 'Type__c', 'Category__c', 'Area__c', 'Created_At__c'
         };
-        
         QBuilder qb = new QBuilder(Log__c.SObjectType)
             .selectFields(fields)
             .add(QBuilder.condition('Id').isIn(new List<Id>(logIds)))
             .add(QBuilder.orderBy('Id').ascending());
-        
-        List<Log__c> result = Database.query(qb.build());
-        
-        return result;
-    }
+        List<Log__c> logs = Database.query(qb.build());
 
-
-
-    private void setLastProcessedId(String lastProcessedId) {
-        if (String.isNotBlank(lastProcessedId)) {
-            this.lastProcessedId = lastProcessedId;
-        }
-    }
-
-    private List<Map<String, Object>> transformLogsForAWS(List<Log__c> logs) {
-        List<Map<String, Object>> cleanedLogs = new List<Map<String, Object>>();
+        List<Map<String, Object>> transformedLogs = new List<Map<String, Object>>();
         for (Log__c log : logs) {
-            Map<String, Object> cleanedLog = new Map<String, Object>();
-            cleanedLog.put('id', log.Id);
-            cleanedLog.put('name', log.Name);
-            cleanedLog.put('hash1', log.Hash_1__c);
-            cleanedLog.put('summary', log.Summary__c);
-            cleanedLog.put('details', log.Details__c);
-            cleanedLog.put('category', log.Category__c);
-            cleanedLog.put('area', log.Area__c);
-            cleanedLogs.add(cleanedLog);
+            Map<String, Object> transformedLog = new Map<String, Object>();
+            transformedLog.put('id', log.Id);
+            transformedLog.put('name', log.Name);
+            transformedLog.put('hash1', log.Hash_1__c);
+            transformedLog.put('summary', log.Summary__c);
+            transformedLog.put('category', log.Category__c);
+            transformedLog.put('area', log.Area__c);
+            transformedLog.put('created_at', log.Created_At__c);
+            
+            // Truncate details if over MAX_DETAILS_LENGTH
+            String details = log.Details__c;
+            if (details != null && details.length() > MAX_DETAILS_LENGTH) {
+                details = details.substring(0, MAX_DETAILS_LENGTH) + ' ...';
+            }
+            transformedLog.put('details', details);
+            
+            transformedLogs.add(transformedLog);
         }
-        return cleanedLogs;
+        return transformedLogs;
     }
 
-    public AWSChatServiceResponse startAwsChatService(Connected_Org__c corg, String logsJSON) {
-        AWSChatServiceResponse result;
+    public void startAwsChatService(Connected_Org__c corg, String logsJSON) {
         try {
-            if (PermissionsUtil.MetadataChatEnabled) {
-                AWSChatServiceRequest request = new AWSChatServiceRequest(corg, logsJSON);
-                Map<String, String> headers = GitHubUtils.authHeaders();
-                headers.putAll(HttpUtils.getHeadersContentTypeJSON());
+            AWSChatServiceRequest request = new AWSChatServiceRequest(corg, logsJSON);
 
-                System.debug('++++endpoint: ' + INDEX_MANAGER_LOGS_ENDPOINT);
-                System.debug('++++request: ' + JSON.serialize(request));
-                System.debug('++++headers: ' + headers);
-                
-                String response = HttpUtils.post(
-                    INDEX_MANAGER_LOGS_ENDPOINT,
-                    JSON.serialize(request),
-                    headers,
-                    201
-                );
-                
-                System.debug('++++response: ' + response);
-                if (String.isNotBlank(response)) {
-                    result = (AWSChatServiceResponse)JSON.deserialize(response, AWSChatServiceResponse.class);
-                } else {
-                    result = new AWSChatServiceResponse();
-                    result.statusCode = 500;
-                    result.body = 'Empty response from Lambda service';
-                }
-            }
+            HttpUtils.post(
+                INDEX_MANAGER_LOGS_ENDPOINT,
+                JSON.serialize(request),
+                GitHubUtils.authHeaders(),
+                200
+            );
         }
         catch(Exception e) {
             this.loggerInstance?.add(loggerInstance.getInternalError(e, null, ChatIndexBatch.class.getName(), 'startAwsChatService'));
         }
-        return result;
-    }
-
-    public class AWSChatServiceResponse {
-        public Integer statusCode;
-        public String body;
-    
-        public AWSChatServiceResponse(){}
     }
 
     public class AWSChatServiceRequest {
