@@ -1,14 +1,18 @@
 public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImpl implements Database.Batchable<SObject>, Database.Stateful, Database.AllowsCallouts, Database.RaisesPlatformEvents {
     private static final String INDEX_MANAGER_ENDPOINT = Constants.REMOTE_SITE_SETTINGS.AI_URL + '/index';
-    private static final String INDEX_MANAGER_LOGS_ENDPOINT = INDEX_MANAGER_ENDPOINT + '/logs';
+    private static final String S3_UPLOAD_ENDPOINT = INDEX_MANAGER_ENDPOINT + '/s3/upload';
     
     private static final Integer MAX_AWS_REQUEST_SIZE = 10*1024*1024; //10MB
-    private static final Integer ESTIMATED_MAX_LOG_SIZE = 5*1024; //5KB
+    private static final Integer ESTIMATED_MAX_LOG_SIZE = 50*1024; //50KB
     private static final Integer MAX_LOGS_PER_BATCH = MAX_AWS_REQUEST_SIZE / ESTIMATED_MAX_LOG_SIZE;
-    private static final Integer MAX_DETAILS_LENGTH = 4096;
     
     private static ChatIndexBatch instance = null;
-    public DateTime startDate = DateTime.now().addDays(-1); //TODO: Change to addHours(-1)
+    public DateTime startDate = DateTime.now().addMonths(-1); //TODO: Change to addHours(-1)
+    
+    // S3 Upload state
+    private String uploadId = null;
+    private Integer partNumber = 1;
+    private List<String> etags = new List<String>();
 
     public static ChatIndexBatch getInstance() {
         if (instance == null) {
@@ -23,12 +27,10 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     }
 
     public override void startBatch() {
-        System.debug('++++ChatIndexBatch: startBatch() called');
         DatabaseUtils.executeBatchWithLimitCheck('ChatIndexBatch', this);
     }
 
     public override Integer getIterationsCount() {
-        System.debug('++++ChatIndexBatch: getIterationsCount() called');
         // Calculate total iterations based on unique hashes and batch size
         List<AggregateResult> hashCounts = [
             SELECT COUNT_DISTINCT(Hash_1__c) uniqueCount
@@ -37,77 +39,133 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             AND CreatedDate >= :startDate
         ];
         Integer totalUniqueHashes = hashCounts.isEmpty() ? 0 : (Integer)hashCounts[0].get('uniqueCount');
-        System.debug('++++ChatIndexBatch: totalUniqueHashes = ' + totalUniqueHashes + ', MAX_LOGS_PER_BATCH = ' + MAX_LOGS_PER_BATCH);
-        Integer iterations = Math.max(1, Math.ceil(totalUniqueHashes / MAX_LOGS_PER_BATCH).intValue());
-        System.debug('++++ChatIndexBatch: iterations = ' + iterations);
-        return iterations;
+        return Math.max(1, Math.ceil(totalUniqueHashes / MAX_LOGS_PER_BATCH).intValue());
     }
 
     public override Boolean initialValidation() {
-        System.debug('++++ChatIndexBatch: initialValidation() called');
-        Boolean isValid = PermissionsUtil.MetadataChatEnabled;
-        System.debug('++++ChatIndexBatch: initialValidation result = ' + isValid);
-        return isValid;
+        return PermissionsUtil.MetadataChatEnabled;
     }
 
-    public Database.QueryLocator start(Database.BatchableContext batchableContext) {
-        System.debug('++++ChatIndexBatch: start() called');
-        System.debug('++++ChatIndexBatch: startDate = ' + startDate);
-        // Get ids of unique logs
-        QBuilder uniqueIdsQb = new QBuilder(Log__c.SObjectType)
-        .selectFields(new Set<String>{'MIN(Id)'})
-        .add(QBuilder.condition('Hash_1__c').isNotNull())
-        .add(QBuilder.condition('CreatedDate').isGreaterOrEquals(startDate));
-        String uniqueIdsQuery = uniqueIdsQb.build() + ' GROUP BY Hash_1__c ORDER BY MIN(Id) DESC';
-        System.debug('++++ChatIndexBatch: query = ' + uniqueIdsQuery);
-        return Database.getQueryLocator(uniqueIdsQuery);
+    public Iterable<SObject> start(Database.BatchableContext batchableContext) {
+        // Get ids of unique logs using aggregate query
+        List<AggregateResult> uniqueIds = [
+            SELECT MIN(Id) minId
+            FROM Log__c 
+            WHERE Hash_1__c != NULL 
+            AND CreatedDate >= :startDate 
+            GROUP BY Hash_1__c 
+            ORDER BY MIN(Id) DESC
+        ];
+        
+        // Return the list directly - batch framework will chunk it based on BATCH_SCOPE
+        return uniqueIds;
     }
 
     public void execute(Database.BatchableContext info, List<SObject> scope) {
-        System.debug('++++ChatIndexBatch: execute() called');
-        System.debug('++++ChatIndexBatch: scope size = ' + (scope != null ? String.valueOf(scope.size()) : 'null'));
-        
         if (scope == null || scope.isEmpty()) {
-            System.debug('++++ChatIndexBatch: scope is null or empty, returning');
             return;
         }
         
         try {
-            System.debug('++++ChatIndexBatch: getting Connected_Org__c');
             Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId());
-            System.debug('++++ChatIndexBatch: Connected_Org__c = ' + corg);
             
-            System.debug('++++ChatIndexBatch: calling getLogsForAWS');
             List<Map<String, Object>> transformedLogs = getLogsForAWS(scope);
-            System.debug('++++ChatIndexBatch: transformedLogs size = ' + transformedLogs.size());
-            
-            System.debug('++++ChatIndexBatch: serializing logs');
             String logsJSON = JSON.serialize(transformedLogs);
-            System.debug('++++ChatIndexBatch: logsJSON length = ' + logsJSON.length());
             
-            System.debug('++++ChatIndexBatch: calling startAwsChatService');
-            startAwsChatService(corg, logsJSON);
-            System.debug('++++ChatIndexBatch: startAwsChatService completed');
+            // Upload chunk to S3
+            uploadChunkToS3(corg, logsJSON, partNumber);
+            partNumber++;
         }
         catch (Exception e) {
-            System.debug('++++ChatIndexBatch: Exception in execute: ' + e.getMessage());
-            System.debug('++++ChatIndexBatch: Exception stack trace: ' + e.getStackTraceString());
             loggerInstance?.addInternalError(e, ChatIndexBatch.class.getName(), ':execute');
         }
     }
 
     public void finish(Database.BatchableContext BC) {
-        System.debug('++++ChatIndexBatch: finish() called');
+        try {
+            // Complete the multipart upload
+            if (uploadId != null && !etags.isEmpty()) {
+                Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId());
+                completeS3Upload(corg);
+            }
+        } catch (Exception e) {
+            loggerInstance?.addInternalError(e, ChatIndexBatch.class.getName(), ':finish');
+        }
         this.loggerInstance?.flush();
     }
 
+    private void uploadChunkToS3(Connected_Org__c corg, String logsJSON, Integer partNum) {
+        try {
+            if (uploadId == null) {
+                // Initialize multipart upload
+                uploadId = initiateS3Upload(corg);
+            }
+            
+            // Upload part
+            String etag = uploadS3Part(corg, logsJSON, partNum);
+            etags.add(etag);
+            
+        } catch(Exception e) {
+            this.loggerInstance?.add(loggerInstance.getInternalError(e, null, ChatIndexBatch.class.getName(), 'uploadChunkToS3'));
+        }
+    }
+
+    private String initiateS3Upload(Connected_Org__c corg) {
+        S3UploadRequest request = new S3UploadRequest(corg, 'initiate');
+        Map<String, String> headers = GitHubUtils.authHeaders();
+        headers.putAll(HttpUtils.getHeadersContentTypeJSON());
+
+        String responseBody = HttpUtils.post(
+            S3_UPLOAD_ENDPOINT,
+            JSON.serialize(request),
+            headers,
+            200
+        );
+        
+        Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(responseBody);
+        return (String)responseMap.get('uploadId');
+    }
+
+    private String uploadS3Part(Connected_Org__c corg, String logsJSON, Integer partNum) {
+        S3PartUploadRequest request = new S3PartUploadRequest(corg, uploadId, partNum, logsJSON);
+        Map<String, String> headers = GitHubUtils.authHeaders();
+        headers.putAll(HttpUtils.getHeadersContentTypeJSON());
+
+        String responseBody = HttpUtils.post(
+            S3_UPLOAD_ENDPOINT + '/part',
+            JSON.serialize(request),
+            headers,
+            200
+        );
+        
+        Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(responseBody);
+        return (String)responseMap.get('etag');
+    }
+
+    private void completeS3Upload(Connected_Org__c corg) {
+        S3CompleteUploadRequest request = new S3CompleteUploadRequest(corg, uploadId, etags);
+        Map<String, String> headers = GitHubUtils.authHeaders();
+        headers.putAll(HttpUtils.getHeadersContentTypeJSON());
+
+        HttpUtils.post(
+            S3_UPLOAD_ENDPOINT + '/complete',
+            JSON.serialize(request),
+            headers,
+            200
+        );
+    }
+
     private List<Map<String, Object>> getLogsForAWS(List<SObject> scope) {
-        System.debug('++++ChatIndexBatch: getLogsForAWS() called');
         Set<Id> logIds = new Set<Id>();
         for (SObject record : scope) {
-            logIds.add(record.Id);
+            // Handle AggregateResult from GROUP BY query
+            if (record instanceof AggregateResult) {
+                AggregateResult ar = (AggregateResult)record;
+                logIds.add((Id)ar.get('minId'));
+            } else {
+                logIds.add(record.Id);
+            }
         }
-        System.debug('++++ChatIndexBatch: logIds size = ' + logIds.size());
         
         Set<String> fields = new Set<String>{
             'Id', 'Name', 'Hash_1__c', 'Summary__c', 'Details__c', 'Type__c', 'Category__c', 'Area__c', 'Created_At__c'
@@ -116,11 +174,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             .selectFields(fields)
             .add(QBuilder.condition('Id').isIn(new List<Id>(logIds)))
             .add(QBuilder.orderBy('Id').ascending());
-        String query = qb.build();
-        System.debug('++++ChatIndexBatch: getLogsForAWS query = ' + query);
-        
-        List<Log__c> logs = Database.query(query);
-        System.debug('++++ChatIndexBatch: logs size = ' + logs.size());
+        List<Log__c> logs = Database.query(qb.build());
 
         List<Map<String, Object>> transformedLogs = new List<Map<String, Object>>();
         for (Log__c log : logs) {
@@ -132,50 +186,46 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             transformedLog.put('category', log.Category__c);
             transformedLog.put('area', log.Area__c);
             transformedLog.put('created_at', log.Created_At__c);
-            
-            // Truncate details if over MAX_DETAILS_LENGTH
-            String details = log.Details__c;
-            if (details != null && details.length() > MAX_DETAILS_LENGTH) {
-                details = details.substring(0, MAX_DETAILS_LENGTH) + ' ...';
-            }
-            transformedLog.put('details', details);
-            
+            transformedLog.put('details', log.Details__c);
             transformedLogs.add(transformedLog);
         }
-        System.debug('++++ChatIndexBatch: transformedLogs size = ' + transformedLogs.size());
         return transformedLogs;
     }
 
-    public void startAwsChatService(Connected_Org__c corg, String logsJSON) {
-        System.debug('++++ChatIndexBatch: startAwsChatService() called');
-        try {
-            System.debug('++++ChatIndexBatch: creating AWSChatServiceRequest');
-            AWSChatServiceRequest request = new AWSChatServiceRequest(corg, logsJSON);
-            System.debug('++++ChatIndexBatch: AWSChatServiceRequest created');
+    // Request classes for S3 upload
+    public class S3UploadRequest {
+        public String oid;
+        public String action;
 
-            System.debug('++++ChatIndexBatch: making HTTP POST request');
-            HttpUtils.post(
-                INDEX_MANAGER_LOGS_ENDPOINT,
-                JSON.serialize(request),
-                GitHubUtils.authHeaders(),
-                200
-            );
-            System.debug('++++ChatIndexBatch: HTTP POST request completed successfully');
-        }
-        catch(Exception e) {
-            System.debug('++++ChatIndexBatch: Exception in startAwsChatService: ' + e.getMessage());
-            System.debug('++++ChatIndexBatch: Exception stack trace: ' + e.getStackTraceString());
-            this.loggerInstance?.add(loggerInstance.getInternalError(e, null, ChatIndexBatch.class.getName(), 'startAwsChatService'));
+        public S3UploadRequest(Connected_Org__c corg, String action) {
+            this.oid = UserInfo.getOrganizationId();
+            this.action = action;
         }
     }
 
-    public class AWSChatServiceRequest {
+    public class S3PartUploadRequest {
         public String oid;
-        public String logs;
+        public String uploadId;
+        public Integer partNumber;
+        public String data;
 
-        public AWSChatServiceRequest(Connected_Org__c corg, String logs) {
+        public S3PartUploadRequest(Connected_Org__c corg, String uploadId, Integer partNumber, String data) {
             this.oid = UserInfo.getOrganizationId();
-            this.logs = logs;
+            this.uploadId = uploadId;
+            this.partNumber = partNumber;
+            this.data = data;
+        }
+    }
+
+    public class S3CompleteUploadRequest {
+        public String oid;
+        public String uploadId;
+        public List<String> etags;
+
+        public S3CompleteUploadRequest(Connected_Org__c corg, String uploadId, List<String> etags) {
+            this.oid = UserInfo.getOrganizationId();
+            this.uploadId = uploadId;
+            this.etags = etags;
         }
     }
 }
