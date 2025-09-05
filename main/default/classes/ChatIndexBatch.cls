@@ -3,17 +3,22 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     private static final String INDEX_MANAGER_LOGS_ENDPOINT = INDEX_MANAGER_ENDPOINT + '/logs';
     
     private static final Integer MAX_LOGS_PER_BATCH = 200;
+    
     private static Chat_Index_Settings__c settingsInstance = null;
     private static Chat_Index_Settings__c SETTINGS {
         get {
             if (settingsInstance == null) {
-                settingsInstance = getOrCreateSettings();
+                Chat_Index_Settings__c settings = Chat_Index_Settings__c.getOrgDefaults();
+                if (settings == null || settings.Id == null) {
+                    settings = new Chat_Index_Settings__c();
+                    settings.ProcessedLogHashes__c = 0;
+                    insert settings;
+                }
+                settingsInstance = settings;
             }
             return settingsInstance;
         }
-        set {
-            settingsInstance = value;
-        }
+        private set;
     }
 
     public enum JobType {LOG_INDEX_FULL_UPSERT, LOG_INDEX_UPDATE}
@@ -25,35 +30,6 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             instance = new ChatIndexBatch(jobType, Logger.getInstance());
         }
         return instance;
-    }
-
-    private static Chat_Index_Settings__c getOrCreateSettings() {
-        try {
-            Chat_Index_Settings__c settings = Chat_Index_Settings__c.getOrgDefaults();
-            System.debug('++++ChatIndexBatch: getOrCreateSettings - getOrgDefaults returned: ' + settings);
-            if (settings == null) {
-                System.debug('++++ChatIndexBatch: Creating new Chat_Index_Settings__c record');
-                settings = new Chat_Index_Settings__c();
-                settings.ProcessedLogHashes__c = 0;
-                insert settings;
-                System.debug('++++ChatIndexBatch: Created settings with ProcessedLogHashes__c = ' + settings.ProcessedLogHashes__c);
-            } else {
-                System.debug('++++ChatIndexBatch: Found existing settings with ProcessedLogHashes__c = ' + settings.ProcessedLogHashes__c);
-                // Ensure the field is not null
-                if (settings.ProcessedLogHashes__c == null) {
-                    System.debug('++++ChatIndexBatch: ProcessedLogHashes__c is null, setting to 0');
-                    settings.ProcessedLogHashes__c = 0;
-                    update settings;
-                }
-            }
-            return settings;
-        } catch (Exception e) {
-            System.debug('++++ChatIndexBatch: Error in getOrCreateSettings: ' + e.getMessage());
-            // Return a default settings object if everything fails
-            Chat_Index_Settings__c defaultSettings = new Chat_Index_Settings__c();
-            defaultSettings.ProcessedLogHashes__c = 0;
-            return defaultSettings;
-        }
     }
 
     private ChatIndexBatch(JobType jobType, Logger logger) {
@@ -68,13 +44,8 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
 
     public override Integer getIterationsCount() {
         Integer count = [SELECT COUNT() FROM Log_Index__c];
-        System.debug('++++ChatIndexBatch: getIterationsCount - total Log_Index__c count: ' + count);
         if (runJobType == JobType.LOG_INDEX_UPDATE) {
-            System.debug('++++ChatIndexBatch: SETTINGS = ' + SETTINGS);
-            System.debug('++++ChatIndexBatch: SETTINGS.ProcessedLogHashes__c = ' + SETTINGS.ProcessedLogHashes__c);
-            Integer processedCount = (SETTINGS.ProcessedLogHashes__c != null) ? (Integer)SETTINGS.ProcessedLogHashes__c : 0;
-            count = count - processedCount;
-            System.debug('++++ChatIndexBatch: calculated count after subtracting processed: ' + count);
+            count = count - (Integer)SETTINGS.ProcessedLogHashes__c;
         }
         return count;
     }
@@ -126,12 +97,6 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             List<Map<String, Object>> transformedLogs = getTransformedLogs(scope);
             String logsJSON = JSON.serialize(transformedLogs);
             startAwsChatService(logsJSON);
-
-            if (runJobType == JobType.LOG_INDEX_UPDATE) {
-                System.debug('++++ChatIndexBatch: Updating ProcessedLogHashes__c, current value: ' + SETTINGS.ProcessedLogHashes__c);
-                SETTINGS.ProcessedLogHashes__c = (SETTINGS.ProcessedLogHashes__c != null ? SETTINGS.ProcessedLogHashes__c : 0) + scope.size();
-                System.debug('++++ChatIndexBatch: New ProcessedLogHashes__c value: ' + SETTINGS.ProcessedLogHashes__c);
-            }
         }
         catch (Exception e) {
             loggerInstance?.addInternalError(e, ChatIndexBatch.class.getName(), ':execute');
@@ -139,8 +104,11 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     }
 
     public void finish(Database.BatchableContext BC) {
+        System.debug('++++ChatIndexBatch: finish, settings = ' + SETTINGS);
         if (runJobType == JobType.LOG_INDEX_UPDATE) {
-            DatabaseUtils.getInstance().performUpdateDML(new List<Chat_Index_Settings__c>{SETTINGS}, Schema.SObjectType.Chat_Index_Settings__c);
+            SETTINGS.ProcessedLogHashes__c = [SELECT COUNT() FROM Log_Index__c];
+            System.debug('++++ChatIndexBatch: SETTINGS.ProcessedLogHashes__c = ' + SETTINGS.ProcessedLogHashes__c);
+            update SETTINGS;
         }
 
         this.loggerInstance?.flush();
@@ -183,12 +151,13 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             Map<String, String> headers = GitHubUtils.authHeaders();
             headers.putAll(HttpUtils.getHeadersContentTypeJSON());
 
-            HttpUtils.post(
-                INDEX_MANAGER_LOGS_ENDPOINT,
-                JSON.serialize(request),
-                headers,
-                200
-            );
+            //TODO: Uncomment this
+            // HttpUtils.post(
+            //     INDEX_MANAGER_LOGS_ENDPOINT,
+            //     JSON.serialize(request),
+            //     headers,
+            //     200
+            // );
         }
         catch(Exception e) {
             this.loggerInstance?.add(loggerInstance.getInternalError(e, null, ChatIndexBatch.class.getName(), 'startAwsChatService'));
