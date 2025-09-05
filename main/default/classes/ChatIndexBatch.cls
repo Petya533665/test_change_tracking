@@ -29,7 +29,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         if (instance == null) {
             instance = new ChatIndexBatch(jobType, Logger.getInstance());
         }
-        return instance;
+        return instance; 
     }
 
     private ChatIndexBatch(JobType jobType, Logger logger) {
@@ -104,10 +104,8 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     }
 
     public void finish(Database.BatchableContext BC) {
-        System.debug('++++ChatIndexBatch: finish, settings = ' + SETTINGS);
         if (runJobType == JobType.LOG_INDEX_UPDATE) {
             SETTINGS.ProcessedLogHashes__c = [SELECT COUNT() FROM Log_Index__c];
-            System.debug('++++ChatIndexBatch: SETTINGS.ProcessedLogHashes__c = ' + SETTINGS.ProcessedLogHashes__c);
             update SETTINGS;
         }
 
@@ -151,13 +149,12 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             Map<String, String> headers = GitHubUtils.authHeaders();
             headers.putAll(HttpUtils.getHeadersContentTypeJSON());
 
-            //TODO: Uncomment this
-            // HttpUtils.post(
-            //     INDEX_MANAGER_LOGS_ENDPOINT,
-            //     JSON.serialize(request),
-            //     headers,
-            //     200
-            // );
+            HttpUtils.post(
+                INDEX_MANAGER_LOGS_ENDPOINT,
+                JSON.serialize(request),
+                headers,
+                200
+            );
         }
         catch(Exception e) {
             this.loggerInstance?.add(loggerInstance.getInternalError(e, null, ChatIndexBatch.class.getName(), 'startAwsChatService'));
