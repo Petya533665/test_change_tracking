@@ -183,7 +183,7 @@ public with sharing class IntegrationSettingsTest {
         gitApiSettings.Username__c = 'Test_Username';
         gitApiSettings.Reponame__c = 'Test_Reponame';
         gitApiSettings.Branch_Name__c = 'Test_BranchName';
-        gitApiSettings.Last_Processed_Id__c = 'Test_LastProcessedId';
+        gitApiSettings.Last_Processed_Date_Time__c = Datetime.now().formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         upsert gitApiSettings;
 
         Test.startTest();
@@ -195,7 +195,7 @@ public with sharing class IntegrationSettingsTest {
         Assert.isTrue(String.isBlank(ConfigUtil.GIT_API_SETTINGS.Username__c));
         Assert.isTrue(String.isBlank(ConfigUtil.GIT_API_SETTINGS.Reponame__c));
         Assert.isTrue(String.isBlank(ConfigUtil.GIT_API_SETTINGS.Branch_Name__c));
-        Assert.isTrue(String.isBlank(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c));
+        Assert.isTrue(String.isBlank(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c));
     }
 
     @IsTest
@@ -225,7 +225,7 @@ public with sharing class IntegrationSettingsTest {
         ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
         ConfigUtil.GIT_API_SETTINGS.Username__c = GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME;
         ConfigUtil.GIT_API_SETTINGS.Token__c = GitHubCommitBatchTest.TEST_GIT_API_TOKEN;
-        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = UserInfo.getUserId();
+        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = UserInfo.getUserId();
         upsert ConfigUtil.GIT_API_SETTINGS;
 
         Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
@@ -242,7 +242,7 @@ public with sharing class IntegrationSettingsTest {
             };
             IntegrationSettings.GIT_HUB.setGitHubSettings(inputSettings);
         Test.stopTest();
-        Assert.areEqual(null, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c);
+        Assert.areEqual(null, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c);
     }
 
     @IsTest
@@ -250,7 +250,7 @@ public with sharing class IntegrationSettingsTest {
         ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
         ConfigUtil.GIT_API_SETTINGS.Username__c = GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME;
         ConfigUtil.GIT_API_SETTINGS.Token__c = GitHubCommitBatchTest.TEST_GIT_API_TOKEN;
-        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = UserInfo.getUserId();
+        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = UserInfo.getUserId();
         upsert ConfigUtil.GIT_API_SETTINGS;
 
         Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
@@ -278,7 +278,7 @@ public with sharing class IntegrationSettingsTest {
         ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
         ConfigUtil.GIT_API_SETTINGS.Username__c = GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME;
         ConfigUtil.GIT_API_SETTINGS.Token__c = GitHubCommitBatchTest.TEST_GIT_API_TOKEN;
-        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = UserInfo.getUserId();
+        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = UserInfo.getUserId();
         upsert ConfigUtil.GIT_API_SETTINGS;
 
         Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();

@@ -2921,89 +2921,88 @@ public class MonitoringUtilTest {
 
     private static final String GMT_FORMAT_DATE = 'yyyy-MM-dd';
     private static final String GMT_FORMAT_TIME = 'HH:mm:ss';
-    private static final String GMT_FORMAT_DATETIME = 'yyyy-MM-dd HH:mm:ss';
 
     @IsTest
     private static void test_evaluate_filter_DateTime_equal_positive() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Equal', localeDT, gmtStringDT, true);
     }
 
     @IsTest
     private static void test_evaluate_filter_DateTime_equal_negative() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.addMinutes(10).formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.addMinutes(10).formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Equal', localeDT, gmtStringDT, false);
     }
 
     @IsTest
     private static void test_evaluate_filter_DateTime_not_equal_positive() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.addMinutes(10).formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.addMinutes(10).formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Not equal', localeDT, gmtStringDT, true);
     }
 
     @IsTest
     private static void test_evaluate_filter_DateTime_not_equal_negative() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Not equal', localeDT, gmtStringDT, false);
     }
 
     @IsTest
     private static void test_evaluate_filter_DateTime_greater_than_positive() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.addMinutes(-10).formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.addMinutes(-10).formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Greater than', localeDT, gmtStringDT, true);
     }
 
     @IsTest
     private static void test_evaluate_filter_DateTime_greater_than_negative() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.addMinutes(10).formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.addMinutes(10).formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Greater than', localeDT, gmtStringDT, false);
     }
 
     @IsTest
     private static void test_evaluate_filter_DateTime_greater_or_equal_positive() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Greater or equal', localeDT, gmtStringDT, true);
     }
 
     @IsTest
     private static void test_evaluate_filter_DateTime_greater_or_equal_negative() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.addMinutes(10).formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.addMinutes(10).formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Greater or equal', localeDT, gmtStringDT, false);
     }
 
     @IsTest
     private static void test_evaluate_filter_DateTime_less_than_positive() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.addMinutes(10).formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.addMinutes(10).formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Less than', localeDT, gmtStringDT, true);
     }
 
     @IsTest
     private static void test_evaluate_filter_DateTime_less_than_negative() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.addMinutes(-10).formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.addMinutes(-10).formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Less than', localeDT, gmtStringDT, false);
     }
 
     @IsTest
     private static void test_evaluate_filter_DateTime_less_or_equal_positive() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.addMinutes(10).formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.addMinutes(10).formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Less or equal', localeDT, gmtStringDT, true);
     }
 
     @IsTest
     private static void test_evaluate_filter_DateTime_less_or_equal_negative() {
         Datetime localeDT = Datetime.now();
-        String gmtStringDT = localeDT.addMinutes(-10).formatGmt(GMT_FORMAT_DATETIME);
+        String gmtStringDT = localeDT.addMinutes(-10).formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         test_evaluate_DateTime_filter('Less or equal', localeDT, gmtStringDT, false);
     }
 

@@ -32,6 +32,7 @@ public with sharing class RuleUtil {
 	public static final String ERROR_MERGE_FIELD_OBJECT_NOT_EXISTS = 'Invalid merge field in field {0}: Object "{1}" does not exist.';
 	public static final String ERROR_MERGE_FIELD_FIELD_NOT_EXISTS = 'Invalid merge field in field {0}: Field "{1}" does not exist on object "{2}".';
 	public static final String ERROR_MERGE_FIELD_NOT_ACCESSIBLE = 'Invalid merge field in field {0}: Field "{1}" on object "{2}" is not accessible.';
+	public static final String ERROR_MERGE_FIELD_NOT_RELATIONSHIP = 'Invalid merge field in field {0}: Field "{1}" on object "{2}" is not a relationship field and cannot be traversed.';
 	public static final String ERROR_VALIDATING_MERGE_FIELD = 'Error validating merge field {{!{0}.{1}}} in field {2}: {3}';
 	public static final String ERROR_MERGE_FIELD_SYNTAX_INVALID = 'Contains invalid merge field syntax.';
 
@@ -1939,18 +1940,11 @@ public with sharing class RuleUtil {
 
 			// Validate field exists on object
 			try {
-				Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
-				Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
-				
-				Schema.SObjectField field = fieldMap.get(mergeField.fieldName);
-				if (field == null) {
-					throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_FIELD_NOT_EXISTS, new List<String>{fieldRef, mergeField.fieldName, mergeField.objectName}));
-				}
-
-				// Validate field is accessible
-				Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
-				if (!fieldDescribe.isAccessible()) {
-					throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_NOT_ACCESSIBLE, new List<String>{fieldRef, mergeField.fieldName, mergeField.objectName}));
+				// Handle relationship field traversals (e.g., CreatedBy.IsActive)
+				if (mergeField.fieldName.contains('.')) {
+					validateRelationshipField(mergeField.objectName, mergeField.fieldName, fieldRef, objectType);
+				} else {
+					validateDirectField(mergeField.fieldName, fieldRef, objectType, mergeField.objectName);
 				}
 
 			} catch (RuleUtilException e) {
@@ -1958,6 +1952,108 @@ public with sharing class RuleUtil {
 			} catch (Exception e) {
 				throw new RuleUtilException(String.format(ERROR_VALIDATING_MERGE_FIELD, new List<String>{mergeField.objectName, mergeField.fieldName, fieldRef, e.getMessage()}));
 			}
+		}
+
+		/**
+		 * Validates a direct field access (no relationship traversal)
+		 */
+		private void validateDirectField(String fieldName, String fieldRef, Schema.SObjectType objectType, String objectName) {
+			Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
+			Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
+			
+			// If the field name ends with runtime generated field name like 'Link', use 'Id' instead
+			String actualFieldName = (fieldName.endsWith('Link')) ? 'Id' : fieldName;
+			
+			Schema.SObjectField field = fieldMap.get(actualFieldName);
+			if (field == null) {
+				throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_FIELD_NOT_EXISTS, new List<String>{fieldRef, fieldName, objectName}));
+			}
+
+			// Validate field is accessible
+			Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+			if (!fieldDescribe.isAccessible()) {
+				throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_NOT_ACCESSIBLE, new List<String>{fieldRef, fieldName, objectName}));
+			}
+		}
+
+		/**
+		 * Validates a relationship field traversal (e.g., CreatedBy.IsActive)
+		 */
+		private void validateRelationshipField(String objectName, String fieldPath, String fieldRef, Schema.SObjectType currentObjectType) {
+			List<String> fieldParts = fieldPath.split('\\.');
+			Schema.SObjectType currentType = currentObjectType;
+			String currentObjectName = objectName;
+			
+			for (Integer i = 0; i < fieldParts.size(); i++) {
+				String fieldName = fieldParts[i];
+				Schema.DescribeSObjectResult objectDescribe = currentType.getDescribe();
+				Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
+				
+				String actualFieldName;
+				
+				// Handle special case for 'Link' suffix
+				if (fieldName.endsWith('Link')) {
+					actualFieldName = 'Id';
+				}
+				// If this is not the last field in the path, it's a relationship field
+				// Try both the field name as-is and with 'Id' suffix for relationship fields
+				else if (i < fieldParts.size() - 1) {
+					// For relationship fields, try the field name with 'Id' suffix first
+					if (fieldMap.containsKey(fieldName + 'Id')) {
+						actualFieldName = fieldName + 'Id';
+					} else if (fieldMap.containsKey(fieldName)) {
+						actualFieldName = fieldName;
+					} else {
+						// Try case-insensitive lookup
+						actualFieldName = findFieldCaseInsensitive(fieldMap, fieldName);
+						if (actualFieldName == null) {
+							actualFieldName = findFieldCaseInsensitive(fieldMap, fieldName + 'Id');
+						}
+						if (actualFieldName == null) {
+							throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_FIELD_NOT_EXISTS, new List<String>{fieldRef, fieldName, currentObjectName}));
+						}
+					}
+				} else {
+					// For the last field in the path, use the field name as-is
+					actualFieldName = fieldName;
+				}
+				
+				Schema.SObjectField field = fieldMap.get(actualFieldName);
+				if (field == null) {
+					throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_FIELD_NOT_EXISTS, new List<String>{fieldRef, fieldName, currentObjectName}));
+				}
+
+				// Validate field is accessible
+				Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+				if (!fieldDescribe.isAccessible()) {
+					throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_NOT_ACCESSIBLE, new List<String>{fieldRef, fieldName, currentObjectName}));
+				}
+
+				// If this is not the last field in the path, it should be a relationship field
+				if (i < fieldParts.size() - 1) {
+					// Get the referenced object type for relationship fields
+					List<Schema.sObjectType> referenceTo = fieldDescribe.getReferenceTo();
+					if (referenceTo.isEmpty()) {
+						throw new RuleUtilException(String.format(ERROR_MERGE_FIELD_NOT_RELATIONSHIP, new List<String>{fieldRef, fieldName, currentObjectName}));
+					}
+					
+					// Move to the referenced object for the next iteration
+					currentType = referenceTo[0];
+					currentObjectName = currentType.getDescribe().getName();
+				}
+			}
+		}
+
+		/**
+		 * Finds a field in the field map using case-insensitive lookup
+		 */
+		private String findFieldCaseInsensitive(Map<String, Schema.SObjectField> fieldMap, String fieldName) {
+			for (String key : fieldMap.keySet()) {
+				if (key.equalsIgnoreCase(fieldName)) {
+					return key;
+				}
+			}
+			return null;
 		}
 
 		/**

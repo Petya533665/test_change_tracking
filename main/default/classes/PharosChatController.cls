@@ -111,15 +111,6 @@ public with sharing class PharosChatController {
     }
 
     @AuraEnabled
-    public static Map<String, String> getSendMessageData() {
-        return new Map<String, String> {
-            'sf_session' => EncodingUtil.base64Encode(Blob.valueOf(ConnectedOrgService.getSelfConnectedOrgAccessToken())),
-            'sf_instance' => System.Url.getOrgDomainUrl().toExternalForm(),
-            'sf_namespace' => ConfigUtil.nameSpacePrefix
-        };
-    }
-
-    @AuraEnabled
     public static String getCodeEntityLink(String entity) {
         String type = '';
         String name = entity.replaceAll('\\.cls|\\.js', '');

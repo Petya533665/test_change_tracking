@@ -1,5 +1,5 @@
 public with sharing class EventMonitoringUtil {
-    private static final Integer MAX_RECORDS = 1;
+    private static final Integer MAX_RECORDS = 100; // Allow multiple CSV files per hour
     
     private static final String INTERVAL_HOURLY = 'Hourly';
     private static final String INTERVAL_DAILY = 'Daily';
@@ -55,11 +55,12 @@ public with sharing class EventMonitoringUtil {
             .selectFields(selectFields)
             .add(QBuilder.condition(EVENT_LOG_FILE_EVENT_TYPE).isIn(eventTypes))
             .add(QBuilder.condition(EVENT_LOG_FILE_LOG_DATE).isGreaterOrEquals(lastProcessedHourlyDateTimeGMT))
+            .add(QBuilder.condition(EVENT_LOG_FILE_LOG_DATE).isLessOrEquals(lastProcessedHourlyDateTimeGMT.addHours(1)))
             .add(QBuilder.condition(EVENT_LOG_FILE_INTERVAL).equalsTo(INTERVAL_HOURLY))
             .add(QBuilder.orderBy(EVENT_LOG_FILE_LOG_DATE).descending())
             .addLimit(MAX_RECORDS);
         
-        // Add Sequence ordering if field is available
+        // Add Sequence ordering if field is available - prioritize sequence over log date for same hour
         if (isSequenceFieldAvailable()) {
             queryBuilder.add(QBuilder.orderBy(EVENT_LOG_FILE_SEQUENCE).ascending());
         }
@@ -816,7 +817,7 @@ public with sharing class EventMonitoringUtil {
             }
         }
         ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = String.join(enabledTypes, ',');
-        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+        DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
     }
 
     public void disableEventType(String eventTypeToDisable) {
@@ -841,7 +842,7 @@ public with sharing class EventMonitoringUtil {
             }
         }
         ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = String.join(enabledTypes, ',');
-        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+        DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
     }
 
     public static List<EventTypeStatus> getEventTypesWithStatus() {
@@ -1004,7 +1005,7 @@ public with sharing class EventMonitoringUtil {
         }
 
         ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled_Types__c = String.join(enabledEventTypesList, ',');
-        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+        DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
     }
 
     /**
@@ -1162,6 +1163,6 @@ public with sharing class EventMonitoringUtil {
         lastProcessedHourlyDateTime = lastProcessedHourlyDateTime.addHours(1);
         // save the last processed hourly datetime
         ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c = lastProcessedHourlyDateTime;
-        update ConfigUtil.EVENT_MONITORING_SETTINGS;
+        DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
     }
 }

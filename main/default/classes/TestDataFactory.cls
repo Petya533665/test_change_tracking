@@ -3,11 +3,13 @@ public class TestDataFactory {
 
     private static final String CONNECTED_ORG_SETTINGS_CLIENT_KEY = 'test_client_key';
     private static final String CONNECTED_ORG_SETTINGS_CLIENT_SECRET = 'test_client_secret';
+    private static final String CONNECTED_ORG_SETTINGS_CONNECTED_APP_NAME = 'test_connected_app_name';
 
     public static void createConnectedOrgSettings() {
         Connected_Orgs_Settings__c connectedOrgsSettings = new Connected_Orgs_Settings__c(
                 Client_Key__c = CONNECTED_ORG_SETTINGS_CLIENT_KEY,
-                Client_Secret__c = CONNECTED_ORG_SETTINGS_CLIENT_SECRET
+                Client_Secret__c = CONNECTED_ORG_SETTINGS_CLIENT_SECRET,
+                Connected_App_Name__c = CONNECTED_ORG_SETTINGS_CONNECTED_APP_NAME
         );
         insert connectedOrgsSettings;
     }
@@ -208,9 +210,52 @@ public class TestDataFactory {
                 MetadataService.upsertMetadataResponse_element responseElement = new MetadataService.upsertMetadataResponse_element();
                 responseElement.result = new MetadataService.UpsertResult[] {result};
                 response.put('response_x', responseElement);
+            } else if (request instanceof MetadataService.createMetadata_element) {
+                MetadataService.SaveResult result = new MetadataService.SaveResult();
+                result.success = true;
+                result.fullName = 'Pharos_ai_Test';
+                MetadataService.createMetadataResponse_element responseElement = new MetadataService.createMetadataResponse_element();
+                responseElement.result = new MetadataService.SaveResult[] {result};
+                response.put('response_x', responseElement);
+            } else if (request instanceof MetadataService.deleteMetadata_element) {
+                MetadataService.DeleteResult result = new MetadataService.DeleteResult();
+                result.success = true;
+                MetadataService.deleteMetadataResponse_element responseElement = new MetadataService.deleteMetadataResponse_element();
+                responseElement.result = new MetadataService.DeleteResult[] {result};
+                response.put('response_x', responseElement);
+            } else if (request instanceof MetadataService.readMetadata_element) {
+                // Create mock classes that implement the required interfaces
+                MockReadResult mockResult = new MockReadResult();
+                
+                // Create a mock ConnectedApp record
+                MetadataService.ConnectedApp mockConnectedApp = new MetadataService.ConnectedApp();
+                mockConnectedApp.fullName = CONNECTED_ORG_SETTINGS_CONNECTED_APP_NAME;
+                mockConnectedApp.label = 'Pharos AI Test';
+                mockConnectedApp.contactEmail = 'test@example.com';
+                mockConnectedApp.contactPhone = '123-456-7890';
+                
+                mockResult.records = new List<MetadataService.Metadata>{ mockConnectedApp };
+                
+                MockReadResponseElement mockResponseElement = new MockReadResponseElement();
+                mockResponseElement.result = mockResult;
+                
+                response.put('response_x', mockResponseElement);
             }
-
-
+        }
+    }
+    
+    // Mock classes for MetadataService interfaces
+    public class MockReadResult implements MetadataService.IReadResult {
+        public List<MetadataService.Metadata> records;
+        public MetadataService.Metadata[] getRecords() { 
+            return records != null ? records : new MetadataService.Metadata[0]; 
+        }
+    }
+    
+    public class MockReadResponseElement implements MetadataService.IReadResponseElement {
+        public MockReadResult result;
+        public MetadataService.IReadResult getResult() { 
+            return result; 
         }
     }
 

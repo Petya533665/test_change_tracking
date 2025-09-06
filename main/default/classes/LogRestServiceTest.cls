@@ -74,7 +74,7 @@ private class LogRestServiceTest {
 
         req.requestURI = REST_URI;
         DateTime dt = DateTime.now().addHours(-2);
-        String dtString = dt.format('yyyy-MM-dd HH:mm:ss');
+        String dtString = dt.format(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         req.addParameter('startDate', dtString);
         req.httpMethod = 'GET';
 
@@ -106,7 +106,7 @@ private class LogRestServiceTest {
 
         req.requestURI = REST_URI;
         DateTime dt = DateTime.now().addDays(1);
-        String dtString = dt.format('yyyy-MM-dd HH:mm:ss');
+        String dtString = dt.format(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         req.addParameter('startDate', dtString);
         req.httpMethod = 'GET';
 

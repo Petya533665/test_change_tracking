@@ -64,10 +64,10 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
                 && ConfigUtil.GIT_API_SETTINGS.Reponame__c != null
                 && ConfigUtil.GIT_API_SETTINGS.Username__c != null) {
 
-            hasAuditChangesToStart = String.isBlank(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c);
+            hasAuditChangesToStart = String.isBlank(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c);
 
             if (!hasAuditChangesToStart) {
-                AuditChangeWrapper lastChanges = getAuditTrails(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c);
+                AuditChangeWrapper lastChanges = getAuditTrails(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c);
                 hasAuditChangesToStart = (lastChanges != null && !lastChanges.auditChange.isEmpty());
             }
         }
@@ -332,39 +332,39 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
     public static List<MetadataTypeWrapper> getMetadataTypeMembers() {
         List<MetadataTypeWrapper> result = new List<MetadataTypeWrapper>();
         // return all metadata items
-        if(String.isBlank(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c)) {
+        if(String.isBlank(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c)) {
             result = getDefaultMetadataTypeMembers();
-            setLastProcessedId(getAuditTrails(null).lastProcessedId);
+            setLastProcessedDateTime(getAuditTrails(null).lastProcessedCreatedDate);
         }
         // return only changed metadata
         else {
-            AuditChangeWrapper lastChanges = getAuditTrails(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c);
+            AuditChangeWrapper lastChanges = getAuditTrails(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c);
             if(!lastChanges.auditChange.isEmpty()) {
                 result = getFilteredMetadataTypeMembers(lastChanges.auditChange);
-                setLastProcessedId(lastChanges.lastProcessedId);
+                setLastProcessedDateTime(lastChanges.lastProcessedCreatedDate);
             }
         }
         return result;
     }
 
-    public static void setLastProcessedId(String lastProcessedId) {
-        if(String.isNotBlank(lastProcessedId)) {
-            ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = lastProcessedId;
+    public static void setLastProcessedDateTime(DateTime lastProcessedCreatedDate) {
+        if(lastProcessedCreatedDate != null) {
+            ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = lastProcessedCreatedDate.formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
         }
     }
 
     public class AuditChangeWrapper {
         public List<AuditChange> auditChange;
-        public String lastProcessedId;
+        public Datetime lastProcessedCreatedDate;
 
-        public AuditChangeWrapper(String lastProcessedId) {
+        public AuditChangeWrapper(Datetime lastProcessedCreatedDate) {
             this.auditChange = new List<AuditChange>();
-            this.lastProcessedId = lastProcessedId;
+            this.lastProcessedCreatedDate = lastProcessedCreatedDate;
         }
 
-        public AuditChangeWrapper(List<AuditChange> auditChange, String lastProcessedId) {
+        public AuditChangeWrapper(List<AuditChange> auditChange, Datetime lastProcessedCreatedDate) {
             this.auditChange = auditChange;
-            this.lastProcessedId = lastProcessedId;
+            this.lastProcessedCreatedDate = lastProcessedCreatedDate;
         }
     }
     public class AuditChange {
@@ -398,16 +398,7 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
         MetadataTypeWrapperContainer result = new MetadataTypeWrapperContainer();
         if(!permission) return result;
 
-        if(metaType == METADATA_TYPE_APEX_CLASS || metaType == METADATA_TYPE_APEX_TRIGGER || metaType == METADATA_TYPE_CUSTOM_OBJECT) {
-            if(METADATA_BUNDLE != null && METADATA_BUNDLE.containsKey(metaType) && METADATA_BUNDLE.get(metaType) != null) {
-                for(MetaWrapper item : METADATA_BUNDLE.get(metaType)) {
-                    result.addMember(metaType, item.apiName, item.size);
-                }
-            }
-        }
-        else {
-            result.members = new List<MetadataTypeWrapper>{new MetadataTypeWrapper(metaType, '*')};
-        }
+        result.members = new List<MetadataTypeWrapper>{new MetadataTypeWrapper(metaType, '*')};
         return result;
     }
 
@@ -417,6 +408,10 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
 
         for(String auditChange : changes) {
             if(METADATA_BUNDLE != null && METADATA_BUNDLE.containsKey(metaType) && METADATA_BUNDLE.get(metaType) != null) {
+                if (auditChange.containsIgnoreCase('delete')) {
+                    result.members = new List<MetadataTypeWrapper>{new MetadataTypeWrapper(metaType, '*')};
+                    break;
+                }
                 for(MetaWrapper item : METADATA_BUNDLE.get(metaType)) {
                     String label;
                     String labelPlural;
@@ -475,23 +470,24 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
     @TestVisible
     private static List<SetupAuditTrail> mockAuditTrails = new List<SetupAuditTrail>();
 
-    private static List<SetupAuditTrail> getAuditTrailRecords(String lastProcessedId) {
+    private static List<SetupAuditTrail> getAuditTrailRecords(String lastProcessedDateTime) {
         List<SetupAuditTrail> records;
-        if(lastProcessedId == null) {
+        if(lastProcessedDateTime == null) {
             records = Test.isRunningTest() ? mockAuditTrails : [
                 SELECT Id, Action, CreatedDate, Display, Section
                 FROM SetupAuditTrail
-                ORDER BY Id DESC
+                ORDER BY CreatedDate DESC
                 LIMIT 1
             ];
         }
         else {
+            Datetime lastCreatedDate = DateTime.valueOfGmt(lastProcessedDateTime);
             records = new List<SetupAuditTrail>();
             List<SetupAuditTrail> auditTrails = Test.isRunningTest() ? mockAuditTrails : [
                 SELECT Id, Action, CreatedDate, Display, Section
                 FROM SetupAuditTrail
-                WHERE Id > :lastProcessedId
-                ORDER BY Id DESC
+                WHERE CreatedDate > :lastCreatedDate
+                ORDER BY CreatedDate DESC
                 LIMIT 2000
             ];
             Set<String> displayFilter = new Set<String>();
@@ -505,14 +501,15 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
         return records;
     }
 
-    public static AuditChangeWrapper getAuditTrails(String lastProcessedId) {
+    public static AuditChangeWrapper getAuditTrails(String lastProcessedDateTime) {
         AuditChangeWrapper result;
 
-        List<SetupAuditTrail> records = getAuditTrailRecords(lastProcessedId);
+        List<SetupAuditTrail> records = getAuditTrailRecords(lastProcessedDateTime);
+        Map<Id, SetupAuditTrail> justMap = new Map<Id, SetupAuditTrail>(records);
 
-        if(lastProcessedId == null) {
-            String currentLastProcessedId = records.isEmpty() ? null : records.get(0).Id;
-            result = new AuditChangeWrapper(currentLastProcessedId);
+        if(lastProcessedDateTime == null) {
+            Datetime currentLastProcessedCreatedDate = records.isEmpty() ? null : records.get(0).CreatedDate;
+            result = new AuditChangeWrapper(currentLastProcessedCreatedDate);
         }
         else {
             /**
@@ -521,7 +518,7 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
              * 2 AuditTrail, DateTime: 2025-07-28 09:00:00, Id: 1001
              * 3 AuditTrail, DateTime: 2025-07-28 08:00:00, Id: 1000
              */
-            String currentLastProcessedId = (records.isEmpty()) ? null : records.get(0).Id;
+            Datetime currentLastProcessedCreatedDate = (records.isEmpty()) ? null : records.get(0).CreatedDate;
 
             Map<String, AuditChange> changes = new Map<String, AuditChange>();
             for(SetupAuditTrail record : records) {
@@ -536,7 +533,7 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
                     changes.put(metaType, change);
                 }
             }
-            result = new AuditChangeWrapper(changes.values(), currentLastProcessedId);
+            result = new AuditChangeWrapper(changes.values(), currentLastProcessedCreatedDate);
         }
         return result;
     }

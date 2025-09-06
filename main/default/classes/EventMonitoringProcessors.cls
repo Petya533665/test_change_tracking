@@ -227,8 +227,36 @@ public class EventMonitoringProcessors {
             return matches;
         }
 
+        protected virtual String thresholdExceededString(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
+            String result = 'threshold exceeded: ';
+            switch on config.evaluationType {
+                when EQUALS {
+                    result += String.format('{0} = {1}', new Object[]{value, config.threshold});
+                }
+                when GREATER_THAN {
+                    result += String.format('{0} > {1}', new Object[]{value, config.threshold});
+                }
+                when LESS_THAN {
+                    result += String.format('{0} < {1}', new Object[]{value, config.threshold});
+                }
+                when NOT_EQUALS {
+                    result += String.format('{0} != {1}', new Object[]{value, config.threshold});
+                }
+                when NOT_NULL {
+                    result += String.format('{0} != null', new Object[]{value});
+                }
+                when IS_IN {
+                    result += String.format('{0} is in {1}', new Object[]{value, config.threshold});
+                }
+                when else {
+                    result += 'undefined threshold evaluation type';
+                }
+            }
+            return result;
+        }
+
         protected virtual String getSummary(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
-            return String.format('{0} {1} threshold exceeded: {2} > {3}', new Object[]{this.eventType, metric, value, config.threshold});
+            return String.format('{0} {1} {2}', new Object[]{this.eventType, metric, thresholdExceededString(metric, value, config, event)});
         }
 
         protected virtual String getDetails(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {

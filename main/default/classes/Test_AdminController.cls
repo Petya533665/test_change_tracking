@@ -65,12 +65,6 @@ public class Test_AdminController {
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
-            'method' => 'getMasks',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
             'method' => 'getLoggerWrapperInfo',
             'data' => ''
         };
@@ -79,12 +73,6 @@ public class Test_AdminController {
         payload = new Map<String, Object>{
             'method' => 'getSplunkSettings',
             'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-                'method' => 'saveMask',
-                'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
@@ -108,12 +96,6 @@ public class Test_AdminController {
 
         payload = new Map<String, Object>{
             'method' => 'saveAzureDevOpsSettings',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'createConnectedApp',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -162,12 +144,6 @@ public class Test_AdminController {
 
         payload = new Map<String, Object>{
             'method' => 'savePagerDutySettings',
-            'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-            'method' => 'deleteLogRecordTypeMappings',
             'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -744,18 +720,6 @@ public class Test_AdminController {
         AdminController ctrl = new AdminController();
 
         Map<String, Object> payload = new Map<String, Object>{
-                'method' => 'deleteMask',
-                'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-                'method' => 'testMask',
-                'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
                 'method' => 'saveSplunkSettings',
                 'data' => ''
         };
@@ -763,12 +727,6 @@ public class Test_AdminController {
 
         payload = new Map<String, Object>{
                 'method' => 'validateSplunkEventCollectorConnection',
-                'data' => ''
-        };
-        AdminController.remoteActionHandler(JSON.serialize(payload));
-
-        payload = new Map<String, Object>{
-                'method' => 'getCreateMeta',
                 'data' => ''
         };
         AdminController.remoteActionHandler(JSON.serialize(payload));
@@ -922,30 +880,6 @@ public class Test_AdminController {
         Test.stopTest();
 
         System.assertNotEquals(null, payload);
-    }
-
-    @IsTest
-    private static void testLogCategories() {
-        Test.startTest();
-        Map<String, Object> payload = new Map<String, Object> {
-            'method' => 'getLogCategories',
-            'data' => ''
-        };
-        String responseData = AdminController.remoteActionHandler(JSON.serialize(payload));
-        System.assertNotEquals(null, responseData);
-        Map<String, Object> mapResponse = (Map<String, Object>)JSON.deserializeUntyped(responseData);
-        Map<String, Object> mapData = (Map<String, Object>)mapResponse.get('data');
-        System.assertNotEquals(null, mapData.get('categories'));
-        System.assertNotEquals(null, mapData.get('recordtypes'));
-        System.assertNotEquals(null, mapData.get('mappings'));
-
-        payload = new Map<String, Object> {
-            'method' => 'setLogRecordTypeMappings',
-            'data' => JSON.serialize(mapData.get('mappings'))
-        };
-        String responseSaveData = AdminController.remoteActionHandler(JSON.serialize(payload));
-        System.assertNotEquals('success', responseSaveData);
-        Test.stopTest();
     }
 
     @IsTest
@@ -2856,6 +2790,557 @@ public class Test_AdminController {
         Test.stopTest();
 
         Assert.areNotEqual(null, response);
+    }
+
+    @IsTest
+    static void test_RemoteAction_getCreateMeta() {
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(JiraNotificationBatchTest.createJiraMocks());
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'getCreateMeta',
+                'data' => new Map<String, Object>{
+                    ConfigUtil.CREATE_META_REQUEST_DATA_KEY_PROJECT_ID => JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID,
+                    ConfigUtil.CREATE_META_REQUEST_DATA_KEY_ISSUE_TYPE_ID => JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+
+        Map<String, Object> mapData = (Map<String, Object>) response.get('data');
+        Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_META));
+        Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_LOG_FIELDS));
+        Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_ISSUE_FIELDS));
+        Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_COMPONENTS));
+        Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_EPICS));
+        Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_PRIORITIES));
+    }
+
+    @IsTest
+    static void test_RemoteAction_getJiraProjectIssueTypes() {
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(JiraNotificationBatchTest.createJiraMocks());
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'getJiraProjectIssueTypes',
+                'data' => JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+
+        List<JiraService.JiraProjectIssueType> issueTypes = (List<JiraService.JiraProjectIssueType>) JSON.deserialize(JSON.serialize(response.get('data')), List<JiraService.JiraProjectIssueType>.class);
+        Assert.isFalse(issueTypes.isEmpty());
+    }
+
+    @IsTest
+    static void test_RemoteAction_getJiraProject() {
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(JiraNotificationBatchTest.createJiraMocks());
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'getJiraProject',
+                'data' => JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+
+        JiraService.JiraProject jiraProject = (JiraService.JiraProject) JSON.deserialize(JSON.serialize(response.get('data')), JiraService.JiraProject.class);
+
+        Assert.isTrue(jiraProject != null);
+        Assert.isTrue(String.isNotBlank(jiraProject.id));
+        Assert.isTrue(String.isNotBlank(jiraProject.key));
+    }
+
+    @IsTest
+    static void test_RemoteAction_createConnectedApp_useManagedAppTrue() {
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'createConnectedApp',
+                'data' => new Map<String, Object> {
+                    'useManagedApp' => true
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+
+        OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(ConfigUtil.PHAROS_APP_SETTINGS_NAME);
+        AdminService.OAuthSettings oauthSettings = new AdminService.OAuthSettings();
+
+        oauthSettings = (AdminService.OAuthSettings) JSON.deserialize(JSON.serialize(response.get('data')), AdminService.OAuthSettings.class);
+
+        Assert.areEqual(mdtSettings.Client_Id__c, oauthSettings.clientKey);
+        Assert.areEqual(mdtSettings.Client_Secret__c, oauthSettings.clientSecret);
+        Assert.areEqual(ConfigUtil.CONNECTED_APP_API_NAME, ConfigUtil.CONNECTED_ORGS_SETTINGS.Connected_App_Name__c);
+        Assert.isTrue(ConfigUtil.CONNECTED_ORGS_SETTINGS.Use_Managed_App__c);
+        Assert.isTrue(ConfigUtil.CONNECTED_ORGS_SETTINGS.Connected_App_Created_At__c != null);
+    }
+
+    @IsTest
+    static void test_RemoteAction_createConnectedApp_useManagedAppFalse() {
+        TestDataFactory.createConnectedOrgSettings();
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+                   
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'createConnectedApp',
+                'data' => new Map<String, Object> {
+                    'useManagedApp' => false
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+
+        AdminService.OAuthSettings oauthSettings = new AdminService.OAuthSettings();
+
+        oauthSettings = (AdminService.OAuthSettings) JSON.deserialize(JSON.serialize(response.get('data')), AdminService.OAuthSettings.class);
+
+        Assert.isTrue(String.isNotBlank(oauthSettings.clientKey));
+        Assert.isTrue(String.isNotBlank(oauthSettings.clientSecret));
+        Assert.isTrue(String.isNotBlank(ConfigUtil.CONNECTED_ORGS_SETTINGS.Connected_App_Name__c));
+        Assert.isFalse(ConfigUtil.CONNECTED_ORGS_SETTINGS.Use_Managed_App__c);
+        Assert.isTrue(ConfigUtil.CONNECTED_ORGS_SETTINGS.Connected_App_Created_At__c != null);
+    }
+
+    @IsTest
+    static void test_RemoteAction_getMasks() {
+        final String NAME = 'testName';
+        final String DESCRIPTION = 'testDescription';
+        final String REGEX = 'testRegex';
+
+        insert new SensitiveDataMask__c(
+            Name = NAME,
+            Description__c = DESCRIPTION,
+            Regex__c = REGEX
+        );
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'getMasks',
+                'data' => ''
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+
+        List<AdminService.SensitiveDataMaskWrapper> wrappers = (List<AdminService.SensitiveDataMaskWrapper>) JSON.deserialize(
+            JSON.serialize(response.get('data')), List<AdminService.SensitiveDataMaskWrapper>.class
+        );
+
+        Assert.isFalse(wrappers.isEmpty());
+        Assert.areEqual(1, wrappers.size());
+        Assert.areEqual(NAME, wrappers.get(0).id);
+        Assert.areEqual(NAME, wrappers.get(0).name);
+        Assert.areEqual(DESCRIPTION, wrappers.get(0).description);
+        Assert.areEqual(REGEX, wrappers.get(0).regex);
+    }
+
+    @IsTest
+    static void test_RemoteAction_saveMask() {
+        final String NAME = 'testName';
+        final String DESCRIPTION = 'testDescription';
+        final String REGEX = 'testRegex';
+
+        AdminService.SensitiveDataMaskWrapper wrapper = new AdminService.SensitiveDataMaskWrapper();
+        wrapper.Id = NAME;
+        wrapper.description = DESCRIPTION;
+        wrapper.regex = REGEX;
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'saveMask',
+                'data' => wrapper
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+        
+        List<AdminService.SensitiveDataMaskWrapper> wrappers = (List<AdminService.SensitiveDataMaskWrapper>) JSON.deserialize(
+            JSON.serialize(response.get('data')), List<AdminService.SensitiveDataMaskWrapper>.class
+        );
+
+        Assert.isFalse(wrappers.isEmpty());
+        Assert.areEqual(1, wrappers.size());
+        Assert.areEqual(NAME, wrappers.get(0).id);
+        Assert.areEqual(NAME, wrappers.get(0).name);
+        Assert.areEqual(DESCRIPTION, wrappers.get(0).description);
+        Assert.areEqual(REGEX, wrappers.get(0).regex);
+
+        List<SensitiveDataMask__c> masks = SensitiveDataMask__c.getAll().values();
+        Assert.areEqual(1, masks.size());
+        Assert.areEqual(NAME, masks.get(0).Name);
+        Assert.areEqual(DESCRIPTION, masks.get(0).Description__c);
+        Assert.areEqual(REGEX, masks.get(0).Regex__c);
+    }
+
+    @IsTest
+    static void test_RemoteAction_testMask() {
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'testMask',
+                'data' => new Map<String, Object>{
+                    ConfigUtil.SENSETIVE_MASK_KEY_TEXT => 'test@example.com',
+                    ConfigUtil.SENSETIVE_MASK_KEY_REGEX => '\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b'
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+
+        String result = (String) response.get('data');
+
+        Assert.isTrue(String.isNotBlank(result));
+        Assert.areEqual(ConfigUtil.SENSETIVE_MASK_KEY_MASK, result);
+    }
+
+    @IsTest
+    static void test_RemoteAction_deleteMask() {
+        final String NAME = 'testName';
+        final String DESCRIPTION = 'testDescription';
+        final String REGEX = 'testRegex';
+
+        insert new SensitiveDataMask__c(
+            Name = NAME,
+            Description__c = DESCRIPTION,
+            Regex__c = REGEX
+        );
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'deleteMask',
+                'data' => new Map<String, Object>{
+                    ConfigUtil.SENSETIVE_MASK_KEY_ID => NAME
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+
+        List<AdminService.SensitiveDataMaskWrapper> wrappers = (List<AdminService.SensitiveDataMaskWrapper>) JSON.deserialize(
+            JSON.serialize(response.get('data')), List<AdminService.SensitiveDataMaskWrapper>.class
+        );
+
+        Assert.isTrue(wrappers.isEmpty());
+
+        List<SensitiveDataMask__c> masks = SensitiveDataMask__c.getAll().values();
+        Assert.areEqual(0, masks.size());
+    }
+
+    @IsTest
+    static void test_RemoteAction_deleteLogRecordTypeMappings() {
+        final String LOG_CATEGORY_ERROR = 'Error';
+        final String LOG_RT_NAME_ERROR = Schema.SObjectType.Log__c.getRecordTypeInfosByName().get('Error').getDeveloperName();
+
+        insert new Log_Category_Mapping_Setting__c(
+            Name = 'Error',
+            Category__c = LOG_CATEGORY_ERROR,
+            Record_Type_Developer_Name__c = LOG_RT_NAME_ERROR
+        );
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'deleteLogRecordTypeMappings',
+                'data' => new AdminService.LogRecordTypeMapping(LOG_CATEGORY_ERROR, LOG_CATEGORY_ERROR, LOG_RT_NAME_ERROR, LOG_RT_NAME_ERROR)
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+        Assert.areEqual(Constants.UI.RESULT_SUCCESS, (String) response.get('data'));
+        Assert.areEqual(0, Log_Category_Mapping_Setting__c.getAll().values().size());
+    }
+
+    @IsTest
+    static void test_RemoteAction_setLogRecordTypeMappings_insert() {
+        final String LOG_CATEGORY_ERROR = 'Error';
+        final String LOG_RT_NAME_ERROR = Schema.SObjectType.Log__c.getRecordTypeInfosByName().get('Error').getDeveloperName();
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'setLogRecordTypeMappings',
+                'data' => new AdminService.LogRecordTypeMapping(LOG_CATEGORY_ERROR, LOG_CATEGORY_ERROR, LOG_RT_NAME_ERROR, LOG_RT_NAME_ERROR)
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+        Assert.areEqual(Constants.UI.RESULT_SUCCESS, (String) response.get('data'));
+        
+        List<Log_Category_Mapping_Setting__c> settings = Log_Category_Mapping_Setting__c.getAll().values();
+        Assert.areEqual(1, settings.size());
+        Assert.areEqual(LOG_CATEGORY_ERROR, settings.get(0).Category__c);
+        Assert.areEqual(LOG_RT_NAME_ERROR, settings.get(0).Record_Type_Developer_Name__c);
+    }
+
+    @IsTest
+    static void test_RemoteAction_setLogRecordTypeMappings_update() {
+        final String LOG_CATEGORY_ERROR = 'Error';
+        final String LOG_RT_NAME_ERROR = Schema.SObjectType.Log__c.getRecordTypeInfosByName().get('Error').getDeveloperName();
+        final String LOG_RT_NAME_DEBUG = Schema.SObjectType.Log__c.getRecordTypeInfosByName().get('Debug').getDeveloperName();
+
+        insert new Log_Category_Mapping_Setting__c(
+            Name = 'Error',
+            Category__c = LOG_CATEGORY_ERROR,
+            Record_Type_Developer_Name__c = LOG_RT_NAME_ERROR
+        );
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'setLogRecordTypeMappings',
+                'data' => new AdminService.LogRecordTypeMapping(LOG_CATEGORY_ERROR, LOG_CATEGORY_ERROR, LOG_RT_NAME_DEBUG, LOG_RT_NAME_DEBUG)
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+        Assert.areEqual(Constants.UI.RESULT_SUCCESS, (String) response.get('data'));
+
+        List<Log_Category_Mapping_Setting__c> settings = Log_Category_Mapping_Setting__c.getAll().values();
+        Assert.areEqual(1, settings.size());
+        Assert.areEqual(LOG_CATEGORY_ERROR, settings.get(0).Category__c);
+        Assert.areEqual(LOG_RT_NAME_DEBUG, settings.get(0).Record_Type_Developer_Name__c);
+    }
+
+    @IsTest
+    static void test_RemoteAction_getLogCategories() {
+        final String LOG_CATEGORY_ERROR = 'Error';
+        final String LOG_RT_NAME_ERROR = Schema.SObjectType.Log__c.getRecordTypeInfosByName().get('Error').getDeveloperName();
+
+        insert new Log_Category_Mapping_Setting__c(
+            Name = 'Error',
+            Category__c = LOG_CATEGORY_ERROR,
+            Record_Type_Developer_Name__c = LOG_RT_NAME_ERROR
+        );
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'getLogCategories',
+                'data' => new AdminService.LogRecordTypeMapping(LOG_CATEGORY_ERROR, LOG_CATEGORY_ERROR, LOG_RT_NAME_ERROR, LOG_RT_NAME_ERROR)
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+
+        Map<String, Object> mapData = (Map<String, Object>) response.get('data');
+        Assert.areNotEqual(null, mapData.get(ConfigUtil.LOG_CATEGORIES_KEY_CATEGORIES));
+        Assert.areNotEqual(null, mapData.get(ConfigUtil.LOG_CATEGORIES_KEY_RECORDTYPES));
+        Assert.areNotEqual(null, mapData.get(ConfigUtil.LOG_CATEGORIES_KEY_MAPPINGS));
+    }
+
+    @IsTest
+    static void test_RemoteAction_getMetadataChatSettings() {
+        final String GIT_API_SETTINGS_USERNAME = 'Test_Username';
+        final String GIT_API_SETTINGS_REPONAME = 'Test_Reponame';
+        final String GIT_API_SETTINGS_BRANCH_NAME = 'Test_BranchName';
+
+        OpenAI_Settings__c openAISettings = OpenAI_Settings__c.getOrgDefaults();
+        openAISettings.OpenAI_Enabled__c = true;
+        openAISettings.Token__c = 'someToken';
+        upsert openAISettings;
+
+        Git_API_Settings__c gitApiSettings = Git_API_Settings__c.getOrgDefaults();
+        gitApiSettings.Token__c = 'Test_Token';
+        gitApiSettings.oAuth_Token__c = 'Test_oAuthToken';
+        gitApiSettings.Username__c = GIT_API_SETTINGS_USERNAME;
+        gitApiSettings.Reponame__c = GIT_API_SETTINGS_REPONAME;
+        gitApiSettings.Branch_Name__c = GIT_API_SETTINGS_BRANCH_NAME;
+        gitApiSettings.Last_Processed_Date_Time__c = Datetime.now().formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+        gitApiSettings.Enabled__c = true;
+        upsert gitApiSettings;
+
+        MetadataServiceUtil.CspTrustedSiteWrapper cspTrustedSiteWrapper = new MetadataServiceUtil.CspTrustedSiteWrapper();
+        cspTrustedSiteWrapper.Id = 'someId';
+        cspTrustedSiteWrapper.IsActive = true;
+        cspTrustedSiteWrapper.DeveloperName = 'someDeveloperName';
+        cspTrustedSiteWrapper.EndpointUrl = PharosChatController.CHAT_WEBSOCKET_URL;
+
+        GitHubUtils.GitRepoBranchInfo gitRepoBranchInfo = new GitHubUtils.GitRepoBranchInfo();
+        gitRepoBranchInfo.name = GIT_API_SETTINGS_BRANCH_NAME;
+
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>{
+            ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_CSP_TRUSTED_SITES_QUERY => new TestDataFactory.SingleRequestMock(
+                200,
+                'OK',
+                JSON.serialize(new Map<String, Object>{
+                    ConfigUtil.CSP_TRUSTED_SITES_KEY_RECORDS => new List<MetadataServiceUtil.CspTrustedSiteWrapper>{ cspTrustedSiteWrapper }
+                })
+            ),
+            PharosChatController.CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + UserInfo.getOrganizationId() => new TestDataFactory.SingleRequestMock(
+                200,
+                'OK',
+                '{"empty": false, "indexingInProgress": true}'
+            ),
+            ConfigUtil.OPEN_AI_USAGE_ENDPOINT => new TestDataFactory.SingleRequestMock(
+                200,
+                'OK',
+                ''
+            ),
+            String.format(GitHubUtils.GIT_API_GET_REPO_BRANCHES_INFO, new List<String>{GIT_API_SETTINGS_USERNAME, GIT_API_SETTINGS_REPONAME, GIT_API_SETTINGS_BRANCH_NAME}) => new TestDataFactory.SingleRequestMock(
+                200,
+                'OK',
+                JSON.serialize(gitRepoBranchInfo)
+            )
+        };
+        mocks.putAll(getRemoteSiteSettingsMock());
+        
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(mocks));
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'getMetadataChatSettings',
+                'data' => ''
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+
+        AdminService.MetadataChatSettings settings = (AdminService.MetadataChatSettings) JSON.deserialize(
+            JSON.serialize(response.get('data')), AdminService.MetadataChatSettings.class
+        );
+
+        Assert.isTrue(settings.openAiConfigured);
+        Assert.isTrue(settings.gitConfigured);
+        Assert.isTrue(settings.codebaseIndexed);
+        Assert.isTrue(settings.indexingInProgress);
+        Assert.isTrue(settings.trustedSiteReady);
+    }
+
+    @IsTest
+    static void test_RemoteAction_setupMetadataChatTrustedSite() {
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>{
+            ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_CSP_TRUSTED_SITES_QUERY => new TestDataFactory.SingleRequestMock(
+                200,
+                'OK',
+                JSON.serialize(new Map<String, Object>{
+                    ConfigUtil.CSP_TRUSTED_SITES_KEY_RECORDS => new List<MetadataServiceUtil.CspTrustedSiteWrapper>()
+                })
+            )
+        };
+
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(mocks));
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'setupMetadataChatTrustedSite',
+                'data' => ''
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.isTrue(String.isBlank((String) response.get('error')));
+
+        AdminService.MetadataChatSettings settings = (AdminService.MetadataChatSettings) JSON.deserialize(
+            JSON.serialize(response.get('data')), AdminService.MetadataChatSettings.class
+        );
+
+        Assert.areEqual(0, [SELECT COUNT() FROM Log__c]);
+
+        Assert.isTrue(settings.openAiConfigured == null);
+        Assert.isTrue(settings.gitConfigured == null);
+        Assert.isTrue(settings.codebaseIndexed == null);
+        Assert.isTrue(settings.indexingInProgress == null);
+        Assert.isTrue(settings.trustedSiteReady);
     }
 
     @IsTest
@@ -4818,5 +5303,207 @@ public class Test_AdminController {
         result.put(endpoint, singleRequestMock);
 
         return result;
+    }
+
+    // ============ NEW TEST CASES FOR AdminService.setEventMonitoringSetting DML EXCEPTION FIX ============
+    
+    @IsTest
+    static void test_setEventMonitoringSetting_WithFreshOrgNoExistingRecord() {
+        // Arrange - Simulate fresh org where Event_Monitoring__c record doesn't exist
+        List<Event_Monitoring__c> existingSettings = [SELECT Id FROM Event_Monitoring__c];
+        if (!existingSettings.isEmpty()) {
+            delete existingSettings;
+        }
+        
+        // Clear the cached settings to force re-initialization
+        ConfigUtil.EVENT_MONITORING_SETTINGS = null;
+        
+        // Prepare input data with event type statuses
+        List<Map<String, Object>> eventTypeStatusesData = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'name' => EventLogProcessors.EVENT_TYPE_API,
+                'active' => true,
+                'logsLimit' => 150
+            },
+            new Map<String, Object>{
+                'name' => EventLogProcessors.EVENT_TYPE_APEX_TRIGGER,
+                'active' => true,
+                'logsLimit' => 200
+            }
+        };
+        
+        Map<String, Object> inputData = new Map<String, Object>{
+            ConfigUtil.MONITORING_APP_KEY_ENABLED => true,
+            ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES => eventTypeStatusesData
+        };
+        
+        Test.startTest();
+        
+        // Act - This should not throw DML exception even with no existing record
+        Event_Monitoring__c result = AdminService.setEventMonitoringSetting(inputData);
+        
+        Test.stopTest();
+        
+        // Assert - Verify settings were created successfully
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.Id, 'Settings should have an Id after upsert');
+        System.assertEquals(true, result.Enabled__c, 'Event monitoring should be enabled');
+        System.assertNotEquals(null, result.Enabled_Types__c, 'Enabled_Types__c should be set');
+        
+        // Verify rules were created
+        List<Rule__c> createdRules = [
+            SELECT Subtype__c, Logs_Limit__c 
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
+        ];
+        System.assertEquals(2, createdRules.size(), 'Should create 2 rules');
+    }
+    
+    @IsTest
+    static void test_setEventMonitoringSetting_WithExistingRecord() {
+        // Arrange - Create existing Event_Monitoring__c record
+        Event_Monitoring__c existingSettings = Event_Monitoring__c.getOrgDefaults();
+        existingSettings.Enabled__c = false;
+        existingSettings.Enabled_Types__c = '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+        upsert existingSettings;
+        
+        Id originalId = existingSettings.Id;
+        
+        Map<String, Object> inputData = new Map<String, Object>{
+            ConfigUtil.MONITORING_APP_KEY_ENABLED => true
+        };
+        
+        Test.startTest();
+        
+        // Act - This should work with existing record
+        Event_Monitoring__c result = AdminService.setEventMonitoringSetting(inputData);
+        
+        Test.stopTest();
+        
+        // Assert - Verify settings were updated successfully
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertEquals(originalId, result.Id, 'Should update the same record');
+        System.assertEquals(true, result.Enabled__c, 'Event monitoring should be enabled');
+    }
+    
+    @IsTest
+    static void test_setEventMonitoringSetting_WithNullEventTypeStatuses() {
+        // Arrange - Simulate fresh org where Event_Monitoring__c record doesn't exist
+        List<Event_Monitoring__c> existingSettings = [SELECT Id FROM Event_Monitoring__c];
+        if (!existingSettings.isEmpty()) {
+            delete existingSettings;
+        }
+        
+        // Clear the cached settings to force re-initialization
+        ConfigUtil.EVENT_MONITORING_SETTINGS = null;
+        
+        Map<String, Object> inputData = new Map<String, Object>{
+            ConfigUtil.MONITORING_APP_KEY_ENABLED => true,
+            ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES => null // Explicitly set to null
+        };
+        
+        Test.startTest();
+        
+        // Act - This should not throw DML exception even with null event types
+        Event_Monitoring__c result = AdminService.setEventMonitoringSetting(inputData);
+        
+        Test.stopTest();
+        
+        // Assert - Verify settings were created successfully
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.Id, 'Settings should have an Id after upsert');
+        System.assertEquals(true, result.Enabled__c, 'Event monitoring should be enabled');
+    }
+    
+    @IsTest
+    static void test_setEventMonitoringSetting_WithEmptyEventTypeStatuses() {
+        // Arrange - Simulate fresh org where Event_Monitoring__c record doesn't exist
+        List<Event_Monitoring__c> existingSettings = [SELECT Id FROM Event_Monitoring__c];
+        if (!existingSettings.isEmpty()) {
+            delete existingSettings;
+        }
+        
+        // Clear the cached settings to force re-initialization
+        ConfigUtil.EVENT_MONITORING_SETTINGS = null;
+        
+        Map<String, Object> inputData = new Map<String, Object>{
+            ConfigUtil.MONITORING_APP_KEY_ENABLED => true,
+            ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES => new List<Object>() // Empty list
+        };
+        
+        Test.startTest();
+        
+        // Act - This should not throw DML exception even with empty event types list
+        Event_Monitoring__c result = AdminService.setEventMonitoringSetting(inputData);
+        
+        Test.stopTest();
+        
+        // Assert - Verify settings were created successfully
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.Id, 'Settings should have an Id after upsert');
+        System.assertEquals(true, result.Enabled__c, 'Event monitoring should be enabled');
+    }
+    
+    @IsTest
+    static void test_setEventMonitoringSetting_DisableEventMonitoring() {
+        // Arrange - Create existing Event_Monitoring__c record with some enabled types
+        Event_Monitoring__c existingSettings = Event_Monitoring__c.getOrgDefaults();
+        existingSettings.Enabled__c = true;
+        existingSettings.Enabled_Types__c = '1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+        upsert existingSettings;
+        
+        // Create some existing rules that should be disabled
+        List<Rule__c> existingRules = new List<Rule__c>{
+            new Rule__c(
+                Type__c = EventMonitoringUtil.EVENT_MONITORING_TYPE,
+                Subtype__c = EventLogProcessors.EVENT_TYPE_API,
+                Active__c = true
+            ),
+            new Rule__c(
+                Type__c = EventMonitoringUtil.EVENT_MONITORING_TYPE,
+                Subtype__c = EventLogProcessors.EVENT_TYPE_APEX_CALLOUT,
+                Active__c = true
+            )
+        };
+        insert existingRules;
+        
+        // Prepare input data to disable all event types
+        List<Map<String, Object>> eventTypeStatusesData = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'name' => EventLogProcessors.EVENT_TYPE_API,
+                'active' => false,
+                'logsLimit' => 100
+            },
+            new Map<String, Object>{
+                'name' => EventLogProcessors.EVENT_TYPE_APEX_CALLOUT,
+                'active' => false,
+                'logsLimit' => 100
+            }
+        };
+        
+        Map<String, Object> inputData = new Map<String, Object>{
+            ConfigUtil.MONITORING_APP_KEY_ENABLED => false,
+            ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES => eventTypeStatusesData
+        };
+        
+        Test.startTest();
+        
+        // Act - This should work to disable event monitoring
+        Event_Monitoring__c result = AdminService.setEventMonitoringSetting(inputData);
+        
+        Test.stopTest();
+        
+        // Assert - Verify settings were updated successfully
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertEquals(false, result.Enabled__c, 'Event monitoring should be disabled');
+        
+        // Verify rules were deleted/disabled properly
+        List<Rule__c> remainingActiveRules = [
+            SELECT Id 
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE 
+            AND Active__c = true
+        ];
+        System.assertEquals(0, remainingActiveRules.size(), 'No rules should be active after disabling');
     }
 }
