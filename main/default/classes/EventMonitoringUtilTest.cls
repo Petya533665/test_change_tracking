@@ -156,6 +156,183 @@ private class EventMonitoringUtilTest {
     }
     
     @IsTest
+    static void testGetEventLogsMultipleFilesInSameHour() {
+        enableEventMonitoringPermissions();
+
+        // Arrange - Create multiple CSV files for the same hour and event type
+        DateTime testDateTime = DateTime.now().addHours(-1);
+        List<SObject> testLogs = new List<SObject>();
+        
+        // Create 3 CSV files with different sequences for the same hour
+        for (Integer i = 1; i <= 3; i++) {
+            Map<String, Object> testData = EventMonitoringUtil.createTestEventLogData(
+                TEST_EVENT_TYPE,
+                Date.today(),
+                Blob.valueOf('test,data\nvalue' + i + ',data' + i)
+            );
+            testData.put(EventMonitoringUtil.EVENT_LOG_FILE_SEQUENCE, i);
+            testData.put(EventMonitoringUtil.EVENT_LOG_FILE_ID, '001000000000' + String.valueOf(i).leftPad(3, '0') + 'AAA');
+            
+            Account mockAccount = new Account(Name = 'Test Mock EventLog ' + i);
+            mockAccount.Description = JSON.serialize(testData);
+            testLogs.add((SObject)mockAccount);
+        }
+        
+        EventMonitoringUtil.testEventLogs = testLogs;
+        
+        // Act
+        Test.startTest();
+        List<SObject> result = EventMonitoringUtil.getEventLogs(TEST_EVENT_TYPE);
+        Test.stopTest();
+        
+        // Assert
+        System.assertEquals(3, result.size(), 'Should return all three CSV files for the same hour');
+        System.assertNotEquals(null, result[0], 'Should return valid SObjects');
+    }
+    
+    @IsTest 
+    static void testGetEventLogsTimeWindowBoundary() {
+        enableEventMonitoringPermissions();
+
+        // Arrange - Test that only files within 1-hour window are returned
+        DateTime lastProcessedTime = DateTime.now().addHours(-2);
+        
+        // Update settings to set last processed time
+        Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
+        settings.Last_Processed_Hourly_Events__c = lastProcessedTime;
+        update settings;
+        
+        List<SObject> testLogs = new List<SObject>();
+        
+        // Create file exactly at the boundary (should be included)
+        Map<String, Object> testData1 = EventMonitoringUtil.createTestEventLogData(
+            TEST_EVENT_TYPE,
+            lastProcessedTime.date(),
+            Blob.valueOf('test,data\nvalue1,data1')
+        );
+        testData1.put(EventMonitoringUtil.EVENT_LOG_FILE_LOG_DATE, lastProcessedTime);
+        testData1.put(EventMonitoringUtil.EVENT_LOG_FILE_ID, '001000000000001AAA');
+        
+        Account mockAccount1 = new Account(Name = 'Test Mock EventLog 1');
+        mockAccount1.Description = JSON.serialize(testData1);
+        testLogs.add((SObject)mockAccount1);
+        
+        // Create file exactly at the upper boundary (should be included)
+        Map<String, Object> testData2 = EventMonitoringUtil.createTestEventLogData(
+            TEST_EVENT_TYPE,
+            lastProcessedTime.addHours(1).date(),
+            Blob.valueOf('test,data\nvalue2,data2')
+        );
+        testData2.put(EventMonitoringUtil.EVENT_LOG_FILE_LOG_DATE, lastProcessedTime.addHours(1));
+        testData2.put(EventMonitoringUtil.EVENT_LOG_FILE_ID, '001000000000002AAA');
+        
+        Account mockAccount2 = new Account(Name = 'Test Mock EventLog 2');
+        mockAccount2.Description = JSON.serialize(testData2);
+        testLogs.add((SObject)mockAccount2);
+        
+        // Create file beyond the 1-hour window (should be excluded in real query, but included in test since we mock)
+        Map<String, Object> testData3 = EventMonitoringUtil.createTestEventLogData(
+            TEST_EVENT_TYPE,
+            lastProcessedTime.addHours(2).date(),
+            Blob.valueOf('test,data\nvalue3,data3')
+        );
+        testData3.put(EventMonitoringUtil.EVENT_LOG_FILE_LOG_DATE, lastProcessedTime.addHours(2));
+        testData3.put(EventMonitoringUtil.EVENT_LOG_FILE_ID, '001000000000003AAA');
+        
+        Account mockAccount3 = new Account(Name = 'Test Mock EventLog 3');
+        mockAccount3.Description = JSON.serialize(testData3);
+        testLogs.add((SObject)mockAccount3);
+        
+        EventMonitoringUtil.testEventLogs = testLogs;
+        
+        // Act
+        Test.startTest();
+        List<SObject> result = EventMonitoringUtil.getEventLogs(TEST_EVENT_TYPE);
+        Test.stopTest();
+        
+        // Assert - In test context, all mocked logs are returned, but the real query would filter by time window
+        System.assertEquals(3, result.size(), 'Should return all mocked event logs in test context');
+        System.assertNotEquals(null, result[0], 'Should return valid SObjects');
+    }
+    
+    @IsTest
+    static void testEventLogFileTypeIteratorMultipleCSVFiles() {
+        enableEventMonitoringPermissions();
+
+        // Arrange - Create multiple CSV files for the same hour to test iterator functionality
+        List<SObject> testLogs = new List<SObject>();
+        
+        // Create 3 CSV files with small file sizes to avoid chunking (use very small files)
+        for (Integer i = 1; i <= 3; i++) {
+            Map<String, Object> testData = EventMonitoringUtil.createTestEventLogData(
+                TEST_EVENT_TYPE,
+                Date.today(),
+                Blob.valueOf('test,data\nvalue' + i + ',data' + i)
+            );
+            testData.put(EventMonitoringUtil.EVENT_LOG_FILE_SEQUENCE, i);
+            testData.put(EventMonitoringUtil.EVENT_LOG_FILE_ID, '001000000000' + String.valueOf(i).leftPad(3, '0') + 'AAA');
+            testData.put(EventMonitoringUtil.EVENT_LOG_FILE_LOG_FILE_LENGTH, 100.0 + i); // Very small files to avoid chunking (100-103 bytes)
+            
+            Account mockAccount = new Account(Name = 'Test Mock EventLog ' + i);
+            mockAccount.Description = JSON.serialize(testData);
+            testLogs.add((SObject)mockAccount);
+        }
+        
+        EventMonitoringUtil.testEventLogs = testLogs;
+        
+        // Act
+        Test.startTest();
+        
+        // Create a minimal EventLogFileType list for the specific event type to avoid other enabled types
+        List<EventLogProcessingBatch.EventLogFileType> enabledMembers = new List<EventLogProcessingBatch.EventLogFileType>{
+            new EventLogProcessingBatch.EventLogFileType(TEST_EVENT_TYPE)
+        };
+        
+        // Test the EventLogFileTypeIterable directly with our controlled input
+        EventLogProcessingBatch.EventLogFileTypeIterable iterable = new EventLogProcessingBatch.EventLogFileTypeIterable(enabledMembers);
+        
+        // Collect all wrapper objects from iterator
+        List<EventLogProcessingBatch.EventLogFileType> wrappers = new List<EventLogProcessingBatch.EventLogFileType>();
+        for (EventLogProcessingBatch.EventLogFileType wrapper : iterable) {
+            wrappers.add(wrapper);
+        }
+        
+        Test.stopTest();
+        
+        // Assert - The iterator creates chunks based on file size, so we may get more wrappers than CSV files
+        System.assert(wrappers.size() >= 3, 'Iterator should return at least 3 wrapper objects (may create chunks per CSV file)');
+        // Note: The exact number of chunks can vary based on test context and chunking logic
+        System.assert(wrappers.size() <= 10, 'Iterator should not create excessive chunks');
+        
+        // Verify that we have exactly 3 unique log file IDs (representing our 3 CSV files)
+        Set<String> uniqueLogFileIds = new Set<String>();
+        Set<String> eventTypes = new Set<String>();
+        
+        for (EventLogProcessingBatch.EventLogFileType wrapper : wrappers) {
+            // All wrappers should have the same event type
+            eventTypes.add(wrapper.type);
+            
+            // Collect unique log file IDs
+            if (wrapper.logFileId != null) {
+                uniqueLogFileIds.add(wrapper.logFileId);
+            }
+            
+            // Verify wrapper properties
+            System.assertEquals(TEST_EVENT_TYPE, wrapper.type, 'Wrapper should have correct event type');
+            System.assertNotEquals(null, wrapper.logFileId, 'Wrapper should have a log file ID');
+            System.assertNotEquals(null, wrapper.logFileLengthBytes, 'Wrapper should have file length');
+            System.assertNotEquals(null, wrapper.chunkSize, 'Wrapper should have chunk size');
+            System.assert(wrapper.startRow >= 0, 'Wrapper should have valid start row');
+            System.assert(wrapper.endRow >= wrapper.startRow, 'Wrapper should have valid end row');
+        }
+        
+        // Verify we have exactly 3 unique CSV files represented
+        System.assertEquals(3, uniqueLogFileIds.size(), 'Should have exactly 3 unique log file IDs from our 3 CSV files');
+        System.assertEquals(1, eventTypes.size(), 'All wrappers should have the same event type');
+        System.assertEquals(TEST_EVENT_TYPE, new List<String>(eventTypes)[0], 'Event type should match our test type');
+    }
+    
+    @IsTest
     static void testGetEventLogsWithNullParams() {
         // Act
         Test.startTest();
@@ -893,5 +1070,213 @@ private class EventMonitoringUtilTest {
         System.assertEquals(1, createdRules.size(), 'Should create 1 rule');
         System.assertEquals(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION, createdRules[0].Subtype__c, 'Should be Exception rule');
         System.assertEquals(100, createdRules[0].Logs_Limit__c, 'Should be capped at DEFAULT_LOGS_LIMIT_PER_HOUR');
+    }
+
+    // ============ NEW TEST CASES FOR DML EXCEPTION FIX ============
+    
+    @IsTest
+    static void testSetEventTypesStatuses_WithFreshOrgNoExistingRecord() {
+        enableEventMonitoringPermissions();
+        
+        // Arrange - Simulate fresh org where Event_Monitoring__c record doesn't exist
+        // Delete any existing Event_Monitoring__c records to simulate fresh org
+        List<Event_Monitoring__c> existingSettings = [SELECT Id FROM Event_Monitoring__c];
+        if (!existingSettings.isEmpty()) {
+            delete existingSettings;
+        }
+        
+        // Clear the cached settings to force re-initialization
+        ConfigUtil.EVENT_MONITORING_SETTINGS = null;
+        
+        // Create event type statuses to set
+        List<EventMonitoringUtil.EventTypeStatus> statusesToSet = new List<EventMonitoringUtil.EventTypeStatus>{
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_API, true, 150),
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_APEX_TRIGGER, true, 200)
+        };
+        
+        Test.startTest();
+        
+        // Act - This should not throw DML exception even with no existing record
+        EventMonitoringUtil.setEventTypesStatuses(statusesToSet);
+        
+        Test.stopTest();
+        
+        // Assert - Verify settings were created successfully
+        Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
+        System.assertNotEquals(null, settings, 'Settings should be created');
+        System.assertNotEquals(null, settings.Id, 'Settings should have an Id after upsert');
+        System.assertNotEquals(null, settings.Enabled_Types__c, 'Enabled_Types__c should be set');
+        
+        // Verify rules were created
+        List<Rule__c> createdRules = [
+            SELECT Subtype__c, Logs_Limit__c 
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
+        ];
+        System.assertEquals(2, createdRules.size(), 'Should create 2 rules');
+    }
+    
+    @IsTest
+    static void testEnableEventType_WithFreshOrgNoExistingRecord() {
+        enableEventMonitoringPermissions();
+        
+        // Arrange - Simulate fresh org where Event_Monitoring__c record doesn't exist
+        List<Event_Monitoring__c> existingSettings = [SELECT Id FROM Event_Monitoring__c];
+        if (!existingSettings.isEmpty()) {
+            delete existingSettings;
+        }
+        
+        // Clear the cached settings to force re-initialization
+        ConfigUtil.EVENT_MONITORING_SETTINGS = null;
+        
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        
+        Test.startTest();
+        
+        // Act - This should not throw DML exception even with no existing record
+        util.enableEventType(EventLogProcessors.EVENT_TYPE_API);
+        
+        Test.stopTest();
+        
+        // Assert - Verify settings were created successfully
+        Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
+        System.assertNotEquals(null, settings, 'Settings should be created');
+        System.assertNotEquals(null, settings.Id, 'Settings should have an Id after upsert');
+        System.assertNotEquals(null, settings.Enabled_Types__c, 'Enabled_Types__c should be set');
+        System.assert(settings.Enabled_Types__c.startsWith('1'), 'First event type should be enabled');
+    }
+    
+    @IsTest
+    static void testDisableEventType_WithFreshOrgNoExistingRecord() {
+        enableEventMonitoringPermissions();
+        
+        // Arrange - Simulate fresh org where Event_Monitoring__c record doesn't exist
+        List<Event_Monitoring__c> existingSettings = [SELECT Id FROM Event_Monitoring__c];
+        if (!existingSettings.isEmpty()) {
+            delete existingSettings;
+        }
+        
+        // Clear the cached settings and pre-populate with enabled state
+        ConfigUtil.EVENT_MONITORING_SETTINGS = null;
+        Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
+        settings.Enabled_Types__c = '1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+        
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        
+        Test.startTest();
+        
+        // Act - This should not throw DML exception even with no existing record
+        util.disableEventType(EventLogProcessors.EVENT_TYPE_API);
+        
+        Test.stopTest();
+        
+        // Assert - Verify settings were created successfully
+        settings = Event_Monitoring__c.getOrgDefaults();
+        System.assertNotEquals(null, settings, 'Settings should be created');
+        System.assertNotEquals(null, settings.Id, 'Settings should have an Id after upsert');
+        System.assertNotEquals(null, settings.Enabled_Types__c, 'Enabled_Types__c should be set');
+        System.assert(settings.Enabled_Types__c.startsWith('0'), 'First event type should be disabled');
+    }
+    
+    @IsTest
+    static void testSaveLastProcessedHourlyDateTime_WithFreshOrgNoExistingRecord() {
+        enableEventMonitoringPermissions();
+        
+        // Arrange - Simulate fresh org where Event_Monitoring__c record doesn't exist
+        List<Event_Monitoring__c> existingSettings = [SELECT Id FROM Event_Monitoring__c];
+        if (!existingSettings.isEmpty()) {
+            delete existingSettings;
+        }
+        
+        // Clear the cached settings to force re-initialization
+        ConfigUtil.EVENT_MONITORING_SETTINGS = null;
+        
+        DateTime testDateTime = DateTime.now().addHours(-2);
+        DateTime expectedDateTime = testDateTime.addHours(1); // Method adds 1 hour
+        
+        Test.startTest();
+        
+        // Act - This should not throw DML exception even with no existing record
+        EventMonitoringUtil.saveLastProcessedHourlyDateTime(testDateTime);
+        
+        Test.stopTest();
+        
+        // Assert - Verify settings were created successfully
+        Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
+        System.assertNotEquals(null, settings, 'Settings should be created');
+        System.assertNotEquals(null, settings.Id, 'Settings should have an Id after upsert');
+        System.assertEquals(expectedDateTime, settings.Last_Processed_Hourly_Events__c, 
+            'Last processed hourly datetime should be set correctly');
+    }
+    
+    @IsTest
+    static void testSetEventTypesStatuses_WithExistingRecord() {
+        enableEventMonitoringPermissions();
+        
+        // Arrange - Create existing Event_Monitoring__c record
+        Event_Monitoring__c existingSettings = Event_Monitoring__c.getOrgDefaults();
+        existingSettings.Enabled__c = true;
+        existingSettings.Enabled_Types__c = '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+        upsert existingSettings;
+        
+        // Create event type statuses to set
+        List<EventMonitoringUtil.EventTypeStatus> statusesToSet = new List<EventMonitoringUtil.EventTypeStatus>{
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_API, true, 150),
+            new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_APEX_TRIGGER, true, 200)
+        };
+        
+        Test.startTest();
+        
+        // Act - This should work with existing record
+        EventMonitoringUtil.setEventTypesStatuses(statusesToSet);
+        
+        Test.stopTest();
+        
+        // Assert - Verify settings were updated successfully
+        Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
+        System.assertEquals(existingSettings.Id, settings.Id, 'Should update the same record');
+        System.assertNotEquals(null, settings.Enabled_Types__c, 'Enabled_Types__c should be set');
+        
+        // Verify rules were created
+        List<Rule__c> createdRules = [
+            SELECT Subtype__c, Logs_Limit__c 
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
+        ];
+        System.assertEquals(2, createdRules.size(), 'Should create 2 rules');
+    }
+    
+    @IsTest
+    static void testMultipleOperations_WithFreshOrgNoExistingRecord() {
+        enableEventMonitoringPermissions();
+        
+        // Arrange - Simulate fresh org where Event_Monitoring__c record doesn't exist
+        List<Event_Monitoring__c> existingSettings = [SELECT Id FROM Event_Monitoring__c];
+        if (!existingSettings.isEmpty()) {
+            delete existingSettings;
+        }
+        
+        // Clear the cached settings to force re-initialization
+        ConfigUtil.EVENT_MONITORING_SETTINGS = null;
+        
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        DateTime testDateTime = DateTime.now().addHours(-2);
+        
+        Test.startTest();
+        
+        // Act - Perform multiple operations that should all work without DML exceptions
+        util.enableEventType(EventLogProcessors.EVENT_TYPE_API);
+        EventMonitoringUtil.saveLastProcessedHourlyDateTime(testDateTime);
+        util.disableEventType(EventLogProcessors.EVENT_TYPE_API);
+        
+        Test.stopTest();
+        
+        // Assert - Verify all operations completed successfully
+        Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
+        System.assertNotEquals(null, settings, 'Settings should be created');
+        System.assertNotEquals(null, settings.Id, 'Settings should have an Id after upsert');
+        System.assertNotEquals(null, settings.Enabled_Types__c, 'Enabled_Types__c should be set');
+        System.assertNotEquals(null, settings.Last_Processed_Hourly_Events__c, 
+            'Last processed hourly datetime should be set');
     }
 }

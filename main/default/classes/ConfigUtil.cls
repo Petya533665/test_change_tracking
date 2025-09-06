@@ -526,6 +526,7 @@ public with sharing class ConfigUtil {
         PHAROS_SETTINGS = Pharos_Settings__c.getOrgDefaults();
     }
 
+    @TestVisible
     public static Event_Monitoring__c EVENT_MONITORING_SETTINGS {
         get {
             if (EVENT_MONITORING_SETTINGS == null) {

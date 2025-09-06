@@ -51,154 +51,149 @@ public with sharing class HoltwintersForecastController {
     }
 
     public static Map<String, Object> getLogsCountByDayLargeDataset(String parametersJSON) {
-        String issueId;
-        Datetime startDatetime;
-        Datetime endDatetime;
-        
+
         try {
-            // Try to parse as JSON object first
-            Map<String, Object> parameters = (Map<String, Object>) JSON.deserializeUntyped(parametersJSON);
-            issueId = (String) parameters.get('issueId');
-            
-            // Handle date parameters
-            if (parameters.containsKey('startDate') && parameters.containsKey('endDate')) {
-                String startDateStr = (String) parameters.get('startDate');
-                String endDateStr = (String) parameters.get('endDate');
-                
-                // Parse ISO format dates using valueOfGmt
-                startDatetime = (Datetime) JSON.deserialize(startDateStr, Datetime.class);
-                endDatetime = (Datetime) JSON.deserialize(endDateStr, Datetime.class);
-            } else {
-                // Default to last 90 days
-                Datetime currentDatetime = System.now();
-                startDatetime = currentDatetime.addDays(-DEFAULT_LOOKBACK_DAYS);
-                endDatetime = currentDatetime;
-            }
+            HoltwintersForecastParameters params = (HoltwintersForecastParameters) JSON.deserialize(parametersJSON, HoltwintersForecastParameters.class);
+            params.setDefaultDates();
+            List<Map<String, Datetime>> logsCountByDayLargeDataset = HoltwintersForecastLambdaService.getLogsCountByDayLargeDataset(
+                params.issueId,
+                params.startDatetime,
+                params.endDatetime
+            );
+
+            Map<String, Object> result = new Map<String, Object> {
+                'logsCountByDayLargeDataset' => logsCountByDayLargeDataset
+            };
+            return result;
         } catch (JSONException e) {
-            // If JSON parsing fails, treat as simple issue ID string
-            issueId = parametersJSON.replace('"', ''); // Remove quotes if present
-            Datetime currentDatetime = System.now();
-            startDatetime = currentDatetime.addDays(-90);
-            endDatetime = currentDatetime;
+            // If any parsing fails, return empty result
+            Map<String, Object> result = new Map<String, Object> {
+                'logsCountByDayLargeDataset' => new List<Map<String, Datetime>>(),
+                'error' => e.getMessage()
+            };
+            return result;
         }
-
-        List<Map<String, Datetime>> logsCountByDayLargeDataset = HoltwintersForecastLambdaService.getLogsCountByDayLargeDataset(
-            issueId,
-            startDatetime,
-            endDatetime
-        );
-
-        Map<String, Object> result = new Map<String, Object> {
-            'logsCountByDayLargeDataset' => logsCountByDayLargeDataset
-        };
-        return result;
     }
 
     public static Map<String, Object> getUserIdToDateTime(String parametersJSON) {
         try {
-            Map<String, Object> parameters = (Map<String, Object>) JSON.deserializeUntyped(parametersJSON);
-            String issueId = (String) parameters.get('issueId');
-            String startDatetimeStr = (String) parameters.get('startDatetime');
-            String endDatetimeStr = (String) parameters.get('endDatetime');
-            
-            Datetime startDatetime;
-            Datetime endDatetime;
-            
-            // Parse ISO format dates using valueOfGmt
-            startDatetime = (Datetime) JSON.deserialize(startDatetimeStr, Datetime.class);
-            endDatetime = (Datetime) JSON.deserialize(endDatetimeStr, Datetime.class);
+            HoltwintersForecastParameters params = (HoltwintersForecastParameters) JSON.deserialize(parametersJSON, HoltwintersForecastParameters.class);
+            params.setDefaultDates();
+            // Validate parameters
+            if (!params.isValid()) {
+                String errorMessage = params.getValidationErrorMessage();
+                return new Map<String, Object> {
+                    'userIdToDateTimeData' => new List<HoltwintersForecastLambdaClient.LogEntry>(),
+                    'error' => errorMessage
+                };
+            }
 
             List<HoltwintersForecastLambdaClient.LogEntry> userIdToDateTimeData = HoltwintersForecastLambdaService.getUserIdToDateTime(
-                issueId,
-                startDatetime,
-                endDatetime
+                params.issueId,
+                params.startDatetime,
+                params.endDatetime
             );
 
             Map<String, Object> result = new Map<String, Object> {
                 'userIdToDateTimeData' => userIdToDateTimeData
             };
+
             return result;
         } catch (JSONException e) {
-            // If JSON parsing fails, return empty result
+            // If any parsing fails, return empty result
             Map<String, Object> result = new Map<String, Object> {
-                'userIdToDateTimeData' => new List<HoltwintersForecastLambdaClient.LogEntry>()
+                'userIdToDateTimeData' => new List<HoltwintersForecastLambdaClient.LogEntry>(),
+                'error' => e.getMessage()
             };
             return result;
         }
     }
 
     public static Map<String, Object> createAutoTraceRequests(String parametersJSON) {
-         // Extract the forecast logic from createAutoTraceRequests method
-         
-         Map<String, Object> parameters = (Map<String, Object>) JSON.deserializeUntyped(parametersJSON);
-         String logsDataObject = (String) parameters.get('logsData');
-         String traceScheduleId = (String) parameters.get('traceScheduleId');
-         String issueId = (String) parameters.get('issueId');
+        try {
+            HoltwintersForecastParameters params = (HoltwintersForecastParameters) JSON.deserialize(parametersJSON, HoltwintersForecastParameters.class);
+            params.setDefaultDates();
+            // Validate required parameters for this method
+            if (String.isBlank(params.issueId) || String.isBlank(params.logsData) || String.isBlank(params.traceScheduleId)) {
+                return new Map<String, Object> {
+                    'success' => false,
+                    'traceRequestsCreated' => 0,
+                    'message' => 'Missing required parameters: issueId, logsData, or traceScheduleId'
+                };
+            }
 
-        List<Trace_Request__c> traceRequestsToDelete = [
-            SELECT Id 
-            FROM Trace_Request__c 
-            WHERE Issue__c = :issueId
-                AND Type__c = 'AutoTrace'
-        ];
-        HoltwintersForecastLambdaClient.SeasonalityType seasonalityType = HoltwintersForecastLambdaClient.SeasonalityType.WEEKLY;
+            List<Trace_Request__c> traceRequestsToDelete = [
+                SELECT Id 
+                FROM Trace_Request__c 
+                WHERE Issue__c = :params.issueId
+                    AND Type__c = 'AutoTrace'
+            ];
+            HoltwintersForecastLambdaClient.SeasonalityType seasonalityType = HoltwintersForecastLambdaClient.SeasonalityType.WEEKLY;
 
-
-        List<HoltwintersForecastLambdaClient.LogEntry> logsData = (List<HoltwintersForecastLambdaClient.LogEntry>) JSON.deserialize(
-            logsDataObject, List<HoltwintersForecastLambdaClient.LogEntry>.class
-        );
-        
-        HoltwintersForecastLambdaClient.LambdaResponse response = HoltwintersForecastLambdaService.generateUserActivityForecast(
-            logsData,
-            seasonalityType,
-            DEFAULT_FORECAST_DAYS,
-            DEFAULT_LOOKBACK_DAYS
-        );
-
-        // Create AutoTrace requests based on forecast response
-        Integer traceRequestsCreated = 0;
-        String resultMessage = 'No forecast data available';
-        Boolean success = false;
-        
-        if (response != null && response.forecast != null && !response.forecast.isEmpty()) {
-            List<TraceScheduleController.TraceRequest> traceRequestsToCreate = new List<TraceScheduleController.TraceRequest>();
+            List<HoltwintersForecastLambdaClient.LogEntry> logsData = (List<HoltwintersForecastLambdaClient.LogEntry>) JSON.deserialize(
+                params.logsData, List<HoltwintersForecastLambdaClient.LogEntry>.class
+            );
             
-            // Iterate through each date in the forecast
-            for (String dateKey : response.forecast.keySet()) {
-                List<HoltwintersForecastLambdaClient.ActivityTimeRange> timeRanges = response.forecast.get(dateKey);
+            HoltwintersForecastLambdaClient.LambdaResponse response = HoltwintersForecastLambdaService.generateUserActivityForecast(
+                logsData,
+                seasonalityType,
+                DEFAULT_FORECAST_DAYS,
+                DEFAULT_LOOKBACK_DAYS
+            );
+
+            // Create AutoTrace requests based on forecast response
+            Integer traceRequestsCreated = 0;
+            String resultMessage = 'No forecast data available';
+            Boolean success = false;
+            
+            if (response != null && response.forecast != null && !response.forecast.isEmpty()) {
+                List<TraceScheduleController.TraceRequest> traceRequestsToCreate = new List<TraceScheduleController.TraceRequest>();
                 
-                if (timeRanges != null) {
-                    // Create trace requests for each predicted activity time range
-                    for (HoltwintersForecastLambdaClient.ActivityTimeRange timeRange : timeRanges) {
-                        TraceScheduleController.TraceRequest traceRequest = createTraceRequest(timeRange, traceScheduleId);
-                        
-                        // Add to list if creation was successful
-                        if (traceRequest != null) {
-                            traceRequestsToCreate.add(traceRequest);
+                // Iterate through each date in the forecast
+                for (String dateKey : response.forecast.keySet()) {
+                    List<HoltwintersForecastLambdaClient.ActivityTimeRange> timeRanges = response.forecast.get(dateKey);
+                    
+                    if (timeRanges != null) {
+                        // Create trace requests for each predicted activity time range
+                        for (HoltwintersForecastLambdaClient.ActivityTimeRange timeRange : timeRanges) {
+                            TraceScheduleController.TraceRequest traceRequest = createTraceRequest(timeRange, params.traceScheduleId);
+                            
+                            // Add to list if creation was successful
+                            if (traceRequest != null) {
+                                traceRequestsToCreate.add(traceRequest);
+                            }
                         }
                     }
                 }
+                
+                // Save trace requests to database
+                if (!traceRequestsToCreate.isEmpty()) {
+                    Map<String, Object> saveResult = saveTraceRequestsToDatabase(traceRequestsToCreate, traceRequestsToDelete);
+                    success = (Boolean) saveResult.get('success');
+                    traceRequestsCreated = (Integer) saveResult.get('traceRequestsCreated');
+                    resultMessage = (String) saveResult.get('message');
+                } else {
+                    resultMessage = 'No valid time ranges found in forecast data for trace request creation';
+                }
             }
-            
-            // Save trace requests to database
-            if (!traceRequestsToCreate.isEmpty()) {
-                Map<String, Object> saveResult = saveTraceRequestsToDatabase(traceRequestsToCreate, traceRequestsToDelete);
-                success = (Boolean) saveResult.get('success');
-                traceRequestsCreated = (Integer) saveResult.get('traceRequestsCreated');
-                resultMessage = (String) saveResult.get('message');
-            } else {
-                resultMessage = 'No valid time ranges found in forecast data for trace request creation';
-            }
+
+            Map<String, Object> result = new Map<String, Object> {
+                'holtwintersForecast' => response,
+                'success' => success,
+                'traceRequestsCreated' => traceRequestsCreated,
+                'message' => resultMessage
+            };
+
+            return result;
+        } catch (JSONException e) {
+            // If any parsing fails, return error result
+            return new Map<String, Object> {
+                'holtwintersForecast' => null,
+                'success' => false,
+                'traceRequestsCreated' => 0,
+                'message' => 'Error: ' + e.getMessage()
+            };
         }
-
-        Map<String, Object> result = new Map<String, Object> {
-            'holtwintersForecast' => response,
-            'success' => success,
-            'traceRequestsCreated' => traceRequestsCreated,
-            'message' => resultMessage
-        };
-
-        return result;
     }
 
     /**
@@ -208,12 +203,7 @@ public with sharing class HoltwintersForecastController {
         if (String.isBlank(dateTimeString)) {
             return null;
         }
-        
-        try {
-            return (Datetime) JSON.deserialize('"' + dateTimeString + '"', Datetime.class);
-        } catch (JSONException e) {
-            return null;
-        }
+        return (Datetime) JSON.deserialize('"' + dateTimeString + '"', Datetime.class);
     }
 
     /**
@@ -280,15 +270,41 @@ public with sharing class HoltwintersForecastController {
             // Create new trace requests
             Map<String, Object> createResult = TraceScheduleController.createTraceRequests(traceRequestsToCreate);
             
-            result.put('success', true);
-            result.put('traceRequestsCreated', traceRequestsToCreate.size());
-            result.put('message', 'Successfully created ' + traceRequestsToCreate.size() + ' AutoTrace requests');
+            // Check if creation was successful
+            if (createResult != null && createResult.containsKey('result')) {
+                List<Database.SaveResult> saveResults = (List<Database.SaveResult>) createResult.get('result');
+                Integer successCount = 0;
+                List<String> errors = new List<String>();
+                
+                for (Database.SaveResult saveResult : saveResults) {
+                    if (saveResult.isSuccess()) {
+                        successCount++;
+                    } else {
+                        for (Database.Error error : saveResult.getErrors()) {
+                            errors.add(error.getMessage());
+                        }
+                    }
+                }
+                
+                if (successCount == traceRequestsToCreate.size()) {
+                    result.put('success', true);
+                    result.put('traceRequestsCreated', successCount);
+                    result.put('message', 'Successfully created ' + successCount + ' AutoTrace requests');
+                } else {
+                    result.put('success', false);
+                    result.put('traceRequestsCreated', successCount);
+                    result.put('message', 'Partially created trace requests. Created: ' + successCount + '/' + traceRequestsToCreate.size() + '. Errors: ' + String.join(errors, '; '));
+                }
+            } else {
+                result.put('success', false);
+                result.put('traceRequestsCreated', 0);
+                result.put('message', 'Failed to create trace requests: Invalid response from createTraceRequests');
+            }
         } catch (Exception e) {
             result.put('success', false);
             result.put('traceRequestsCreated', 0);
             result.put('message', 'Error creating trace requests: ' + e.getMessage());
         }
-        
         return result;
     }
 

@@ -297,6 +297,10 @@ public class EventLogProcessors {
         public String getFieldType(String name) {
             return fieldMetadataBuilder.getFieldType(name);
         }
+
+        public void addField(String name, String type) {
+            fieldMetadataBuilder.addField(name, type);
+        }
     }
 
     public class FilterField {
@@ -384,6 +388,13 @@ public class EventLogProcessors {
             String fieldNames = Test.isRunningTest() ? testEventLogFieldNames : EventMonitoringUtil.getStringValue(logFile, EventMonitoringUtil.EVENT_LOG_FILE_LOG_FILE_FIELD_NAMES);
             String fieldTypes = Test.isRunningTest() ? testEventLogFieldTypes : EventMonitoringUtil.getStringValue(logFile, EventMonitoringUtil.EVENT_LOG_FILE_LOG_FILE_FIELD_TYPES);
             this.fieldMetadataConfig = new FieldMetadataConfig(fieldNames, fieldTypes);
+
+            // field Metadata Config override for Apex Callout
+            // in documentation Success field is Boolean but in actual it is String
+            String eventType = EventMonitoringUtil.getStringValue(logFile, EventMonitoringUtil.EVENT_LOG_FILE_EVENT_TYPE);
+            if (String.isNotBlank(eventType) && eventType == EVENT_TYPE_APEX_CALLOUT) {
+                this.fieldMetadataConfig?.addField('SUCCESS', 'String');
+            }
 
             // Parse the log file, retrieve the headers
             csvParser.parse(logFileBlob.toString());

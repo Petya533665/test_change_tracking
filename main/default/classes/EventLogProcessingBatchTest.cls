@@ -457,8 +457,8 @@ private class EventLogProcessingBatchTest {
             }
             when 'ApexCallout' {
                 // SUCCESS NOT_EQUALS '1' - in test data: SUCCESS is boolean (true/false)
-                // Since '1' != true and '1' != false, this triggers on most rows (after WARNING removal)
-                return 11;
+                // all rows should be triggered
+                return 13;
             }
             when 'ApexTrigger' {
                 // REQUEST_STATUS IS_IN ['F', 'A', 'N', 'U'] - triggers on row 7 (REQUEST_STATUS='F') and row 12 (REQUEST_STATUS='F')

@@ -41,13 +41,15 @@ private class GitHubCommitBatchTest {
 		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
 		setMocks();
 
-		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = 'someId';
+		String initialLastProcessedDatetime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = initialLastProcessedDatetime;
 		upsert ConfigUtil.GIT_API_SETTINGS;
 
 		Map<String, Object> dataMap = new Map<String, Object>();
 		dataMap.put('Id', 'someNewTrailId');
 		dataMap.put('Display', 'someChangedApexClass');
 		dataMap.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
+		dataMap.put('CreatedDate', Datetime.now());
 		List<Map<String, Object>> dataMapList = new List<Map<String, Object>>();
 		dataMapList.add(dataMap);
 
@@ -58,7 +60,7 @@ private class GitHubCommitBatchTest {
 		Test.stopTest();
 		system.assertEquals(1, items.size());
 		system.assertEquals(true, items.get(0).member.contains('someChangedApexClass'));
-		system.assertEquals('someNewTrailId', ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c);
+		system.assertNotEquals(initialLastProcessedDatetime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c);
 	}
 
 	@IsTest
@@ -534,7 +536,7 @@ private class GitHubCommitBatchTest {
 	}
 
 	@IsTest
-	static void test_last_processed_id_update() {
+	static void test_last_processed_date_time_update() {
 		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
 				GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
 		};
@@ -542,8 +544,10 @@ private class GitHubCommitBatchTest {
 		createMockApexClasses(new List<String>{'TestApexClass'});
 		setMocks();
 
-		// Test Case 1: Initial run with blank Last_Processed_Id__c
-		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = null;
+		Datetime dtNow = Datetime.now();
+
+		// Test Case 1: Initial run with blank Last_Processed_Date_Time__c
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = null;
 		upsert ConfigUtil.GIT_API_SETTINGS;
 
 		Test.startTest();
@@ -555,18 +559,21 @@ private class GitHubCommitBatchTest {
 		dataMap1.put('Id', 'initialTrailId1');
 		dataMap1.put('Display', 'TestApexClass1');
 		dataMap1.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
+		dataMap1.put('CreatedDate', dtNow);
 		dataMapList.add(dataMap1);
 		
 		Map<String, Object> dataMap2 = new Map<String, Object>();
 		dataMap2.put('Id', 'initialTrailId2');
 		dataMap2.put('Display', 'TestApexClass2');
 		dataMap2.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
+		dataMap2.put('CreatedDate', dtNow.addDays(-1));
 		dataMapList.add(dataMap2);
 		
 		Map<String, Object> dataMap3 = new Map<String, Object>();
 		dataMap3.put('Id', 'initialTrailId3');
 		dataMap3.put('Display', 'TestApexClass3');
 		dataMap3.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
+		dataMap3.put('CreatedDate', dtNow.addDays(-2));
 		dataMapList.add(dataMap3);
 
 		GitHubCommitBatch.mockAuditTrails = (List<SetupAuditTrail>)JSON.deserialize(JSON.serialize(dataMapList), List<SetupAuditTrail>.class);
@@ -575,8 +582,8 @@ private class GitHubCommitBatchTest {
 
 		Test.stopTest();
 
-		// Verify Last_Processed_Id__c was updated to the highest trail ID (first record due to DESC order)
-		System.assertEquals('initialTrailId1', ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c, 'Last_Processed_Id__c should be updated to the highest trail ID');
+		// Verify Last_Processed_Date_Time__c was updated to the highest CreatedDate (first record due to DESC order)
+		System.assertEquals(dtNow.formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT), ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should be updated to the highest CreatedDate');
 	}
 
 	@IsTest
@@ -588,8 +595,10 @@ private class GitHubCommitBatchTest {
 		createMockApexClasses(new List<String>{'ChangedApexClass'});
 		setMocks();
 
-		// Test Case: Subsequent run with existing Last_Processed_Id__c and new changes
-		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = 'initialTrailId3';
+		// Test Case: Subsequent run with existing Last_Processed_Date_Time__c and new changes
+		Datetime dtNow = Datetime.now();
+		String initialLastProcessedDatetime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = initialLastProcessedDatetime;
 		upsert ConfigUtil.GIT_API_SETTINGS;
 
 		Test.startTest();
@@ -599,14 +608,16 @@ private class GitHubCommitBatchTest {
 		
 		Map<String, Object> dataMap1 = new Map<String, Object>();
 		dataMap1.put('Id', 'newTrailId1');
-		dataMap1.put('Display', 'ChangedApexClass1');
+		dataMap1.put('Display', 'ChangedApexClass2');
 		dataMap1.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
+		dataMap1.put('CreatedDate', dtNow);
 		dataMapList.add(dataMap1);
 		
 		Map<String, Object> dataMap2 = new Map<String, Object>();
 		dataMap2.put('Id', 'newTrailId2');
-		dataMap2.put('Display', 'ChangedApexClass2');
+		dataMap2.put('Display', 'ChangedApexClass1');
 		dataMap2.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
+		dataMap2.put('CreatedDate', dtNow.addSeconds(-5));
 		dataMapList.add(dataMap2);
 
 		GitHubCommitBatch.mockAuditTrails = (List<SetupAuditTrail>)JSON.deserialize(JSON.serialize(dataMapList), List<SetupAuditTrail>.class);
@@ -615,8 +626,8 @@ private class GitHubCommitBatchTest {
 
 		Test.stopTest();
 
-		// Verify Last_Processed_Id__c was updated to the highest trail ID (first record due to DESC order)
-		System.assertEquals('newTrailId1', ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c, 'Last_Processed_Id__c should be updated to the highest trail ID');
+		// Verify Last_Processed_Date_Time__c was updated to the highest CreatedDate (first record due to DESC order)
+		System.assertEquals(dtNow.formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT), ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should be updated to the highest CreatedDate');
 	}
 
 	@IsTest
@@ -629,7 +640,8 @@ private class GitHubCommitBatchTest {
 		setMocks();
 
 		// Test Case: No changes scenario
-		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = 'newTrailId2';
+		String initialLastProcessedDatetime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = initialLastProcessedDatetime;
 		upsert ConfigUtil.GIT_API_SETTINGS;
 
 		Test.startTest();
@@ -641,8 +653,8 @@ private class GitHubCommitBatchTest {
 
 		Test.stopTest();
 
-		// Verify Last_Processed_Id__c remains unchanged when no new changes
-		System.assertEquals('newTrailId2', ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c, 'Last_Processed_Id__c should remain unchanged when no new changes');
+		// Verify Last_Processed_Date_Time__c remains unchanged when no new changes
+		System.assertEquals(initialLastProcessedDatetime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should remain unchanged when no new changes');
 		System.assertEquals(0, items.size(), 'Should return empty list when no changes detected');
 	}
 

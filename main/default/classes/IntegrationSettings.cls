@@ -136,7 +136,7 @@ public with sharing class IntegrationSettings {
             ConfigUtil.GIT_API_SETTINGS.Username__c = null;
             ConfigUtil.GIT_API_SETTINGS.Reponame__c = null;
             ConfigUtil.GIT_API_SETTINGS.Branch_Name__c = null;
-            ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = null;
+            ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = null;
             DatabaseUtils.getInstance().performUpsertDML(new List<Git_API_Settings__c>{ConfigUtil.GIT_API_SETTINGS}, Schema.SObjectType.Git_API_Settings__c, true);
             return getGitHubSettings();
         }
@@ -154,7 +154,7 @@ public with sharing class IntegrationSettings {
             String newRepoName = ownerRepo.get(1);
 
             if (this.isNewRepoNameOrBranchName(newRepoName, newBranchName)) {
-                ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c = null;
+                ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = null;
             }
 
             ConfigUtil.GIT_API_SETTINGS.Reponame__c = newRepoName;

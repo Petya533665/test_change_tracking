@@ -82,6 +82,8 @@ public with sharing class Constants {
 
         public final Pattern PATTERN_SOBJECT_ID = Pattern.compile('([a-zA-Z0-9]{15,18})');
 
+        public final String DATETIME_FORMAT = 'yyyy-MM-dd HH:mm:ss';
+
         public final Map<String, String> RFC2822_MONTHS = new Map<String, String> {
             'Jan' => '01',
             'Feb' => '02',

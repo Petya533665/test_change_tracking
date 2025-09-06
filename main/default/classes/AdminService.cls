@@ -41,11 +41,11 @@ public without sharing class AdminService {
         List<MergeField> result = new List<MergeField>();
         String linkLabel =  d.getLabel() + ' Link';
         String linkApiName = '{!' + d.getName() + '.Link}';
-        result.add(new MergeField(linkLabel, linkApiName, dType, 'link'));
+        result.add(new MergeField(linkLabel, linkApiName, dType, 'link', true));
         if (d.getName() == Issue__c.SObjectType.getDescribe().getName()) {
             String analysisLabel =  'Advanced Analysis';
             String analysisApiName = '{!' + d.getName() + '.Analysis}';
-            result.add(new MergeField(analysisLabel, analysisApiName, dType, 'analysis'));
+            result.add(new MergeField(analysisLabel, analysisApiName, dType, 'analysis', false));
         }
         return result;
     }
@@ -142,7 +142,11 @@ public without sharing class AdminService {
             String apiName = '{!' + objectName + '.' + localName + '}';
             String sobjectFieldAPIName = (parentObject != null) ? parent.getRelationshipName() + '.' + sobjectFieldName : sobjectFieldName;
 
-            result.add(new MergeField(label, apiName, dType, sobjectFieldAPIName));
+            Boolean availableForJiraMapping = true;
+            if (MAP_SOBJECT_TYPE_TO_NOT_AVAILABLE_FOR_JIRA_MAPPING.get(dType).contains(sobjectFieldAPIName)) {
+                availableForJiraMapping = false;
+            }
+            result.add(new MergeField(label, apiName, dType, sobjectFieldAPIName, availableForJiraMapping));
 
             List<Schema.sObjectType> relSObjectTypes = dfr.getReferenceTo();
             if(!relSObjectTypes.isEmpty() && depth < 2 && dfr.getRelationshipName() != null) {
@@ -174,24 +178,94 @@ public without sharing class AdminService {
         mergeFields.addAll(getSobjectFields(traceResultDsR, 'traceResult'));
 
         mergeFields.addAll(ChartService.getChartsFields());
-
+        
         mergeFields.sort();
         return mergeFields;
     }
 
-
+    public static final Map<String, Set<String>> MAP_SOBJECT_TYPE_TO_NOT_AVAILABLE_FOR_JIRA_MAPPING = new Map<String, Set<String>>{
+        'log' => new Set<String>{
+            ConfigUtil.nameSpacePrefix + 'Deploy_Results__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Setup_Audit_Trail__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Pending_Jobs__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Total_Pending_Jobs__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Total_Active_Sessions__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Installed_Packages__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Related_Id__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Related_Object_Type__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Related_Objects__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Stacktrace__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Stacktrace_Parse_Result__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Stack_trace_parse_result_available__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Post_Processing_Settings__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Post_Processing_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Post_Processing_Complete__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Broadcast_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Email_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Jira_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Slack_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'PagerDuty_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Notification_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Teams_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Sent_To_Splunk__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Splunk_Link__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Executable_Rules__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Bug_Tracker__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Audit_Trail_available__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Issue_Tracker_Status__c'.toLowerCase()
+        },
+        'issue' => new Set<String>{
+            ConfigUtil.nameSpacePrefix + 'Analysis_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Analysis_Statuses_Details__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Bug_Tracker__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'DevOps_Center_Metadata_Available__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Email_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Jira_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Slack_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'PagerDuty_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Notification_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Teams_Integration_Status__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Executable_Rules__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Impacted_Objects__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Impacted_Objects_by_Type__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Impacted_Users_Count__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Issue_Analysis__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Override_Priority__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Source_Control_Metadata__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Users_Impacted__c'.toLowerCase()
+        },
+        'event' => new Set<String>{
+            ConfigUtil.nameSpacePrefix + 'Event_Details__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Grouped_Field_Values__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Records__c'.toLowerCase()
+        },
+        'traceResult' => new Set<String>{
+            ConfigUtil.nameSpacePrefix + 'Executable_Rules__c'.toLowerCase(),
+            ConfigUtil.nameSpacePrefix + 'Notification_Integration_Status__c'.toLowerCase()
+        }
+    };
 
     public class MergeField implements Comparable{
         public String label;
         public String value;
         public String sobjectype;
         public String apiName;
+        public Boolean availableForJiraMapping;
 
         public MergeField(String label, String value, String sobjectype, String apiName) {
+            this(label, value, sobjectype, apiName, true);
+        }
+
+        public MergeField(String label, String value, String sobjectype, String apiName, Boolean availableForJiraMapping) {
             this.label = label;
             this.value = value;
             this.sobjectype = sobjectype;
             this.apiName = apiName;
+            this.availableForJiraMapping = availableForJiraMapping;
+        }
+
+        public void setAvailableForJiraMapping(Boolean availableForJiraMapping) {
+            this.availableForJiraMapping = availableForJiraMapping;
         }
 
         public Integer compareTo(Object compareTo) {
@@ -980,7 +1054,7 @@ public without sharing class AdminService {
             DateTime previousHour = roundedHour.addHours(-1);
             
             ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c = previousHour;
-            update ConfigUtil.EVENT_MONITORING_SETTINGS;
+            DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
         }
         catch(Exception e) {
             throw new AdminServiceException(e);
@@ -1355,9 +1429,9 @@ public without sharing class AdminService {
     public static Map<String, Boolean> pushGitChanges() {
         GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
         Boolean isJobAlreadyRunning = !DatabaseUtils.getCurrentJobs(new List<String>{'GitHubCommitBatch'}).isEmpty();
-        Boolean hasAuditChanges = String.isBlank(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c);
+        Boolean hasAuditChanges = String.isBlank(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c);
         if (!hasAuditChanges) {
-            GitHubCommitBatch.AuditChangeWrapper lastChanges = GitHubCommitBatch.getAuditTrails(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Id__c);
+            GitHubCommitBatch.AuditChangeWrapper lastChanges = GitHubCommitBatch.getAuditTrails(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c);
             hasAuditChanges = (lastChanges != null && !lastChanges.auditChange.isEmpty()) || false;
         }
         
@@ -2662,6 +2736,9 @@ public without sharing class AdminService {
         public String name;
         public String regex;
         public String description;
+
+        public SensitiveDataMaskWrapper() {}
+
         public SensitiveDataMaskWrapper(SensitiveDataMask__c mask) {
             id = mask.Name;
             name = mask.Name;

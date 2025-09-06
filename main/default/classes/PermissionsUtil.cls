@@ -443,7 +443,7 @@ public without sharing class PermissionsUtil {
 	public static final Integer DEFAULT_FEATURE_MAP_5_VALUE = 0;
 	public static final Integer DEFAULT_FEATURE_MAP_6_VALUE = 0;
 	public static final Integer MAX_USED_BITS_IN_INTEGER = 29;
-	public static final Integer DEFAULT_FEATURE_MAP_10_VALUE = 0; // AutoChart moved to FeatureMap12
+	public static final Integer DEFAULT_FEATURE_MAP_10_VALUE = 0;
 
 	@TestVisible
 	public static Integer FeatureMap1IntValue {
@@ -844,7 +844,7 @@ public without sharing class PermissionsUtil {
 			if(DebugJiraRefreshTokensEnabled == null) {
 				DebugJiraRefreshTokensEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_DEBUG_JIRA_REFRESH_TOKENS_ENABLED));
 			}
-			return false;
+			return DebugJiraRefreshTokensEnabled;
 		}
 		private set;
 	}

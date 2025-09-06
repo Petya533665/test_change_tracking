@@ -1832,4 +1832,882 @@ private class RuleUtilTest {
 		Test.stopTest();
 	}
 
+	// ===============================================
+	// RELATIONSHIP FIELD VALIDATION TESTS
+	// ===============================================
+
+	/**
+	 * Test successful validation of relationship field traversal (CreatedBy.IsActive)
+	 */
+	@IsTest
+	public static void test_validate_relationship_field_success() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// Use valid relationship field traversal
+		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.CreatedBy.IsActive}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:select"},"required":false}}';
+		
+		// This should not throw an exception - valid relationship field
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action with relationship field should be created successfully');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation of relationship field with Owner traversal
+	 */
+	@IsTest
+	public static void test_validate_relationship_field_owner_traversal() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// Use Owner relationship field traversal
+		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Owner.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
+		
+		// This should not throw an exception - valid relationship field
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action with Owner relationship field should be created successfully');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation failure for invalid relationship field (non-existent intermediate field)
+	 */
+	@IsTest
+	public static void test_validate_relationship_field_invalid_intermediate() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// Use invalid intermediate field in relationship traversal
+		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.InvalidRelationship.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
+		
+		try {
+			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid intermediate field');
+		} catch (RuleUtil.RuleUtilValidationException e) {
+			System.assert(e.getMessage().contains('Field "InvalidRelationship" does not exist'), 'Should indicate intermediate field does not exist: ' + e.getMessage());
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation failure for invalid final field in relationship traversal
+	 */
+	@IsTest
+	public static void test_validate_relationship_field_invalid_final_field() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// Use valid intermediate field but invalid final field
+		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.CreatedBy.InvalidField}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
+		
+		try {
+			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid final field');
+		} catch (RuleUtil.RuleUtilValidationException e) {
+			System.assert(e.getMessage().contains('Field "InvalidField" does not exist'), 'Should indicate final field does not exist: ' + e.getMessage());
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation failure for non-relationship field used in traversal
+	 */
+	@IsTest
+	public static void test_validate_relationship_field_non_relationship() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// Use non-relationship field in traversal (Name is not a relationship field)
+		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Name.SomeField}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
+		
+		try {
+			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			System.assert(false, 'Should have thrown RuleUtilValidationException for non-relationship field traversal');
+		} catch (RuleUtil.RuleUtilValidationException e) {
+			System.assert(e.getMessage().contains('is not a relationship field'), 'Should indicate field is not a relationship field: ' + e.getMessage());
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation of multi-level relationship traversal (Account.Owner.Manager.Name)
+	 */
+	@IsTest
+	public static void test_validate_multi_level_relationship_traversal() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// Use multi-level relationship traversal
+		action.additionalMetadata = '{"customfield_10100":{"value":"{!Account.Owner.Manager.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
+		
+		// This should not throw an exception - valid multi-level relationship
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action with multi-level relationship should be created successfully');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation with Link suffix field (should use Id instead)
+	 */
+	@IsTest
+	public static void test_validate_relationship_field_link_suffix() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// Use Link suffix field
+		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Link}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:url"},"required":false}}';
+		
+		// This should not throw an exception - Link should be treated as Id
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action with Link field should be created successfully');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation with case-insensitive field lookup
+	 */
+	@IsTest
+	public static void test_validate_relationship_field_case_insensitive() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// Use different case for field name (should still work due to case-insensitive lookup)
+		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.createdby.IsActive}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:select"},"required":false}}';
+		
+		// This should not throw an exception - case-insensitive lookup should find CreatedBy
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action with case-insensitive field should be created successfully');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test validation of relationship field accessibility
+	 */
+	@IsTest
+	public static void test_validate_relationship_field_accessibility() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// Use accessible relationship field
+		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.LastModifiedBy.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
+		
+		// This should not throw an exception - accessible fields should work
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action with accessible relationship field should be created successfully');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test setActions method with valid relationship field
+	 */
+	@IsTest
+	public static void test_setActions_valid_relationship_field() {
+		Test.startTest();
+		
+		// Create action with valid relationship field
+		RuleUtil.Action action = createActionWithAdditionalMetadata(
+			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			'{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.CreatedBy.IsActive}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:select"},"required":false}}'
+		);
+		
+		Map<String, Object> data = new Map<String, Object>();
+		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{action});
+		
+		Map<String, Object> input = new Map<String, Object>();
+		input.put('method', 'setActions');
+		input.put('data', data);
+		
+		// This should succeed - valid relationship field
+		String response = AdminController.remoteActionHandler(JSON.serialize(input));
+		
+		// Verify response indicates success
+		Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+		System.assertEquals(null, responseMap.get('error'), 'Should not have error for valid relationship field');
+		
+		// Verify action was created
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
+		System.assertEquals(1, actions.size(), 'Action should be created');
+		System.assert(actions[0].Additional_Metadata__c.contains('CreatedBy.IsActive'), 'Relationship field should be preserved');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test setActions method with invalid relationship field
+	 */
+	@IsTest
+	public static void test_setActions_invalid_relationship_field() {
+		Test.startTest();
+		
+		// Create action with invalid relationship field
+		RuleUtil.Action action = createActionWithAdditionalMetadata(
+			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			'{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.InvalidRelationship.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}'
+		);
+		
+		Map<String, Object> data = new Map<String, Object>();
+		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{action});
+		
+		Map<String, Object> input = new Map<String, Object>();
+		input.put('method', 'setActions');
+		input.put('data', data);
+		
+		// This should fail - invalid relationship field
+		String response = AdminController.remoteActionHandler(JSON.serialize(input));
+		
+		// Verify response indicates error
+		Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+		String error = (String)responseMap.get('error');
+		System.assertNotEquals(null, error, 'Should have error for invalid relationship field');
+		System.assert(error.contains('does not exist') || error.contains('Invalid merge field'), 'Error should indicate field validation issue: ' + error);
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test setActions method with non-relationship field used in traversal
+	 */
+	@IsTest
+	public static void test_setActions_non_relationship_traversal() {
+		Test.startTest();
+		
+		// Create action with non-relationship field used in traversal
+		RuleUtil.Action action = createActionWithAdditionalMetadata(
+			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			'{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Name.SomeField}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}'
+		);
+		
+		Map<String, Object> data = new Map<String, Object>();
+		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{action});
+		
+		Map<String, Object> input = new Map<String, Object>();
+		input.put('method', 'setActions');
+		input.put('data', data);
+		
+		// This should fail - non-relationship field cannot be traversed
+		String response = AdminController.remoteActionHandler(JSON.serialize(input));
+		
+		// Verify response indicates error
+		Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+		String error = (String)responseMap.get('error');
+		System.assertNotEquals(null, error, 'Should have error for non-relationship field traversal');
+		System.assert(error.contains('is not a relationship field') || error.contains('cannot be traversed'), 'Error should indicate relationship field issue: ' + error);
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test setActions method with multi-level relationship field
+	 */
+	@IsTest
+	public static void test_setActions_multi_level_relationship() {
+		Test.startTest();
+		
+		// Create action with multi-level relationship field
+		RuleUtil.Action action = createActionWithAdditionalMetadata(
+			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			'{"customfield_10100":{"value":"{!Account.Owner.Manager.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}'
+		);
+		
+		Map<String, Object> data = new Map<String, Object>();
+		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{action});
+		
+		Map<String, Object> input = new Map<String, Object>();
+		input.put('method', 'setActions');
+		input.put('data', data);
+		
+		// This should succeed - valid multi-level relationship
+		String response = AdminController.remoteActionHandler(JSON.serialize(input));
+		
+		// Verify response indicates success
+		Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+		System.assertEquals(null, responseMap.get('error'), 'Should not have error for multi-level relationship field');
+		
+		// Verify action was created
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
+		System.assertEquals(1, actions.size(), 'Action should be created');
+		System.assert(actions[0].Additional_Metadata__c.contains('Owner.Manager.Name'), 'Multi-level relationship field should be preserved');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test setActions method with Link suffix field
+	 */
+	@IsTest
+	public static void test_setActions_link_suffix_field() {
+		Test.startTest();
+		
+		// Create action with Link suffix field
+		RuleUtil.Action action = createActionWithAdditionalMetadata(
+			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			'{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Link}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:url"},"required":false}}'
+		);
+		
+		Map<String, Object> data = new Map<String, Object>();
+		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{action});
+		
+		Map<String, Object> input = new Map<String, Object>();
+		input.put('method', 'setActions');
+		input.put('data', data);
+		
+		// This should succeed - Link field should be treated as Id
+		String response = AdminController.remoteActionHandler(JSON.serialize(input));
+		
+		// Verify response indicates success
+		Map<String, Object> responseMap = (Map<String, Object>)JSON.deserializeUntyped(response);
+		System.assertEquals(null, responseMap.get('error'), 'Should not have error for Link field');
+		
+		// Verify action was created
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
+		System.assertEquals(1, actions.size(), 'Action should be created');
+		System.assert(actions[0].Additional_Metadata__c.contains('Link'), 'Link field should be preserved');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test relationship field validation with Event__c object (matches the debug log scenario)
+	 */
+	@IsTest
+	public static void test_validate_event_relationship_field() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// Use Event__c with CreatedBy.IsActive (matches the original debug log scenario)
+		action.additionalMetadata = '{"customfield_11301":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Event__c.CreatedBy.IsActive}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield","type":"string"},"required":false,"allowedValues":null,"name":"Test Text Field"}}';
+		
+		// This should not throw an exception - valid relationship field on Event__c
+		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action with Event__c relationship field should be created successfully');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test relationship field validation with case variations
+	 */
+	@IsTest
+	public static void test_validate_relationship_field_case_variations() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		
+		// Test various case combinations that should all work
+		List<String> testCases = new List<String>{
+			'{!' + ConfigUtil.nameSpacePrefix + 'Log__c.CreatedBy.IsActive}',
+			'{!' + ConfigUtil.nameSpacePrefix + 'Log__c.createdby.IsActive}',
+			'{!' + ConfigUtil.nameSpacePrefix + 'Log__c.CREATEDBY.IsActive}',
+			'{!' + ConfigUtil.nameSpacePrefix + 'Log__c.CreatedBy.isactive}',
+			'{!' + ConfigUtil.nameSpacePrefix + 'Log__c.CreatedBy.ISACTIVE}'
+		};
+		
+		for (String testCase : testCases) {
+			action.additionalMetadata = '{"customfield_10100":{"value":"' + testCase + '","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:select"},"required":false}}';
+			
+			// Each case should work due to case-insensitive lookup
+			Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			System.assertNotEquals(null, result, 'Action with case variation should be created successfully: ' + testCase);
+		}
+		
+		Test.stopTest();
+	}
+
+	// ===============================================
+	// MERGE FIELDS AND JIRA MAPPING TESTS
+	// ===============================================
+
+	/**
+	 * Test getMergeFields method returns proper structure
+	 */
+	@IsTest
+	public static void test_getMergeFields_structure() {
+		Test.startTest();
+		
+		Object result = AdminService.getMergeFields();
+		System.assertNotEquals(null, result, 'getMergeFields should return a result');
+		
+		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)result;
+		System.assert(mergeFields.size() > 0, 'Should return merge fields');
+		
+		// Verify fields have required properties
+		for (AdminService.MergeField field : mergeFields) {
+			System.assertNotEquals(null, field.label, 'Field should have label');
+			System.assertNotEquals(null, field.value, 'Field should have value');
+			System.assertNotEquals(null, field.sobjectype, 'Field should have sobjectype');
+			System.assertNotEquals(null, field.apiName, 'Field should have apiName');
+			System.assertNotEquals(null, field.availableForJiraMapping, 'Field should have availableForJiraMapping flag');
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test that Link fields are available for JIRA mapping
+	 */
+	@IsTest
+	public static void test_getMergeFields_link_fields_available() {
+		Test.startTest();
+		
+		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+		
+		// Find Link fields
+		List<AdminService.MergeField> linkFields = new List<AdminService.MergeField>();
+		for (AdminService.MergeField field : mergeFields) {
+			if (field.apiName == 'link') {
+				linkFields.add(field);
+			}
+		}
+		
+		System.assert(linkFields.size() > 0, 'Should have Link fields');
+		
+		// Verify all Link fields are available for JIRA mapping
+		for (AdminService.MergeField linkField : linkFields) {
+			System.assertEquals(true, linkField.availableForJiraMapping, 'Link fields should be available for JIRA mapping: ' + linkField.label);
+			System.assert(linkField.value.contains('.Link}'), 'Link field value should contain .Link: ' + linkField.value);
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test that Analysis field is NOT available for JIRA mapping
+	 */
+	@IsTest
+	public static void test_getMergeFields_analysis_field_not_available() {
+		Test.startTest();
+		
+		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+		
+		// Find Analysis field
+		AdminService.MergeField analysisField = null;
+		for (AdminService.MergeField field : mergeFields) {
+			if (field.apiName == 'analysis') {
+				analysisField = field;
+				break;
+			}
+		}
+		
+		System.assertNotEquals(null, analysisField, 'Should have Analysis field');
+		System.assertEquals(false, analysisField.availableForJiraMapping, 'Analysis field should NOT be available for JIRA mapping');
+		System.assertEquals('Advanced Analysis', analysisField.label, 'Analysis field should have correct label');
+		System.assert(analysisField.value.contains('.Analysis}'), 'Analysis field value should contain .Analysis: ' + analysisField.value);
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test that filtered fields are marked as not available for JIRA mapping
+	 */
+	@IsTest
+	public static void test_getMergeFields_filtered_fields_not_available() {
+		Test.startTest();
+		
+		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+		
+		// Test all sobject types that have filtered fields
+		for (String sobjectType : AdminService.MAP_SOBJECT_TYPE_TO_NOT_AVAILABLE_FOR_JIRA_MAPPING.keySet()) {
+			Set<String> filteredFieldNames = AdminService.MAP_SOBJECT_TYPE_TO_NOT_AVAILABLE_FOR_JIRA_MAPPING.get(sobjectType);
+			System.assert(filteredFieldNames.size() > 0, 'Should have filtered fields for ' + sobjectType);
+			
+			// For each filtered field name in the map, find the corresponding merge field and verify it's marked as not available
+			for (String filteredFieldName : filteredFieldNames) {
+				// Find the merge field that has this field name as its apiName property (which contains sobjectFieldAPIName used for comparison)
+				AdminService.MergeField foundField = null;
+				for (AdminService.MergeField field : mergeFields) {
+					if (field.apiName == filteredFieldName && field.sobjectype == sobjectType) {
+						foundField = field;
+						break;
+					}
+				}
+				
+				// If not found, also check if the field might not exist in the schema (which is valid)
+				if (foundField == null) {
+					continue; // Skip fields that don't exist in the schema
+				}
+				
+				// Assert that the field is marked as not available for JIRA mapping
+				System.assertEquals(false, foundField.availableForJiraMapping, 
+					'Filtered field should NOT be available for JIRA mapping: ' + foundField.apiName + ' (sobjectType: ' + sobjectType + ')');
+			}
+		}
+		
+		Test.stopTest();
+	}
+	
+
+	/**
+	 * Test that Event__c fields are properly filtered
+	 */
+	@IsTest
+	public static void test_getMergeFields_event_filtered_fields() {
+		Test.startTest();
+		
+		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+		
+		// Test Event__c specific filtered fields
+		Set<String> eventFilteredFields = AdminService.MAP_SOBJECT_TYPE_TO_NOT_AVAILABLE_FOR_JIRA_MAPPING.get('event');
+		System.assert(eventFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Event_Details__c'.toLowerCase()), 'Event_Details__c should be in filtered fields');
+		System.assert(eventFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Grouped_Field_Values__c'.toLowerCase()), 'Grouped_Field_Values__c should be in filtered fields');
+		System.assert(eventFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Records__c'.toLowerCase()), 'Records__c should be in filtered fields');
+		
+		// Find event fields that should be filtered
+		List<AdminService.MergeField> eventFilteredFields_found = new List<AdminService.MergeField>();
+		for (AdminService.MergeField field : mergeFields) {
+			if (field.sobjectype == 'event' && eventFilteredFields.contains(field.apiName)) {
+				eventFilteredFields_found.add(field);
+			}
+		}
+		
+		// Verify filtered event fields are not available for JIRA mapping
+		for (AdminService.MergeField filteredField : eventFilteredFields_found) {
+			System.assertEquals(false, filteredField.availableForJiraMapping, 'Event filtered field should NOT be available for JIRA mapping: ' + filteredField.apiName);
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test that Issue__c fields are properly filtered
+	 */
+	@IsTest
+	public static void test_getMergeFields_issue_filtered_fields() {
+		Test.startTest();
+		
+		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+		
+		// Test Issue__c specific filtered fields
+		Set<String> issueFilteredFields = AdminService.MAP_SOBJECT_TYPE_TO_NOT_AVAILABLE_FOR_JIRA_MAPPING.get('issue');
+		System.assert(issueFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Users_Impacted__c'.toLowerCase()), 'Users_Impacted__c should be in filtered fields');
+		System.assert(issueFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Analysis_Status__c'.toLowerCase()), 'Analysis_Status__c should be in filtered fields');
+		
+		// Find issue fields that should be filtered
+		List<AdminService.MergeField> issueFilteredFields_found = new List<AdminService.MergeField>();
+		for (AdminService.MergeField field : mergeFields) {
+			if (field.sobjectype == 'issue' && issueFilteredFields.contains(field.apiName)) {
+				issueFilteredFields_found.add(field);
+			}
+		}
+		
+		// Verify filtered issue fields are not available for JIRA mapping
+		for (AdminService.MergeField filteredField : issueFilteredFields_found) {
+			System.assertEquals(false, filteredField.availableForJiraMapping, 'Issue filtered field should NOT be available for JIRA mapping: ' + filteredField.apiName);
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test that regular fields are available for JIRA mapping by default
+	 */
+	@IsTest
+	public static void test_getMergeFields_regular_fields_available() {
+		Test.startTest();
+		
+		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+		
+		// Find regular fields that should be available (not in filtered lists and not AutoChart fields)
+		List<AdminService.MergeField> regularFields = new List<AdminService.MergeField>();
+		for (AdminService.MergeField field : mergeFields) {
+			Set<String> filteredFields = AdminService.MAP_SOBJECT_TYPE_TO_NOT_AVAILABLE_FOR_JIRA_MAPPING.get(field.sobjectype);
+			// Exclude filtered fields, analysis field, and AutoChart fields
+			if (filteredFields != null && !filteredFields.contains(field.apiName) && 
+				field.apiName != 'analysis' && 
+				!field.apiName.contains('System_Auto_Chart') &&
+				!field.value.contains('System_Auto_Chart')) {
+				regularFields.add(field);
+			}
+		}
+		
+		System.assert(regularFields.size() > 0, 'Should have regular fields available');
+		
+		// Verify regular fields are available for JIRA mapping
+		for (AdminService.MergeField regularField : regularFields) {
+			System.assertEquals(true, regularField.availableForJiraMapping, 'Regular field should be available for JIRA mapping: ' + regularField.apiName);
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test that AutoChart fields are NOT available for JIRA mapping
+	 */
+	@IsTest
+	public static void test_getMergeFields_autochart_fields_not_available() {
+		Test.startTest();
+		
+		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+		
+		// Find AutoChart fields
+		List<AdminService.MergeField> autoChartFields = new List<AdminService.MergeField>();
+		for (AdminService.MergeField field : mergeFields) {
+			if (field.apiName.contains('System_Auto_Chart') || field.value.contains('System_Auto_Chart')) {
+				autoChartFields.add(field);
+			}
+		}
+		
+		System.assert(autoChartFields.size() > 0, 'Should have AutoChart fields');
+		
+		// Verify AutoChart fields are not available for JIRA mapping
+		for (AdminService.MergeField autoChartField : autoChartFields) {
+			System.assertEquals(false, autoChartField.availableForJiraMapping, 'AutoChart field should NOT be available for JIRA mapping: ' + autoChartField.apiName);
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test ChartService.getChartsFields() directly to verify AutoChart fields are created with correct flags
+	 */
+	@IsTest
+	public static void test_chartService_getChartsFields_not_available() {
+		Test.startTest();
+		
+		List<AdminService.MergeField> chartFields = ChartService.getChartsFields();
+		
+		System.assert(chartFields.size() > 0, 'ChartService should return chart fields');
+		
+		// Verify all chart fields are not available for JIRA mapping
+		for (AdminService.MergeField chartField : chartFields) {
+			System.assertEquals(false, chartField.availableForJiraMapping, 'Chart field should NOT be available for JIRA mapping: ' + chartField.apiName);
+			System.assert(chartField.apiName.contains('System_Auto_Chart'), 'Chart field apiName should contain System_Auto_Chart: ' + chartField.apiName);
+			System.assert(chartField.value.contains('System_Auto_Chart'), 'Chart field value should contain System_Auto_Chart: ' + chartField.value);
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test MergeField class constructor and methods
+	 */
+	@IsTest
+	public static void test_merge_field_class_functionality() {
+		Test.startTest();
+		
+		// Test constructor with availableForJiraMapping parameter
+		AdminService.MergeField field1 = new AdminService.MergeField('Test Label', '{!Log__c.Name}', 'log', 'Name', true);
+		System.assertEquals('Test Label', field1.label, 'Label should be set correctly');
+		System.assertEquals('{!Log__c.Name}', field1.value, 'Value should be set correctly');
+		System.assertEquals('log', field1.sobjectype, 'Sobjectype should be set correctly');
+		System.assertEquals('Name', field1.apiName, 'ApiName should be set correctly');
+		System.assertEquals(true, field1.availableForJiraMapping, 'AvailableForJiraMapping should be set correctly');
+		
+		// Test constructor without availableForJiraMapping parameter (defaults to true)
+		AdminService.MergeField field2 = new AdminService.MergeField('Test Label 2', '{!Log__c.Id}', 'log', 'Id');
+		System.assertEquals(true, field2.availableForJiraMapping, 'AvailableForJiraMapping should default to true');
+		
+		// Test setAvailableForJiraMapping method
+		field2.setAvailableForJiraMapping(false);
+		System.assertEquals(false, field2.availableForJiraMapping, 'setAvailableForJiraMapping should update the flag');
+		
+		// Test compareTo method
+		AdminService.MergeField field3 = new AdminService.MergeField('Test Label 3', '{!Log__c.CreatedDate}', 'log', 'CreatedDate');
+		Integer comparison = field1.compareTo(field3);
+		System.assertEquals('Name'.compareTo('CreatedDate'), comparison, 'compareTo should compare apiName fields');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test that merge fields are sorted correctly
+	 */
+	@IsTest
+	public static void test_getMergeFields_sorted() {
+		Test.startTest();
+		
+		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+		
+		// Verify fields are sorted by apiName
+		for (Integer i = 1; i < mergeFields.size(); i++) {
+			String currentApiName = mergeFields[i].apiName;
+			String previousApiName = mergeFields[i-1].apiName;
+			System.assert(currentApiName.compareTo(previousApiName) >= 0, 
+				'Fields should be sorted by apiName: ' + previousApiName + ' should come before ' + currentApiName);
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test addCustomMergeFields method directly
+	 */
+	@IsTest
+	public static void test_addCustomMergeFields_log() {
+		Test.startTest();
+		
+		Schema.DescribeSObjectResult logDescribe = Log__c.sObjectType.getDescribe();
+		List<AdminService.MergeField> customFields = AdminService.addCustomMergeFields(logDescribe, 'log');
+		
+		System.assertEquals(1, customFields.size(), 'Should return one custom field for Log__c');
+		
+		AdminService.MergeField linkField = customFields[0];
+		System.assertEquals('link', linkField.apiName, 'Should have link field');
+		System.assertEquals(true, linkField.availableForJiraMapping, 'Link field should be available for JIRA mapping');
+		System.assert(linkField.label.contains('Link'), 'Link field label should contain Link');
+		System.assert(linkField.value.contains('.Link}'), 'Link field value should contain .Link');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test addCustomMergeFields method for Issue__c (includes Analysis field)
+	 */
+	@IsTest
+	public static void test_addCustomMergeFields_issue() {
+		Test.startTest();
+		
+		Schema.DescribeSObjectResult issueDescribe = Issue__c.sObjectType.getDescribe();
+		List<AdminService.MergeField> customFields = AdminService.addCustomMergeFields(issueDescribe, 'issue');
+		
+		System.assertEquals(2, customFields.size(), 'Should return two custom fields for Issue__c');
+		
+		// Find Link and Analysis fields
+		AdminService.MergeField linkField = null;
+		AdminService.MergeField analysisField = null;
+		
+		for (AdminService.MergeField field : customFields) {
+			if (field.apiName == 'link') {
+				linkField = field;
+			} else if (field.apiName == 'analysis') {
+				analysisField = field;
+			}
+		}
+		
+		System.assertNotEquals(null, linkField, 'Should have link field');
+		System.assertEquals(true, linkField.availableForJiraMapping, 'Link field should be available for JIRA mapping');
+		
+		System.assertNotEquals(null, analysisField, 'Should have analysis field');
+		System.assertEquals(false, analysisField.availableForJiraMapping, 'Analysis field should NOT be available for JIRA mapping');
+		System.assertEquals('Advanced Analysis', analysisField.label, 'Analysis field should have correct label');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test filtering logic directly with known field names
+	 */
+	@IsTest
+	public static void test_filtering_logic_with_known_fields() {
+		Test.startTest();
+		
+		// Get the filtered fields map
+		Set<String> logFilteredFields = AdminService.MAP_SOBJECT_TYPE_TO_NOT_AVAILABLE_FOR_JIRA_MAPPING.get('log');
+		System.assert(logFilteredFields.size() > 0, 'Should have filtered fields for log');
+		
+		// Test that the filtering logic works by simulating field creation
+		Boolean shouldBeFiltered = logFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Deploy_Results__c'.toLowerCase());
+		System.assertEquals(true, shouldBeFiltered, 'Deploy_Results__c should be in filtered fields');
+		
+		shouldBeFiltered = logFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Stacktrace__c'.toLowerCase());
+		System.assertEquals(true, shouldBeFiltered, 'Stacktrace__c should be in filtered fields');
+		
+		shouldBeFiltered = logFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Bug_Tracker__c'.toLowerCase());
+		System.assertEquals(true, shouldBeFiltered, 'Bug_Tracker__c should be in filtered fields');
+		
+		// Test that regular fields are not filtered
+		Boolean shouldNotBeFiltered = logFilteredFields.contains('Name');
+		System.assertEquals(false, shouldNotBeFiltered, 'Name should NOT be in filtered fields');
+		
+		shouldNotBeFiltered = logFilteredFields.contains('Id');
+		System.assertEquals(false, shouldNotBeFiltered, 'Id should NOT be in filtered fields');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test that relationship fields are included and properly configured
+	 */
+	@IsTest
+	public static void test_getMergeFields_relationship_fields() {
+		Test.startTest();
+		
+		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+		
+		// Find relationship fields (should contain dots in apiName for traversal)
+		List<AdminService.MergeField> relationshipFields = new List<AdminService.MergeField>();
+		for (AdminService.MergeField field : mergeFields) {
+			if (field.apiName.contains('.') && !field.apiName.endsWith('.Link') && !field.apiName.endsWith('.Analysis')) {
+				relationshipFields.add(field);
+			}
+		}
+		
+		System.assert(relationshipFields.size() > 0, 'Should have relationship fields');
+		
+		// Verify relationship fields have proper structure
+		for (AdminService.MergeField relField : relationshipFields) {
+			System.assert(relField.value.contains('{!'), 'Relationship field value should start with merge field syntax');
+			System.assert(relField.value.contains('}'), 'Relationship field value should end with merge field syntax');
+			System.assert(relField.label.contains(' -> '), 'Relationship field label should contain arrow separator');
+			System.assertNotEquals(null, relField.availableForJiraMapping, 'Relationship field should have availableForJiraMapping set');
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test that all sobject types are represented in merge fields
+	 */
+	@IsTest
+	public static void test_getMergeFields_all_sobject_types() {
+		Test.startTest();
+		
+		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+		
+		// Check that all expected sobject types are present
+		Set<String> foundTypes = new Set<String>();
+		for (AdminService.MergeField field : mergeFields) {
+			foundTypes.add(field.sobjectype);
+		}
+		
+		System.assert(foundTypes.contains('log'), 'Should have log fields');
+		System.assert(foundTypes.contains('event'), 'Should have event fields');
+		System.assert(foundTypes.contains('issue'), 'Should have issue fields');
+		System.assert(foundTypes.contains('traceResult'), 'Should have traceResult fields');
+		
+		Test.stopTest();
+	}
+
 }

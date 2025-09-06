@@ -209,6 +209,10 @@ public with sharing class NotificationService {
             return this.batchStats;
         }
         
+        public void setBatchStats(BatchExecutionStats stats) {
+            this.batchStats = stats;
+        }
+        
         // Notification attempts tracking
         public void incrementNotificationAttempts(String recordId) {
             Integer currentCount = notificationAttempts.get(recordId);
@@ -686,6 +690,7 @@ public with sharing class NotificationService {
 
         public virtual void finish(Database.BatchableContext info, BatchContextManager batchContextManager) {
             Boolean hasRateLimitSummary = false;
+            Boolean shouldRescheduleBatch = true; // Default to reschedule
 
             // Check for rate limit events and log summary
             if (batchContextManager != null && batchContextManager instanceof BaseBatchContextManager) {
@@ -703,6 +708,10 @@ public with sharing class NotificationService {
                 if (stats.hasRateLimitEvents()) {
                     logSlackRateLimitSummary(stats);
                     hasRateLimitSummary = true;
+                    
+                    // Don't reschedule if rate limit events occurred
+                    // This prevents infinite retry loops during rate limiting
+                    shouldRescheduleBatch = false;
                 }
             }
 
@@ -711,7 +720,8 @@ public with sharing class NotificationService {
                 this.logger?.flush();
             }
 
-            if (!Test.isRunningTest()) {
+            // Only reschedule batch if no rate limiting occurred
+            if (!Test.isRunningTest() && shouldRescheduleBatch) {
                 this.startNotificationBatch();
             }
         }
@@ -746,7 +756,7 @@ public with sharing class NotificationService {
         protected virtual String buildRateLimitDetails(BatchExecutionStats stats) {
             List<String> detailLines = new List<String>();
             detailLines.add('=== SLACK RATE LIMIT BATCH SUMMARY ===');
-            detailLines.add('Batch Timestamp: ' + DateTime.now().formatGMT('yyyy-MM-dd HH:mm:ss') + ' UTC');
+            detailLines.add('Batch Timestamp: ' + DateTime.now().formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT) + ' UTC');
             detailLines.add('Total Slack Actions in Batch: ' + stats.totalSlackActions);
             detailLines.add('Rate Limited Actions: ' + stats.rateLimitedSlackActions);
             detailLines.add('Successful Actions: ' + stats.successfulSlackActions);
@@ -771,11 +781,11 @@ public with sharing class NotificationService {
                 detailLines.add('');
                 detailLines.add('=== RATE LIMIT EVENTS ===');
                 for (RateLimitEvent event : stats.rateLimitEvents) {
-                    detailLines.add('Time: ' + event.timestamp.formatGMT('yyyy-MM-dd HH:mm:ss') + ' UTC');
+                    detailLines.add('Time: ' + event.timestamp.formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT) + ' UTC');
                     detailLines.add('Record: ' + event.recordId);
                     detailLines.add('Message: ' + event.message);
                     if (event.retryAfter != null) {
-                        detailLines.add('Retry After: ' + event.retryAfter.formatGMT('yyyy-MM-dd HH:mm:ss') + ' UTC');
+                        detailLines.add('Retry After: ' + event.retryAfter.formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT) + ' UTC');
                     }
                     detailLines.add('---');
                 }

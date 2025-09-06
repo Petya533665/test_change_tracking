@@ -60,7 +60,7 @@
                         break;
                     default:
                         try {
-                            height = stackTrace.length * 320;
+                            height = stackTrace.length * 310;
                         } catch (e) {}
                         break;
                 }

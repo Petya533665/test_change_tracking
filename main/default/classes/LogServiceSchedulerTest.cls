@@ -78,6 +78,9 @@ private class LogServiceSchedulerTest {
 
 	@IsTest
 	private static void test_queueJobsMode2() {
+		// Disable Event Monitoring to prevent EventLogProcessingBatch from running
+		disableEventMonitoring();
+		
 		test_queueJobs(LogServiceScheduler.SCHEDULER_MODE.SCHEDULER_MODE_2);
 
 		System.assertEquals(1, [SELECT COUNT() FROM AsyncApexJob WHERE ParentJobId = NULL]);
@@ -291,6 +294,9 @@ private class LogServiceSchedulerTest {
 
 	@IsTest
 	private static void test_scopeJobsMode2_LogPostProcessingBatch() {
+		// Disable Event Monitoring to prevent EventLogProcessingBatch from running
+		disableEventMonitoring();
+		
 		Log__c log = new Log__c();
 		log.Hash_1__c = 'hash1';
 		log.Category__c = 'Other';
@@ -311,6 +317,14 @@ private class LogServiceSchedulerTest {
 		LogServiceScheduler logServiceScheduler = new LogServiceScheduler(schedulerMode);
 		logServiceScheduler.execute(null);
 		Test.stopTest();
+	}
+
+	private static void disableEventMonitoring() {
+		// Disable Event Monitoring permissions and settings to prevent EventLogProcessingBatch from running in Mode 2 tests
+		PermissionsUtil.EventMonitoringEnabled = false;
+		Event_Monitoring__c settings = Event_Monitoring__c.getOrgDefaults();
+		settings.Enabled__c = false;
+		upsert settings;
 	}
 
 }

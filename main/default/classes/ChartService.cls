@@ -165,26 +165,30 @@ public with sharing class ChartService {
 				CHART_PREFIX_Label + ' -> ' + ISSUE_CHART_USER_IMPACT_LAST_7_DAYS_DETAILS,
 				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ISSUE_CHART_USER_IMPACT_LAST_7_DAYS_DETAILS)).toString() + '}',
 				'issue',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ISSUE_CHART_USER_IMPACT_LAST_7_DAYS_DETAILS)).toString()
+				CHART_PREFIX + '.' + (CHART_MAP.get(ISSUE_CHART_USER_IMPACT_LAST_7_DAYS_DETAILS)).toString(),
+				false
 			),
 			new AdminService.MergeField(
 				CHART_PREFIX_Label + ' -> ' + ISSUE_CHART_USER_IMPACT_LAST_30_DAYS_DETAILS,
 				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.ISSUE_CHART_USER_IMPACT_LAST_30_DAYS_DETAILS)).toString()+ '}',
 				'issue',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.ISSUE_CHART_USER_IMPACT_LAST_30_DAYS_DETAILS)).toString()
+				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.ISSUE_CHART_USER_IMPACT_LAST_30_DAYS_DETAILS)).toString(),
+				false
 			),
 
 			new AdminService.MergeField(
 				CHART_PREFIX_Label + ' -> ' + ISSUE_CHART_OCCURRENCE_LAST_7_DAYS,
 				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ISSUE_CHART_OCCURRENCE_LAST_7_DAYS)).toString() + '}',
 				'issue',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ISSUE_CHART_OCCURRENCE_LAST_7_DAYS)).toString()
+				CHART_PREFIX + '.' + (CHART_MAP.get(ISSUE_CHART_OCCURRENCE_LAST_7_DAYS)).toString(),
+				false
 			),
 			new AdminService.MergeField(
 				CHART_PREFIX_Label + ' -> ' + ISSUE_CHART_OCCURRENCE_LAST_30_DAYS,
 				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.ISSUE_CHART_OCCURRENCE_LAST_30_DAYS)).toString()+ '}',
 				'issue',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.ISSUE_CHART_OCCURRENCE_LAST_30_DAYS)).toString()
+				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.ISSUE_CHART_OCCURRENCE_LAST_30_DAYS)).toString(),
+				false
 			),
 
 			//Log object
@@ -192,14 +196,16 @@ public with sharing class ChartService {
 				CHART_PREFIX_Label + ' -> ' + LOG_CHART_OCCURRENCE_LOGS_LAST_7_DAYS,
 				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.LOG_CHART_OCCURRENCE_LOGS_LAST_7_DAYS)).toString() + '}',
 				'log',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.LOG_CHART_OCCURRENCE_LOGS_LAST_7_DAYS)).toString()
+				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.LOG_CHART_OCCURRENCE_LOGS_LAST_7_DAYS)).toString(),
+				false
 
 			),
 			new AdminService.MergeField(
 				CHART_PREFIX_Label + ' -> ' + LOG_CHART_OCCURRENCE_LOGS_LAST_30_DAYS,
 				'{!' + CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.LOG_CHART_OCCURRENCE_LOGS_LAST_30_DAYS)).toString() + '}',
 				'log',
-				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.LOG_CHART_OCCURRENCE_LOGS_LAST_30_DAYS)).toString()
+				CHART_PREFIX + '.' + (CHART_MAP.get(ChartService.LOG_CHART_OCCURRENCE_LOGS_LAST_30_DAYS)).toString(),
+				false
 			)
 		};
 	}
