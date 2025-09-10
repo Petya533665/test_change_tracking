@@ -169,7 +169,18 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             AWSChatServiceRequest request = new AWSChatServiceRequest(UserInfo.getOrganizationId(), partsCount);
             Map<String, String> headers = GitHubUtils.authHeaders();
             headers.putAll(HttpUtils.getHeadersContentTypeJSON());
-            String response = HttpUtils.post(INDEX_MANAGER_LOGS_ENDPOINT, JSON.serialize(request), headers, 200);
+            
+            // Check if API key is present
+            if (!headers.containsKey('x-api-key') || String.isBlank(headers.get('x-api-key'))) {
+                System.debug('++++ChatIndexBatch: AWS API key is missing or empty');
+            }
+            
+            String requestBody = JSON.serialize(request);
+            System.debug('++++ChatIndexBatch: Request body: ' + requestBody);
+            System.debug('++++ChatIndexBatch: Headers: ' + JSON.serialize(headers));
+            System.debug('++++ChatIndexBatch: Endpoint: ' + INDEX_MANAGER_LOGS_ENDPOINT);
+            
+            String response = HttpUtils.post(INDEX_MANAGER_LOGS_ENDPOINT, requestBody, headers, 200);
             
             Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response);
             this.uploadId = (String) responseBody.get('upload_id');
@@ -178,6 +189,9 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             System.debug('++++ChatIndexBatch: Multipart upload initiated - UploadId: ' + this.uploadId + ', ObjectKey: ' + this.objectKey + ', Parts: ' + this.presignedUrls.size());
         }
         catch (Exception e) {
+            System.debug('++++ChatIndexBatch: Error in initiateMultipartUpload: ' + e.getMessage());
+            System.debug('++++ChatIndexBatch: Error type: ' + e.getTypeName());
+            System.debug('++++ChatIndexBatch: Stack trace: ' + e.getStackTraceString());
             loggerInstance?.addInternalError(e, ChatIndexBatch.class.getName(), 'initiateMultipartUpload');
             throw e;
         }
