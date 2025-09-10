@@ -473,7 +473,7 @@ public with sharing class AIAnalysisService {
 			this.flowApiName = issue.Log__r.Flow_API_Name__c;
 			this.flowVersion = issue.Log__r.Flow_Version__c;
 			if (String.isNotBlank(issue.Log__r.Stacktrace_Parse_Result__c)) {
-				FlowService.FlowAiMeta flowAiMeta = FlowService.getFlowAiMeta(issue.Log__r.Stacktrace_Parse_Result__c);
+				FlowDataStructures.FlowAiMeta flowAiMeta = FlowService.getFlowAiMeta(issue.Log__r.Stacktrace_Parse_Result__c);
 				this.flowErrorNode = flowAiMeta.errorNode;
 				this.flowNodesAfterError = JSON.serialize(flowAiMeta.nodesAfterError);
 			}

@@ -135,7 +135,7 @@ public with sharing class LogPostProcessingService {
 	}
 
 	public static String FLOW_ORCHESTRATOR_STACKTRACE_TOKEN = 'orchestratorStackTrace';
-	public static String appendOrchestratorParseResult(String existStacktraceParseResult, FlowService.Flow flowStackTrace) {
+	public static String appendOrchestratorParseResult(String existStacktraceParseResult, FlowDataStructures.Flow flowStackTrace) {
 		String result = existStacktraceParseResult;
 		try {
 			Map<String, Object> mapStackTraceParseResult = (Map<String, Object>)JSON.deserializeUntyped(existStacktraceParseResult);
@@ -448,7 +448,7 @@ public with sharing class LogPostProcessingService {
 			}
 			else if (log.Category__c == FlowExceptionParser.FLOW_CATEGORY) {
 				
-				FlowService.Flow stackTrace = null;
+				FlowDataStructures.Flow stackTrace = null;
 				try {
 					stackTrace = FlowService.parseFlowStackTrace(log.Stacktrace__c);
 				}
@@ -463,14 +463,14 @@ public with sharing class LogPostProcessingService {
 					throw e;
 				}
 
-				if (log.Type__c == FlowService.FLOW_TYPE_ORCHESTRATOR) {
+				if (log.Type__c == Constants.FLOW.FLOW_TYPE_ORCHESTRATOR) {
 					// if orchestrator flow has related autolanched flow error log
 					if (String.isNotBlank(stackTrace.orchestratorFailedFlowApiName)) {
 						List<Log__c> relatedFlowLog = [
 								SELECT Id, Stacktrace_Parse_Result__c
 								FROM Log__c
 								WHERE Flow_API_Name__c = :stackTrace.orchestratorFailedFlowApiName
-								AND Type__c = :FlowService.FLOW_TYPE_AUTOLAUNCHED_FLOW
+								AND Type__c = :Constants.FLOW.FLOW_TYPE_AUTOLAUNCHED_FLOW
 								AND User_Id__c = :log.User_Id__c
 								AND CreatedDate >= :Datetime.now().addMinutes(-10)
 								ORDER BY CreatedDate DESC

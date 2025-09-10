@@ -341,10 +341,10 @@ global with sharing virtual class FlowExceptionParser implements IErrorParser {
 
     private void parseErrorMessage() {
         FlowService.FlowStacktraceParser parser = new FlowService.FlowStacktraceParser(getStackTrace());
-        FlowService.FlowStacktraceInfo stackTraceInfo = parser.parse();
+        FlowDataStructures.FlowStacktraceInfo stackTraceInfo = parser.parse();
 
         if (stackTraceInfo != null && !stackTraceInfo.stacktraceElements.isEmpty()) {
-            FlowService.FlowStacktraceElement lastElement = stackTraceInfo.stacktraceElements.get(stackTraceInfo.stacktraceElements.size() - 1);
+            FlowDataStructures.FlowStacktraceElement lastElement = stackTraceInfo.stacktraceElements.get(stackTraceInfo.stacktraceElements.size() - 1);
             String operation =  lastElement.apiType;
             if(String.isNotBlank(operation)) {
                 this.operation = operation;
@@ -372,8 +372,8 @@ global with sharing virtual class FlowExceptionParser implements IErrorParser {
 
         String summaryValue = stackTraceInfo?.errorMessage;
         this.summary = (String.isNotBlank(summaryValue)) ? summaryValue.abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH) : this.emailSubject;
-        if(this.emailSubject.startsWith(FlowService.FLOW_ERROR_MESSAGE_SEPARATOR)) {
-            this.summary = this.emailSubject?.removeStart(FlowService.FLOW_ERROR_MESSAGE_SEPARATOR)?.abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH);
+        if(this.emailSubject.startsWith(Constants.FLOW.FLOW_ERROR_MESSAGE_SEPARATOR)) {
+            this.summary = this.emailSubject?.removeStart(Constants.FLOW.FLOW_ERROR_MESSAGE_SEPARATOR)?.abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH);
         }
         this.userId = stackTraceInfo?.flowInterviewDetails?.currentUserId;
         this.interviewGUID = stackTraceInfo?.flowInterviewDetails?.interviewGUID;

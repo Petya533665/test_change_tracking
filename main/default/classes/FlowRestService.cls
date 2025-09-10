@@ -37,7 +37,7 @@ global with sharing class FlowRestService {
         public String flowFullName;
         public String flowType;
 
-        public FlowService.Flow flow;
+        public FlowDataStructures.Flow flow;
         public FlowService.ProcessBuilder processBuilder; 
 
         public GetFlowMetadataResult() {}

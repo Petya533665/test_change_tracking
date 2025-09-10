@@ -130,7 +130,7 @@ private class SystemOverviewControllerTest {
 	@IsTest
 	private static void test_getOrgAtAGlance() {
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		String workflowQuery = 'SELECT Id, Name, Metadata FROM WorkflowRule';
+		String workflowQuery = SystemOverviewController.ORG_AT_A_GLANCE_WORKFLOW_QUERY;
 		endpoint2TestResp.put('https://test_Instance_Url' + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(workflowQuery, 'UTF-8'), getWorkflowRulesMock());
 		Test.startTest();
 		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);

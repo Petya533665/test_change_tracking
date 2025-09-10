@@ -211,14 +211,14 @@ public class Test_StackTraceParser {
         Map<String, Object> edges = (Map<String, Object>)stacktraceData.get('edges');
         for(String edgeName : edges.keySet()) {
             Object edgeObj = edges.get(edgeName);
-            Set<FlowService.FlowEdge> flowEdges = (Set<FlowService.FlowEdge>)JSON.deserialize(JSON.serialize(edgeObj), Set<FlowService.FlowEdge>.class);
-            for(FlowService.FlowEdge flowEdge : flowEdges) {
+            Set<FlowDataStructures.FlowEdge> flowEdges = (Set<FlowDataStructures.FlowEdge>)JSON.deserialize(JSON.serialize(edgeObj), Set<FlowDataStructures.FlowEdge>.class);
+            for(FlowDataStructures.FlowEdge  flowEdge : flowEdges) {
                 System.assertNotEquals(null, flowEdge);
                 System.assertNotEquals(null, flowEdge.target);
             }
             if (edgeName == 'More') {
                 System.assertEquals(2, flowEdges.size());
-                for (FlowService.FlowEdge flowEdge : flowEdges) {
+                for (FlowDataStructures.FlowEdge  flowEdge : flowEdges) {
                     // goto route
                     if (flowEdge.target == 'Account_Selection_Scree') {
                         System.assertEquals(true, flowEdge.indexes.contains(7));
@@ -378,7 +378,7 @@ public class Test_StackTraceParser {
 
         Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(Test_LogService.getTestStub('FLOW_STACKTRACE_HANDLED_ERROR_METADATA')));
         String stacktrace = String.valueOf(Test_LogService.getTestStub('FLOW_STACKTRACE_HANDLED_ERROR'));
-        FlowService.Flow flow = FlowService.parseFlowStackTrace(stacktrace);
+        FlowDataStructures.Flow flow = FlowService.parseFlowStackTrace(stacktrace);
         System.assertNotEquals(null, flow);
         System.assertNotEquals(null, flow.elements);
         System.assertNotEquals(null, flow.edges);
@@ -386,23 +386,23 @@ public class Test_StackTraceParser {
         System.assertEquals(true, flow.elements.containsKey('Testeeet'));
         Test.stopTest();
 
-        Map<String, FlowService.FlowElement> elements = flow.elements;
-        FlowService.FlowElement createOppElement = flow.elements.get('Create_Opp');
+        Map<String, FlowDataStructures.FlowElement> elements = flow.elements;
+        FlowDataStructures.FlowElement createOppElement = flow.elements.get('Create_Opp');
         System.assertNotEquals(null, createOppElement);
         System.assertEquals(true, createOppElement.executed);
 
-        FlowService.FlowElement testeeetElement = flow.elements.get('Testeeet');
+        FlowDataStructures.FlowElement testeeetElement = flow.elements.get('Testeeet');
         System.assertNotEquals(null, testeeetElement);
         System.assertEquals(true, testeeetElement.executed);
 
-        Map<String, Set<FlowService.FlowEdge>> edges = flow.edges;
+        Map<String, Set<FlowDataStructures.FlowEdge>> edges = flow.edges;
         System.assertNotEquals(null, edges);
         System.assertEquals(true, edges.containsKey('Create_Opp'));
 
-        Set<FlowService.FlowEdge> createOppEdges = edges.get('Create_Opp');
+        Set<FlowDataStructures.FlowEdge> createOppEdges = edges.get('Create_Opp');
         System.assertNotEquals(null, createOppEdges);
         System.assertEquals(true, createOppEdges.size() == 1);
-        FlowService.FlowEdge createOppEdge = createOppEdges.iterator().next();
+        FlowDataStructures.FlowEdge  createOppEdge = createOppEdges.iterator().next();
         System.assertNotEquals(null, createOppEdge);
         System.assertEquals(true, createOppEdge.target == 'Testeeet');
 
@@ -419,15 +419,15 @@ public class Test_StackTraceParser {
 
         Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(Test_LogService.getTestStub('FLOW_STACKTRACE_ROLLBACK_WITH_WRONG_FORMAT_METADATA')));
         String stacktrace = String.valueOf(Test_LogService.getTestStub('FLOW_STACKTRACE_ROLLBACK_WITH_WRONG_FORMAT'));
-        FlowService.Flow flow = FlowService.parseFlowStackTrace(stacktrace);
+        FlowDataStructures.Flow flow = FlowService.parseFlowStackTrace(stacktrace);
         System.assertNotEquals(null, flow);
         System.assertNotEquals(null, flow.elements);
         System.assertNotEquals(null, flow.edges);
         System.assertEquals(true, flow.elements.containsKey('Get_Account'));
         Test.stopTest();
 
-        Map<String, FlowService.FlowElement> elements = flow.elements;
-        FlowService.FlowElement getAccountElement = flow.elements.get('Get_Account');
+        Map<String, FlowDataStructures.FlowElement> elements = flow.elements;
+        FlowDataStructures.FlowElement getAccountElement = flow.elements.get('Get_Account');
         System.assertNotEquals(null, getAccountElement);
         System.assertEquals(true, getAccountElement.executed);
     }
@@ -443,20 +443,20 @@ public class Test_StackTraceParser {
 
         Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(Test_LogService.getTestStub('FLOW_WAIT_ALL_TYPES_METADATA')));
         String stacktrace = String.valueOf(Test_LogService.getTestStub('FLOW_WAIT_ALL_TYPES_STACKTRACE')).replaceAll('00D6g000005kAqN', Test_LogService.CONNECETED_ORG_NAME);
-        FlowService.Flow flow = FlowService.parseFlowStackTrace(stacktrace);
+        FlowDataStructures.Flow flow = FlowService.parseFlowStackTrace(stacktrace);
         System.assertNotEquals(null, flow);
         System.assertNotEquals(null, flow.elements);
         System.assertNotEquals(null, flow.edges);
 
-        Map<String, FlowService.FlowElement> elements = flow.elements;
-        FlowService.FlowElement waitDecision = elements.get('wait11');
+        Map<String, FlowDataStructures.FlowElement> elements = flow.elements;
+        FlowDataStructures.FlowElement waitDecision = elements.get('wait11');
         System.assertNotEquals(null, waitDecision);
         System.assertEquals(true, waitDecision.executed);
         Map<String, Object> metadataInfoWaitDecision = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(waitDecision.metadataInfo));
         System.assertEquals(true, metadataInfoWaitDecision.containsKey('elementSubtype'));
         System.assertEquals(true, metadataInfoWaitDecision.containsKey('events'));
 
-        FlowService.FlowElement waitDuration = elements.get('wait22');
+        FlowDataStructures.FlowElement waitDuration = elements.get('wait22');
         System.assertNotEquals(null, waitDuration);
         System.assertEquals(false, waitDuration.executed);
         Map<String, Object> metadataInfoWaitDuration = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(waitDuration.metadataInfo));
@@ -468,7 +468,7 @@ public class Test_StackTraceParser {
         System.assertEquals(true, eventDuration.containsKey('offset'));
         System.assertEquals(true, eventDuration.containsKey('offsetUnit'));
 
-        FlowService.FlowElement waitDate = elements.get('wait33');
+        FlowDataStructures.FlowElement waitDate = elements.get('wait33');
         System.assertNotEquals(null, waitDate);
         System.assertEquals(false, waitDate.executed);
         Map<String, Object> metadataInfoWaitDate = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(waitDate.metadataInfo));
@@ -490,9 +490,9 @@ public class Test_StackTraceParser {
         String testStub = String.valueOf(Test_LogService.getTestStub('FLOW_MULTI_SUBFLOWS_STACKTRACE'));
         
         FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(testStub);
-        FlowService.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
+        FlowDataStructures.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
         
-        FlowService.FlowStacktraceInfo stackTraceInfo = sp.parse();
+        FlowDataStructures.FlowStacktraceInfo stackTraceInfo = sp.parse();
         System.assertNotEquals(null, stackTraceInfo);
         System.assertNotEquals(null, stackTraceInfo.stacktraceElements);
         System.assertEquals(true, !stackTraceInfo.stacktraceElements.isEmpty());
@@ -560,11 +560,11 @@ public class Test_StackTraceParser {
         String testStub = String.valueOf(Test_LogService.getTestStub('TEST_FLOW_BULK_ERROR_STACKTRACE1'));
         
         FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(testStub);
-        FlowService.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
+        FlowDataStructures.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
         System.assertNotEquals(null, abbreviatedTestStub.abbreviatedStacktrace);
         System.assertEquals(true, testStub.length() > abbreviatedTestStub.abbreviatedStacktrace.length());
 
-        FlowService.FlowStacktraceInfo stackTraceInfo = sp.parse();
+        FlowDataStructures.FlowStacktraceInfo stackTraceInfo = sp.parse();
         System.assertNotEquals(null, stackTraceInfo);
         System.assertNotEquals(null, stackTraceInfo.stacktraceElements);
         System.assertEquals(true, !stackTraceInfo.stacktraceElements.isEmpty());
@@ -582,11 +582,11 @@ public class Test_StackTraceParser {
         String testStub = String.valueOf(Test_LogService.getTestStub('TEST_FLOW_BULK_ERROR_STACKTRACE2'));
         
         FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(testStub);
-        FlowService.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
+        FlowDataStructures.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
         System.assertNotEquals(null, abbreviatedTestStub.abbreviatedStacktrace);
         System.assertEquals(true, testStub.length() > abbreviatedTestStub.abbreviatedStacktrace.length());
 
-        FlowService.FlowStacktraceInfo stackTraceInfo = sp.parse();
+        FlowDataStructures.FlowStacktraceInfo stackTraceInfo = sp.parse();
         System.assertNotEquals(null, stackTraceInfo);
         System.assertNotEquals(null, stackTraceInfo.stacktraceElements);
         System.assertEquals(true, !stackTraceInfo.stacktraceElements.isEmpty());
@@ -603,11 +603,11 @@ public class Test_StackTraceParser {
     private static void test_abbreviate_large_flow_multi_entry() {
         String testStub = [SELECT Body FROM StaticResource WHERE Name = 'FlowParserLargeMultiFlowEntry'].Body.toString();
         FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(testStub);
-        FlowService.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
+        FlowDataStructures.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
         System.assertNotEquals(null, abbreviatedTestStub.abbreviatedStacktrace);
         System.assertEquals(true, testStub.length() > abbreviatedTestStub.abbreviatedStacktrace.length());
 
-        FlowService.FlowStacktraceInfo stackTraceInfo = sp.parse();
+        FlowDataStructures.FlowStacktraceInfo stackTraceInfo = sp.parse();
         System.assertNotEquals(null, stackTraceInfo);
         System.assertNotEquals(null, stackTraceInfo.stacktraceElements);
         System.assertEquals(true, !stackTraceInfo.stacktraceElements.isEmpty());
@@ -623,11 +623,11 @@ public class Test_StackTraceParser {
     private static void test_abbreviate_large_flow_entry() {
         String testStub = [SELECT Body FROM StaticResource WHERE Name = 'FlowParserLargeFlowEntry'].Body.toString();
         FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(testStub);
-        FlowService.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
+        FlowDataStructures.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
         System.assertNotEquals(null, abbreviatedTestStub.abbreviatedStacktrace);
         System.assertEquals(true, testStub.length() > abbreviatedTestStub.abbreviatedStacktrace.length());
 
-        FlowService.FlowStacktraceInfo stackTraceInfo = sp.parse();
+        FlowDataStructures.FlowStacktraceInfo stackTraceInfo = sp.parse();
         System.assertNotEquals(null, stackTraceInfo);
         System.assertNotEquals(null, stackTraceInfo.stacktraceElements);
         System.assertEquals(true, !stackTraceInfo.stacktraceElements.isEmpty());
@@ -643,11 +643,11 @@ public class Test_StackTraceParser {
     private static void test_abbreviate_large_error_message() {
         String testStub = [SELECT Body FROM StaticResource WHERE Name = 'FlowParserLargeErrorMessage'].Body.toString();
         FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(testStub);
-        FlowService.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
+        FlowDataStructures.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
         System.assertNotEquals(null, abbreviatedTestStub.abbreviatedStacktrace);
         System.assertEquals(true, testStub.length() > abbreviatedTestStub.abbreviatedStacktrace.length());
 
-        FlowService.FlowStacktraceInfo stackTraceInfo = sp.parse();
+        FlowDataStructures.FlowStacktraceInfo stackTraceInfo = sp.parse();
         System.assertNotEquals(null, stackTraceInfo);
         System.assertNotEquals(null, stackTraceInfo.stacktraceElements);
         System.assertEquals(true, !stackTraceInfo.stacktraceElements.isEmpty());
@@ -802,7 +802,7 @@ public class Test_StackTraceParser {
 
         try {
             // this stacktrace contains latest element with fault connector
-            FlowService.Flow flow = FlowService.parseFlowStackTrace(Test_LogService.getTestStub('flow_AllActions_StackTrace'));
+            FlowDataStructures.Flow flow = FlowService.parseFlowStackTrace(Test_LogService.getTestStub('flow_AllActions_StackTrace'));
         }
         catch (Exception e) {
             errorMessage = e.getMessage();
@@ -834,7 +834,7 @@ public class Test_StackTraceParser {
         System.assertEquals(FlowService.SideBarItemType.CHECKBOX, processBuilder.start.sections.get(2).itemType);
 
         System.assertEquals('Account', processBuilder.start.sections.get(0).value);
-        System.assertEquals(FlowService.PB_LABEL_OBJECT, processBuilder.start.sections.get(0).label);
+        System.assertEquals(Constants.FLOW.PB_LABEL_OBJECT, processBuilder.start.sections.get(0).label);
         
 
         // start sidebar info
@@ -914,7 +914,7 @@ public class Test_StackTraceParser {
         String testStubStacktrace = String.valueOf(Test_LogService.getTestStub('ORCHESTRATOR_FAILED_FLOW_STACKTRACE'));
         
         Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(testStubMetadata));
-        FlowService.Flow orchestratorFlow = FlowService.parseFlowStackTrace(testStubStacktrace);
+        FlowDataStructures.Flow orchestratorFlow = FlowService.parseFlowStackTrace(testStubStacktrace);
         System.assertNotEquals(null, orchestratorFlow);
         System.assertNotEquals(null, orchestratorFlow.elements);
         System.assertNotEquals(null, orchestratorFlow.edges);
@@ -932,7 +932,7 @@ public class Test_StackTraceParser {
         String testStubStacktrace = String.valueOf(Test_LogService.getTestStub('ORCHESTRATOR_STACK_TRACE'));
         
         Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(testStubMetadata));
-        FlowService.Flow orchestratorFlow = FlowService.parseFlowStackTrace(testStubStacktrace);
+        FlowDataStructures.Flow orchestratorFlow = FlowService.parseFlowStackTrace(testStubStacktrace);
         System.assertNotEquals(null, orchestratorFlow);
         System.assertNotEquals(null, orchestratorFlow.elements);
         System.assertNotEquals(null, orchestratorFlow.edges);
@@ -951,11 +951,11 @@ public class Test_StackTraceParser {
         String testStubStacktrace = String.valueOf(Test_LogService.getTestStub('FLOW_SAME_API_LABELS_ELEMENTS_STACKTRACE'));
         
         Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(testStubMetadata));
-        FlowService.Flow testedFlow = FlowService.parseFlowStackTrace(testStubStacktrace);
+        FlowDataStructures.Flow testedFlow = FlowService.parseFlowStackTrace(testStubStacktrace);
         System.assertNotEquals(null, testedFlow);
         System.assertNotEquals(null, testedFlow.elements);
         System.assertNotEquals(null, testedFlow.edges);
-        for(FlowService.FlowElement stElement : testedFlow.elements.values()) {
+        for(FlowDataStructures.FlowElement stElement : testedFlow.elements.values()) {
             System.assertEquals(true, stElement.executed);
         }
     }
@@ -974,7 +974,7 @@ public class Test_StackTraceParser {
         Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(testStubMetadata));
 
         FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(testStubStacktrace);
-        FlowService.FlowErrorAbbreviateResult abbreviatedHtmlBody = sp.abbreviateStacktraceErrorMessages();
+        FlowDataStructures.FlowErrorAbbreviateResult abbreviatedHtmlBody = sp.abbreviateStacktraceErrorMessages();
         Log__c log = LogService.createLogFromEmailBody(testStubStacktrace, 'An error occurred with your "GovnopaketFlowContact1" flow', 'test@test.com', Datetime.now());
         DatabaseUtils.getInstance().performInsertDML(new List<Log__c>{log}, Schema.SObjectType.Log__c)
             .handleError(LogService.class.getName(), '.', null);
@@ -1004,7 +1004,7 @@ public class Test_StackTraceParser {
         Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(testStubMetadata));
 
         FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(testStubStacktrace);
-        FlowService.FlowErrorAbbreviateResult abbreviatedHtmlBody = sp.abbreviateStacktraceErrorMessages();
+        FlowDataStructures.FlowErrorAbbreviateResult abbreviatedHtmlBody = sp.abbreviateStacktraceErrorMessages();
         Log__c log = LogService.createLogFromEmailBody(testStubStacktrace, 'An error occurred with your "GovnopaketFlowContact1" flow', 'test@test.com', Datetime.now());
         DatabaseUtils.getInstance().performInsertDML(new List<Log__c>{log}, Schema.SObjectType.Log__c)
             .handleError(LogService.class.getName(), '.', null);
@@ -1089,7 +1089,7 @@ public class Test_StackTraceParser {
     
         FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(testStubStacktrace);
         
-        FlowService.FlowStacktraceInfo stackTraceInfo = sp.parse();
+        FlowDataStructures.FlowStacktraceInfo stackTraceInfo = sp.parse();
         System.assertNotEquals(null, stackTraceInfo);
         System.assertNotEquals(null, stackTraceInfo.stacktraceElements);
         System.assertEquals(true, !stackTraceInfo.stacktraceElements.isEmpty());
@@ -1181,9 +1181,9 @@ public class Test_StackTraceParser {
         Test.startTest();
 
         FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(testStub);
-        FlowService.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
+        FlowDataStructures.FlowErrorAbbreviateResult abbreviatedTestStub = sp.abbreviateStacktraceErrorMessages();
         FlowService.FlowStacktraceParser sp2 = new FlowService.FlowStacktraceParser(abbreviatedTestStub.abbreviatedStacktrace);
-        FlowService.FlowStacktraceInfo stackTraceInfo = sp2.parse();
+        FlowDataStructures.FlowStacktraceInfo stackTraceInfo = sp2.parse();
 
         Test.stopTest();
 

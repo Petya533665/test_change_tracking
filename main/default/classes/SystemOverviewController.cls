@@ -23,7 +23,7 @@ public with sharing class SystemOverviewController {
 	private static final Set<String> CODE_INFO_OBJECTS_NAME = new Set<String>{'ApexClass', 'ApexTrigger', 'ApexPage', 'ApexComponent'};
 
 	@TestVisible
-	private static final String ORG_AT_A_GLANCE_WORKFLOW_QUERY = 'SELECT Id, Name, Metadata FROM WorkflowRule';
+	private static final String ORG_AT_A_GLANCE_WORKFLOW_QUERY = 'SELECT Id FROM WorkflowRule';
 
 	@TestVisible
 	private static final String CODE_INFO_QUERY = 'SELECT COUNT(Id) count_id, NamespacePrefix namespacePrefix FROM {0} GROUP BY NamespacePrefix';
@@ -492,16 +492,12 @@ public with sharing class SystemOverviewController {
 		orgAtAGlance.workflows = 0;
 		String query = ORG_AT_A_GLANCE_WORKFLOW_QUERY;
 		List<Object> rows = SystemOverviewController.getToolingAPIObjects(query);
-
-		Integer activeWorkflows = 0;
+		Set<String> workflowIds = new Set<String>();
 		for (Object row : rows) {
 			Map<String, Object> m = (Map<String, Object>) row;
-			Map<String, Object> md = (Map<String, Object>) m.get('Metadata');
-			if (md != null && (Boolean) md.get('active') == true) {
-				activeWorkflows++;
-			}
+			workflowIds.add(String.valueOf(m.get('Id')));
 		}
-		orgAtAGlance.workflows = activeWorkflows;
+		orgAtAGlance.workflowIds = new List<String>(workflowIds);
 
 		Map<String, List<FlowDefinitionView>> flowDefinitionViewsByTypes = getFlowDefinitionView();
 		orgAtAGlance.processes = flowDefinitionViewsByTypes.get('processes').size();
@@ -525,6 +521,29 @@ public with sharing class SystemOverviewController {
 			}
 		}
 		return orgAtAGlance;
+	}
+
+	@AuraEnabled
+	public static Integer isActiveWorkflow(List<String> recordIds) {
+		Integer workflows = 0;
+		for (String recordId : recordIds) {
+			if (String.isNotBlank(recordId)) {
+				String query = new QBuilder('WorkflowRule')
+						.selectFields(new Set<String>{'Id','Metadata'})
+						.add(QBuilder.condition('Id').equalsTo(recordId))
+						.addLimit(1)
+						.build();
+				List<Object> rows = getToolingAPIObjects(query);
+				for (Object row : rows) {
+					Map<String, Object> m = (Map<String, Object>) row;
+					Map<String, Object> md = (Map<String, Object>) m.get('Metadata');
+					if (md != null && (Boolean) md.get('active') == true) {
+						workflows++;
+					}
+				}
+			}
+		}
+		return workflows;
 	}
 
 	@AuraEnabled
@@ -872,6 +891,8 @@ public with sharing class SystemOverviewController {
 		public Integer triggers;
 		@AuraEnabled
 		public Integer linesOfCode;
+		@AuraEnabled
+		public List<String> workflowIds;
 	}
 
 	public class RecordCount {
