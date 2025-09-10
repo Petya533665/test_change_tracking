@@ -27,15 +27,15 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
         }
         PermissionsUtil.putSObjectField(inboundEmail, Schema.sObjectType.Inbound_Email__c.fields.Plain_Text__c, maskContent(plainTextBody));
         
-        FlowService.FlowErrorAbbreviateResult abbreviateResult = new FlowService.FlowErrorAbbreviateResult();
+        FlowDataStructures.FlowErrorAbbreviateResult abbreviateResult = new FlowDataStructures.FlowErrorAbbreviateResult();
         abbreviateResult.abbreviatedStacktrace = email?.htmlBody;
         
         // handle extra size of flow errors, over max size Rich Text Area field
         if(email?.htmlBody != null 
             && email?.htmlBody?.startsWithIgnoreCase('<') 
             && (email?.htmlBody?.length() > MAX_LENGTH_LONG_TEXT_AREA_FIELD 
-                || !email?.htmlBody?.contains(FlowService.PB_ST_FLOW_ERROR_DETAILS)
-                || email?.htmlBody?.contains(FlowService.FLOW_ERROR_MESSAGE_SEPARATOR)
+                || !email?.htmlBody?.contains(Constants.FLOW.PB_ST_FLOW_ERROR_DETAILS)
+                || email?.htmlBody?.contains(Constants.FLOW.FLOW_ERROR_MESSAGE_SEPARATOR)
             )) {
             FlowService.FlowStacktraceParser sp = new FlowService.FlowStacktraceParser(email.htmlBody);
             abbreviateResult = sp.abbreviateStacktraceErrorMessages();
@@ -83,14 +83,14 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                                     String incomeOrganizationId,
                                     DateTime createdAtDateTime,
                                     Messaging.inboundEmail email,
-                                    FlowService.FlowErrorAbbreviateResult abbreviateResult) {
+                                    FlowDataStructures.FlowErrorAbbreviateResult abbreviateResult) {
         processEmail(inboundEmails, incomeOrganizationId, createdAtDateTime, email, abbreviateResult, false);
     }
     public static void processEmail(List<Inbound_Email__c> inboundEmails,
                                     String incomeOrganizationId,
                                     DateTime createdAtDateTime,
                                     Messaging.inboundEmail email,
-                                    FlowService.FlowErrorAbbreviateResult abbreviateResult,
+                                    FlowDataStructures.FlowErrorAbbreviateResult abbreviateResult,
                                     Boolean isRoutedFromPassthroughMode) {
                                        
         Inbound_Email__c inboundEmail = inboundEmails.get(0);
@@ -113,7 +113,7 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                 // multiply errors in email
                 if(abbreviateResult?.errorMessages != null && !abbreviateResult?.errorMessages?.isEmpty()) {
                     for(String errorMessage : abbreviateResult.errorMessages.values()) {
-                        log = LogService.createLogFromEmailBody(body, FlowService.FLOW_ERROR_MESSAGE_SEPARATOR + errorMessage, inboundEmail.From__c, createdAt, incomeOrganizationId, loggerInstance);
+                        log = LogService.createLogFromEmailBody(body, Constants.FLOW.FLOW_ERROR_MESSAGE_SEPARATOR + errorMessage, inboundEmail.From__c, createdAt, incomeOrganizationId, loggerInstance);
                         
                         if (log != null) {
                             if (String.isNotBlank(log.Async_Job_Id__c)) {

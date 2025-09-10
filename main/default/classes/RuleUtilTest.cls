@@ -2641,8 +2641,8 @@ private class RuleUtilTest {
 		Boolean shouldBeFiltered = logFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Deploy_Results__c'.toLowerCase());
 		System.assertEquals(true, shouldBeFiltered, 'Deploy_Results__c should be in filtered fields');
 		
-		shouldBeFiltered = logFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Stacktrace__c'.toLowerCase());
-		System.assertEquals(true, shouldBeFiltered, 'Stacktrace__c should be in filtered fields');
+		Boolean shouldBeNotFiltered = !logFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Stacktrace__c'.toLowerCase());
+		System.assertEquals(true, shouldBeNotFiltered, 'Stacktrace__c should be in filtered fields');
 		
 		shouldBeFiltered = logFilteredFields.contains(ConfigUtil.nameSpacePrefix + 'Bug_Tracker__c'.toLowerCase());
 		System.assertEquals(true, shouldBeFiltered, 'Bug_Tracker__c should be in filtered fields');

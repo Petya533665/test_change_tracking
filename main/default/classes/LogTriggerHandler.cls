@@ -45,7 +45,7 @@ public with sharing class LogTriggerHandler {
 
 	private static Boolean isRegularErrorLogPostprocessingCompleted(Log__c newLog, Log__c oldLog) {
 		if (oldLog != null
-				&& newLog.Type__c != FlowService.FLOW_TYPE_ORCHESTRATOR
+				&& newLog.Type__c != Constants.FLOW.FLOW_TYPE_ORCHESTRATOR
 				&& newLog.Post_Processing_Status__c != oldLog.Post_Processing_Status__c
 				&& newLog.Post_Processing_Status__c == IssueService.POST_PROCESSING_STATUS_COMPLETED) {
 			return true;

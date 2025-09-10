@@ -85,9 +85,13 @@ public with sharing class AzureApiClient {
         headers.putAll(HttpUtils.getHeadersContentTypeJSON());
         headers.putAll(HttpUtils.getHeadersAcceptJson());
 
+        Map<String, Object> body = new Map<String, Object>{
+            'text' => comment
+        };
+
         String responseBody = HttpUtils.post(
             endpoint,
-            comment,
+            JSON.serialize(body),
             headers,
             200
         );

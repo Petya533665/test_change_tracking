@@ -89,7 +89,7 @@ public with sharing class LogPostProcessingBatch extends DatabaseUtils.PharosBat
 
                 if (result.errors.isEmpty()) {
                     successLogIdsInTransaction.add(scope[0].Id);
-                    if (scope.get(0).Type__c == FlowService.FLOW_TYPE_ORCHESTRATOR) {
+                    if (scope.get(0).Type__c == Constants.FLOW.FLOW_TYPE_ORCHESTRATOR) {
                         if (!result.orchestratorLogIdsForBroadcast.isEmpty()) {
                             this.orchestratorLogIdsForBroadcastInTransaction.addAll(result.orchestratorLogIdsForBroadcast);
                         }

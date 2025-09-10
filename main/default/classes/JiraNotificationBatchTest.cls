@@ -1056,6 +1056,16 @@ public class JiraNotificationBatchTest {
 			: String.format(AzureApiClient.AZURE_DEVOPS_REST_API_WORK_ITEM_COMMENT, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_WORK_ITEM_ID});
 		HttpRequest postRequest = multiCalloutMock.getRequest(newTicketCommentEndpoint);
 		System.assertNotEquals(null, postRequest.getBody());
+
+		if (!isJira) {
+			Map<String, Object> body;
+			try {
+				body = (Map<String, Object>)JSON.deserializeUntyped(postRequest.getBody());
+			}
+			catch(Exception e) {}
+			System.assertNotEquals(null, body, 'Body is not a valid JSON: ' + postRequest.getBody());
+			System.assertNotEquals(null, body.get('text'), 'Text is not a valid JSON: ' + postRequest.getBody());
+		}
 		System.assertNotEquals(null, issue.Bug_Tracker__c);
 		System.assertEquals(ConfigUtil.NEW_TICKET_CREATED_STATUS, issue.Jira_Integration_Status__c);
 		assertNoInternalLogs();
