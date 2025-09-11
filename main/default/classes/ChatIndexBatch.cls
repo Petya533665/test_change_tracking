@@ -168,7 +168,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
                     AND LastModifiedDate > :SETTINGS.LastLogUpdateTimestamp__c
                     ALL ROWS
                 ];
-                List<String> deletedHashes = new List<String>();
+                Set<String> deletedHashes = new Set<String>();
                 for (Log_Index__c deletedLog : deletedLogIndexes) {
                     deletedHashes.add(deletedLog.Hash__c);
                 }
