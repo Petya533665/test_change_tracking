@@ -7,7 +7,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     private static final String S3_REMOTE_SITE_DESCRIPTION = 'S3 Bucket for Pharos AI indexing purposes';
 
     private static final Integer MAX_LOGS_PER_BATCH = 100;
-    private static final Integer HEAP_SIZE_THRESHOLD = 6 * 1024 * 1024; //6MB
+    private static final Integer HEAP_SIZE_THRESHOLD = 7 * 1024 * 1024; //7MB
     
     private String uploadId;
     private String objectKey;
@@ -15,15 +15,19 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     private List<Map<String, Object>> uploadedParts = new List<Map<String, Object>>();
     private List<Map<String, Object>> logBuffer = new List<Map<String, Object>>();
     private Integer currentPartIndex = 0;
+    private Integer totalBatches = 0;
+    private Integer currentBatchNumber = 0;
+    private Integer deletedLogCount = 0;
     
-    private static Chat_Index_Settings__c settingsInstance = null;
-    private static Chat_Index_Settings__c SETTINGS {
+    private Chat_Index_Settings__c settingsInstance = null;
+    private Chat_Index_Settings__c SETTINGS {
         get {
             if (settingsInstance == null) {
                 Chat_Index_Settings__c settings = Chat_Index_Settings__c.getOrgDefaults();
                 if (settings == null || settings.Id == null) {
                     settings = new Chat_Index_Settings__c();
                     settings.ProcessedLogHashes__c = 0;
+                    settings.LastLogUpdateTimestamp__c = DateTime.newInstance(1970, 1, 1);
                     insert settings;
                 }
                 settingsInstance = settings;
@@ -70,7 +74,8 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         AdminService.upsertRemoteSiteSetting(S3_REMOTE_SITE_NAME, S3_REMOTE_SITE_URL, S3_REMOTE_SITE_DESCRIPTION);
         
         Integer itemsCount = getIterationsCount();
-        initiateMultipartUpload(Integer.valueOf(Math.ceil(itemsCount / Decimal.valueOf(BATCH_SCOPE))));
+        this.totalBatches = Integer.valueOf(Math.ceil(itemsCount / Decimal.valueOf(BATCH_SCOPE)));
+        initiateMultipartUpload(this.totalBatches);
         
         if (runJobType == JobType.LOG_INDEX_UPDATE) {
             List<Log_Index__c> newLogIndexes = [
@@ -83,6 +88,13 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             for (Log_Index__c logIndex : newLogIndexes) {
                 newHashes.add(logIndex.Hash__c);
             }
+
+            this.deletedLogCount = [
+                SELECT COUNT() 
+                FROM Log_Index__c
+                WHERE IsDeleted = true AND LastModifiedDate > :SETTINGS.LastLogUpdateTimestamp__c
+                ALL ROWS
+            ];
 
             List<AggregateResult> uniqueIds = [
                 SELECT MIN(Id) uniqueId
@@ -110,10 +122,13 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         }
         
         try {
+            this.currentBatchNumber++;
             List<Map<String, Object>> transformedLogs = getTransformedLogs(scope);
             logBuffer.addAll(transformedLogs);
-            if (Limits.getHeapSize() > HEAP_SIZE_THRESHOLD) {
-                uploadCurrentPart(false);
+            
+            Boolean isLastBatch = this.currentBatchNumber == this.totalBatches;
+            if (Limits.getHeapSize() > HEAP_SIZE_THRESHOLD || (isLastBatch && !logBuffer.isEmpty())) {
+                uploadCurrentPart(isLastBatch);
             }
         }
         catch (Exception e) {
@@ -123,13 +138,10 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
 
     public void finish(Database.BatchableContext BC) {
         try {
-            if (!logBuffer.isEmpty()) {
-                uploadCurrentPart(true);
-            }
             completeMultipartUpload();
-
             if (runJobType == JobType.LOG_INDEX_UPDATE) {
                 SETTINGS.ProcessedLogHashes__c = [SELECT COUNT() FROM Log_Index__c];
+                SETTINGS.LastLogUpdateTimestamp__c = DateTime.now();
                 update SETTINGS;
             }
         }
@@ -148,6 +160,21 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         try {
             String presignedUrl = this.presignedUrls[currentPartIndex];
             String partJSON = createArrayPart(logBuffer, currentPartIndex, lastPart);
+            if (lastPart && this.deletedLogCount > 0) {
+                List<Log_Index__c> deletedLogIndexes = [
+                    SELECT Hash__c
+                    FROM Log_Index__c
+                    WHERE IsDeleted = true
+                    AND LastModifiedDate > :SETTINGS.LastLogUpdateTimestamp__c
+                    ALL ROWS
+                ];
+                List<String> deletedHashes = new List<String>();
+                for (Log_Index__c deletedLog : deletedLogIndexes) {
+                    deletedHashes.add(deletedLog.Hash__c);
+                }
+                partJSON = partJSON.substring(0, partJSON.length() - 1) + ',"deletedHashes":' + JSON.serialize(deletedHashes) + '}';
+            }
+
             HttpUtils.put(presignedUrl, partJSON, null, 200);
             String etag = HttpUtils.responseHeaders.get('ETag');
             
@@ -171,13 +198,11 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         
         // Remove outer brackets from the JSON array
         String objectsJSON = arrayJSON.substring(1, arrayJSON.length() - 1);
-        if (partIndex == 0) {
-            return '[' + objectsJSON;
+        if (!lastPart) {
+            return partIndex == 0 ? '{"logs":[' + objectsJSON : ',' + objectsJSON;
+        } else {
+            return partIndex == 0 ? '{"logs":[' + objectsJSON + ']}' : ',' + objectsJSON + ']}';
         }
-        if (lastPart) {
-            return ',' + objectsJSON + ']';
-        }
-        return ',' + objectsJSON;
     }
 
     private List<Map<String, Object>> getTransformedLogs(List<SObject> scope) {
@@ -204,8 +229,9 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             transformedLog.put('category', log.Category__c);
             transformedLog.put('area', log.Area__c);
             transformedLog.put('created_at', log.Created_At__c);
-            //TODO: remove repeat and ternary
-            transformedLog.put('details', log.Details__c != null ? log.Details__c.repeat(100) : '');
+            //TODO: remove
+            // transformedLog.put('details', log.Details__c != null ? log.Details__c.rightPad(100000) : '');
+            transformedLog.put('details', log.Details__c);
             transformedLogs.add(transformedLog);
         }
         return transformedLogs;
