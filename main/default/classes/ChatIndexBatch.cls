@@ -7,7 +7,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     private static final String S3_REMOTE_SITE_DESCRIPTION = 'S3 Bucket for Pharos AI indexing purposes';
 
     private static final Integer MAX_LOGS_PER_BATCH = 100;
-    private static final Integer HEAP_SIZE_THRESHOLD = 7 * 1024 * 1024; //7MB
+    private static final Integer HEAP_SIZE_THRESHOLD = 6 * 1024 * 1024; //6MB
     
     private String uploadId;
     private String objectKey;
@@ -113,8 +113,10 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         try {
             List<Map<String, Object>> transformedLogs = getTransformedLogs(scope);
             logBuffer.addAll(transformedLogs);
+            System.debug('++++ChatIndexBatch: Log buffer size: ' + logBuffer.size());
+            System.debug('++++ChatIndexBatch: Heap size: ' + Limits.getHeapSize());
             if (Limits.getHeapSize() > HEAP_SIZE_THRESHOLD) {
-                uploadCurrentPart();
+                uploadCurrentPart(false);
             }
         }
         catch (Exception e) {
@@ -124,10 +126,9 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
 
     public void finish(Database.BatchableContext BC) {
         System.debug('++++ChatIndexBatch: Finishing batch job');
-        
         try {
             if (!logBuffer.isEmpty()) {
-                uploadCurrentPart();
+                uploadCurrentPart(true);
             }
             completeMultipartUpload();
 
@@ -143,7 +144,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         this.loggerInstance?.flush();
     }
     
-    private void uploadCurrentPart() {
+    private void uploadCurrentPart(Boolean lastPart) {
         if (logBuffer.isEmpty()) {
             return;
         }
@@ -151,7 +152,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         System.debug('++++ChatIndexBatch: Uploading part ' + currentPartIndex + ' with ' + logBuffer.size() + ' logs');
         try {
             String presignedUrl = this.presignedUrls[currentPartIndex];
-            String partJSON = createArrayPart(logBuffer, currentPartIndex);
+            String partJSON = createArrayPart(logBuffer, currentPartIndex, lastPart);
             HttpUtils.put(presignedUrl, partJSON, null, 200);
             String etag = HttpUtils.responseHeaders.get('ETag');
             
@@ -171,21 +172,19 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         }
     }
 
-    private String createArrayPart(List<Map<String, Object>> batchLogs, Integer partIndex) {
+    private String createArrayPart(List<Map<String, Object>> batchLogs, Integer partIndex, Boolean lastPart) {
         String arrayJSON = JSON.serialize(batchLogs);
-        if (this.presignedUrls.size() == 1) {
-            return arrayJSON;
-        }
         
         // Remove outer brackets from the JSON array
         String objectsJSON = arrayJSON.substring(1, arrayJSON.length() - 1);
+        System.debug('++++ChatIndexBatch: partIndex: ' + partIndex + ', lastPart: ' + lastPart);
         if (partIndex == 0) {
             return '[' + objectsJSON;
-        } else if (partIndex == this.presignedUrls.size() - 1) {
-            return objectsJSON + ']';
-        } else {
-            return ',' + objectsJSON;
         }
+        if (lastPart) {
+            return ',' + objectsJSON + ']';
+        }
+        return ',' + objectsJSON;
     }
 
     private List<Map<String, Object>> getTransformedLogs(List<SObject> scope) {
@@ -212,7 +211,8 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
             transformedLog.put('category', log.Category__c);
             transformedLog.put('area', log.Area__c);
             transformedLog.put('created_at', log.Created_At__c);
-            transformedLog.put('details', log.Details__c);
+            //TODO: remove repeat and ternary
+            transformedLog.put('details', log.Details__c != null ? log.Details__c.repeat(100) : '');
             transformedLogs.add(transformedLog);
         }
         return transformedLogs;
