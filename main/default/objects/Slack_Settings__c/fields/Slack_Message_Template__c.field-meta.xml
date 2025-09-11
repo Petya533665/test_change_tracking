@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Slack_Message_Template__c</fullName>
+    <defaultValue>&apos;New Log: pharos__Log__c.Name\n pharos__Log__c.Link&apos;</defaultValue>
+    <externalId>false</externalId>
+    <label>Slack Message Template</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>TextArea</type>
+</CustomField>
