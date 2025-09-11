@@ -6,12 +6,15 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     private static final String S3_REMOTE_SITE_URL = 'https://ai-pharos-index.s3.amazonaws.com';
     private static final String S3_REMOTE_SITE_DESCRIPTION = 'S3 Bucket for Pharos AI indexing purposes';
 
-    private static final Integer MAX_LOGS_PER_BATCH = 40; //TODO: change to 200
+    private static final Integer MAX_LOGS_PER_BATCH = 100;
+    private static final Integer HEAP_SIZE_THRESHOLD = 7 * 1024 * 1024; //7MB
     
     private String uploadId;
     private String objectKey;
     private List<String> presignedUrls = new List<String>();
     private List<Map<String, Object>> uploadedParts = new List<Map<String, Object>>();
+    private List<Map<String, Object>> logBuffer = new List<Map<String, Object>>();
+    private Integer currentPartIndex = 0;
     
     private static Chat_Index_Settings__c settingsInstance = null;
     private static Chat_Index_Settings__c SETTINGS {
@@ -67,7 +70,7 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         AdminService.upsertRemoteSiteSetting(S3_REMOTE_SITE_NAME, S3_REMOTE_SITE_URL, S3_REMOTE_SITE_DESCRIPTION);
         
         Integer itemsCount = getIterationsCount();
-        initiateMultipartUpload(Math.max(1, itemsCount / BATCH_SCOPE));
+        initiateMultipartUpload(Integer.valueOf(Math.ceil(itemsCount / Decimal.valueOf(BATCH_SCOPE))));
         
         if (runJobType == JobType.LOG_INDEX_UPDATE) {
             List<Log_Index__c> newLogIndexes = [
@@ -109,7 +112,10 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         System.debug('++++ChatIndexBatch: Executing batch with ' + scope.size() + ' records');
         try {
             List<Map<String, Object>> transformedLogs = getTransformedLogs(scope);
-            uploadBatchAsPart(transformedLogs);
+            logBuffer.addAll(transformedLogs);
+            if (Limits.getHeapSize() > HEAP_SIZE_THRESHOLD) {
+                uploadCurrentPart();
+            }
         }
         catch (Exception e) {
             loggerInstance?.addInternalError(e, ChatIndexBatch.class.getName(), ':execute');
@@ -120,7 +126,11 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         System.debug('++++ChatIndexBatch: Finishing batch job');
         
         try {
+            if (!logBuffer.isEmpty()) {
+                uploadCurrentPart();
+            }
             completeMultipartUpload();
+
             if (runJobType == JobType.LOG_INDEX_UPDATE) {
                 SETTINGS.ProcessedLogHashes__c = [SELECT COUNT() FROM Log_Index__c];
                 update SETTINGS;
@@ -131,6 +141,51 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
         }
 
         this.loggerInstance?.flush();
+    }
+    
+    private void uploadCurrentPart() {
+        if (logBuffer.isEmpty()) {
+            return;
+        }
+        
+        System.debug('++++ChatIndexBatch: Uploading part ' + currentPartIndex + ' with ' + logBuffer.size() + ' logs');
+        try {
+            String presignedUrl = this.presignedUrls[currentPartIndex];
+            String partJSON = createArrayPart(logBuffer, currentPartIndex);
+            HttpUtils.put(presignedUrl, partJSON, null, 200);
+            String etag = HttpUtils.responseHeaders.get('ETag');
+            
+            Map<String, Object> partInfo = new Map<String, Object>{
+                'ETag' => etag,
+                'PartNumber' => currentPartIndex + 1
+            };
+            uploadedParts.add(partInfo);
+            
+            logBuffer.clear();
+            currentPartIndex++;
+            System.debug('++++ChatIndexBatch: Part ' + (currentPartIndex - 1) + ' uploaded successfully');
+        }
+        catch (Exception e) {
+            loggerInstance?.addInternalError(e, ChatIndexBatch.class.getName(), 'uploadCurrentPart');
+            throw e;
+        }
+    }
+
+    private String createArrayPart(List<Map<String, Object>> batchLogs, Integer partIndex) {
+        String arrayJSON = JSON.serialize(batchLogs);
+        if (this.presignedUrls.size() == 1) {
+            return arrayJSON;
+        }
+        
+        // Remove outer brackets from the JSON array
+        String objectsJSON = arrayJSON.substring(1, arrayJSON.length() - 1);
+        if (partIndex == 0) {
+            return '[' + objectsJSON;
+        } else if (partIndex == this.presignedUrls.size() - 1) {
+            return objectsJSON + ']';
+        } else {
+            return ',' + objectsJSON;
+        }
     }
 
     private List<Map<String, Object>> getTransformedLogs(List<SObject> scope) {
@@ -166,110 +221,40 @@ public without sharing class ChatIndexBatch extends DatabaseUtils.PharosBatchImp
     private void initiateMultipartUpload(Integer partsCount) {
         try {
             System.debug('++++ChatIndexBatch: Initiating multipart upload');
-            AWSChatServiceRequest request = new AWSChatServiceRequest(UserInfo.getOrganizationId(), partsCount);
-            Map<String, String> headers = GitHubUtils.authHeaders();
-            headers.putAll(HttpUtils.getHeadersContentTypeJSON());
-            
-            // Check if API key is present
-            if (!headers.containsKey('x-api-key') || String.isBlank(headers.get('x-api-key'))) {
-                System.debug('++++ChatIndexBatch: AWS API key is missing or empty');
-            }
-            
-            String requestBody = JSON.serialize(request);
-            System.debug('++++ChatIndexBatch: Request body: ' + requestBody);
-            System.debug('++++ChatIndexBatch: Headers: ' + JSON.serialize(headers));
-            System.debug('++++ChatIndexBatch: Endpoint: ' + INDEX_MANAGER_LOGS_ENDPOINT);
-            
-            String response = HttpUtils.post(INDEX_MANAGER_LOGS_ENDPOINT, requestBody, headers, 200);
+            Map<String, Object> request = new Map<String, Object>{
+                'oid' => UserInfo.getOrganizationId(),
+                'parts_count' => partsCount
+            };
+            String response = HttpUtils.post(INDEX_MANAGER_LOGS_ENDPOINT, JSON.serialize(request), GitHubUtils.authHeaders(), 200);
             
             Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response);
             this.uploadId = (String) responseBody.get('upload_id');
             this.objectKey = (String) responseBody.get('object_key');
-            this.presignedUrls = (List<String>) responseBody.get('parts');
+            this.presignedUrls = (List<String>)JSON.deserialize(JSON.serialize(responseBody.get('parts')), List<String>.class);
             System.debug('++++ChatIndexBatch: Multipart upload initiated - UploadId: ' + this.uploadId + ', ObjectKey: ' + this.objectKey + ', Parts: ' + this.presignedUrls.size());
         }
         catch (Exception e) {
-            System.debug('++++ChatIndexBatch: Error in initiateMultipartUpload: ' + e.getMessage());
-            System.debug('++++ChatIndexBatch: Error type: ' + e.getTypeName());
-            System.debug('++++ChatIndexBatch: Stack trace: ' + e.getStackTraceString());
             loggerInstance?.addInternalError(e, ChatIndexBatch.class.getName(), 'initiateMultipartUpload');
             throw e;
         }
     }
     
-    private void uploadBatchAsPart(List<Map<String, Object>> batchLogs) {
-        try {
-            System.debug('++++ChatIndexBatch: Uploading batch as part');
-            Integer partIndex = uploadedParts.size();
-            String presignedUrl = this.presignedUrls[partIndex];
-            String partJSON = createArrayPart(batchLogs, partIndex);
-            
-            HttpUtils.put(presignedUrl, partJSON, HttpUtils.getHeadersContentTypeJSON(), 200);
-            String etag = HttpUtils.responseHeaders.get('ETag');
-            
-            Map<String, Object> partInfo = new Map<String, Object>{
-                'ETag' => etag,
-                'PartNumber' => partIndex + 1
-            };
-            uploadedParts.add(partInfo);
-            
-            System.debug('++++ChatIndexBatch: Part ' + partIndex + ' uploaded successfully');
-        }
-        catch (Exception e) {
-            loggerInstance?.addInternalError(e, ChatIndexBatch.class.getName(), 'uploadBatchAsPart');
-            throw e;
-        }
-    }
-    
-    private String createArrayPart(List<Map<String, Object>> batchLogs, Integer partIndex) {
-        String arrayJSON = JSON.serialize(batchLogs);
-        if (this.presignedUrls.size() == 1) {
-            return arrayJSON;
-        }
-        
-        // Remove outer brackets from the JSON array
-        String objectsJSON = arrayJSON.substring(1, arrayJSON.length() - 1);
-        if (partIndex == 0) {
-            return '[' + objectsJSON;
-        } else if (partIndex == this.presignedUrls.size() - 1) {
-            return objectsJSON + ']';
-        } else {
-            return ',' + objectsJSON;
-        }
-    }
-    
-    
     private void completeMultipartUpload() {
         try {
             System.debug('++++ChatIndexBatch: Completing multipart upload with ' + uploadedParts.size() + ' parts');
-            AWSChatServiceRequest request = new AWSChatServiceRequest(this.objectKey, this.uploadId, this.uploadedParts);
-            Map<String, String> headers = GitHubUtils.authHeaders();
-            headers.putAll(HttpUtils.getHeadersContentTypeJSON());
-            HttpUtils.post(INDEX_MANAGER_LOGS_ENDPOINT, JSON.serialize(request), headers, 200);
+            System.debug('++++ChatIndexBatch: Object key: ' + this.objectKey);
+            System.debug('++++ChatIndexBatch: Upload ID: ' + this.uploadId);
+            Map<String, Object> request = new Map<String, Object>{
+                'object_key' => this.objectKey,
+                'upload_id' => this.uploadId,
+                'parts' => this.uploadedParts
+            };
+            HttpUtils.post(INDEX_MANAGER_LOGS_ENDPOINT, JSON.serialize(request), GitHubUtils.authHeaders(), 200);
             System.debug('++++ChatIndexBatch: Multipart upload completed successfully');
         }
         catch (Exception e) {
             loggerInstance?.addInternalError(e, ChatIndexBatch.class.getName(), 'completeMultipartUpload');
             throw e;
-        }
-    }
-
-    public class AWSChatServiceRequest {
-        public String oid;
-        public Integer parts_count;
-        public String object_key;
-        public String upload_id;
-        public List<Map<String, Object>> parts;
-
-        public AWSChatServiceRequest(String oid, Integer partsCount) {
-            this.oid = oid;
-            this.parts_count = partsCount;
-        }
-
-        public AWSChatServiceRequest(String objectKey, String uploadId, List<Map<String, Object>> parts) {
-            this.object_key = objectKey;
-            this.upload_id = uploadId;
-            this.parts = parts;
         }
     }
 }
