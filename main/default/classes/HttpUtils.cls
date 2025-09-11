@@ -194,6 +194,8 @@ public with sharing class HttpUtils {
             }
             res = new Http().send(req);
         }
+		System.debug('++++HTTP Response code: ' + res.getStatusCode());
+		System.debug('++++HTTP Response body: ' + res.getBody());
         if (res.getStatusCode() == expectedResponseCode) {
             for(String headerKey : res.getHeaderKeys()) {
                 responseHeaders.put(headerKey, res.getHeader(headerKey));
