@@ -94,7 +94,7 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
         
         if (runJobType == JobType.LOG_INDEX_UPDATE) {
             if (this.onlyDeletedLogsPresent) {
-                return null;
+                return new List<SObject>();
             }
 
             List<Log_Index__c> newLogIndexes = [
@@ -176,9 +176,12 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
                     AND LastModifiedDate > :SETTINGS.LastLogUpdateTimestamp__c
                     ALL ROWS
                 ];
-                Set<String> deletedHashes = new Set<String>();
+                List<String> deletedHashes = new List<String>();
                 for (Log_Index__c deletedLogIndex : deletedLogIndexes) {
-                    deletedHashes.add(deletedLogIndex.Hash__c);
+                    String hash = deletedLogIndex.Hash__c;
+                    if (!deletedHashes.contains(hash) && [SELECT COUNT() FROM Log__c WHERE Hash_1__c = :hash] == 0) {
+                        deletedHashes.add(hash);
+                    }
                 }
 
                 if (this.onlyDeletedLogsPresent) {
