@@ -1,7 +1,7 @@
 public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchImpl implements Database.Batchable<SObject>, Database.Stateful, Database.AllowsCallouts, Database.RaisesPlatformEvents {
     private static final String INDEX_MANAGER_ENDPOINT = Constants.REMOTE_SITE_SETTINGS.AI_URL + '/index';
     private static final String INDEX_MANAGER_LOGS_ENDPOINT = INDEX_MANAGER_ENDPOINT + '/logs';
-    
+
     private static final String S3_REMOTE_SITE_NAME = 'Pharos_AI_S3_Bucket';
     private static final String S3_REMOTE_SITE_URL = 'https://ai-pharos-index.s3.amazonaws.com';
     private static final String S3_REMOTE_SITE_DESCRIPTION = 'S3 Bucket for Pharos AI indexing purposes';
@@ -231,7 +231,7 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
         }
         
         Set<String> fields = new Set<String>{
-            'Id', 'Name', 'Hash_1__c', 'Summary__c', 'Details__c', 'Type__c', 'Category__c', 'Area__c', 'Created_At__c'
+            'Id', 'Name', 'Hash_1__c', 'Created_At__c', 'Category__c', 'Type__c', 'Area__c', 'Summary__c', 'Details__c'
         };
         QBuilder qb = new QBuilder(Log__c.SObjectType)
             .selectFields(fields)
@@ -244,10 +244,11 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
             transformedLog.put('id', log.Id);
             transformedLog.put('name', log.Name);
             transformedLog.put('hash1', log.Hash_1__c);
-            transformedLog.put('summary', log.Summary__c);
-            transformedLog.put('category', log.Category__c);
-            transformedLog.put('area', log.Area__c);
             transformedLog.put('created_at', log.Created_At__c);
+            transformedLog.put('category', log.Category__c);
+            transformedLog.put('type', log.Type__c);
+            transformedLog.put('area', log.Area__c);
+            transformedLog.put('summary', log.Summary__c);
             transformedLog.put('details', log.Details__c);
             transformedLogs.add(transformedLog);
         }
