@@ -1,5 +1,5 @@
 public with sharing class PharosChatController {
-    public static final String CHAT_ENV_URL = 'https://ai.pharos.ai/chat';
+    public static final String CHAT_ENV_URL = 'https://oa9kb839ng.execute-api.us-east-2.amazonaws.com/production';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
     public static final String CHAT_WEBSOCKET_URL = 'wss://chat.pharos.ai';
@@ -108,6 +108,15 @@ public with sharing class PharosChatController {
     @AuraEnabled
     public static Boolean isMetadataChatEnabled() {
         return PermissionsUtil.MetadataChatEnabled;
+    }
+
+    @AuraEnabled
+    public static Map<String, String> getSendMessageData() {
+        return new Map<String, String> {
+            'sf_session' => EncodingUtil.base64Encode(Blob.valueOf(ConnectedOrgService.getSelfConnectedOrgAccessToken())),
+            'sf_instance' => System.Url.getOrgDomainUrl().toExternalForm(),
+            'sf_namespace' => ConfigUtil.nameSpacePrefix
+        };
     }
 
     @AuraEnabled
