@@ -231,7 +231,7 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
         }
         
         Set<String> fields = new Set<String>{
-            'Id', 'Name', 'Hash_1__c', 'Created_At__c', 'Category__c', 'Type__c', 'Area__c', 'Summary__c', 'Details__c'
+            'Id', 'Name', 'Hash_1__c', 'Created_At__c', 'Category__c', 'Type__c', 'Area__c', 'Summary__c', 'Details__c', 'Issue__r.Id', 'Issue__r.Name'
         };
         QBuilder qb = new QBuilder(Log__c.SObjectType)
             .selectFields(fields)
@@ -250,6 +250,8 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
             transformedLog.put('area', log.Area__c);
             transformedLog.put('summary', log.Summary__c);
             transformedLog.put('details', log.Details__c);
+            transformedLog.put('issue_id', log.Issue__r?.Id);
+            transformedLog.put('issue_name', log.Issue__r?.Name);
             transformedLogs.add(transformedLog);
         }
         return transformedLogs;
