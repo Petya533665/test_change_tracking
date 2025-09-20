@@ -184,13 +184,13 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
                 Set<String> existingHashes = new Set<String>();
                 if (!deletedHashes.isEmpty()) {
                     List<AggregateResult> existingLogs = [
-                        SELECT Hash_1__c
+                        SELECT Hash_1__c hash1
                         FROM Log__c
                         WHERE Hash_1__c IN :deletedHashes
                         GROUP BY Hash_1__c
                     ];
                     for (AggregateResult result : existingLogs) {
-                        existingHashes.add((String) result.get('Hash_1__c'));
+                        existingHashes.add((String) result.get('hash1'));
                     }
                 }
                 
