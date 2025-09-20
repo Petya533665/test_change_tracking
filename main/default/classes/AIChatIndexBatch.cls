@@ -176,18 +176,36 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
                     AND LastModifiedDate > :SETTINGS.LastLogUpdateTimestamp__c
                     ALL ROWS
                 ];
-                List<String> deletedHashes = new List<String>();
+                Set<String> deletedHashes = new Set<String>();
                 for (Log_Index__c deletedLogIndex : deletedLogIndexes) {
-                    String hash = deletedLogIndex.Hash__c;
-                    if (!deletedHashes.contains(hash) && [SELECT COUNT() FROM Log__c WHERE Hash_1__c = :hash] == 0) {
-                        deletedHashes.add(hash);
+                    deletedHashes.add(deletedLogIndex.Hash__c);
+                }
+
+                Set<String> existingHashes = new Set<String>();
+                if (!deletedHashes.isEmpty()) {
+                    List<AggregateResult> existingLogs = [
+                        SELECT Hash_1__c
+                        FROM Log__c
+                        WHERE Hash_1__c IN :deletedHashes
+                        GROUP BY Hash_1__c
+                    ];
+                    for (AggregateResult result : existingLogs) {
+                        existingHashes.add((String) result.get('Hash_1__c'));
+                    }
+                }
+                
+                // Only add hashes that don't exist in Log__c
+                List<String> completelyDeletedHashes = new List<String>();
+                for (String hash : deletedHashes) {
+                    if (!existingHashes.contains(hash)) {
+                        completelyDeletedHashes.add(hash);
                     }
                 }
 
                 if (this.onlyDeletedLogsPresent) {
-                    partJSON = '{"deletedHashes":' + JSON.serialize(deletedHashes) + '}';
+                    partJSON = '{"deletedHashes":' + JSON.serialize(completelyDeletedHashes) + '}';
                 } else {
-                    partJSON = partJSON.substring(0, partJSON.length() - 1) + ',"deletedHashes":' + JSON.serialize(deletedHashes) + '}';
+                    partJSON = partJSON.substring(0, partJSON.length() - 1) + ',"deletedHashes":' + JSON.serialize(completelyDeletedHashes) + '}';
                 }
             }
 
