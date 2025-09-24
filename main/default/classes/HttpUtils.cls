@@ -67,6 +67,29 @@ public with sharing class HttpUtils {
 		return headers;
 	}
 
+	/**
+	 * Get headers with x-api-key from AWS_Token__mdt custom metadata
+	 * @return Map containing x-api-key header with AWS token
+	 */
+	public static Map<String, String> getHeadersWithApiKey() {
+		Map<String, String> headers = new Map<String, String>();
+		AWS_Token__mdt mdtSettings = AWS_Token__mdt.getInstance('AWSToken');
+		if(mdtSettings != null) {
+			headers.put('x-api-key', mdtSettings.Token__c);
+		}
+		return headers;
+	}
+
+	/**
+	 * Get headers with x-api-key and Content-Type JSON
+	 * @return Map containing x-api-key and Content-Type headers
+	 */
+	public static Map<String, String> getHeadersWithApiKeyAndJson() {
+		Map<String, String> headers = getHeadersWithApiKey();
+		headers.putAll(getHeadersContentTypeJSON());
+		return headers;
+	}
+
 	public static boolean enableHttpDebug = false;
 	public static Map<String, Object> HTTP_DEBUG_INFO_REQUEST = new Map<String, Object>();
 	public static Map<String, Object> HTTP_DEBUG_INFO_RESPONSE = new Map<String, Object>();
@@ -194,8 +217,6 @@ public with sharing class HttpUtils {
             }
             res = new Http().send(req);
         }
-		System.debug('++++HTTP Response code: ' + res.getStatusCode());
-		System.debug('++++HTTP Response body: ' + res.getBody());
         if (res.getStatusCode() == expectedResponseCode) {
             for(String headerKey : res.getHeaderKeys()) {
                 responseHeaders.put(headerKey, res.getHeader(headerKey));

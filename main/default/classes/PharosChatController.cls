@@ -10,6 +10,7 @@ public with sharing class PharosChatController {
     public static final String ERROR_INIT_FAILED = 'Chat initialization has failed.';
     public static final String ERROR_TRUSTED_SITE_NOT_READY = 'CSP Trusted Site is not configured. Please set up CSP Trusted Site first.';
 
+
     public class InitChatResponse {
         @AuraEnabled public Boolean success;
         @AuraEnabled public List<String> errorMessages;
@@ -59,7 +60,7 @@ public with sharing class PharosChatController {
         try {
             String response = HttpUtils.get(
                     CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + logOrgId,
-                    HttpUtils.getHeadersContentTypeJSON(),
+                    HttpUtils.getHeadersWithApiKeyAndJson(),
                     200
             );
             Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(response);
@@ -100,7 +101,7 @@ public with sharing class PharosChatController {
         HttpUtils.post(
             CHAT_INIT_ENDPOINT,
             body,
-            HttpUtils.getHeadersContentTypeJSON(),
+            HttpUtils.getHeadersWithApiKeyAndJson(),
             200
         );
     }
@@ -124,6 +125,13 @@ public with sharing class PharosChatController {
     public static String getCodeEntityLink(String entity) {
         String type = '';
         String name = entity.replaceAll('\\.cls|\\.js', '');
+        String namespacePrefix = ConfigUtil.nameSpacePrefix;
+        if (name.startsWith(namespacePrefix)) {
+            name = name.substring(namespacePrefix.length());
+        } else if (name.startsWith(namespacePrefix.replace('__', '.'))) {
+            name = name.substring(namespacePrefix.length() - 1);
+        }
+
         if (name.contains('/') || name.contains('(')) {
             return null;
         } else if (name.contains('.')) {
@@ -138,16 +146,14 @@ public with sharing class PharosChatController {
             type = 'other';
         }
 
-        String namespacePrefix = ConfigUtil.nameSpacePrefix;
         String instance = System.Url.getOrgDomainUrl().toExternalForm();
-
         switch on type {
             when 'field' {
                 String objectName = name.split('\\.').get(0);
                 String prefixedObjectName = namespacePrefix + objectName;
                 List<EntityDefinition> objects = [
                     SELECT DurableId, QualifiedApiName FROM EntityDefinition
-                    WHERE QualifiedApiName=:objectName OR QualifiedApiName=:prefixedObjectName
+                    WHERE IsQueryable = true AND (QualifiedApiName=:objectName OR QualifiedApiName=:prefixedObjectName)
                     ORDER BY NamespacePrefix ASC
                     LIMIT 1
                 ];
@@ -167,7 +173,7 @@ public with sharing class PharosChatController {
                 String prefixedObjectName = namespacePrefix + name;
                 List<EntityDefinition> objects = [
                     SELECT DurableId, QualifiedApiName FROM EntityDefinition
-                    WHERE QualifiedApiName=:name OR QualifiedApiName=:prefixedObjectName
+                    WHERE IsQueryable = true AND (QualifiedApiName=:name OR QualifiedApiName=:prefixedObjectName)
                     ORDER BY NamespacePrefix ASC
                     LIMIT 1
                 ];
