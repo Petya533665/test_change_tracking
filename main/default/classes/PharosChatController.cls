@@ -130,6 +130,10 @@ public with sharing class PharosChatController {
             type = 'field';
         } else if (name.contains('__')) {
             type = 'object';
+        } else if (name.startsWith('LOG-')) {
+            type = 'log';
+        } else if (name.startsWith('ISS-')) {
+            type = 'issue';
         } else {
             type = 'other';
         }
@@ -168,6 +172,14 @@ public with sharing class PharosChatController {
                     LIMIT 1
                 ];
                 return objects.isEmpty() ? null : instance + '/lightning/setup/ObjectManager/' + objects[0].DurableId + '/view';
+            }
+            when 'log' {
+                List<Log__c> logs = [SELECT Id FROM Log__c WHERE Name = :name];
+                return logs.isEmpty() ? null : instance + '/lightning/r/' + namespacePrefix + 'Log__c/' + logs[0].Id + '/view';
+            }
+            when 'issue' {
+                List<Issue__c> issues = [SELECT Id FROM Issue__c WHERE Name = :name];
+                return issues.isEmpty() ? null : instance + '/lightning/r/' + namespacePrefix + 'Issue__c/' + issues[0].Id + '/view';
             }
             when 'other' {
                 // search Apex class first, if not found search LWC component
