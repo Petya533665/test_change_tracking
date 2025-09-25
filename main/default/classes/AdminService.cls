@@ -305,7 +305,8 @@ public without sharing class AdminService {
             'FlowLoggingEnabled' => PermissionsUtil.FlowLoggingEnabled,
             'IssueTrackingEnabled' => PermissionsUtil.IssueTrackingEnabled,
             'MetadataChatEnabled' => PermissionsUtil.MetadataChatEnabled,
-            'AutoChartEnabled' => PermissionsUtil.AutoChartEnabled
+            'AutoChartEnabled' => PermissionsUtil.AutoChartEnabled,
+            'ForecastEnabled' => PermissionsUtil.ForecastEnabled
         };
         return result;
     }
@@ -2090,6 +2091,13 @@ public without sharing class AdminService {
                 JSON.serialize(enabledTypesData),
                 List<EventMonitoringUtil.EventTypeStatus>.class
             );
+        } else {
+            // Create default enabled event types when enabledTypesData is null
+            eventTypeStatuses = new List<EventMonitoringUtil.EventTypeStatus>();
+            for (String eventType : EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES) {
+                Integer defaultLogsLimit = EventMonitoringUtil.getDefaultLogsLimitForEventType(eventType);
+                eventTypeStatuses.add(new EventMonitoringUtil.EventTypeStatus(eventType, true, defaultLogsLimit));
+            }
         }
         EventMonitoringUtil.setEventTypesStatuses(eventTypeStatuses);
         DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
@@ -3197,13 +3205,15 @@ public without sharing class AdminService {
         public Boolean gitConfigured;
         public Boolean codebaseIndexed;
         public Boolean indexingInProgress;
+        public Boolean logsIndexed;
         public Boolean trustedSiteReady;
 
-        public MetadataChatSettings(Boolean openAiConfigured, Boolean gitConfigured, Boolean codebaseIndexed, Boolean indexingInProgress, Boolean trustedSiteReady) {
+        public MetadataChatSettings(Boolean openAiConfigured, Boolean gitConfigured, Boolean codebaseIndexed, Boolean indexingInProgress, Boolean logsIndexed, Boolean trustedSiteReady) {
             this.openAiConfigured = openAiConfigured;
             this.gitConfigured = gitConfigured;
             this.codebaseIndexed = codebaseIndexed;
             this.indexingInProgress = indexingInProgress;
+            this.logsIndexed = logsIndexed;
             this.trustedSiteReady = trustedSiteReady;
         }
 
@@ -3225,8 +3235,9 @@ public without sharing class AdminService {
         PharosChatController.NamespaceStatusResponse namespaceStatus = PharosChatController.getNamespaceStatus(orgId);
         Boolean codebaseIndexed = !namespaceStatus.empty;
         Boolean indexingInProgress = namespaceStatus.indexingInProgress;
+        Boolean logsIndexed = !namespaceStatus.logsEmpty;
         
-        return new MetadataChatSettings(openAiConfigured, gitConfigured, codebaseIndexed, indexingInProgress, trustedSiteReady);
+        return new MetadataChatSettings(openAiConfigured, gitConfigured, codebaseIndexed, indexingInProgress, logsIndexed, trustedSiteReady);
     }
 
     public static MetadataChatSettings setupMetadataChatTrustedSite() {
