@@ -55,7 +55,7 @@ public with sharing class EventMonitoringUtil {
             .selectFields(selectFields)
             .add(QBuilder.condition(EVENT_LOG_FILE_EVENT_TYPE).isIn(eventTypes))
             .add(QBuilder.condition(EVENT_LOG_FILE_LOG_DATE).isGreaterOrEquals(lastProcessedHourlyDateTimeGMT))
-            .add(QBuilder.condition(EVENT_LOG_FILE_LOG_DATE).isLessOrEquals(lastProcessedHourlyDateTimeGMT.addHours(1)))
+            .add(QBuilder.condition(EVENT_LOG_FILE_LOG_DATE).isLessThan(lastProcessedHourlyDateTimeGMT.addHours(1)))
             .add(QBuilder.condition(EVENT_LOG_FILE_INTERVAL).equalsTo(INTERVAL_HOURLY))
             .add(QBuilder.orderBy(EVENT_LOG_FILE_LOG_DATE).descending())
             .addLimit(MAX_RECORDS);
@@ -361,7 +361,7 @@ public with sharing class EventMonitoringUtil {
                 .setEventType(EventLogProcessors.EVENT_TYPE_APEX_TRIGGER)
                 .setMetric('REQUEST_STATUS')
                 .setEvalType(ThresholdConfig.EvaluationType.IS_IN)
-                .setThreshold(new List<String>{'F', 'A', 'N', 'U'})
+                .setThreshold(new List<String>{'F', 'A', 'N', 'U', 'R'})
                 .build()
         },
         EventLogProcessors.EVENT_TYPE_APEX_SOAP => new Map<String, ThresholdConfig>{
@@ -369,7 +369,7 @@ public with sharing class EventMonitoringUtil {
                 .setEventType(EventLogProcessors.EVENT_TYPE_APEX_SOAP)
                 .setMetric('REQUEST_STATUS')
                 .setEvalType(ThresholdConfig.EvaluationType.IS_IN)
-                .setThreshold(new List<String>{'F', 'A', 'N', 'U'})
+                .setThreshold(new List<String>{'F', 'A', 'N', 'U', 'R'})
                 .build()
         },
         EventLogProcessors.EVENT_TYPE_LOGIN => new Map<String, ThresholdConfig>{
@@ -385,7 +385,7 @@ public with sharing class EventMonitoringUtil {
                 .setEventType(EventLogProcessors.EVENT_TYPE_VISUALFORCE_REQUEST)
                 .setMetric('REQUEST_STATUS')
                 .setEvalType(ThresholdConfig.EvaluationType.IS_IN)
-                .setThreshold(new List<String>{'F', 'A', 'N', 'U'})
+                .setThreshold(new List<String>{'F', 'A', 'N', 'U', 'R'})
                 .build()
         },
         EventLogProcessors.EVENT_TYPE_AURA_REQUEST => new Map<String, ThresholdConfig>{
@@ -393,7 +393,7 @@ public with sharing class EventMonitoringUtil {
                 .setEventType(EventLogProcessors.EVENT_TYPE_AURA_REQUEST)
                 .setMetric('REQUEST_STATUS')
                 .setEvalType(ThresholdConfig.EvaluationType.IS_IN)
-                .setThreshold(new List<String>{'F', 'A', 'N', 'U'})
+                .setThreshold(new List<String>{'F', 'A', 'N', 'U', 'R'})
                 .build()
         }
     };
@@ -426,7 +426,7 @@ public with sharing class EventMonitoringUtil {
      * @param eventType String
      * @return Integer
      */
-    private static Integer getDefaultLogsLimitForEventType(String eventType) {
+    public static Integer getDefaultLogsLimitForEventType(String eventType) {
         if (MAP_DEFAULT_LOGS_LIMIT_PER_HOUR.containsKey(eventType)) {
             return MAP_DEFAULT_LOGS_LIMIT_PER_HOUR.get(eventType);
         }

@@ -1,5 +1,5 @@
 public with sharing class PharosChatController {
-    public static final String CHAT_ENV_URL = 'https://oa9kb839ng.execute-api.us-east-2.amazonaws.com/production'; //TODO: Change back
+    public static final String CHAT_ENV_URL = 'https://ai.pharos.ai/chat';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
     public static final String CHAT_WEBSOCKET_URL = 'wss://chat.pharos.ai';
@@ -30,10 +30,12 @@ public with sharing class PharosChatController {
     public class NamespaceStatusResponse {
         public Boolean empty;
         public Boolean indexingInProgress;
+        public Boolean logsEmpty;
 
-        public NamespaceStatusResponse(Boolean empty, Boolean indexingInProgress) {
+        public NamespaceStatusResponse(Boolean empty, Boolean indexingInProgress, Boolean logsEmpty) {
             this.empty = empty;
             this.indexingInProgress = indexingInProgress;
+            this.logsEmpty = logsEmpty;
         }
     }
 
@@ -66,11 +68,12 @@ public with sharing class PharosChatController {
             Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(response);
             return new NamespaceStatusResponse(
                 (Boolean) body.get('empty'),
-                body.containsKey('indexingInProgress') ? (Boolean) body.get('indexingInProgress') : false
+                body.containsKey('indexingInProgress') ? (Boolean) body.get('indexingInProgress') : false,
+                (Boolean) body.get('logsEmpty')
             );
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'getNamespaceStatus');
-            return new NamespaceStatusResponse(true, false);
+            return new NamespaceStatusResponse(true, false, true);
         }
     }
 
