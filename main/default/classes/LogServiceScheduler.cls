@@ -161,7 +161,8 @@ public with sharing class LogServiceScheduler implements Schedulable, Database.A
                         GitHubCommitBatch.getInstance(),
                         IssueTrackerBatch.getInstance(),
                         JiraSyncBatch.getInstance(),
-                        TraceService.getInstance()
+                        TraceService.getInstance(),
+                        AIChatIndexBatch.getInstance()
                 };
             }
             when SCHEDULER_MODE_2 {
