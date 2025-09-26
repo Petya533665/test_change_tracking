@@ -1,10 +1,10 @@
 public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchImpl implements Database.Batchable<SObject>, Database.Stateful, Database.AllowsCallouts, Database.RaisesPlatformEvents {
-    private static final String INDEX_MANAGER_ENDPOINT = Constants.REMOTE_SITE_SETTINGS.AI_URL + '/index';
-    private static final String INDEX_MANAGER_LOGS_ENDPOINT = INDEX_MANAGER_ENDPOINT + '/logs';
+    public static final String INDEX_MANAGER_ENDPOINT = Constants.REMOTE_SITE_SETTINGS.AI_URL + '/index';
+    public static final String INDEX_MANAGER_LOGS_ENDPOINT = INDEX_MANAGER_ENDPOINT + '/logs';
 
-    private static final String S3_REMOTE_SITE_NAME = 'Pharos_AI_S3_Bucket';
-    private static final String S3_REMOTE_SITE_URL = 'https://ai-pharos-index.s3.amazonaws.com';
-    private static final String S3_REMOTE_SITE_DESCRIPTION = 'S3 Bucket for Pharos AI indexing purposes';
+    public static final String S3_REMOTE_SITE_NAME = 'Pharos_AI_S3_Bucket';
+    public static final String S3_REMOTE_SITE_URL = 'https://ai-pharos-index.s3.amazonaws.com';
+    public static final String S3_REMOTE_SITE_DESCRIPTION = 'S3 Bucket for Pharos AI indexing purposes';
 
     private static final Integer MAX_LOGS_PER_BATCH = 100;
     private static final Integer HEAP_SIZE_THRESHOLD = 7 * 1024 * 1024; //7MB
@@ -38,24 +38,17 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
         private set;
     }
 
-    public enum JobType {LOG_INDEX_FULL_UPSERT, LOG_INDEX_UPDATE}
-    private JobType runJobType;
-
     private static AIChatIndexBatch instance = null;
     public static AIChatIndexBatch getInstance() {
-        return getInstance(JobType.LOG_INDEX_UPDATE);
-    }
-    public static AIChatIndexBatch getInstance(JobType jobType) {
-        if (instance == null || instance.runJobType != jobType) {
-            instance = new AIChatIndexBatch(jobType, Logger.getInstance());
+        if (instance == null) {
+            instance = new AIChatIndexBatch(Logger.getInstance());
         }
         return instance; 
     }
 
-    private AIChatIndexBatch(JobType jobType, Logger logger) {
+    private AIChatIndexBatch(Logger logger) {
         super(logger);
         BATCH_SCOPE = MAX_LOGS_PER_BATCH;
-        this.runJobType = jobType;
     }
 
     public override void startBatch() {
@@ -63,20 +56,17 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
     }
 
     public override Integer getIterationsCount() {
-        Integer count = [SELECT COUNT() FROM Log_Index__c];
-        if (runJobType == JobType.LOG_INDEX_UPDATE) {
-            count = count - (Integer)SETTINGS.ProcessedLogHashes__c;
-
-            this.deletedLogCount = [
-                SELECT COUNT()
-                FROM Log_Index__c
-                WHERE IsDeleted = true AND LastModifiedDate > :SETTINGS.LastLogUpdateTimestamp__c
-                ALL ROWS
-            ];
-            if (count == 0 && this.deletedLogCount > 0) {
-                count = 1;
-                this.onlyDeletedLogsPresent = true;
-            }
+        this.deletedLogCount = [
+            SELECT COUNT()
+            FROM Log_Index__c
+            WHERE IsDeleted = true AND LastModifiedDate > :SETTINGS.LastLogUpdateTimestamp__c
+            ALL ROWS
+        ];
+        Integer logIndexesCount = [SELECT COUNT() FROM Log_Index__c];
+        Integer count = logIndexesCount - (Integer)SETTINGS.ProcessedLogHashes__c;
+        if (count + this.deletedLogCount <= 0 && this.deletedLogCount > 0) {
+            count = 1;
+            this.onlyDeletedLogsPresent = true;
         }
         return count;
     }
@@ -92,36 +82,25 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
         this.totalBatches = Integer.valueOf(Math.ceil(itemsCount / Decimal.valueOf(BATCH_SCOPE)));
         initiateMultipartUpload(this.totalBatches);
         
-        if (runJobType == JobType.LOG_INDEX_UPDATE) {
-            if (this.onlyDeletedLogsPresent) {
-                return new List<SObject>();
-            }
-
-            List<Log_Index__c> newLogIndexes = [
-                SELECT Hash__c
-                FROM Log_Index__c
-                ORDER BY Id DESC
-                LIMIT :itemsCount
-            ];
-            List<String> newHashes = new List<String>();
-            for (Log_Index__c logIndex : newLogIndexes) {
-                newHashes.add(logIndex.Hash__c);
-            }
-
-            List<AggregateResult> uniqueIds = [
-                SELECT MIN(Id) uniqueId
-                FROM Log__c
-                WHERE Hash_1__c IN :newHashes
-                GROUP BY Hash_1__c
-                ORDER BY MIN(Id) DESC
-            ];
-            return uniqueIds;
+        if (this.onlyDeletedLogsPresent) {
+            return new List<SObject>();
         }
-        
+
+        List<Log_Index__c> newLogIndexes = [
+            SELECT Hash__c
+            FROM Log_Index__c
+            ORDER BY Id DESC
+            LIMIT :itemsCount
+        ];
+        List<String> newHashes = new List<String>();
+        for (Log_Index__c logIndex : newLogIndexes) {
+            newHashes.add(logIndex.Hash__c);
+        }
+
         List<AggregateResult> uniqueIds = [
             SELECT MIN(Id) uniqueId
             FROM Log__c
-            WHERE Hash_1__c != NULL
+            WHERE Hash_1__c IN :newHashes
             GROUP BY Hash_1__c
             ORDER BY MIN(Id) DESC
         ];
@@ -151,11 +130,10 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
             }
             completeMultipartUpload();
             
-            if (runJobType == JobType.LOG_INDEX_UPDATE) {
-                SETTINGS.ProcessedLogHashes__c = [SELECT COUNT() FROM Log_Index__c];
-                SETTINGS.LastLogUpdateTimestamp__c = DateTime.now();
-                update SETTINGS;
-            }
+            AsyncApexJob job = [SELECT CreatedDate FROM AsyncApexJob WHERE Id = :BC.getJobId() LIMIT 1];
+            SETTINGS.ProcessedLogHashes__c = [SELECT COUNT() FROM Log_Index__c WHERE CreatedDate <= :job.CreatedDate];
+            SETTINGS.LastLogUpdateTimestamp__c = job.CreatedDate;
+            update SETTINGS;
         }
         catch (Exception e) {
             loggerInstance?.addInternalError(e, AIChatIndexBatch.class.getName(), 'finish');

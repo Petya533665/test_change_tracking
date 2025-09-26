@@ -29,13 +29,13 @@ public with sharing class PharosChatController {
 
     public class NamespaceStatusResponse {
         public Boolean empty;
-        public Boolean indexingInProgress;
         public Boolean logsEmpty;
+        public Boolean indexingInProgress;
 
-        public NamespaceStatusResponse(Boolean empty, Boolean indexingInProgress, Boolean logsEmpty) {
+        public NamespaceStatusResponse(Boolean empty, Boolean logsEmpty, Boolean indexingInProgress) {
             this.empty = empty;
-            this.indexingInProgress = indexingInProgress;
             this.logsEmpty = logsEmpty;
+            this.indexingInProgress = indexingInProgress;
         }
     }
 
@@ -68,12 +68,12 @@ public with sharing class PharosChatController {
             Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(response);
             return new NamespaceStatusResponse(
                 (Boolean) body.get('empty'),
-                body.containsKey('indexingInProgress') ? (Boolean) body.get('indexingInProgress') : false,
-                (Boolean) body.get('logsEmpty')
+                (Boolean) body.get('logsEmpty'),
+                (Boolean) body.get('indexingInProgress')
             );
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'getNamespaceStatus');
-            return new NamespaceStatusResponse(true, false, true);
+            return new NamespaceStatusResponse(true, true, false);
         }
     }
 
