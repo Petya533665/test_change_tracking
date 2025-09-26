@@ -400,12 +400,16 @@ public with sharing class AdminController {
                 response.data = AdminService.getMetadataChatSettings();
             } else if (method.equals('setupMetadataChatTrustedSite')) {
                 response.data = AdminService.setupMetadataChatTrustedSite();
+            } else if (method.equals('setupMetadataChatIndex')) {
+                response.data = AdminService.setupMetadataChatIndex();
             } else if (method.equals('getAutoChartSetting')) {
                 response.data = AutoChartController.getAutoChartSetting();
             } else if (method.equals('setAutoChartSetting')) {
                 response.data = AutoChartController.updateAutoChartSetting((String)request.get('data'));
             } else if (method.equals('getForecastSetting')) {
                 response.data = HoltwintersForecastController.getForecastSetting();
+            } else if (method.equals('setForecastSetting')) {
+                response.data = HoltwintersForecastController.updateForecastSetting((String)request.get('data'));
             } else {
                 response.error = 'Action not found';
             }

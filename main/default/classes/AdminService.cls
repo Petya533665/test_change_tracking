@@ -3237,11 +3237,59 @@ public without sharing class AdminService {
         Boolean indexingInProgress = namespaceStatus.indexingInProgress;
         Boolean logsIndexed = !namespaceStatus.logsEmpty;
         
+        // Check for running or recently completed batch jobs
+        if (!indexingInProgress) {
+            List<String> batchClassesToCheck = new List<String>();
+            if (!codebaseIndexed) {
+                batchClassesToCheck.add('GitHubCommitBatch');
+            }
+            if (!logsIndexed) {
+                batchClassesToCheck.add('AIChatIndexBatch');
+            }
+            
+            if (!batchClassesToCheck.isEmpty()) {
+                DateTime recencyThreshold = DateTime.now().addMinutes(-1);
+                List<AsyncApexJob> recentJobs = [
+                    SELECT ApexClass.Name, Status, CompletedDate
+                    FROM AsyncApexJob 
+                    WHERE ApexClass.Name IN :batchClassesToCheck 
+                    AND (Status IN ('Preparing', 'Processing') 
+                         OR (Status = 'Completed' AND CompletedDate >= :recencyThreshold))
+                ];
+                
+                if (recentJobs?.isEmpty() == false) {
+                    indexingInProgress = true;
+                }
+            }
+        }
+        
         return new MetadataChatSettings(openAiConfigured, gitConfigured, codebaseIndexed, indexingInProgress, logsIndexed, trustedSiteReady);
     }
 
     public static MetadataChatSettings setupMetadataChatTrustedSite() {
         MetadataServiceUtil.upsertCspTrustedSite('Pharos_Chat_Websocket', PharosChatController.CHAT_WEBSOCKET_URL, 'Pharos chat websocket connection');
         return new MetadataChatSettings(true);
+    }
+
+    public static MetadataChatSettings setupMetadataChatIndex() {
+        MetadataChatSettings settings = getMetadataChatSettings();
+        System.debug('+++settings: ' + settings);
+        if (settings.indexingInProgress) return settings;
+        if (!settings.codebaseIndexed) {
+            System.debug('+++pushing git changes');
+            Map<String, Boolean> result = pushGitChanges();
+            System.debug('+++pushing git changes result: ' + result);
+            if (result.get('changesPushed') || result.get('jobAlreadyRunning')) {
+                System.debug('+++indexing in progress');
+                settings.indexingInProgress = true;
+            }
+        }
+        if (!settings.logsIndexed) {
+            System.debug('+++Starting AIChatIndexBatch');
+            AIChatIndexBatch.getInstance().startBatch();
+            System.debug('+++AIChatIndexBatch started, indexing in progress');
+            settings.indexingInProgress = true;
+        }
+        return settings;
     }
 }
