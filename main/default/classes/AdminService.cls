@@ -1050,8 +1050,8 @@ public without sharing class AdminService {
             // Round to previous hour and remove minutes/seconds
             DateTime now = DateTime.now();
             DateTime roundedHour = DateTime.newInstance(now.year(), now.month(), now.day(), now.hour(), 0, 0);
-            // Subtract 1 hour to get the previous hour
-            DateTime previousHour = roundedHour.addHours(-1);
+            // Subtract the default delay to get the previous hour
+            DateTime previousHour = roundedHour.addHours(-EventMonitoringUtil.DEFAULT_DELAY_CSV_FILE_GENERATION);
             
             ConfigUtil.EVENT_MONITORING_SETTINGS.Last_Processed_Hourly_Events__c = previousHour;
             DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
@@ -1191,7 +1191,7 @@ public without sharing class AdminService {
         DatabaseUtils.getInstance().performUpsertDML(new List<Git_API_Settings__c>{ConfigUtil.GIT_API_SETTINGS}, Schema.SObjectType.Git_API_Settings__c, true);
 
         // All types of rules (except for archival) should deactivate after refresh.
-        List<Rule__c> allActiveRules = [SELECT Id, Active__c FROM Rule__c WHERE Active__c = true AND Type__c != :RuleUtil.RULE_TYPE_ARCHIVAL];
+        List<Rule__c> allActiveRules = [SELECT Id, Active__c FROM Rule__c WHERE Active__c = true AND Type__c != :Constants.RULE_SOBJECT.TYPE_ARCHIVAL];
         for(Rule__c rule : allActiveRules) {
             rule.Active__c = false;
         }
@@ -1292,18 +1292,18 @@ public without sharing class AdminService {
     }
 
     public static Boolean isNotificationsSetupCompleted() {
-        List<MonitoringUtil.MonitoringRule> notificationRulesLogs = MonitoringUtil.getNotificationRules(null);
-        List<MonitoringUtil.MonitoringRule> notificationRulesIssues = MonitoringUtil.getNotificationRules(null, MonitoringUtil.RULE_ISSUE_SOBJECT_TYPE_FIELD);
+        List<RuleUtil.Rule> notificationRulesLogs = RuleUtil.getNotificationRules(null);
+        List<RuleUtil.Rule> notificationRulesIssues = RuleUtil.getNotificationRules(null, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
         return !notificationRulesLogs.isEmpty() || !notificationRulesIssues.isEmpty();
     }
 
     public static Boolean isMonitoringRulesSetupCompleted() {
-        List<Rule__c> availableMonitoringRules = [SELECT Id FROM Rule__c WHERE Active__c = true AND Type__c = :MonitoringUtil.RULE_TYPE_MONITORING LIMIT 1];
+        List<Rule__c> availableMonitoringRules = [SELECT Id FROM Rule__c WHERE Active__c = true AND Type__c = :Constants.RULE_SOBJECT.TYPE_MONITORING LIMIT 1];
         return (availableMonitoringRules.size() > 0 && PermissionsUtil.MonitoringEnabled);
     }
 
     public static Boolean isArchivalRulesSetupCompleted() {
-        List<Rule__c> availableMonitoringRules = [SELECT Id FROM Rule__c WHERE Active__c = true AND Type__c = :MonitoringUtil.RULE_TYPE_ARCHIVAL LIMIT 1];
+        List<Rule__c> availableMonitoringRules = [SELECT Id FROM Rule__c WHERE Active__c = true AND Type__c = :Constants.RULE_SOBJECT.TYPE_ARCHIVAL LIMIT 1];
         return (availableMonitoringRules.size() > 0 && PermissionsUtil.ArchivalEnabled);
     }
 
@@ -1720,7 +1720,7 @@ public without sharing class AdminService {
         List<Schema.SObjectField> excluded = MAP_EXCLUDE_STANDARD_FIELDS_FOR_FILTERS.get(sobjectType);
         if(!isUpdateRule) {
             for (Schema.SObjectField field : MAP_STANDARD_FIELDS_FOR_FILTERS.get(sobjectType)) {
-                if(ruleType == RuleUtil.RULE_TYPE_MONITORING && excluded.contains(field)) {
+                if(ruleType == Constants.RULE_SOBJECT.TYPE_MONITORING && excluded.contains(field)) {
                     continue;
                 }
                 Schema.DescribeFieldResult dsr = field.getDescribe();
@@ -2007,7 +2007,7 @@ public without sharing class AdminService {
         Map<String, Object> ruleSettings = new Map<String, Object>();
         ruleSettings.put(RuleUtil.KEY_RULE_ENABLED, RuleUtil.MAP_RULES_ENABLED.get(ruleType));
         ruleSettings.put(RuleUtil.KEY_RULES, RuleUtil.getRuleWrappers(ruleType));
-        if(ruleType != RuleUtil.RULE_TYPE_EVENT_MONITORING) {
+        if(ruleType != Constants.RULE_SOBJECT.TYPE_EVENT_MONITORING) {
             ruleSettings.put(RuleUtil.KEY_RULE_COMPARISON_OPERATORS, SObjectType.Rule__c.fields.ComparisonOperator__c.getPicklistValues());
             ruleSettings.put(RuleUtil.KEY_RULE_FILTER_COMPARISON_OPERATORS, SObjectType.RuleFilter__c.fields.ComparisonOperator__c.getPicklistValues());
         }
@@ -2030,10 +2030,10 @@ public without sharing class AdminService {
         ruleSettings.put(RuleUtil.KEY_RULE_SUBTYPES, SObjectType.Rule__c.fields.Subtype__c.getPicklistValues());
         ruleSettings.put(RuleUtil.KEY_USER_TIMEZONE_OFFSET, getUserTimezoneOffset());
 
-        if (ruleType == RuleUtil.RULE_TYPE_LIMITS) {
+        if (ruleType == Constants.RULE_SOBJECT.TYPE_LIMITS) {
             ruleSettings.put(RuleUtil.KEY_LIMIT_FIELD_NAMES, LimitsService.FIELD_MAP.keySet());
             ruleSettings.put(RuleUtil.KEY_LIMIT_MONITORING_FREQUENCY, String.isNotBlank(ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c) ? Integer.valueOf(ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c) : null);
-        } else if (ruleType == RuleUtil.RULE_TYPE_EVENT_MONITORING) {
+        } else if (ruleType == Constants.RULE_SOBJECT.TYPE_EVENT_MONITORING) {
             ruleSettings.put(RuleUtil.KEY_EVENT_MONITORING_TYPES, EventMonitoringUtil.getEventTypesWithStatus());
         }
         return ruleSettings;
@@ -2051,7 +2051,7 @@ public without sharing class AdminService {
             if(rtName != ruleType) continue;
             Schema.RecordTypeInfo rtInfo = rtMapByName.get(rtName);
             List<SelectOptionWrapper> options = new List<SelectOptionWrapper>();
-            for(String actionType : MonitoringUtil.ruleTypeActionsMap.get(ruleType)) {
+            for(String actionType : RuleUtil.MAP_ACTION_TYPES_BY_RULE_TYPE.get(ruleType)) {
                 options.add(new SelectOptionWrapper(actionType, actionType));
             }
             result.put(rtInfo.getRecordTypeId(), options);
@@ -2084,6 +2084,18 @@ public without sharing class AdminService {
     public static Event_Monitoring__c setEventMonitoringSetting(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
+        Boolean incomingValue = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
+
+        // if the incoming value is true and the enabled value is false, enable the event log generation in metadata settings
+        if(incomingValue && !ConfigUtil.EVENT_MONITORING_SETTINGS?.Enabled__c) {
+            if(!MetadataServiceUtil.getEventSettingsLogGenerationEnabled()) {
+                // enable event log generation in metadata settings
+                MetadataServiceUtil.setEventSettingsLogGeneration(incomingValue);
+            }
+        }
+        // set the enabled value to the input value
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = incomingValue;
+
         List<EventMonitoringUtil.EventTypeStatus> eventTypeStatuses = null;
         Object enabledTypesData = input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES);
         if (enabledTypesData != null) {
@@ -2167,15 +2179,15 @@ public without sharing class AdminService {
         return RuleUtil.deleteAction(String.valueOf(input.get(RuleUtil.KEY_ACTION_ID)));
     }
     
-    public static List<Rule__c> validateRuleFilters(List<MonitoringUtil.MonitoringRule> rules) {
+    public static List<Rule__c> validateRuleFilters(List<RuleUtil.Rule> rules) {
         List<Rule__c> toUpdate = new List<Rule__c>();
         if(!rules.isEmpty()) {
             Boolean ruleNotValid = false;
-            if(rules.get(0).ruleType == MonitoringUtil.RULE_TYPE_ARCHIVAL) {
+            if(rules.get(0).type.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL)) {
                 try {
                     DateTime lastProcessedDatetime = DateTime.now();
                     DateTime ruleStartTime = Datetime.now();
-                    List<String> logFields = MonitoringUtil.getLogFieldNames(rules);
+                    List<String> logFields = RuleUtil.getLogFieldNames(rules);
                     QBuilder qb = RetentionBatch.getArchivalLogsQuery(rules.get(0), new Set<String>(logFields), lastProcessedDatetime, ruleStartTime);
                     qb.addLimit(1);
                     String qbQuery = qb.build();
@@ -2184,18 +2196,18 @@ public without sharing class AdminService {
                 catch(Exception e) {
                     ruleNotValid = true;
                 }
-                if(rules.get(0).filters == null || rules.get(0).filters.isEmpty()) {
+                if(rules.get(0).ruleFilters == null || rules.get(0).ruleFilters.isEmpty()) {
                     ruleNotValid = true;
                 }
             }
-            if(rules.get(0).ruleType == MonitoringUtil.RULE_TYPE_MONITORING) {
+            if(rules.get(0).type.equals(Constants.RULE_SOBJECT.TYPE_MONITORING)) {
                 try {
                     DateTime lastProcessedDatetime = DateTime.now();
                     QBuilder qbCount = MonitoringService.buildMonitoringLogsQuery(rules.get(0), new Set<String>{'COUNT()'});
                     String qbCountQuery = qbCount.build();
                     Integer countLogs = Database.countQuery(qbCountQuery);
 
-                    List<String> logFields = MonitoringUtil.getLogFieldNames(rules);
+                    List<String> logFields = RuleUtil.getLogFieldNames(rules);
                     QBuilder qb = MonitoringService.buildMonitoringLogsQuery(rules.get(0), new Set<String>(logFields));
                     qb.addLimit(1);
                     String qbQuery = qb.build();
@@ -2205,9 +2217,9 @@ public without sharing class AdminService {
                     ruleNotValid = true;
                 }
             }
-            if (rules[0].ruleType == RuleUtil.RULE_TYPE_JIRA_UPDATE) {
+            if (rules[0].type == Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE) {
                 try {
-                    List<String> jiraLogFields = MonitoringUtil.getLogFieldNames(rules);
+                    List<String> jiraLogFields = RuleUtil.getLogFieldNames(rules);
                     String query = new QBuilder(Log__c.SObjectType)
                         .selectFields(new Set<String>(jiraLogFields))
                         .addLimit(1)
@@ -2218,9 +2230,9 @@ public without sharing class AdminService {
                     ruleNotValid = true;
                 }
             }
-            if(rules.get(0).ruleType == MonitoringUtil.RULE_TYPE_NOTIFICATION) {
+            if(rules.get(0).type.equals(Constants.RULE_SOBJECT.TYPE_NOTIFICATION)) {
                 try {
-                    List<String> logFields = MonitoringUtil.getLogFieldNames(rules);
+                    List<String> logFields = RuleUtil.getLogFieldNames(rules);
                     String query = new QBuilder(Log__c.SObjectType)
                         .selectFields(new Set<String>(logFields))
                         .addLimit(1)
@@ -2231,57 +2243,57 @@ public without sharing class AdminService {
                     ruleNotValid = true;
                 }
             }
-            if(rules.get(0).ruleType == null) {
+            if(rules.get(0).type == null) {
                 ruleNotValid = true;
             }
             Boolean isNotValidRuleFields = isRuleNotValid(rules.get(0));
             if(isNotValidRuleFields && !ruleNotValid) {
                 ruleNotValid = isNotValidRuleFields;
             }
-            toUpdate.add(new Rule__c(Id = rules.get(0).ruleId, Is_Not_Valid__c = ruleNotValid));
+            toUpdate.add(new Rule__c(Id = rules.get(0).id, Is_Not_Valid__c = ruleNotValid));
         }
         return toUpdate;
     }
 
-    public static Boolean isRuleNotValid(MonitoringUtil.MonitoringRule monitoringRule) {
+    public static Boolean isRuleNotValid(RuleUtil.Rule rule) {
         Boolean ruleNotValid = false;
-        if(monitoringRule.ruleType == MonitoringUtil.RULE_TYPE_ARCHIVAL) {
-            ruleNotValid = isNotValidArchivalRule(monitoringRule);
+        if(rule.type.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL)) {
+            ruleNotValid = isNotValidArchivalRule(rule);
         }
-        if(monitoringRule.ruleType == MonitoringUtil.RULE_TYPE_MONITORING) {
-            ruleNotValid = isNotValidMonitoringRule(monitoringRule);
+        if(rule.type.equals(Constants.RULE_SOBJECT.TYPE_MONITORING)) {
+            ruleNotValid = isNotValidMonitoringRule(rule);
         }
-        if(monitoringRule.ruleType == MonitoringUtil.RULE_TYPE_JIRA_UPDATE) {
-            ruleNotValid = isNotValidJiraUpdateRule(monitoringRule);
+        if(rule.type.equals(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE)) {
+            ruleNotValid = isNotValidJiraUpdateRule(rule);
         }
-        if(monitoringRule.ruleType == MonitoringUtil.RULE_TYPE_NOTIFICATION) {
-            ruleNotValid = isNotValidNotificationRule(monitoringRule);
+        if(rule.type.equals(Constants.RULE_SOBJECT.TYPE_NOTIFICATION)) {
+            ruleNotValid = isNotValidNotificationRule(rule);
         }
         return ruleNotValid;
     }
 
-    public static Boolean isNotValidArchivalRule(MonitoringUtil.MonitoringRule monitoringRule) {
-        return (monitoringRule.eventTypeInterval == null
-            || (monitoringRule.actions == null
-            || monitoringRule.actions.isEmpty()
-            || monitoringRule.filters == null
-            || monitoringRule.filters.isEmpty()));
+    public static Boolean isNotValidArchivalRule(RuleUtil.Rule rule) {
+        return (rule.eventTimeInterval == null
+            || (rule.actions == null
+            || rule.actions.isEmpty()
+            || rule.ruleFilters == null
+            || rule.ruleFilters.isEmpty()));
     }
 
-    public static Boolean isNotValidMonitoringRule(MonitoringUtil.MonitoringRule monitoringRule) {
-        return (monitoringRule.eventTypeInterval == null
-            || monitoringRule.threshold == null
-            || String.isBlank(monitoringRule.ruleSubType)
-            || (monitoringRule.actions == null
-            || monitoringRule.actions.isEmpty()));
+    public static Boolean isNotValidMonitoringRule(RuleUtil.Rule rule) {
+        return (rule.eventTimeInterval == null
+            || rule.threshold == null
+            || String.isBlank(rule.subtype)
+            || (rule.actions == null
+            || rule.actions.isEmpty()));
     }
 
-    public static Boolean isNotValidJiraUpdateRule(MonitoringUtil.MonitoringRule monitoringRule) {
-        return (monitoringRule.actions == null || monitoringRule.actions.isEmpty());
+    public static Boolean isNotValidJiraUpdateRule(RuleUtil.Rule rule) {
+        return (rule.actions == null || rule.actions.isEmpty());
     }
 
-    public static Boolean isNotValidNotificationRule(MonitoringUtil.MonitoringRule monitoringRule) {
-        return (monitoringRule.actions == null || monitoringRule.actions.isEmpty());
+    public static Boolean isNotValidNotificationRule(RuleUtil.Rule rule) {
+        return (rule.actions == null || rule.actions.isEmpty());
     }
 
     public static Map<String, Object> setRuleIndex(Object data) {
@@ -2302,32 +2314,31 @@ public without sharing class AdminService {
         return new Map<String, Object>{RuleUtil.KEY_RULES => RuleUtil.getRuleWrappers(null, RuleUtil.addAllTicketingRuleTypes(rule.Type__c))};
     }
 
-    private static MonitoringUtil.MonitoringRule getMonitoringRuleWrapper(RuleUtil.Rule ruleWrapper, Map<String, Object> input) {
-        MonitoringUtil.MonitoringRule mRuleWrapper = (MonitoringUtil.MonitoringRule)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE)), MonitoringUtil.MonitoringRule.class);
-        mRuleWrapper.ruleType = ruleWrapper.type;
-        mRuleWrapper.eventTypeInterval = ruleWrapper.eventTimeInterval;
-        mRuleWrapper.sobjectType = ruleWrapper.sobjectType;
-        mRuleWrapper.ruleSubType = ruleWrapper.subtype;
-        mRuleWrapper.threshold = ruleWrapper.threshold;
+    private static RuleUtil.Rule getMonitoringRuleWrapper(RuleUtil.Rule rule, Map<String, Object> input) {
+        RuleUtil.Rule ruleWrapper = (RuleUtil.Rule)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE)), RuleUtil.Rule.class);
+        ruleWrapper.type = rule.type;
+        ruleWrapper.eventTimeInterval = rule.eventTimeInterval;
+        ruleWrapper.sobjectType = rule.sobjectType;
+        ruleWrapper.subtype = rule.subtype;
+        ruleWrapper.threshold = rule.threshold;
 
-        mRuleWrapper.aggregateType = MonitoringUtil.MAP_AGGREGATETYPES_BY_STRINGS.get(ruleWrapper.aggregateType);
-        mRuleWrapper.eventTypeInterval = ruleWrapper.eventTimeInterval;
-        mRuleWrapper.aggregateInterval = ruleWrapper.aggregateInterval;
-        mRuleWrapper.comparisonOperator = ruleWrapper.comparisonOperator;
-        mRuleWrapper.comparisonOperatorType = MonitoringUtil.comparisonOperatorMap.get(ruleWrapper.comparisonOperator);
+        ruleWrapper.aggregateType = rule.aggregateType;
+        ruleWrapper.eventTimeInterval = rule.eventTimeInterval;
+        ruleWrapper.aggregateInterval = rule.aggregateInterval;
+        ruleWrapper.comparisonOperator = rule.comparisonOperator;
         
-        mRuleWrapper.actions = (List<MonitoringUtil.Action>)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_ACTIONS)), List<MonitoringUtil.Action>.class);
-        mRuleWrapper.filters = new List<MonitoringUtil.RuleFilter>();
-        mRuleWrapper.groupFieldNames = new Set<String>();
-        mRuleWrapper.isUpdateRule = (ruleWrapper.isUpdateRule == null) ? false : ruleWrapper.isUpdateRule;
+        ruleWrapper.actions = (List<RuleUtil.Action>)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_ACTIONS)), List<RuleUtil.Action>.class);
+        ruleWrapper.ruleFilters = new List<RuleUtil.RuleFilter>();
+        ruleWrapper.groupFieldNames = new Set<String>();
+        ruleWrapper.isUpdateRule = (rule.isUpdateRule == null) ? false : rule.isUpdateRule;
 
-        List<MonitoringUtil.RuleFilter> ruleFilters = new List<MonitoringUtil.RuleFilter>();
+        List<RuleUtil.RuleFilter> ruleFilters = new List<RuleUtil.RuleFilter>();
         ruleFilters.sort();
-        for(MonitoringUtil.RuleFilter rf : (List<MonitoringUtil.RuleFilter>)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE_FILTERS)), List<MonitoringUtil.RuleFilter>.class)) {
-            ruleFilters.add(new MonitoringUtil.RuleFilter(rf.index, rf.comparisonType, rf.comparisonOperator, rf.fieldName, rf.value, mRuleWrapper.sobjectType, rf.isOld));
+        for(RuleUtil.RuleFilter rf : (List<RuleUtil.RuleFilter>)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE_FILTERS)), List<RuleUtil.RuleFilter>.class)) {
+            ruleFilters.add(new RuleUtil.RuleFilter(rf.index, rf.comparisonType, rf.comparisonOperator, rf.fieldName, rf.value, ruleWrapper.sobjectType, rf.isOld));
         }
-        mRuleWrapper.addFilters(ruleFilters);
-        return mRuleWrapper;
+        ruleWrapper.addFilters(ruleFilters);
+        return ruleWrapper;
     }
 
     public static final String RULE_FILTER_LOGIC_NOT_VALID = 'Rule filter logic not valid';
@@ -2372,29 +2383,29 @@ public without sharing class AdminService {
             && !input.containsKey(RuleUtil.KEY_RULE_ACTIONS)
             && !input.containsKey(RuleUtil.KEY_ACTIONS)
             && !input.containsKey(RuleUtil.KEY_RULE_FILTERS);
-        RuleUtil.Rule ruleWrapper = (RuleUtil.Rule)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE)), RuleUtil.Rule.class);
+        RuleUtil.Rule deserializedRuleWrapper = (RuleUtil.Rule)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE)), RuleUtil.Rule.class);
         if(!isOnlyRuleData) {
-            MonitoringUtil.MonitoringRule mRuleWrapper = getMonitoringRuleWrapper(ruleWrapper, input);
-            if(mRuleWrapper != null) {
-                if(String.isNotBlank(mRuleWrapper.filterLogic)) {
+            RuleUtil.Rule ruleWrapper = getMonitoringRuleWrapper(deserializedRuleWrapper, input);
+            if(ruleWrapper != null) {
+                if(String.isNotBlank(ruleWrapper.filterLogic)) {
                     // validate expression
-                    ConfigUtil.BooleanExpressionParser parser = new ConfigUtil.BooleanExpressionParser(mRuleWrapper.filterLogic);
+                    ConfigUtil.BooleanExpressionParser parser = new ConfigUtil.BooleanExpressionParser(ruleWrapper.filterLogic);
                     if(!parser.isValidExpression()) {
                         throw new AdminServiceValidationException(RULE_FILTER_LOGIC_NOT_VALID);
                     }
                     // validate expression & rule filters
                     Set<String> operands = parser?.getOperands();
                     if(operands != null && !operands.isEmpty()) {
-                        for(MonitoringUtil.RuleFilter rf : mRuleWrapper.filters) {
-                            if(rf.comparisonType == MonitoringUtil.ComparisonType.FIELD) {
+                        for (RuleUtil.RuleFilter rf : ruleWrapper.ruleFilters) {
+                            if (RuleUtil.MAP_COMPARISON_TYPES_BY_STRINGS.get(rf.comparisonType) == RuleUtil.ComparisonType.FIELD) {
                                 continue;
                             }
                             Integer filterIndex = Integer.valueOf(rf.index);
-                            if(mRuleWrapper.ruleType == MonitoringUtil.RULE_TYPE_ARCHIVAL) {
-                                if(filterIndex == 1 && mRuleWrapper.filterLogic != '1') {
+                            if(ruleWrapper.type.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL)) {
+                                if(filterIndex == 1 && ruleWrapper.filterLogic != '1') {
                                     continue;
                                 }
-                                else if(filterIndex == 1 && mRuleWrapper.filterLogic == '1') {
+                                else if(filterIndex == 1 && ruleWrapper.filterLogic == '1') {
                                     operands.remove(String.valueOf(filterIndex));
                                 }
                                 else {
@@ -2408,11 +2419,11 @@ public without sharing class AdminService {
                             }
                         }
                         if(!operands.isEmpty() 
-                            && mRuleWrapper.ruleType == MonitoringUtil.RULE_TYPE_MONITORING 
-                            && (mRuleWrapper.ruleSubType == MonitoringUtil.RULE_SUB_TYPE_IMPACT
-                                || mRuleWrapper.ruleSubType == MonitoringUtil.RULE_SUB_TYPE_SPIKE
-                                || mRuleWrapper.ruleSubType == MonitoringUtil.RULE_SUB_TYPE_FREQUENCY)
-                            && mRuleWrapper?.filters?.isEmpty()) {
+                            && ruleWrapper.type.equals(Constants.RULE_SOBJECT.TYPE_MONITORING) 
+                            && (ruleWrapper.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_IMPACT)
+                                || ruleWrapper.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_SPIKE)
+                                || ruleWrapper.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_FREQUENCY))
+                            && ruleWrapper?.ruleFilters?.isEmpty()) {
                             operands.clear();
                         }
                         if(!operands.isEmpty()) {
@@ -2421,7 +2432,7 @@ public without sharing class AdminService {
                     }
                 }
                 // validate soql with rule filters by logic expression
-                List<Rule__c> checkRuleFilterRecords = validateRuleFilters(new List<MonitoringUtil.MonitoringRule>{mRuleWrapper});
+                List<Rule__c> checkRuleFilterRecords = validateRuleFilters(new List<RuleUtil.Rule>{ruleWrapper});
                 Rule__c resultRule = checkRuleFilterRecords.get(0);
                 if(resultRule.Is_Not_Valid__c) {
                     throw new AdminServiceValidationException(RULE_NOT_VALID);
@@ -2429,11 +2440,11 @@ public without sharing class AdminService {
 
                 // validate rule filter values
                 try {
-                    List<SObject> testData = generateSObjectsForEvaluateRuleFilters(mRuleWrapper);
-                    Schema.SObjectField ruleSubType = (mRuleWrapper.ruleSubType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME) 
+                    List<SObject> testData = generateSObjectsForEvaluateRuleFilters(ruleWrapper);
+                    Schema.SObjectField ruleSubType = (ruleWrapper.subtype == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME) 
                         ? Trace_Result__c.Issue__c.getDescribe().getSObjectField()
                         : null;
-                    mRuleWrapper.applyNotificationRules(testData, ruleSubType);
+                    ruleWrapper.applyNotificationRules(testData, ruleSubType);
                 }
                 catch(Exception e) {
                     throw new AdminServiceValidationException(RULE_NOT_VALID);
@@ -2441,22 +2452,22 @@ public without sharing class AdminService {
             }
         }
 
-        if(!isOnlyRuleData && ruleWrapper?.type == MonitoringUtil.RULE_TYPE_ARCHIVAL) {
+        if(!isOnlyRuleData && deserializedRuleWrapper?.type.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL)) {
             List<RuleUtil.RuleFilter> currentRuleFilters = new List<RuleUtil.RuleFilter>();
             if (input.get(RuleUtil.KEY_RULE_FILTERS) != null) {
                 currentRuleFilters = (List<RuleUtil.RuleFilter>)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE_FILTERS)), List<RuleUtil.RuleFilter>.class);
                 currentRuleFilters.sort();
             }
-            Boolean isChangedRuleFilterLogicOrFilters = isChangedRuleFilterLogicOrFilters(ruleWrapper, currentRuleFilters);
+            Boolean isChangedRuleFilterLogicOrFilters = isChangedRuleFilterLogicOrFilters(deserializedRuleWrapper, currentRuleFilters);
             if(isChangedRuleFilterLogicOrFilters) {
-                List<Event__c> relatedEvents = [SELECT Id FROM Event__c WHERE Rule__c = :ruleWrapper.Id LIMIT 1000];
+                List<Event__c> relatedEvents = [SELECT Id FROM Event__c WHERE Rule__c = :deserializedRuleWrapper.Id LIMIT 1000];
                 DatabaseUtils.getInstance().performDeleteDML(relatedEvents, Schema.SObjectType.Event__c, true);
             }
         }
 
-        Rule__c rule = ruleWrapper.getRule();
+        Rule__c rule = deserializedRuleWrapper.getRule();
         validateMaxActiveRules(rule?.Type__c, rule?.Id, rule?.Active__c);
-        validateJiraActions(ruleWrapper, JSON.serialize(input.get(RuleUtil.KEY_ACTIONS)));
+        validateJiraActions(deserializedRuleWrapper, JSON.serialize(input.get(RuleUtil.KEY_ACTIONS)));
         
         RuleUtil.setRuleIndex(rule);
         DatabaseUtils.getInstance().performUpsertDML(new List<Rule__c>{rule}, Schema.SObjectType.Rule__c, true);
@@ -2464,7 +2475,7 @@ public without sharing class AdminService {
         if(!isOnlyRuleData) {
             RuleUtil.upsertRuleFilters(input, rule.Id);
             if (input.get(RuleUtil.KEY_RULE_ACTIONS) != null && input.get(RuleUtil.KEY_ACTIONS) != null) {
-                String recordTypeName = rule.Type__c == RuleUtil.ACTION_RT_ARCHIVAL ? RuleUtil.ACTION_RT_ARCHIVAL : RuleUtil.ACTION_RT_MONITORING;
+                String recordTypeName = rule.Type__c == Constants.ACTION_SOBJECT.RT_ARCHIVAL ? Constants.ACTION_SOBJECT.RT_ARCHIVAL : Constants.ACTION_SOBJECT.RT_MONITORING;
                 RuleUtil.upsertRuleActionsWithActions(JSON.serialize(input.get(RuleUtil.KEY_ACTIONS)), JSON.serialize(input.get(RuleUtil.KEY_RULE_ACTIONS)), rule.Id, recordTypeName);
             }
         }
@@ -2472,11 +2483,11 @@ public without sharing class AdminService {
     }
 
     public static void validateJiraActions(RuleUtil.Rule ruleWrapper, String actionsJSON) {
-        if(ruleWrapper.type == RuleUtil.RULE_TYPE_JIRA_UPDATE) {
+        if(ruleWrapper.type == Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE) {
             List<RuleUtil.Action> actions = (List<RuleUtil.Action>)JSON.deserialize(actionsJSON, List<RuleUtil.Action>.class);
             for(RuleUtil.Action actionWrapper : actions) {
                 // getAction start validation of jira custom fields
-                Action__c action = actionWrapper.getAction(RuleUtil.ACTION_RT_MONITORING);
+                Action__c action = actionWrapper.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
             }
         }
     }
@@ -2488,7 +2499,7 @@ public without sharing class AdminService {
         List<Action__c> actionsToUpsert = new List<Action__c>();
 
         for (RuleUtil.Action actionWrapper : actionWrappers) {
-            Action__c action = actionWrapper.getAction(RuleUtil.ACTION_RT_MONITORING);
+            Action__c action = actionWrapper.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
             if (action.Id == null) {
                 actionsToCreate.add(action);
             } else {
@@ -2542,10 +2553,10 @@ public without sharing class AdminService {
         return result;
     }
 
-    public static List<SObject> generateSObjectsForEvaluateRuleFilters(MonitoringUtil.MonitoringRule rule) {
+    public static List<SObject> generateSObjectsForEvaluateRuleFilters(RuleUtil.Rule rule) {
         List<SObject> result = new List<SObject>();
 
-        Schema.SObjectField ruleSubType = (rule.ruleSubType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME) 
+        Schema.SObjectField ruleSubType = (rule.subtype == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME) 
             ? Trace_Result__c.Issue__c.getDescribe().getSObjectField()
             : null;
         String sobjectType = rule.sobjectType == null ? Schema.SObjectType.Log__c.getName() : rule.sobjectType;
@@ -2553,10 +2564,10 @@ public without sharing class AdminService {
         Type t = Type.forName(sobjectType);  
         Map<String, Object> sobjectMap = new Map<String, Object>();
 
-        for(MonitoringUtil.RuleFilter filter : rule.filters) {
-            if(filter.comparisonType == MonitoringUtil.ComparisonType.VALUE) {
+        for(RuleUtil.RuleFilter filter : rule.ruleFilters) {
+            if(RuleUtil.MAP_COMPARISON_TYPES_BY_STRINGS.get(filter.comparisonType) == RuleUtil.ComparisonType.VALUE) {
                 Object testValue;
-                switch on filter.fieldType {
+                switch on filter.getFieldType() {
                     when FT_BOOLEAN {
                         testValue = true;
                     }
@@ -3203,17 +3214,19 @@ public without sharing class AdminService {
     public class MetadataChatSettings {
         public Boolean openAiConfigured;
         public Boolean gitConfigured;
+        public Boolean changeTrackingConfigured;
         public Boolean codebaseIndexed;
-        public Boolean indexingInProgress;
         public Boolean logsIndexed;
+        public Boolean indexingInProgress;
         public Boolean trustedSiteReady;
 
-        public MetadataChatSettings(Boolean openAiConfigured, Boolean gitConfigured, Boolean codebaseIndexed, Boolean indexingInProgress, Boolean logsIndexed, Boolean trustedSiteReady) {
+        public MetadataChatSettings(Boolean openAiConfigured, Boolean gitConfigured, Boolean changeTrackingConfigured, Boolean codebaseIndexed, Boolean logsIndexed, Boolean indexingInProgress, Boolean trustedSiteReady) {
             this.openAiConfigured = openAiConfigured;
             this.gitConfigured = gitConfigured;
+            this.changeTrackingConfigured = changeTrackingConfigured;
             this.codebaseIndexed = codebaseIndexed;
-            this.indexingInProgress = indexingInProgress;
             this.logsIndexed = logsIndexed;
+            this.indexingInProgress = indexingInProgress;
             this.trustedSiteReady = trustedSiteReady;
         }
 
@@ -3230,12 +3243,13 @@ public without sharing class AdminService {
         String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
         Boolean openAiConfigured = ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c && String.isNotBlank(openAiKey) && OpenAI.validateToken(openAiKey);
         Boolean gitConfigured = GitHubUtils.validateGitHubConnection().gitValid;
+        Boolean changeTrackingConfigured = ConfigUtil.CHANGE_TRACKING_SETTINGS.Git_Change_Tracking__c;
         
         upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.AI_NAME, Constants.REMOTE_SITE_SETTINGS.AI_URL, Constants.REMOTE_SITE_SETTINGS.AI_DESCRIPTION);
         PharosChatController.NamespaceStatusResponse namespaceStatus = PharosChatController.getNamespaceStatus(orgId);
-        Boolean codebaseIndexed = !namespaceStatus.empty;
-        Boolean indexingInProgress = namespaceStatus.indexingInProgress;
-        Boolean logsIndexed = !namespaceStatus.logsEmpty;
+        Boolean codebaseIndexed = namespaceStatus?.empty != null && !namespaceStatus?.empty;
+        Boolean logsIndexed = namespaceStatus?.logsEmpty != null && !namespaceStatus?.logsEmpty;
+        Boolean indexingInProgress = namespaceStatus?.indexingInProgress != null && namespaceStatus?.indexingInProgress;
         
         // Check for running or recently completed batch jobs
         if (!indexingInProgress) {
@@ -3253,8 +3267,8 @@ public without sharing class AdminService {
                     SELECT ApexClass.Name, Status, CompletedDate
                     FROM AsyncApexJob 
                     WHERE ApexClass.Name IN :batchClassesToCheck 
-                    AND (Status IN ('Preparing', 'Processing') 
-                         OR (Status = 'Completed' AND CompletedDate >= :recencyThreshold))
+                    AND (Status IN (:Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUS_PREPARING, :Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUS_PROCESSING) 
+                         OR (Status = :Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUS_COMPLETED AND CompletedDate >= :recencyThreshold))
                 ];
                 
                 if (recentJobs?.isEmpty() == false) {
@@ -3263,7 +3277,7 @@ public without sharing class AdminService {
             }
         }
         
-        return new MetadataChatSettings(openAiConfigured, gitConfigured, codebaseIndexed, indexingInProgress, logsIndexed, trustedSiteReady);
+        return new MetadataChatSettings(openAiConfigured, gitConfigured, changeTrackingConfigured, codebaseIndexed, logsIndexed, indexingInProgress, trustedSiteReady);
     }
 
     public static MetadataChatSettings setupMetadataChatTrustedSite() {
@@ -3273,21 +3287,15 @@ public without sharing class AdminService {
 
     public static MetadataChatSettings setupMetadataChatIndex() {
         MetadataChatSettings settings = getMetadataChatSettings();
-        System.debug('+++settings: ' + settings);
         if (settings.indexingInProgress) return settings;
         if (!settings.codebaseIndexed) {
-            System.debug('+++pushing git changes');
             Map<String, Boolean> result = pushGitChanges();
-            System.debug('+++pushing git changes result: ' + result);
             if (result.get('changesPushed') || result.get('jobAlreadyRunning')) {
-                System.debug('+++indexing in progress');
                 settings.indexingInProgress = true;
             }
         }
         if (!settings.logsIndexed) {
-            System.debug('+++Starting AIChatIndexBatch');
             AIChatIndexBatch.getInstance().startBatch();
-            System.debug('+++AIChatIndexBatch started, indexing in progress');
             settings.indexingInProgress = true;
         }
         return settings;
