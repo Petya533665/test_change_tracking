@@ -3101,7 +3101,7 @@ public with sharing class FlowService {
 			for (MetadataService.FlowAssignment assignment : sfdcFlow.assignments) {
 				if (assignment != null && nextRefferenceName == assignment.name) {
 					FlowDataStructures.FlowElement fe = createFlowElement(assignment.name, assignment.label, 'FlowAssignment',
-													assignment.locationX, assignment.locationY, assignment.description, Constants.FLOW.FLOW_ELEMENT_ICON_SUB_FLOW);
+													assignment.locationX, assignment.locationY, assignment.description, Constants.FLOW.FLOW_ELEMENT_ICON_ASSIGNMENT);
 					addAssignmentInfo(fe, assignment);
 					flow.elements.put(assignment.name, fe);
 					handleConnectors(flow, nextRefferenceName, assignment.connector, null, sfdcFlow);
