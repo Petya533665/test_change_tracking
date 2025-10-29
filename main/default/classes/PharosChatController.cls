@@ -118,8 +118,8 @@ public with sharing class PharosChatController {
     }
 
     @AuraEnabled
-    public static Map<String, String> getSendMessageData() {
-        return new Map<String, String> {
+    public static Map<String, String> getSendMessageData(String recordId) {
+        Map<String, String> data = new Map<String, String> {
             'sf_session' => EncodingUtil.base64Encode(Blob.valueOf(ConnectedOrgService.getSelfConnectedOrgAccessToken())),
             'sf_instance' => System.Url.getOrgDomainUrl().toExternalForm(),
             'sf_namespace' => ConfigUtil.nameSpacePrefix,
@@ -127,6 +127,11 @@ public with sharing class PharosChatController {
             'git_user' => GitHubUtils.GIT_USERNAME,
             'git_repo' => GitHubUtils.GIT_REPONAME
         };
+        if (recordId != null) {
+            data.put('chat_type', 'issue');
+            data.put('chat_context', JSON.serialize([SELECT Id, Name, CreatedDate, First_Occurred_On__c, Last_Occurred_On__c, Category__c, Functional_Area__c, Summary__c, Description__c, Impacted_Objects__c, Impacted_Objects_Count__c, Impacted_Users__c, Impacted_Users_Count__c, Log_Count__c FROM Issue__c WHERE Id = :recordId]));
+        }
+        return data;
     }
 
     @AuraEnabled
