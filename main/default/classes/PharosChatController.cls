@@ -128,10 +128,8 @@ public with sharing class PharosChatController {
             'git_repo' => GitHubUtils.GIT_REPONAME
         };
         if (recordId != null) {
-            data.put('chat_type', 'issue');
+            data.put('record_id', recordId);
             data.put('chat_context', JSON.serialize([SELECT Id, Name, CreatedDate, First_Occurred_On__c, Last_Occurred_On__c, Category__c, Functional_Area__c, Summary__c, Description__c, Impacted_Objects__c, Impacted_Objects_Count__c, Impacted_Users__c, Impacted_Users_Count__c, Log_Count__c FROM Issue__c WHERE Id = :recordId]));
-        } else {
-            data.put('chat_type', 'org');
         }
         return data;
     }
