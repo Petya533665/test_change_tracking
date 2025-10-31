@@ -125,12 +125,9 @@ public with sharing class PharosChatController {
             'sf_namespace' => ConfigUtil.nameSpacePrefix,
             'sf_timezone_offset' => AdminService.getUserTimezoneOffset().toString(),
             'git_user' => GitHubUtils.GIT_USERNAME,
-            'git_repo' => GitHubUtils.GIT_REPONAME
+            'git_repo' => GitHubUtils.GIT_REPONAME,
+            'record_id' => recordId
         };
-        if (recordId != null) {
-            data.put('record_id', recordId);
-            data.put('chat_context', JSON.serialize([SELECT Id, Name, CreatedDate, First_Occurred_On__c, Last_Occurred_On__c, Category__c, Functional_Area__c, Summary__c, Description__c, Impacted_Objects__c, Impacted_Objects_Count__c, Impacted_Users__c, Impacted_Users_Count__c, Log_Count__c FROM Issue__c WHERE Id = :recordId]));
-        }
         return data;
     }
 
