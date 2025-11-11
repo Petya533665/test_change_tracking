@@ -184,7 +184,7 @@ public with sharing class BroadcastBatch extends DatabaseUtils.PharosBatchImpl i
 
 		public Map<String, RuleUtil.Rule> getMapRulesByRelatedId() {
 			Map<String, RuleUtil.Rule> mapRulesByRelatedId = new Map<String, RuleUtil.Rule>();
-			for (RuleUtil.Rule rule : RuleUtil.getRuleWrappers(RuleUtil.RULE_TYPE_BROADCAST)) {
+			for (RuleUtil.Rule rule : RuleUtil.getRuleWrappers(Constants.RULE_SOBJECT.TYPE_BROADCAST)) {
 				mapRulesByRelatedId.put(rule.relatedId, rule);
 			}
 			return mapRulesByRelatedId;

@@ -18,9 +18,11 @@ private class LogServiceSchedulerTest {
 
 	@IsTest
 	private static void test_startJobsMode1() {
+		PermissionsUtil.MetadataChatEnabled = true; //for AIChatIndexBatch to run
 		Test.startTest();
 		test_startJobs(LogServiceScheduler.SCHEDULER_MODE.SCHEDULER_MODE_1);
 		System.assertEquals(DatabaseUtils.startJobs, new Set<String>{
+				'AIChatIndexBatch',
 				'HourlyLimitsBatch',
 				'LogServiceBatch',
 				'ManageTokensBatch',
@@ -161,11 +163,11 @@ private class LogServiceSchedulerTest {
 	private static void initData_RetentionBatch() {
 		Rule__c mr1 = new Rule__c();
 		mr1.Active__c = true;
-		mr1.Type__c = MonitoringUtil.RULE_TYPE_ARCHIVAL;
+		mr1.Type__c = Constants.RULE_SOBJECT.TYPE_ARCHIVAL;
 		mr1.EventTimeInterval__c = 1*60;
 		insert mr1;
 
-		Id recordtypeId = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(MonitoringUtil.RULE_TYPE_ARCHIVAL).getRecordTypeId();
+		Id recordtypeId = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(Constants.RULE_SOBJECT.TYPE_ARCHIVAL).getRecordTypeId();
 
 		Action__c rn1 = new Action__c();
 		rn1.RecordTypeId = recordtypeId;
@@ -182,7 +184,7 @@ private class LogServiceSchedulerTest {
 		rn1.JIRAPriority__c = 'test';
 		rn1.JIRAProject__c = 'test';
 		rn1.JIRAIssueType__c = 'test';
-		rn1.Action_Type__c = MonitoringUtil.ACTION_TYPE_REMOVAL;
+		rn1.Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL;
 		insert rn1;
 
 		RuleAction__c en1 = new RuleAction__c();
@@ -276,6 +278,7 @@ private class LogServiceSchedulerTest {
 		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
 		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
 
+		PermissionsUtil.MetadataChatEnabled = false; //prevent AIChatIndexBatch from running
 		test_scopeJobs(LogServiceScheduler.SCHEDULER_MODE.SCHEDULER_MODE_1);
 
 		System.assertEquals(2, [SELECT COUNT() FROM AsyncApexJob WHERE ParentJobId = NULL]);

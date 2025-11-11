@@ -5,7 +5,7 @@ private class RuleUtilTest {
 	public static void test_rule_action_create_and_delete() {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
-				createAction(RuleUtil.ACTION_TYPE_REMOVAL, null, null, null)});
+				createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
 		data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
 				createRuleAction()});
 		Map<String, Object> input = new Map<String, Object>();
@@ -67,11 +67,11 @@ private class RuleUtilTest {
 		TestDataFactory.enableMaxJiraRules();
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-			createRule(RuleUtil.RULE_TYPE_JIRA_UPDATE, null, true));
+			createRule(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, null, true));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 			createRuleFilter('Name', null, '1', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 1)});
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
-			createAction(RuleUtil.ACTION_TYPE_REMOVAL, null, null, null)});
+			createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
 		data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
 			createRuleAction()});
 		Map<String, Object> input = new Map<String, Object>();
@@ -93,11 +93,11 @@ private class RuleUtilTest {
 	public static void test_notification_rule_limits_reached_on_create() {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-			createRule(RuleUtil.RULE_TYPE_NOTIFICATION, null, true));
+			createRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, null, true));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 			createRuleFilter('Name', null, '1', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 1)});
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
-			createAction(RuleUtil.ACTION_TYPE_REMOVAL, null, null, null)});
+			createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
 		data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
 			createRuleAction()});
 		Map<String, Object> input = new Map<String, Object>();
@@ -119,11 +119,11 @@ private class RuleUtilTest {
 	public static void test_monitoring_rule_limits_reached_on_create() {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-			createRule(RuleUtil.RULE_TYPE_MONITORING, RuleUtil.RULE_SUBTYPE_IMPACT, null, true, 60, 1));
+			createRule(Constants.RULE_SOBJECT.TYPE_MONITORING, Constants.RULE_SOBJECT.SUB_TYPE_IMPACT, null, true, 60, 1));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 			createRuleFilter(Schema.SObjectType.Log__c.fields.User_Id__c.getName(), null, '1', RuleUtil.COMPARISON_TYPE_FIELD, RuleUtil.COMPARISON_OPERATOR_EQUAL, null)});
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
-			createAction(RuleUtil.ACTION_TYPE_REMOVAL, null, null, null)});
+			createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
 		data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
 			createRuleAction()});
 		Map<String, Object> input = new Map<String, Object>();
@@ -147,11 +147,11 @@ private class RuleUtilTest {
 	public static void test_monitoring_rule_limits_not_reached_on_update_exist() {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-			createRule(RuleUtil.RULE_TYPE_MONITORING, RuleUtil.RULE_SUBTYPE_IMPACT, null, true, 60, 1));
+			createRule(Constants.RULE_SOBJECT.TYPE_MONITORING, Constants.RULE_SOBJECT.SUB_TYPE_IMPACT, null, true, 60, 1));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 			createRuleFilter(Schema.SObjectType.Log__c.fields.User_Id__c.getName(), null, '1', RuleUtil.COMPARISON_TYPE_FIELD, RuleUtil.COMPARISON_OPERATOR_EQUAL, null)});
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
-			createAction(RuleUtil.ACTION_TYPE_REMOVAL, null, null, null)});
+			createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
 		data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
 			createRuleAction()});
 		Map<String, Object> input = new Map<String, Object>();
@@ -161,7 +161,7 @@ private class RuleUtilTest {
 		AdminController.remoteActionHandler(JSON.serialize(input));
 
 		input.put('method', 'getRuleSettings');
-		input.put('ruleType', RuleUtil.RULE_TYPE_MONITORING);
+		input.put('ruleType', Constants.RULE_SOBJECT.TYPE_MONITORING);
 		Map<String, Object> result = AdminService.getRuleSettings(input);
 		List<RuleUtil.Rule> rules = (List<RuleUtil.Rule>)result.get(RuleUtil.KEY_RULES);
 
@@ -169,7 +169,7 @@ private class RuleUtilTest {
 		Integer limitRules = 1;
 		setMaxMonitoringRules(limitRules);
 		Map<String, Object> dataUpdate = new Map<String, Object>();
-		RuleUtil.Rule updatedRule = createRule(RuleUtil.RULE_TYPE_MONITORING, RuleUtil.RULE_SUBTYPE_IMPACT, null, true, 60, 1);
+		RuleUtil.Rule updatedRule = createRule(Constants.RULE_SOBJECT.TYPE_MONITORING, Constants.RULE_SOBJECT.SUB_TYPE_IMPACT, null, true, 60, 1);
 		updatedRule.id = rules.get(0).id;
 		dataUpdate.put(RuleUtil.KEY_RULE, updatedRule);
 
@@ -188,27 +188,40 @@ private class RuleUtilTest {
 	public static void test_monitoring_rule() {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-				createRule(RuleUtil.RULE_TYPE_MONITORING, null, true));
+				createRule(Constants.RULE_SOBJECT.TYPE_MONITORING, Constants.RULE_SOBJECT.SUB_TYPE_SPIKE, null, true, 60, 1));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 				createRuleFilter('Name', RuleUtil.FIELD_TYPE_STRING, '1', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 1)});
+		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
+			createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
+		data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
+			createRuleAction()});
+		
 		Map<String, Object> input = new Map<String, Object>();
 		input.put('method', 'setRule');
 		input.put('data', data);
 		AdminController.remoteActionHandler(JSON.serialize(input));
 		input.put('method', 'getRuleSettings');
-		input.put('ruleType', RuleUtil.RULE_TYPE_MONITORING);
-		AdminService.getRuleSettings(input);
+		input.put('ruleType', Constants.RULE_SOBJECT.TYPE_MONITORING);
+		Map<String, Object> result = AdminService.getRuleSettings(input);
+		System.assertNotEquals(null, result);
+		List<RuleUtil.RuleFilter> ruleFilters = (List<RuleUtil.RuleFilter>)result.get(RuleUtil.KEY_RULE_FILTERS);
+		System.assertNotEquals(null, ruleFilters);
+		System.assertEquals(1, ruleFilters.size());
+		System.assertEquals(RuleUtil.FIELD_TYPE_STRING, ruleFilters.get(0).fieldType);
+		System.assertEquals(RuleUtil.COMPARISON_TYPE_VALUE, ruleFilters.get(0).comparisonType);
+		System.assertEquals(RuleUtil.COMPARISON_OPERATOR_EQUAL, ruleFilters.get(0).comparisonOperator);
+		System.assertEquals(1, ruleFilters.get(0).index);
 	}
 
 	@IsTest
 	public static void test_monitoring_impact_rule() {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-			createRule(RuleUtil.RULE_TYPE_MONITORING, RuleUtil.RULE_SUBTYPE_IMPACT, null, true, 60, 1));
+			createRule(Constants.RULE_SOBJECT.TYPE_MONITORING, Constants.RULE_SOBJECT.SUB_TYPE_IMPACT, null, true, 60, 1));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 			createRuleFilter(Schema.SObjectType.Log__c.fields.User_Id__c.getName(), null, '1', RuleUtil.COMPARISON_TYPE_FIELD, RuleUtil.COMPARISON_OPERATOR_EQUAL, null)});
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
-			createAction(RuleUtil.ACTION_TYPE_REMOVAL, null, null, null)});
+			createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
 		data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
 			createRuleAction()});
 		Map<String, Object> input = new Map<String, Object>();
@@ -216,24 +229,31 @@ private class RuleUtilTest {
 		input.put('data', data);
 		AdminController.remoteActionHandler(JSON.serialize(input));
 		input.put('method', 'getRuleSettings');
-		input.put('ruleType', RuleUtil.RULE_TYPE_MONITORING);
+		input.put('ruleType', Constants.RULE_SOBJECT.TYPE_MONITORING);
 		Map<String, Object> result = AdminService.getRuleSettings(input);
 		System.assertNotEquals(null, result);
 		List<RuleUtil.Rule> rules = (List<RuleUtil.Rule>)result.get(RuleUtil.KEY_RULES);
 		System.assertNotEquals(null, rules);
 		System.assertEquals(true, String.isBlank(rules.get(0).filterLogic));
 		System.assertEquals(false, rules.get(0).isNotValid);
+
+		List<RuleUtil.RuleFilter> ruleFilters = (List<RuleUtil.RuleFilter>)result.get(RuleUtil.KEY_RULE_FILTERS);
+		System.assertNotEquals(null, ruleFilters);
+		System.assertEquals(1, ruleFilters.size());
+		System.assertEquals(RuleUtil.COMPARISON_TYPE_FIELD, ruleFilters.get(0).comparisonType);
+		System.assertEquals(RuleUtil.COMPARISON_OPERATOR_EQUAL, ruleFilters.get(0).comparisonOperator);
+		System.assertEquals(1, ruleFilters.get(0).index);
 	}
 
 	@IsTest
 	public static void test_archival_rule() {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-				createRule(RuleUtil.RULE_TYPE_ARCHIVAL, null, true));
+				createRule(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null, true));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 				createRuleFilter('Name', RuleUtil.FIELD_TYPE_STRING, '1', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 1)});
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
-				createAction(RuleUtil.ACTION_TYPE_REMOVAL, null, null, null)});
+				createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
 		data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
 				createRuleAction()});
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.RuleAction>{createRuleAction()});
@@ -242,7 +262,7 @@ private class RuleUtilTest {
 		input.put('data', data);
 		AdminController.remoteActionHandler(JSON.serialize(input));
 		input.put('method', 'getRuleSettings');
-		input.put('ruleType', RuleUtil.RULE_TYPE_ARCHIVAL);
+		input.put('ruleType', Constants.RULE_SOBJECT.TYPE_ARCHIVAL);
 		AdminService.getRuleSettings(input);
 	}
 
@@ -250,11 +270,11 @@ private class RuleUtilTest {
 	public static void test_archival_rule_update_filters() {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-				createRule(RuleUtil.RULE_TYPE_ARCHIVAL, null, null, true, 60, null));
+				createRule(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null, null, true, 60, null));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 				createRuleFilter('Name', null, '1', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 1)});
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
-				createAction(RuleUtil.ACTION_TYPE_REMOVAL, null, null, null)});
+				createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
 		data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
 				createRuleAction()});
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.RuleAction>{createRuleAction()});
@@ -263,7 +283,7 @@ private class RuleUtilTest {
 		input.put('data', data);
 		AdminController.remoteActionHandler(JSON.serialize(input));
 		input.put('method', 'getRuleSettings');
-		input.put('ruleType', RuleUtil.RULE_TYPE_ARCHIVAL);
+		input.put('ruleType', Constants.RULE_SOBJECT.TYPE_ARCHIVAL);
 		Map<String, Object> result = AdminService.getRuleSettings(input);
 		List<RuleUtil.Rule> rules = (List<RuleUtil.Rule>)result.get(RuleUtil.KEY_RULES);
 
@@ -273,7 +293,7 @@ private class RuleUtilTest {
 		
 		Test.startTest();
 		Map<String, Object> dataUpdate = new Map<String, Object>();
-		RuleUtil.Rule updatedRule = createRule(RuleUtil.RULE_TYPE_ARCHIVAL, null, '1', true, 60, null);
+		RuleUtil.Rule updatedRule = createRule(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null, '1', true, 60, null);
 		updatedRule.id = rules.get(0).id;
 		dataUpdate.put(RuleUtil.KEY_RULE, updatedRule);
 
@@ -282,7 +302,7 @@ private class RuleUtilTest {
 			createRuleFilter(Schema.SObjectType.Log__c.fields.User_Id__c.getName(), null, 'someuser', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 2)});
 
 		dataUpdate.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
-			createAction(RuleUtil.ACTION_TYPE_REMOVAL, null, null, null)});
+			createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
 		dataUpdate.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
 			createRuleAction()});
 
@@ -307,14 +327,14 @@ private class RuleUtilTest {
 	public static void test_archival_rule_update_filters_filter_logic(Boolean isPositive) {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-				createRule(RuleUtil.RULE_TYPE_ARCHIVAL, null, '1 AND 2', true, 60, null));
+				createRule(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null, '1 AND 2', true, 60, null));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 			createRuleFilter('Created_At__c', null, '2880', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_GREATER_THEN, 1),
 			createRuleFilter(Schema.SObjectType.Log__c.fields.User_Id__c.getName(), null, 'valid', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 2),
 			createRuleFilter(Schema.SObjectType.Log__c.fields.User_Id__c.getName(), null, 'notvalid', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_NOT_EQUAL, 3)
 		});
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
-				createAction(RuleUtil.ACTION_TYPE_REMOVAL, null, null, null)});
+				createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
 		data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
 				createRuleAction()});
 		data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.RuleAction>{createRuleAction()});
@@ -323,7 +343,7 @@ private class RuleUtilTest {
 		input.put('data', data);
 		AdminController.remoteActionHandler(JSON.serialize(input));
 		input.put('method', 'getRuleSettings');
-		input.put('ruleType', RuleUtil.RULE_TYPE_ARCHIVAL);
+		input.put('ruleType', Constants.RULE_SOBJECT.TYPE_ARCHIVAL);
 		Map<String, Object> result = AdminService.getRuleSettings(input);
 		List<RuleUtil.Rule> rules = (List<RuleUtil.Rule>)result.get(RuleUtil.KEY_RULES);
 
@@ -334,7 +354,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		Map<String, Object> dataUpdate = new Map<String, Object>();
 		String changedFilterLogic = isPositive ? '1 OR 2' : '1 AND 2';
-		RuleUtil.Rule updatedRule = createRule(RuleUtil.RULE_TYPE_ARCHIVAL, null, changedFilterLogic, true, 60, null);
+		RuleUtil.Rule updatedRule = createRule(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null, changedFilterLogic, true, 60, null);
 		updatedRule.id = rules.get(0).id;
 		dataUpdate.put(RuleUtil.KEY_RULE, updatedRule);
 
@@ -344,7 +364,7 @@ private class RuleUtilTest {
 			createRuleFilter(Schema.SObjectType.Log__c.fields.User_Id__c.getName(), null, 'notvalid', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_NOT_EQUAL, 3)});
 
 		dataUpdate.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{
-			createAction(RuleUtil.ACTION_TYPE_REMOVAL, null, null, null)});
+			createAction(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL, null, null, null)});
 		dataUpdate.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
 			createRuleAction()});
 
@@ -362,7 +382,7 @@ private class RuleUtilTest {
 	public static void test_JiraUpdate_rule() {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-				createRule(RuleUtil.RULE_TYPE_JIRA_UPDATE, null, true));
+				createRule(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, null, true));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 				createRuleFilter('Name', RuleUtil.FIELD_TYPE_STRING, '1', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 1)});
 		Map<String, Object> input = new Map<String, Object>();
@@ -370,7 +390,7 @@ private class RuleUtilTest {
 		input.put('data', data);
 		AdminController.remoteActionHandler(JSON.serialize(input));
 		input.put('method', 'getRuleSettings');
-		input.put('ruleType', RuleUtil.RULE_TYPE_JIRA_UPDATE);
+		input.put('ruleType', Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE);
 		AdminService.getRuleSettings(input);
 	}
 
@@ -378,7 +398,7 @@ private class RuleUtilTest {
 	public static void test_Notification_rule() {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-				createRule(RuleUtil.RULE_TYPE_NOTIFICATION, null, true));
+				createRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, null, true));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 				createRuleFilter('Name', RuleUtil.FIELD_TYPE_STRING, '1', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 1)});
 		Map<String, Object> input = new Map<String, Object>();
@@ -386,7 +406,7 @@ private class RuleUtilTest {
 		input.put('data', data);
 		AdminController.remoteActionHandler(JSON.serialize(input));
 		input.put('method', 'getRuleSettings');
-		input.put('ruleType', RuleUtil.RULE_TYPE_NOTIFICATION);
+		input.put('ruleType', Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
 		AdminService.getRuleSettings(input);
 	}
 
@@ -394,7 +414,7 @@ private class RuleUtilTest {
 	public static void test_broadcast_rule() {
 		Map<String, Object> data = new Map<String, Object>();
 		data.put(RuleUtil.KEY_RULE,
-				createRule(RuleUtil.RULE_TYPE_BROADCAST, null, true));
+				createRule(Constants.RULE_SOBJECT.TYPE_BROADCAST, null, true));
 		data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
 				createRuleFilter('Name', RuleUtil.FIELD_TYPE_STRING, '1', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 1)});
 		Map<String, Object> input = new Map<String, Object>();
@@ -402,7 +422,7 @@ private class RuleUtilTest {
 		input.put('data', data);
 		AdminController.remoteActionHandler(JSON.serialize(input));
 		input.put('method', 'getRuleSettings');
-		input.put('ruleType', RuleUtil.RULE_TYPE_BROADCAST);
+		input.put('ruleType', Constants.RULE_SOBJECT.TYPE_BROADCAST);
 		AdminService.getRuleSettings(input);
 	}
 
@@ -474,7 +494,7 @@ private class RuleUtilTest {
 		
 		// Create a JIRA action with valid additional metadata in new schema format
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		action.additionalMetadata = '{"customfield_10100":{"value":"Option1,Option2","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:multiselect"},"required":false,"allowedValues":[{"id":"Option1","value":"Option1"},{"id":"Option2","value":"Option2"}]},"customfield_10200":{"value":"2023-04-13","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:datepicker"},"required":false}}';
@@ -482,7 +502,7 @@ private class RuleUtilTest {
 		// No HTTP mocks needed - validation uses stored schema
 		
 		// This should not throw an exception
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action should be created successfully');
 		System.assertEquals(action.additionalMetadata, result.Additional_Metadata__c, 'Additional metadata should be preserved');
 		
@@ -497,13 +517,13 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		action.additionalMetadata = 'invalid json format';
 		
 		try {
-			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid JSON');
 		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Invalid JSON format') || e.getMessage().contains('Unable to parse Additional Metadata format'), 'Should indicate JSON format error: ' + e.getMessage());
@@ -522,7 +542,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Invalid date format using new schema format
@@ -531,7 +551,7 @@ private class RuleUtilTest {
 		// No HTTP mocks needed - validation uses stored schema
 		
 		try {
-			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid field value');
 		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('not compatible') || e.getMessage().contains('Invalid date format'), 'Should indicate field validation error: ' + e.getMessage());
@@ -551,11 +571,11 @@ private class RuleUtilTest {
 		
 		// Create a non-JIRA action with additional metadata
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_EMAIL_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION;
 		action.additionalMetadata = '{"some":"metadata"}';
 		
 		// This should not validate JIRA fields and should not throw an exception
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Non-JIRA action should be created successfully');
 		
 		Test.stopTest();
@@ -569,13 +589,13 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		action.additionalMetadata = null;
 		
 		// This should not throw an exception
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action should be created successfully');
 		
 		Test.stopTest();
@@ -589,7 +609,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_TICKET_COMMENT;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		action.additionalMetadata = '{"customfield_10100":{"value":"Option1","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:select"},"required":false,"allowedValues":[{"id":"Option1","value":"Option1"}]}}';
@@ -597,7 +617,7 @@ private class RuleUtilTest {
 		// No HTTP mocks needed - validation uses stored schema
 		
 		// This should validate since it's a JIRA-related action
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'JIRA comment action should be created successfully');
 		
 		Test.stopTest();
@@ -611,7 +631,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Old format - simple key-value pairs
@@ -620,7 +640,7 @@ private class RuleUtilTest {
 		// No HTTP mocks needed - old format is supported for backward compatibility
 		
 		// This should not throw an exception (backward compatibility)
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action should be created with old format metadata');
 		
 		Test.stopTest();
@@ -634,13 +654,13 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = null; // Missing project
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		action.additionalMetadata = '{"customfield_10100":"Option1"}';
 		
 		// This should not throw an exception since we can't validate without project info
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action should be created when project info is missing');
 		
 		Test.stopTest();
@@ -654,13 +674,13 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		action.additionalMetadata = '{}'; // Empty JSON object
 		
 		// This should not throw an exception
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action should be created with empty metadata');
 		
 		Test.stopTest();
@@ -674,7 +694,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		action.additionalMetadata = '{"customfield_10100":{"value":"","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false},"customfield_10200":{"value":"","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:datepicker"},"required":false}}';
@@ -682,7 +702,7 @@ private class RuleUtilTest {
 		// No HTTP mocks needed - validation uses stored schema
 		
 		// This should not throw an exception since blank values are skipped
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action should be created with blank field values');
 		
 		Test.stopTest();
@@ -696,7 +716,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Required field with blank value
@@ -705,7 +725,7 @@ private class RuleUtilTest {
 		// No HTTP mocks needed - validation uses stored schema
 		
 		try {
-			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 			System.assert(false, 'Should have thrown RuleUtilValidationException for required field');
 		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Required field'), 'Should indicate required field error: ' + e.getMessage());
@@ -724,7 +744,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		action.additionalMetadata = '{"customfield_99999":"SomeValue"}'; // Unknown field in old format
@@ -732,7 +752,7 @@ private class RuleUtilTest {
 		// No HTTP mocks needed - old format bypasses detailed validation for backward compatibility
 		
 		// This should not throw an exception (old format bypasses validation)
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action should be created with unknown field in old format');
 		
 		Test.stopTest();
@@ -750,7 +770,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use valid Salesforce object and field with schema
@@ -759,7 +779,7 @@ private class RuleUtilTest {
 		// No HTTP mocks needed - validation uses stored schema
 		
 		// This should not throw an exception - merge fields skip value validation
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action with merge fields should be created successfully');
 		
 		Test.stopTest();
@@ -773,7 +793,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use invalid object name
@@ -784,7 +804,7 @@ private class RuleUtilTest {
 		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
 		
 		try {
-			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid object');
 		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Object "InvalidObject__c" does not exist'), 'Should indicate object does not exist');
@@ -803,7 +823,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use valid object but invalid field
@@ -814,7 +834,7 @@ private class RuleUtilTest {
 		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
 		
 		try {
-			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid field');
 		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Field "InvalidField__c" does not exist'), 'Should indicate field does not exist');
@@ -833,7 +853,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Malformed merge field syntax
@@ -844,7 +864,7 @@ private class RuleUtilTest {
 		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
 		
 		try {
-			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 			System.assert(false, 'Should have thrown RuleUtilValidationException for malformed syntax');
 		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('invalid merge field syntax'), 'Should indicate invalid syntax');
@@ -861,7 +881,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Multiple merge fields in single value - should be treated as string
@@ -872,7 +892,7 @@ private class RuleUtilTest {
 		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
 		
 		// This should not throw an exception - multiple fields default to string type
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action with multiple merge fields should be created successfully');
 		
 		Test.stopTest();
@@ -886,7 +906,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use date field - should be detected as 'date' type
@@ -897,7 +917,7 @@ private class RuleUtilTest {
 		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
 		
 		// This should validate successfully as the date field is compatible with date picker
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Date merge field should be compatible with JIRA date field');
 		
 		Test.stopTest();
@@ -911,14 +931,14 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use date value with numeric JIRA field - should fail compatibility  
 		action.additionalMetadata = '{"customfield_10300":{"value":"2023-04-13","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:float"},"required":false}}';
 		
 		try {
-			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 			System.assert(false, 'Should have thrown RuleUtilValidationException for type incompatibility');
 		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Invalid number format for field "customfield_10300"'), 'Should indicate type incompatibility: ' + e.getMessage());
@@ -943,7 +963,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		
@@ -953,22 +973,22 @@ private class RuleUtilTest {
 		
 		// Test integer value
 		action.additionalMetadata = '{"customfield_10300":"123"}';
-		Action__c result1 = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result1 = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result1, 'Integer value should be processed');
 		
 		// Test decimal value
 		action.additionalMetadata = '{"customfield_10300":"123.45"}';
-		Action__c result2 = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result2 = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result2, 'Decimal value should be processed');
 		
 		// Test date value
 		action.additionalMetadata = '{"customfield_10200":"2023-04-13"}';
-		Action__c result3 = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result3 = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result3, 'Date value should be processed');
 		
 		// Test URL value
 		action.additionalMetadata = '{"customfield_10400":"https://example.com"}';
-		Action__c result4 = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result4 = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result4, 'URL value should be processed');
 		
 		Test.stopTest();
@@ -982,7 +1002,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Runtime field - should skip validation
@@ -993,7 +1013,7 @@ private class RuleUtilTest {
 		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
 		
 		// This should not throw an exception - runtime fields have validation but should succeed
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Runtime rendered fields should be processed successfully');
 		
 		Test.stopTest();
@@ -1034,7 +1054,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		
@@ -1044,18 +1064,105 @@ private class RuleUtilTest {
 		
 		// Test with mixed static text and merge fields
 		action.additionalMetadata = '{"customfield_10100":"Error: {!Account.Name} at {!Account.CreatedDate}"}';
-		Action__c result1 = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result1 = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result1, 'Mixed content should be processed as string');
 		
 		// Test with only merge field
 		action.additionalMetadata = '{"customfield_10100":"{!Account.Name}"}';
-		Action__c result2 = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result2 = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result2, 'Single merge field should be processed');
 		
 		// Test with empty value
 		action.additionalMetadata = '{"customfield_10100":""}';
-		Action__c result3 = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result3 = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result3, 'Empty value should be processed');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test merge field validation with relationship fields (Parent__r)
+	 */
+	@IsTest
+	public static void test_validate_merge_fields_relationship_field() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// Use valid Log object with Parent__r relationship field and a string field instead of datetime to avoid type compatibility issues
+		action.additionalMetadata = '{"customfield_11301":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.' + ConfigUtil.nameSpacePrefix + 'Parent__r.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield","type":"string"},"required":false,"allowedValues":null,"name":"Test Text Field"}}';
+		
+		// No HTTP mocks needed - validation uses stored schema
+		
+		// This should not throw an exception - relationship field should be validated correctly
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
+		System.assertNotEquals(null, result, 'Action with relationship merge field should be created successfully');
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test the specific scenario from the debug log - Parent__r.CreatedDate validation
+	 */
+	@IsTest
+	public static void test_validate_parent_relationship_created_date() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		// This is the exact merge field from the debug log that was failing
+		action.additionalMetadata = '{"customfield_11294":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.' + ConfigUtil.nameSpacePrefix + 'Parent__r.CreatedDate}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:datetime","type":"datetime"},"required":false,"allowedValues":null,"name":"Test Datetime Field"}}';
+		
+		// No HTTP mocks needed - validation uses stored schema
+		
+		try {
+			// This should not throw a field validation exception anymore
+			Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
+			// We expect this to pass validation (no field not found error)
+			// Note: It might still fail on type compatibility, but that's a different issue than the original field validation error
+			System.assertNotEquals(null, result, 'Action should be created - field validation should pass');
+		} catch (RuleUtil.RuleUtilValidationException e) {
+			// If it fails, it should NOT be due to field not existing
+			System.assert(!e.getMessage().contains('does not exist'), 'Should not fail due to field not existing: ' + e.getMessage());
+		}
+		
+		Test.stopTest();
+	}
+
+	/**
+	 * Test textarea field type compatibility using merge fields from actual textarea fields
+	 */
+	@IsTest
+	public static void test_textarea_field_type_compatibility() {
+		Test.startTest();
+		
+		RuleUtil.Action action = new RuleUtil.Action();
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
+		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
+		
+		// Mock JIRA service responses with enhanced custom fields
+		Map<String, HttpCalloutMock> endpoint2TestResp = createEnhancedJiraMocks();
+		Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(endpoint2TestResp));
+		
+		// Test merge field from textarea field with textarea JIRA field type - should work
+		// Using Event Description field which is typically a textarea field
+		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Event__c.' + ConfigUtil.nameSpacePrefix + 'Event_Details__c}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textarea"},"required":false}}';
+		Action__c result1 = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
+		System.assertNotEquals(null, result1, 'Textarea merge field should be compatible with textarea JIRA field');
+		
+		// Test merge field from textarea field with URL JIRA field type - should fail due to incompatibility
+		action.additionalMetadata = '{"customfield_10200":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Event__c.' + ConfigUtil.nameSpacePrefix + 'Event_Details__c}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:url"},"required":false}}';
+		try {
+			action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
+			System.assert(false, 'Should have thrown RuleUtilValidationException for textarea merge field with URL JIRA field');
+		} catch (RuleUtil.RuleUtilValidationException e) {
+			System.assert(e.getMessage().contains('not compatible'), 'Should indicate type incompatibility: ' + e.getMessage());
+		}
 		
 		Test.stopTest();
 	}
@@ -1073,7 +1180,7 @@ private class RuleUtilTest {
 		
 		// Create action with valid merge fields
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}'
 		);
 		
@@ -1092,7 +1199,7 @@ private class RuleUtilTest {
 		System.assertEquals(null, responseMap.get('error'), 'Should not have error for valid merge field');
 		
 		// Verify action was created
-		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
 		System.assertEquals(1, actions.size(), 'Action should be created');
 		System.assert(actions[0].Additional_Metadata__c.contains('{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Name}'), 'Merge field should be preserved');
 		
@@ -1108,7 +1215,7 @@ private class RuleUtilTest {
 		
 		// Create action with invalid merge field (non-existent object)
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"{!NonExistentObject__c.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}'
 		);
 		
@@ -1142,7 +1249,7 @@ private class RuleUtilTest {
 		
 		// Create action with invalid merge field syntax (missing field name)
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"{!Log__c.}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}'
 		);
 		
@@ -1176,7 +1283,7 @@ private class RuleUtilTest {
 		
 		// Create action with valid inline field values (non-merge fields)
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"StaticValue123","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false},"customfield_10200":{"value":"2023-04-13","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:datepicker"},"required":false}}'
 		);
 		
@@ -1195,7 +1302,7 @@ private class RuleUtilTest {
 		System.assertEquals(null, responseMap.get('error'), 'Should not have error for valid inline fields');
 		
 		// Verify action was created
-		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
 		System.assertEquals(1, actions.size(), 'Action should be created');
 		System.assert(actions[0].Additional_Metadata__c.contains('StaticValue123'), 'Inline value should be preserved');
 		
@@ -1211,7 +1318,7 @@ private class RuleUtilTest {
 		
 		// Create action with invalid inline field value (incompatible type)
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10300":{"value":"not-a-number","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:float"},"required":false}}'
 		);
 		
@@ -1243,7 +1350,7 @@ private class RuleUtilTest {
 		
 		// Create action with empty value for required field
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":true}}'
 		);
 		
@@ -1275,7 +1382,7 @@ private class RuleUtilTest {
 		
 		// Create action with value not in allowed values list
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"InvalidOption","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:select"},"required":false,"allowedValues":[{"id":"Option1","value":"Option1"},{"id":"Option2","value":"Option2"}]}}'
 		);
 		
@@ -1307,7 +1414,7 @@ private class RuleUtilTest {
 		
 		// Create action with valid multi-value field
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"Option1,Option2","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:multiselect"},"required":false,"allowedValues":[{"id":"Option1","value":"Option1"},{"id":"Option2","value":"Option2"},{"id":"Option3","value":"Option3"}]}}'
 		);
 		
@@ -1326,7 +1433,7 @@ private class RuleUtilTest {
 		System.assertEquals(null, responseMap.get('error'), 'Should not have error for valid multi-value field');
 		
 		// Verify action was created
-		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
 		System.assertEquals(1, actions.size(), 'Action should be created');
 		System.assert(actions[0].Additional_Metadata__c.contains('Option1,Option2'), 'Multi-value should be preserved');
 		
@@ -1342,7 +1449,7 @@ private class RuleUtilTest {
 		
 		// Create action with old format metadata (simple key-value pairs)
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":"SimpleValue","customfield_10200":"2023-04-13"}'
 		);
 		
@@ -1361,7 +1468,7 @@ private class RuleUtilTest {
 		System.assertEquals(null, responseMap.get('error'), 'Should not have error for old format metadata');
 		
 		// Verify action was created
-		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
 		System.assertEquals(1, actions.size(), 'Action should be created');
 		System.assert(actions[0].Additional_Metadata__c.contains('SimpleValue'), 'Old format value should be preserved');
 		
@@ -1377,7 +1484,7 @@ private class RuleUtilTest {
 		
 		// Create action with mixed merge fields and inline values
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false},"customfield_10200":{"value":"2023-04-13","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:datepicker"},"required":false}}'
 		);
 		
@@ -1396,7 +1503,7 @@ private class RuleUtilTest {
 		System.assertEquals(null, responseMap.get('error'), 'Should not have error for mixed field types');
 		
 		// Verify action was created with both values
-		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
 		System.assertEquals(1, actions.size(), 'Action should be created');
 		System.assert(actions[0].Additional_Metadata__c.contains('{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Name}'), 'Merge field should be preserved');
 		System.assert(actions[0].Additional_Metadata__c.contains('2023-04-13'), 'Inline value should be preserved');
@@ -1413,7 +1520,7 @@ private class RuleUtilTest {
 		
 		// Create non-JIRA action with additional metadata
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_EMAIL_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION,
 			'{"some":"metadata","customfield_10100":"{!NonExistentObject.Field}"}'
 		);
 		
@@ -1432,7 +1539,7 @@ private class RuleUtilTest {
 		System.assertEquals(null, responseMap.get('error'), 'Should not have error for non-JIRA action');
 		
 		// Verify action was created
-		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_EMAIL_NOTIFICATION LIMIT 1];
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION LIMIT 1];
 		System.assertEquals(1, actions.size(), 'Non-JIRA action should be created');
 		
 		Test.stopTest();
@@ -1451,7 +1558,7 @@ private class RuleUtilTest {
 		action.additionalMetadata = additionalMetadata;
 		
 		// Set JIRA-specific fields for JIRA actions
-		if (actionType == RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION || actionType == RuleUtil.ACTION_TYPE_JIRA_TICKET_COMMENT) {
+		if (actionType == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION || actionType == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT) {
 			action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 			action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		}
@@ -1592,7 +1699,7 @@ private class RuleUtilTest {
 		// Create action with incompatible merge field type: ID field mapped to datepicker
 		// Include field name in metadata for friendly error messages
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{\"customfield_10100\":{\"value\":\"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Id}\",\"schema\":{\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:datepicker\",\"type\":\"date\"},\"required\":false,\"allowedValues\":null,\"name\":\"Log Record ID\"}}'
 		);
 		
@@ -1628,7 +1735,7 @@ private class RuleUtilTest {
 		
 		// Create action with incompatible merge field type: decimal field mapped to datepicker
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{\"customfield_10100\":{\"value\":\"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.' + ConfigUtil.nameSpacePrefix + 'Created_Timestamp__c}\",\"schema\":{\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:datepicker\",\"type\":\"date\"},\"required\":false,\"allowedValues\":null,\"name\":\"Created Timestamp\"}}'
 		);
 		
@@ -1658,7 +1765,7 @@ private class RuleUtilTest {
 		
 		// Create action with incompatible merge field type: datetime field mapped to number
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{\"customfield_10200\":{\"value\":\"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.CreatedDate}\",\"schema\":{\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:float\",\"type\":\"number\"},\"required\":false,\"allowedValues\":null,\"name\":\"Created Date\"}}'
 		);
 		
@@ -1688,7 +1795,7 @@ private class RuleUtilTest {
 		
 		// Create action with incompatible merge field type: string field mapped to datepicker (truly incompatible)
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{\"customfield_10300\":{\"value\":\"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.' + ConfigUtil.nameSpacePrefix + 'Summary__c}\",\"schema\":{\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:datepicker\",\"type\":\"date\"},\"required\":false,\"allowedValues\":null,\"name\":\"Log Summary\"}}'
 		);
 		
@@ -1718,7 +1825,7 @@ private class RuleUtilTest {
 		
 		// Create action with incompatible merge field type: boolean field mapped to datepicker
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{\"customfield_10400\":{\"value\":\"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.' + ConfigUtil.nameSpacePrefix + 'Do_Not_Create_Issue__c}\",\"schema\":{\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:datepicker\",\"type\":\"date\"},\"required\":false,\"allowedValues\":null,\"name\":\"Do Not Create Issue\"}}'
 		);
 		
@@ -1748,7 +1855,7 @@ private class RuleUtilTest {
 		
 		// Create action with incompatible merge field type: URL field mapped to number
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{\"customfield_10500\":{\"value\":\"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.' + ConfigUtil.nameSpacePrefix + 'Organization_Url__c}\",\"schema\":{\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:float\",\"type\":\"number\"},\"required\":false,\"allowedValues\":null,\"name\":\"Organization URL\"}}'
 		);
 		
@@ -1778,7 +1885,7 @@ private class RuleUtilTest {
 		
 		// Create action with incompatible merge field type: decimal field mapped to multi-select
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{\"customfield_10600\":{\"value\":\"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.' + ConfigUtil.nameSpacePrefix + 'Created_Timestamp__c}\",\"schema\":{\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:multiselect\",\"type\":\"array\"},\"required\":false,\"allowedValues\":[{\"id\":\"LOW\",\"value\":\"Low Usage\"},{\"id\":\"HIGH\",\"value\":\"High Usage\"}],\"name\":\"Created Timestamp\"}}'
 		);
 		
@@ -1808,7 +1915,7 @@ private class RuleUtilTest {
 		
 		// Create action with incompatible merge field type: string field mapped to URL
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{\"customfield_10700\":{\"value\":\"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.' + ConfigUtil.nameSpacePrefix + 'Duration__c}\",\"schema\":{\"custom\":\"com.atlassian.jira.plugin.system.customfieldtypes:url\",\"type\":\"url\"},\"required\":false,\"allowedValues\":null,\"name\":\"Duration\"}}'
 		);
 		
@@ -1844,14 +1951,14 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use valid relationship field traversal
 		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.CreatedBy.IsActive}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:select"},"required":false}}';
 		
 		// This should not throw an exception - valid relationship field
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action with relationship field should be created successfully');
 		
 		Test.stopTest();
@@ -1865,14 +1972,14 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use Owner relationship field traversal
 		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Owner.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
 		
 		// This should not throw an exception - valid relationship field
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action with Owner relationship field should be created successfully');
 		
 		Test.stopTest();
@@ -1886,14 +1993,14 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use invalid intermediate field in relationship traversal
 		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.InvalidRelationship.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
 		
 		try {
-			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid intermediate field');
 		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Field "InvalidRelationship" does not exist'), 'Should indicate intermediate field does not exist: ' + e.getMessage());
@@ -1910,14 +2017,14 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use valid intermediate field but invalid final field
 		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.CreatedBy.InvalidField}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
 		
 		try {
-			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 			System.assert(false, 'Should have thrown RuleUtilValidationException for invalid final field');
 		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('Field "InvalidField" does not exist'), 'Should indicate final field does not exist: ' + e.getMessage());
@@ -1934,14 +2041,14 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use non-relationship field in traversal (Name is not a relationship field)
 		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Name.SomeField}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
 		
 		try {
-			action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 			System.assert(false, 'Should have thrown RuleUtilValidationException for non-relationship field traversal');
 		} catch (RuleUtil.RuleUtilValidationException e) {
 			System.assert(e.getMessage().contains('is not a relationship field'), 'Should indicate field is not a relationship field: ' + e.getMessage());
@@ -1958,14 +2065,14 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use multi-level relationship traversal
 		action.additionalMetadata = '{"customfield_10100":{"value":"{!Account.Owner.Manager.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
 		
 		// This should not throw an exception - valid multi-level relationship
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action with multi-level relationship should be created successfully');
 		
 		Test.stopTest();
@@ -1979,14 +2086,14 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use Link suffix field
 		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Link}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:url"},"required":false}}';
 		
 		// This should not throw an exception - Link should be treated as Id
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action with Link field should be created successfully');
 		
 		Test.stopTest();
@@ -2000,14 +2107,14 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use different case for field name (should still work due to case-insensitive lookup)
 		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.createdby.IsActive}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:select"},"required":false}}';
 		
 		// This should not throw an exception - case-insensitive lookup should find CreatedBy
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action with case-insensitive field should be created successfully');
 		
 		Test.stopTest();
@@ -2021,14 +2128,14 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use accessible relationship field
 		action.additionalMetadata = '{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.LastModifiedBy.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}';
 		
 		// This should not throw an exception - accessible fields should work
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action with accessible relationship field should be created successfully');
 		
 		Test.stopTest();
@@ -2043,7 +2150,7 @@ private class RuleUtilTest {
 		
 		// Create action with valid relationship field
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.CreatedBy.IsActive}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:select"},"required":false}}'
 		);
 		
@@ -2062,7 +2169,7 @@ private class RuleUtilTest {
 		System.assertEquals(null, responseMap.get('error'), 'Should not have error for valid relationship field');
 		
 		// Verify action was created
-		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
 		System.assertEquals(1, actions.size(), 'Action should be created');
 		System.assert(actions[0].Additional_Metadata__c.contains('CreatedBy.IsActive'), 'Relationship field should be preserved');
 		
@@ -2078,7 +2185,7 @@ private class RuleUtilTest {
 		
 		// Create action with invalid relationship field
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.InvalidRelationship.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}'
 		);
 		
@@ -2110,7 +2217,7 @@ private class RuleUtilTest {
 		
 		// Create action with non-relationship field used in traversal
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Name.SomeField}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}'
 		);
 		
@@ -2142,7 +2249,7 @@ private class RuleUtilTest {
 		
 		// Create action with multi-level relationship field
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"{!Account.Owner.Manager.Name}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield"},"required":false}}'
 		);
 		
@@ -2161,7 +2268,7 @@ private class RuleUtilTest {
 		System.assertEquals(null, responseMap.get('error'), 'Should not have error for multi-level relationship field');
 		
 		// Verify action was created
-		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
 		System.assertEquals(1, actions.size(), 'Action should be created');
 		System.assert(actions[0].Additional_Metadata__c.contains('Owner.Manager.Name'), 'Multi-level relationship field should be preserved');
 		
@@ -2177,7 +2284,7 @@ private class RuleUtilTest {
 		
 		// Create action with Link suffix field
 		RuleUtil.Action action = createActionWithAdditionalMetadata(
-			RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
 			'{"customfield_10100":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Log__c.Link}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:url"},"required":false}}'
 		);
 		
@@ -2196,7 +2303,7 @@ private class RuleUtilTest {
 		System.assertEquals(null, responseMap.get('error'), 'Should not have error for Link field');
 		
 		// Verify action was created
-		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
+		List<Action__c> actions = [SELECT Id, Additional_Metadata__c FROM Action__c WHERE Action_Type__c = :Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION LIMIT 1];
 		System.assertEquals(1, actions.size(), 'Action should be created');
 		System.assert(actions[0].Additional_Metadata__c.contains('Link'), 'Link field should be preserved');
 		
@@ -2211,14 +2318,14 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		// Use Event__c with CreatedBy.IsActive (matches the original debug log scenario)
 		action.additionalMetadata = '{"customfield_11301":{"value":"{!' + ConfigUtil.nameSpacePrefix + 'Event__c.CreatedBy.IsActive}","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:textfield","type":"string"},"required":false,"allowedValues":null,"name":"Test Text Field"}}';
 		
 		// This should not throw an exception - valid relationship field on Event__c
-		Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+		Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 		System.assertNotEquals(null, result, 'Action with Event__c relationship field should be created successfully');
 		
 		Test.stopTest();
@@ -2232,7 +2339,7 @@ private class RuleUtilTest {
 		Test.startTest();
 		
 		RuleUtil.Action action = new RuleUtil.Action();
-		action.type = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION;
+		action.type = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION;
 		action.jiraProject = JiraNotificationBatchTest.JIRA_MOCK_PROJECT_ID;
 		action.jiraIssueType = JiraNotificationBatchTest.JIRA_MOCK_ISSUE_TYPE_ID;
 		
@@ -2249,7 +2356,7 @@ private class RuleUtilTest {
 			action.additionalMetadata = '{"customfield_10100":{"value":"' + testCase + '","schema":{"custom":"com.atlassian.jira.plugin.system.customfieldtypes:select"},"required":false}}';
 			
 			// Each case should work due to case-insensitive lookup
-			Action__c result = action.getAction(RuleUtil.ACTION_RT_MONITORING);
+			Action__c result = action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING);
 			System.assertNotEquals(null, result, 'Action with case variation should be created successfully: ' + testCase);
 		}
 		

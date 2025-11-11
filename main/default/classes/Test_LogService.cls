@@ -15,17 +15,48 @@ public class Test_LogService {
     public static final String CONNECETED_ORG_INSTANCE_URL = 'https://testurl.test';
     public static final String CONNECETED_ORG_IDENTITY_URL = null;
 
+    // Cache individual stubs to avoid repeated extraction
+    private static Map<String, String> stubCache = new Map<String, String>();
+    private static Blob zipData;
+
+    private static Blob getZipData() {
+        if (zipData == null) {
+            zipData = [SELECT Body FROM StaticResource WHERE Name = 'TestStubs' LIMIT 1].Body;
+        }
+        return zipData;
+    }
+
+    private static String extractFromZip(String stubName) {
+        // Check cache first
+        if (stubCache.containsKey(stubName)) {
+            return stubCache.get(stubName);
+        }
+
+        // Extract from ZIP using native Salesforce ZipReader
+        Compression.ZipReader reader = new Compression.ZipReader(getZipData());
+        String filename = stubName + '.txt';
+        Compression.ZipEntry entry = reader.getEntry(filename);
+        
+        if (entry == null) {
+            throw new TestException('Test stub not found: ' + stubName + ' (file: ' + filename + ')');
+        }
+        
+        Blob fileData = reader.extract(entry);
+        String content = fileData.toString();
+        stubCache.put(stubName, content);
+        return content;
+    }
+
     public static String getTestStub(String name) {
-        String testStub = [SELECT Body FROM StaticResource WHERE Name = 'TestStubs'].Body.toString();
-        Map<String, Object> testStubMap = (Map<String, Object>)JSON.deserializeUntyped(testStub);
-        return (String)testStubMap.get(name);
+        return extractFromZip(name);
     }
 
     public static List<Object> getTestStubList(String name) {
-        String testStub = [SELECT Body FROM StaticResource WHERE Name = 'TestStubs'].Body.toString();
-        Map<String, Object> testStubMap = (Map<String, Object>)JSON.deserializeUntyped(testStub);
-        return (List<Object>)testStubMap.get(name);
+        String content = extractFromZip(name);
+        return (List<Object>)JSON.deserializeUntyped(content);
     }
+
+    public class TestException extends Exception {}
 
     public static void initSettings() {
         Connected_Orgs_Settings__c connectedOrgsSettings = new Connected_Orgs_Settings__c(

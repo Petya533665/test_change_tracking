@@ -1,6 +1,6 @@
 public with sharing class AIAnalysisBatch extends DatabaseUtils.PharosBatchImpl implements Database.Batchable<SObject>, Database.Stateful, Database.AllowsCallouts, Database.RaisesPlatformEvents {
 
-	private AIAnalysis analysis;
+	Set<String> issueIds;
 
 	private static final Integer QUERY_LIMIT = 1;
 
@@ -34,11 +34,11 @@ public with sharing class AIAnalysisBatch extends DatabaseUtils.PharosBatchImpl 
 	}
 
 	public void execute(Database.BatchableContext BC, List<Issue__c> scope) {
-		Set<String> issueIds = new Set<String>();
+		issueIds = new Set<String>();
 		for (Issue__c issue : scope) {
 			issueIds.add(issue.Id);
 		}
-		analysis = AIAnalysis.getInstance(issueIds);
+		AIAnalysis analysis = AIAnalysis.getInstance(issueIds);
 		if (analysis != null) {
 			analysis.init();
 			analysis.analysis();
@@ -46,7 +46,9 @@ public with sharing class AIAnalysisBatch extends DatabaseUtils.PharosBatchImpl 
 	}
 
 	public void finish(Database.BatchableContext BC) {
+		AIAnalysis analysis = AIAnalysis.getInstance(issueIds);
 		if (analysis != null) {
+			analysis.init();
 			analysis.Pending();
 			analysis.flush();
 		}

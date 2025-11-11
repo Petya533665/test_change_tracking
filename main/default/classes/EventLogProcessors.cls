@@ -540,7 +540,21 @@ public class EventLogProcessors {
         
         protected DateTime getDateTimeField(List<String> fields, Map<String, Integer> headerMap, String fieldName) {
             String value = getField(fields, headerMap, fieldName);
-            return String.isNotBlank(value) ? DateTime.valueOfGmt(value.replace('T', ' ')) : null;
+            if (String.isBlank(value)) {
+                return null;
+            }
+            
+            try {
+                // Use JSON.deserialize for clean ISO8601 parsing with millisecond precision
+                return (DateTime)JSON.deserialize('"' + value + '"', DateTime.class);
+            } catch (Exception e) {
+                // Fallback to legacy parsing for non-ISO8601 formats
+                try {
+                    return DateTime.valueOfGmt(value.replace('T', ' ').replace('Z', ''));
+                } catch (Exception ex) {
+                    return null;
+                }
+            }
         }
     }
 
@@ -1932,6 +1946,11 @@ public class EventLogProcessors {
             super(eventData);
             
             this.limitCategory = parseLimitExceptionCategory(exceptionCategory);
+            
+            // If base timestamp is null but we have timestampDerived, use that
+            if (this.timestamp == null && this.timestampDerived != null) {
+                this.timestamp = this.timestampDerived;
+            }
         }
     }
 
@@ -8461,7 +8480,7 @@ public class EventLogProcessors {
      */
     public static List<Log__c> processEventLogsWithEmailAwareness(List<Log__c> eventLogs, Map<String, Object> dedupSettings, Logger logger) {
         List<Log__c> logsToCreate = new List<Log__c>();
-        List<Log__c> emailLogsToUpdate = new List<Log__c>();
+        Map<Id, Log__c> emailLogsToUpdateMap = new Map<Id, Log__c>(); // Use Map to prevent duplicates
         
         if (eventLogs.isEmpty()) {
             return logsToCreate;
@@ -8510,9 +8529,9 @@ public class EventLogProcessors {
                     LogMatchingResult result = analyzeLogMatching(eventLog, existingEmailLogTimings, dedupSettings);
                     
                     if (result.hasTimingMatch && result.emailLogMatch != null) {
-                        // Update email log with Request_Id_External__c
+                        // Update email log with Request_Id_External__c (use Map to prevent duplicates)
                         result.emailLogMatch.emailLog.Request_Id_External__c = requestId;
-                        emailLogsToUpdate.add(result.emailLogMatch.emailLog);
+                        emailLogsToUpdateMap.put(result.emailLogMatch.emailLog.Id, result.emailLogMatch.emailLog);
                     } else {
                         // No timing match, create event log
                         logsToCreate.add(eventLog);
@@ -8524,7 +8543,8 @@ public class EventLogProcessors {
             }
             
             // Bulk update email logs with Request_Id_External__c
-            if (!emailLogsToUpdate.isEmpty()) {
+            if (!emailLogsToUpdateMap.isEmpty()) {
+                List<Log__c> emailLogsToUpdate = emailLogsToUpdateMap.values();
                 DatabaseUtils.getInstance().performUpdateDML(emailLogsToUpdate, Schema.SObjectType.Log__c)
                     .handleError(EventLogProcessors.class.getName(), '.processEventLogsWithEmailAwareness', logger);
             }
@@ -8584,6 +8604,7 @@ public class EventLogProcessors {
             WHERE Hash_1__c IN :hashToTimestampMap.keySet()
             AND Created_At__c >= :windowStart
             AND Created_At__c <= :windowEnd
+            AND Request_Id_External__c = null
             ORDER BY Hash_1__c, Created_At__c
         ];
         
@@ -8663,33 +8684,40 @@ public class EventLogProcessors {
             emailMatch.emailLogCreatedDate = emailInfo.logCreatedDate;
             emailMatch.inboundEmailDates = emailInfo.inboundEmailDates;
             
+            // Initialize Boolean fields to prevent null pointer exceptions
+            emailMatch.isWithinTolerance = false;
+            emailMatch.inboundEmailWithinTolerance = false;
+            
             // Create the email log object for update
             emailMatch.emailLog = new Log__c();
             emailMatch.emailLog.Id = emailInfo.logId;
             
             // Check log Created_At timing
             if (emailInfo.logCreatedAt != null) {
-                emailMatch.timeDifferenceSeconds = Math.abs(eventLog.Created_At__c.getTime() - emailInfo.logCreatedAt.getTime()) / 1000;
-                emailMatch.isWithinTolerance = emailMatch.timeDifferenceSeconds <= timingToleranceSeconds;
+                Long timeDiffMillis = Math.abs(eventLog.Created_At__c.getTime() - emailInfo.logCreatedAt.getTime());
+                emailMatch.timeDifferenceSeconds = timeDiffMillis / 1000.0;
+                emailMatch.isWithinTolerance = timeDiffMillis <= (timingToleranceSeconds * 1000);
             }
             
             // Check inbound email timing (priority over log timing)
             if (emailInfo.inboundEmailDates != null && !emailInfo.inboundEmailDates.isEmpty()) {
-                Long closestDiff = null;
+                Long closestDiffMillis = null;
                 for (DateTime inboundDate : emailInfo.inboundEmailDates) {
-                    Long diff = Math.abs(eventLog.Created_At__c.getTime() - inboundDate.getTime()) / 1000;
-                    if (closestDiff == null || diff < closestDiff) {
-                        closestDiff = diff;
+                    Long diffMillis = Math.abs(eventLog.Created_At__c.getTime() - inboundDate.getTime());
+                    if (closestDiffMillis == null || diffMillis < closestDiffMillis) {
+                        closestDiffMillis = diffMillis;
                     }
                 }
-                emailMatch.closestInboundEmailDiff = closestDiff;
-                emailMatch.inboundEmailWithinTolerance = closestDiff != null && closestDiff <= timingToleranceSeconds;
+                emailMatch.closestInboundEmailDiff = closestDiffMillis != null ? closestDiffMillis / 1000.0 : null;
+                emailMatch.inboundEmailWithinTolerance = closestDiffMillis != null && closestDiffMillis <= (timingToleranceSeconds * 1000);
+                
             }
             
             result.emailLogMatches.add(emailMatch);
             
             // Determine if this is a timing match (prioritize inbound email timing)
-            Boolean isTimingMatch = emailMatch.inboundEmailWithinTolerance || emailMatch.isWithinTolerance;
+            Boolean isTimingMatch = (emailMatch.inboundEmailWithinTolerance == true) || (emailMatch.isWithinTolerance == true);
+            
             
             if (isTimingMatch && !result.hasTimingMatch) {
                 result.hasTimingMatch = true;
@@ -8787,10 +8815,10 @@ public class EventLogProcessors {
         public DateTime emailLogCreatedAt;
         public DateTime emailLogCreatedDate;
         public List<DateTime> inboundEmailDates;
-        public Long timeDifferenceSeconds;
+        public Decimal timeDifferenceSeconds;
         public Boolean isWithinTolerance;
         public Boolean inboundEmailWithinTolerance;
-        public Long closestInboundEmailDiff;
+        public Decimal closestInboundEmailDiff;
         
         public Log__c emailLog;
     }

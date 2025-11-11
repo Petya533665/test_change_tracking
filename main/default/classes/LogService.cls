@@ -11,6 +11,9 @@ global with sharing class LogService {
     public static final String FIELD_TYPE_DOUBLE = 'DOUBLE';
     public static final String NAMESPACE_UNKNOWN = 'unknown';
 
+	@TestVisible
+	private static Boolean CUSTOM_SKIP_TEST_VALUE;
+
     private static Map<String, Id> getMapRecordTypes() {
         Map<String, Id> result = new Map<String, Id>();
         Map<String, Log_Category_Mapping_Setting__c> records = Log_Category_Mapping_Setting__c.getAll();
@@ -183,6 +186,8 @@ global with sharing class LogService {
                     }
                 }
 
+	            // for custom parser (Sales Org) // LOG-2666
+	            if (Test.isRunningTest() && CUSTOM_SKIP_TEST_VALUE != null) isCustomSkip = CUSTOM_SKIP_TEST_VALUE;
                 if (isCustomSkip) break;
 
                 if (log.Post_Processing_Status__c != LogPostProcessingService.POST_PROCESSING_STATUS_CUSTOM_NEEDED) {
@@ -231,7 +236,7 @@ global with sharing class LogService {
                     PermissionsUtil.putSObjectField(log, Schema.sObjectType.Log__c.fields.Namespace__c, NAMESPACE_UNKNOWN);
                 }
 
-                if (processor.getStackTrace()?.containsIgnoreCase(PHAROS_CODE_TOKEN) || processor.getStackTrace()?.containsIgnoreCase(PHAROS_HIDE_TOKEN)) {
+                if (String.isNotBlank(processor.getStackTrace()) && (processor.getStackTrace().containsIgnoreCase(PHAROS_CODE_TOKEN) || processor.getStackTrace().containsIgnoreCase(PHAROS_HIDE_TOKEN))) {
                     PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Category__c, Logger.CATEGORY_PHAROS_ERROR);
                     PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Area__c, Logger.AREA_PHAROS_ERROR);
                 }
@@ -248,7 +253,8 @@ global with sharing class LogService {
                 continue;
             }
         }
-        throw new LogException(parsingErrors);
+        if (String.isNotBlank(parsingErrors)) throw new LogException(parsingErrors);
+	    return null;
     }
 
     public static void copyLogFlagsFields(List<Log__c> newLogs) {

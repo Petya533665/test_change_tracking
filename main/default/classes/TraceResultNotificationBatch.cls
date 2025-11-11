@@ -104,15 +104,6 @@ public with sharing class TraceResultNotificationBatch extends DatabaseUtils.Pha
         contextManager.clearChartImages(recordId);
     }
 
-    // Missing methods for timestamp tracking
-    public void setNotificationTimestamp(DateTime timestamp) {
-        contextManager.setNotificationTimestamp(timestamp);
-    }
-
-    public DateTime getNotificationTimestamp() {
-        return contextManager.getNotificationTimestamp();
-    }
-
     public void finish(Database.BatchableContext info) {
         this.notificationServiceImpl.finish(info, this.contextManager);
     }

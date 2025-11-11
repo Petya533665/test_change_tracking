@@ -237,18 +237,49 @@ public with sharing class TraceScheduleController {
             if (!traceSchedules.isEmpty()) {
                 List<Map<String, Object>> logs = new List<Map<String, Object>>();
                 Datetime createdAt = System.now().addDays(-range);
-                for (Log__c log : [
-                        SELECT Id, User_Id__c, User_Name__c, Created_At__c
-                        FROM Log__c
-                        WHERE (Issue__c = :traceSchedules[0].Issue__c OR (Issue__r.Related_Issue__c = :traceSchedules[0].Issue__c AND Issue__r.Status__c = :IssueService.ISSUE_STATUS_DUPLICATE))
-                        AND Created_At__c >= :createdAt
-                        LIMIT 40000
-                ]) {
-                    if (String.isNotBlank(log.User_Id__c) && String.isNotBlank(log.User_Name__c)) {
-                        logs.add(ConfigUtil.getSObjectWithoutNameSpace(log));
+                
+                List<Log__c> allLogs = [
+                    SELECT Id, User_Id__c, User_Name__c, Created_At__c
+                    FROM Log__c
+                    WHERE (Issue__c = :traceSchedules[0].Issue__c OR (Issue__r.Related_Issue__c = :traceSchedules[0].Issue__c AND Issue__r.Status__c = :IssueService.ISSUE_STATUS_DUPLICATE))
+                    AND Created_At__c >= :createdAt
+                    LIMIT 40000
+                ];
+                Integer totalLogs = allLogs.size();
+                Integer intervalMinutes = (totalLogs < 500) ? 5 : ((totalLogs < 5000) ? 10 : 20);
+
+                Map<String, Map<String, Object>> intervalGroups = new Map<String, Map<String, Object>>();
+                for (Log__c log : allLogs) {
+                    if (String.isNotBlank(log.User_Id__c) && String.isNotBlank(log.User_Name__c) && log.Created_At__c != null) {
+                        Long diffMs = log.Created_At__c.getTime() - createdAt.getTime();
+                        Integer minutesFromStart = (Integer)(diffMs / (1000 * 60));
+                        Integer intervalNumber = minutesFromStart / intervalMinutes;
+                        String intervalKey = String.valueOf(intervalNumber);
+
+                        if (!intervalGroups.containsKey(intervalKey)) {
+                            Map<String, Object> intervalData = new Map<String, Object>();
+                            intervalData.put('id', log.Id);
+                            intervalData.put('createdAt', log.Created_At__c);
+                            intervalData.put('logTimesByUser', new Map<String, List<Datetime>>());
+                            intervalGroups.put(intervalKey, intervalData);
+                        }
+
+                        Map<String, List<Datetime>> usersMap = (Map<String, List<Datetime>>)intervalGroups.get(intervalKey).get('logTimesByUser');
+                        if (!usersMap.containsKey(log.User_Name__c)) {
+                            usersMap.put(log.User_Name__c, new List<Datetime>());
+                        }
+                        List<Datetime> times = usersMap.get(log.User_Name__c);
+                        if (times.size() < 5) {
+                            times.add(log.Created_At__c);
+                        }
                     }
                 }
-                output.put('logs', logs);
+
+                List<Map<String, Object>> intervalGroupsList = new List<Map<String, Object>>();
+                for (String intervalKey : intervalGroups.keySet()) {
+                    intervalGroupsList.add(intervalGroups.get(intervalKey));
+                }
+                output.put('logs', intervalGroupsList);
             }
         }
         return output;

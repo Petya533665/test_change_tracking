@@ -22,7 +22,7 @@ public class PharosChatControllerTest {
         TestDataFactory.SingleRequestMock namespaceStatusMock = new TestDataFactory.SingleRequestMock(
             200,
             'OK',
-            '{"empty": false}'
+            '{"empty": false, "logsEmpty": false, "indexingInProgress": false}'
         );
 
         TestDataFactory.SingleRequestMock chatInitMock = new TestDataFactory.SingleRequestMock(

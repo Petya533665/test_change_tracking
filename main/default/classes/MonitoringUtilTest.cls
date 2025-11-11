@@ -34,6 +34,61 @@ public class MonitoringUtilTest {
         insert splunkFields;
     }
 
+    private static Map<String, HttpCalloutMock> getPassthroughModeServiceMock(String passthroughEndpoint) {
+        // Mock the HTTP callout that happens when Logger sends logs via PassthroughtModeService
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>{
+            passthroughEndpoint => new TestDataFactory.SingleRequestMock(
+                200,
+                'OK',
+                '{"status":"success"}'
+            )
+        };
+        return endpoint2TestResp;
+    }
+
+    @IsTest
+    static void test_hourly_limits_batch_creates_limits_record_with_passthrough_mode() {
+        // Set up passthrough connected org for Logger.flush() callout
+        TestDataFactory.createConnectedOrgPassthrought();
+
+        String passthroughEndpoint = TestDataFactory.CONNECTED_ORG_INSTANCE_URL + 
+                                      ConfigUtil.PHAROS_REST_SERVICE_ENDPOINT + 
+                                      '?' + ConfigUtil.PARAMS_TYPE + '=' + ConfigUtil.TYPE_PASSTHROUGH_MODE;
+        
+        Map<String, HttpCalloutMock> endpoint2TestResp = getPassthroughModeServiceMock(passthroughEndpoint);
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        
+        Test.startTest();
+        
+        // Create and run the batch
+        HourlyLimitsBatch batch = HourlyLimitsBatch.getInstance();
+        Database.executeBatch(batch, 1);
+        
+        Test.stopTest();
+
+        HttpRequest request = multiCalloutMock.getRequest(passthroughEndpoint);
+        System.assertEquals(request.getEndpoint(), passthroughEndpoint, 'Should send request to PassthroughModeService');
+        System.assertEquals(request.getMethod(), 'POST', 'Should send POST request to PassthroughModeService');
+        System.assertNotEquals(request.getBody(), null, 'Should send request body to PassthroughModeService');
+        
+        HttpResponse response = multiCalloutMock.getResponse(passthroughEndpoint);
+        System.assertEquals(200, response.getStatusCode(), 'Should receive 200 OK response from PassthroughModeService');
+        
+        // Verify that a Limits__c record was created
+        List<Limits__c> limitsRecords = [SELECT Id FROM Limits__c];
+        System.assertEquals(0, limitsRecords.size(), 'Should not create any Limits__c record');
+        
+        // Verify that a log entry was created for the batch execution
+        List<Log__c> logRecords = [
+            SELECT Id, Category__c, Type__c, Summary__c 
+            FROM Log__c 
+            WHERE Category__c = :HourlyLimitsBatch.CATEGORY 
+            AND Type__c = :HourlyLimitsBatch.TYPE
+        ];
+        System.assertEquals(0, logRecords.size(), 'Should not create any Log__c record for the batch');
+    }
+
     @IsTest
     static void test_hourly_limits_batch_creates_limits_record() {
         Test.startTest();
@@ -50,20 +105,216 @@ public class MonitoringUtilTest {
     }
 
     @IsTest
+    static void test_getFrequencyHours_defaultValue() {
+        // Test when frequency setting is null/empty - should default to 1 hour
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = null;
+        Integer frequency = HourlyLimitsBatch.getFrequencyHours();
+        System.assertEquals(1, frequency, 'Should default to 1 hour when setting is null');
+        
+        // Test with empty string
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = '';
+        frequency = HourlyLimitsBatch.getFrequencyHours();
+        System.assertEquals(1, frequency, 'Should default to 1 hour when setting is empty');
+    }
+
+    @IsTest
+    static void test_getFrequencyHours_validValues() {
+        // Test valid frequency values (1-23 hours)
+        List<Integer> validValues = new List<Integer>{1, 2, 5, 12, 23};
+        
+        for (Integer validValue : validValues) {
+            ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = String.valueOf(validValue*60);
+            Integer frequency = HourlyLimitsBatch.getFrequencyHours();
+            System.assertEquals(validValue, frequency, 'Should return configured value: ' + validValue);
+        }
+    }
+
+    @IsTest
+    static void test_getFrequencyHours_invalidValues() {
+        // Test invalid frequency values - should default to 1 hour
+        List<String> invalidValues = new List<String>{
+            '0',        // Below minimum
+            '24',       // Above maximum  
+            '25',       // Above maximum
+            '-1',       // Negative
+            'abc',      // Non-numeric
+            '1.5',      // Decimal
+            '100'       // Way above maximum
+        };
+        
+        for (String invalidValue : invalidValues) {
+            ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = invalidValue;
+            Integer frequency = HourlyLimitsBatch.getFrequencyHours();
+            System.assertEquals(1, frequency, 'Should default to 1 hour for invalid value: ' + invalidValue);
+        }
+    }
+
+    @IsTest
+    static void test_getFrequencyHours_boundaryValues() {
+        // Test boundary values
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = String.valueOf(1*60);
+        Integer frequency = HourlyLimitsBatch.getFrequencyHours();
+        System.assertEquals(1, frequency, 'Should accept minimum boundary value 1');
+        
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = String.valueOf(23*60);
+        frequency = HourlyLimitsBatch.getFrequencyHours();
+        System.assertEquals(23, frequency, 'Should accept maximum boundary value 23');
+    }
+
+    @IsTest
+    static void test_needToRunBatch_withDifferentFrequencies() {
+        // Create a Limits__c record first
+        Limits__c limitsRecord = new Limits__c(DailyApiRequests__c = 1000);
+        insert limitsRecord;
+        
+        // Create a log entry to simulate previous run
+        DateTime pastTime = DateTime.now().addHours(-2);
+        Log__c previousLog = new Log__c(
+            Created_At__c = pastTime,
+            Category__c = HourlyLimitsBatch.CATEGORY,
+            Type__c = HourlyLimitsBatch.TYPE,
+            Limits__c = limitsRecord.Id
+        );
+        insert previousLog;
+        
+        // Test with 1-hour frequency (should need to run after 1+ hours)
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = String.valueOf(1*60);
+        Boolean shouldRun = HourlyLimitsBatch.needToRunBatch();
+        System.assertEquals(true, shouldRun, 'Should need to run when last run was 2 hours ago and frequency is 1 hour');
+        
+        // Test with 3-hour frequency (should not need to run yet)
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = String.valueOf(3*60);
+        shouldRun = HourlyLimitsBatch.needToRunBatch();
+        System.assertEquals(false, shouldRun, 'Should not need to run when last run was 2 hours ago and frequency is 3 hours');
+    }
+
+    @IsTest
+    static void test_needToRunBatch_noLastRun() {
+        // Test when there's no previous run - should always return true
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = String.valueOf(5*60);
+        
+        Test.startTest();
+        Boolean shouldRun = HourlyLimitsBatch.needToRunBatch();
+        Test.stopTest();
+        
+        System.assertEquals(true, shouldRun, 'Should need to run when there is no previous run');
+    }
+
+    @IsTest
+    static void test_needToRunBatch_exactFrequencyTime() {
+        // Create a Limits__c record first
+        Limits__c limitsRecord = new Limits__c(DailyApiRequests__c = 1000);
+        insert limitsRecord;
+        
+        // Test when exactly the frequency time has passed
+        DateTime exactTime = DateTime.now().addHours(-5);
+        Log__c previousLog = new Log__c(
+            Created_At__c = exactTime,
+            Category__c = HourlyLimitsBatch.CATEGORY,
+            Type__c = HourlyLimitsBatch.TYPE,
+            Limits__c = limitsRecord.Id
+        );
+        insert previousLog;
+        
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = String.valueOf(5*60);
+        
+        Test.startTest();
+        Boolean shouldRun = HourlyLimitsBatch.needToRunBatch();
+        Test.stopTest();
+        
+        System.assertEquals(true, shouldRun, 'Should need to run when exactly the frequency time has passed');
+    }
+
+    @IsTest
+    static void test_needToRunBatch_recentRun() {
+        // Create a Limits__c record first
+        Limits__c limitsRecord = new Limits__c(DailyApiRequests__c = 1000);
+        insert limitsRecord;
+        
+        // Test when batch ran recently - should not run again
+        DateTime recentTime = DateTime.now().addMinutes(-30);
+        Log__c recentLog = new Log__c(
+            Created_At__c = recentTime,
+            Category__c = HourlyLimitsBatch.CATEGORY,
+            Type__c = HourlyLimitsBatch.TYPE,
+            Limits__c = limitsRecord.Id
+        );
+        insert recentLog;
+        
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = String.valueOf(2*60);
+        
+        Test.startTest();
+        Boolean shouldRun = HourlyLimitsBatch.needToRunBatch();
+        Test.stopTest();
+        
+        System.assertEquals(false, shouldRun, 'Should not need to run when last run was recent');
+    }
+
+    @IsTest
+    static void test_initialValidation_withFrequencySettings() {
+        // Test that initialValidation considers the frequency settings
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = true;
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = String.valueOf(2*60);
+        
+        // Create a Limits__c record first
+        Limits__c limitsRecord = new Limits__c(DailyApiRequests__c = 1000);
+        insert limitsRecord;
+        
+        // Create a recent log entry (should not need to run)
+        DateTime recentTime = DateTime.now().addMinutes(-30);
+        Log__c recentLog = new Log__c(
+            Created_At__c = recentTime,
+            Category__c = HourlyLimitsBatch.CATEGORY,
+            Type__c = HourlyLimitsBatch.TYPE,
+            Limits__c = limitsRecord.Id
+        );
+        insert recentLog;
+        
+        HourlyLimitsBatch batch = HourlyLimitsBatch.getInstance();
+        Boolean shouldValidate = batch.initialValidation();
+        System.assertEquals(false, shouldValidate, 'Should not validate when batch ran recently');
+        
+        // Now test with old log entry (should need to run)
+        recentLog.Created_At__c = DateTime.now().addHours(-3);
+        update recentLog;
+        
+        shouldValidate = batch.initialValidation();
+        System.assertEquals(true, shouldValidate, 'Should validate when enough time has passed');
+    }
+
+    @IsTest
+    static void test_getFrequencyHours_integrationWithScheduler() {
+        // Test that the frequency setting integrates properly with the scheduler
+        // Enable permissions and settings first
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = true;
+        ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c = String.valueOf(8*60);
+        
+        // Test that both the batch and scheduler use the same frequency setting
+        Integer frequencyFromBatch = HourlyLimitsBatch.getFrequencyHours();
+        System.assertEquals(8, frequencyFromBatch, 'Batch should return the configured frequency');
+        
+        // Test that the scheduler map contains the correct frequency for HourlyLimitsBatch
+        String schedulerFrequency = LogServiceScheduler.FREQUENCY_HOURS_DEFAULT.get('HourlyLimitsBatch');
+        System.assertEquals('8', schedulerFrequency, 'Scheduler map should contain the configured frequency');
+    }
+
+    @IsTest
     static void testLimitsSpike_EndToEndBatch() {
         enableMonitoringPermissions();
         ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = true;
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
 
         // Create spike rule (50%)
         Rule__c limitsRule = new Rule__c(
             Name__c = 'E2E Spike Rule',
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_LIMITS,
-            Subtype__c = MonitoringUtil.RULE_SUB_TYPE_SPIKE,
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_SPIKE,
             EventTimeInterval__c = 60,
             AggregateType__c = 'Count',
-            ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
             Threshold__c = 50,
             Index__c = 1,
             Is_Not_Valid__c = false
@@ -98,17 +349,17 @@ public class MonitoringUtilTest {
     static void testLimitsThreshold_EndToEndBatch() {
         enableMonitoringPermissions();
         ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = true;
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
 
         // Create threshold rule (80%)
         Rule__c limitsRule = new Rule__c(
             Name__c = 'E2E Threshold Rule',
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_LIMITS,
-            Subtype__c = MonitoringUtil.RULE_SUB_TYPE_THRESHOLD,
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_THRESHOLD,
             EventTimeInterval__c = 60,
             AggregateType__c = 'Count',
-            ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
             Threshold__c = 80,
             Index__c = 1,
             Is_Not_Valid__c = false
@@ -119,10 +370,10 @@ public class MonitoringUtilTest {
             Rule__c = limitsRule.Id,
             Index__c = 1,
             FieldName__c = 'Category__c',
-            ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_NOT_EQUAL,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_NOT_EQUAL,
             Value__c = 'dummy',
-            Comparison_Type__c = MonitoringUtil.COMPARISON_TYPE_VALUE,
-            Field_Type__c = MonitoringUtil.FIELD_TYPE_STRING
+            Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+            Field_Type__c = RuleUtil.FIELD_TYPE_STRING
         );
 
         // Create one snapshot with high DataStorageMB (batch dynamic query fetches fields)
@@ -185,7 +436,7 @@ public class MonitoringUtilTest {
 
     @IsTest
     static void testNeedRunMonitoringRules_NoActiveRules() {
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>(); 
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>(); 
         Test.startTest();
         Datetime currentTime = Datetime.now();
         Boolean needsRun = MonitoringService.needRunMonitoringRules(currentTime);
@@ -194,7 +445,7 @@ public class MonitoringUtilTest {
     }
 
     static void enableMonitoringPermissions() {
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
         PermissionsUtil.MonitoringEnabled = true;
         PermissionsUtil.LimitsMonitoringEnabled = true;
         PermissionsUtil.MaxMonitoringRules = 5;
@@ -551,7 +802,7 @@ public class MonitoringUtilTest {
         Rule__c mr1 = new Rule__c();
         mr1.Active__c = true;
         mr1.FilterLogic__c = filterLogic;
-        mr1.Type__c = MonitoringUtil.RULE_TYPE_ARCHIVAL;
+        mr1.Type__c = Constants.RULE_SOBJECT.TYPE_ARCHIVAL;
         mr1.EventTimeInterval__c = 1*60;
         insert mr1;
         return mr1;
@@ -561,7 +812,7 @@ public class MonitoringUtilTest {
         RuleFilter__c rf1 = new RuleFilter__c();
         rf1.Index__c = filterIndex;
         rf1.Rule__c = ruleId;
-        rf1.ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_EQUAL;
+        rf1.ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_EQUAL;
         rf1.FieldName__c = ConfigUtil.nameSpacePrefix + 'Summary__c';
         rf1.Value__c = 'somevalue';
         rf1.Comparison_Type__c = 'Value';
@@ -573,7 +824,7 @@ public class MonitoringUtilTest {
         RuleFilter__c rf1 = new RuleFilter__c();
         rf1.Index__c = nextIndex++;
         rf1.Rule__c = ruleId;
-        rf1.ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_CONTAINS;
+        rf1.ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_CONTAINS;
         rf1.FieldName__c = ConfigUtil.nameSpacePrefix + 'Details__c';
         rf1.Value__c = 'somevalue2';
         rf1.Comparison_Type__c = 'Value';
@@ -591,7 +842,7 @@ public class MonitoringUtilTest {
 
         Rule__c mr1 = (rule == null) ? createArchivalRule() : rule;
 
-        Id recordtypeId = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(MonitoringUtil.RULE_TYPE_ARCHIVAL).getRecordtypeId();
+        Id recordtypeId = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(Constants.RULE_SOBJECT.TYPE_ARCHIVAL).getRecordtypeId();
 
         Action__c rn1 = new Action__c();
         rn1.RecordTypeId = recordtypeId;
@@ -612,11 +863,11 @@ public class MonitoringUtilTest {
         rf1.Comparison_Type__c = 'Value';
         insert rf1;
 
-        List<MonitoringUtil.MonitoringRule> rules = MonitoringUtil.getArchivalRules(new List<Id>{mr1.Id});
-		Map<Id, MonitoringUtil.Event> mapEventsByIds = MonitoringUtil.getLastCreatedEventsMap();
-		List<String> logFields = MonitoringUtil.getLogFieldNames(rules);
+        List<RuleUtil.Rule> rules = RuleUtil.getArchivalRules(new List<Id>{mr1.Id});
+		Map<Id, RuleUtil.Event> mapEventsByIds = MonitoringUtil.getLastCreatedEventsMap();
+		List<String> logFields = RuleUtil.getLogFieldNames(rules);
 		Datetime currentTime = Datetime.now();
-		Integer shiftMinutes = Integer.valueOf(rules.get(0).eventTypeInterval);
+		Integer shiftMinutes = Integer.valueOf(rules.get(0).eventTimeInterval);
 		Datetime ruleStartTime = currentTime.addMinutes(-shiftMinutes);
 		DateTime lastProcessedDatetime = withEvents ? DateTime.now() : null;
 
@@ -662,11 +913,11 @@ public class MonitoringUtilTest {
 
         Rule__c mr1 = new Rule__c();
         mr1.Active__c = true;
-        mr1.Type__c = MonitoringUtil.RULE_TYPE_ARCHIVAL;
+        mr1.Type__c = Constants.RULE_SOBJECT.TYPE_ARCHIVAL;
         mr1.EventTimeInterval__c = withEvent ? 1*60 : 5*60;
         insert mr1;
 
-        Id recordtypeId = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(MonitoringUtil.RULE_TYPE_ARCHIVAL).getRecordtypeId();
+        Id recordtypeId = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(Constants.RULE_SOBJECT.TYPE_ARCHIVAL).getRecordtypeId();
 
         Action__c rn1 = new Action__c();
         rn1.RecordTypeId = recordtypeId;
@@ -752,7 +1003,7 @@ public class MonitoringUtilTest {
             System.assertEquals(1, events.get(0).RecordCount__c);
             System.assertNotEquals(null, events.get(0).Records__c);
 
-            if(notificationType == MonitoringUtil.ACTION_TYPE_REMOVAL) {
+            if(notificationType.equals(Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL)) {
                 Id removedLogId = (withEvent) ? log_2h_ago.Id : log_6h_ago.Id;
                 List<Log__c> removedLogs = [SELECT Id FROM Log__c WHERE Id =:removedLogId];
                 System.assertEquals(0, removedLogs.size());
@@ -760,10 +1011,10 @@ public class MonitoringUtilTest {
                 System.assertEquals(0, removedEmailLogs.size());
             }
             // TBD
-            if(notificationType == MonitoringUtil.ACTION_TYPE_LOCAL_ARCHIVAL) {
+            if(notificationType.equals(Constants.ACTION_SOBJECT.ACTION_TYPE_LOCAL_ARCHIVAL)) {
 
             }
-            if(notificationType == MonitoringUtil.ACTION_TYPE_EXTERNAL_ARCHIVAL) {
+            if(notificationType.equals(Constants.ACTION_SOBJECT.ACTION_TYPE_EXTERNAL_ARCHIVAL)) {
 
             }
         }
@@ -789,11 +1040,11 @@ public class MonitoringUtilTest {
 
         Rule__c mr1 = new Rule__c();
         mr1.Active__c = true;
-        mr1.Type__c = MonitoringUtil.RULE_TYPE_ARCHIVAL;
+        mr1.Type__c = Constants.RULE_SOBJECT.TYPE_ARCHIVAL;
         mr1.EventTimeInterval__c = 1*60;
         insert mr1;
 
-        Id recordtypeId = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(MonitoringUtil.RULE_TYPE_ARCHIVAL).getRecordtypeId();
+        Id recordtypeId = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(Constants.RULE_SOBJECT.TYPE_ARCHIVAL).getRecordtypeId();
 
         Action__c rn1 = new Action__c();
         rn1.RecordTypeId = recordtypeId;
@@ -810,7 +1061,7 @@ public class MonitoringUtilTest {
         rn1.JIRAPriority__c = 'test';
         rn1.JIRAProject__c = 'test';
         rn1.JIRAIssueType__c = 'test';
-        rn1.Action_Type__c = MonitoringUtil.ACTION_TYPE_REMOVAL;
+        rn1.Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL;
         insert rn1;
 
         RuleAction__c en1 = new RuleAction__c();
@@ -3145,7 +3396,7 @@ public class MonitoringUtilTest {
         Test.startTest();
         setFakeDescribeLogFields();
         RuleFilter__c rf = getRuleFilter(rf1.Id);
-        MonitoringUtil.RuleFilter rfInstance = new MonitoringUtil.RuleFilter(rf);
+        RuleUtil.RuleFilter rfInstance = new RuleUtil.RuleFilter(rf);
         Map<String, Object> objectMap = contact.getPopulatedFieldsAsMap();
         testResult = rfInstance.evaluateFilter(objectMap);
 
@@ -3182,7 +3433,7 @@ public class MonitoringUtilTest {
         Test.startTest();
 
         RuleFilter__c rf = getRuleFilter(rf1.Id);
-        MonitoringUtil.RuleFilter rfInstance = new MonitoringUtil.RuleFilter(rf);
+        RuleUtil.RuleFilter rfInstance = new RuleUtil.RuleFilter(rf);
         Map<String, Object> objectMap = log.getPopulatedFieldsAsMap();
         testResult = rfInstance.evaluateFilter(objectMap);
 
@@ -3246,7 +3497,7 @@ public class MonitoringUtilTest {
         Test.startTest();
 
         RuleFilter__c rf = getRuleFilter(rf1.Id);
-        MonitoringUtil.RuleFilter rfInstance = new MonitoringUtil.RuleFilter(rf);
+        RuleUtil.RuleFilter rfInstance = new RuleUtil.RuleFilter(rf);
         Map<String, Object> objectMap = log.getPopulatedFieldsAsMap();
         testResult = rfInstance.evaluateFilter(objectMap);
 
@@ -3342,6 +3593,56 @@ public class MonitoringUtilTest {
         parser.addOperand(operandNumber);
         System.assertEquals(expected, parser.toConditionString());
     }
+
+	@IsTest
+	private static void test_postprocessing_fill_parent_positive(){
+		test_postprocessing_fill_parent('["UI"]', true);
+	}
+
+	@IsTest
+	private static void test_postprocessing_fill_parent(){
+		test_postprocessing_fill_parent('["UI"]', false);
+	}
+
+	private static void test_postprocessing_fill_parent(String controls, Boolean isPositive){
+		TestDataFactory.createConnectedOrg();
+
+		String testTransactionId = 'test-tran-' + System.currentTimeMillis();
+		String testInterviewGUID = 'test-guid-' + System.currentTimeMillis();
+
+		Log__c parentLog = createPostProcessingTestLog(controls, UserInfo.getOrganizationId());
+		if (isPositive) parentLog.Transaction_Id_External__c = testTransactionId;
+		parentLog.Interview_GUID_External__c = testInterviewGUID;
+		insert parentLog;
+
+		Log__c childLog = createPostProcessingTestLog(controls, UserInfo.getOrganizationId());
+		childLog.Interview_GUID_External__c = testInterviewGUID;
+		childLog.Post_Processing_Status__c = LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED;
+		insert childLog;
+
+		Test.startTest();
+		LogPostProcessingBatch.getInstance().startBatch();
+		Test.stopTest();
+
+		parentLog = [SELECT Id, Is_Parent__c, Parent__c, Post_Processing_Status__c FROM Log__c WHERE Id = :parentLog.Id LIMIT 1];
+		childLog = [SELECT Id, Is_Parent__c, Parent__c, Post_Processing_Status__c FROM Log__c WHERE Id = :childLog.Id LIMIT 1];
+
+		System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, parentLog.Post_Processing_Status__c);
+		System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, childLog.Post_Processing_Status__c);
+
+		if (isPositive) {
+			System.assertEquals(true, parentLog.Is_Parent__c);
+			System.assertEquals(null, parentLog.Parent__c);
+			System.assertEquals(false, childLog.Is_Parent__c);
+			System.assertEquals(parentLog.Id, childLog.Parent__c);
+		}
+		else {
+			System.assertEquals(false, parentLog.Is_Parent__c);
+			System.assertEquals(null, parentLog.Parent__c);
+			System.assertEquals(false, childLog.Is_Parent__c);
+			System.assertEquals(null, childLog.Parent__c);
+		}
+	}
 
     @IsTest
     private static void test_postprocessing_stacktrace_flags_st_enabled(){
@@ -3732,16 +4033,16 @@ public class MonitoringUtilTest {
     static void testGetMapRuleLogsWithNullValues() {
 
         // Create a monitoring rule with null recordIds and groupRecordIds
-        MonitoringUtil.MonitoringRule monitoringRuleWithNulls = createMonitoringRuleWithNulls();
+        RuleUtil.Rule monitoringRuleWithNulls = createMonitoringRuleWithNulls();
 
         // Create a monitoring rule with empty recordIds map
-        MonitoringUtil.MonitoringRule monitoringRuleWithEmptyMaps = createMonitoringRuleWithEmptyMaps();
+        RuleUtil.Rule monitoringRuleWithEmptyMaps = createMonitoringRuleWithEmptyMaps();
 
         // Create a monitoring rule with null values in groupRecordIds
-        MonitoringUtil.MonitoringRule monitoringRuleWithNullValues = createMonitoringRuleWithNullValues();
+        RuleUtil.Rule monitoringRuleWithNullValues = createMonitoringRuleWithNullValues();
 
         // Create a test list with all three rules
-        List<MonitoringUtil.MonitoringRule> rules = new List<MonitoringUtil.MonitoringRule>{
+        List<RuleUtil.Rule> rules = new List<RuleUtil.Rule>{
             monitoringRuleWithNulls,
             monitoringRuleWithEmptyMaps,
             monitoringRuleWithNullValues
@@ -3764,45 +4065,45 @@ public class MonitoringUtilTest {
         Test.stopTest();
 
         System.assertEquals(1, result.size(), 'Result should contain 1 entry');
-        System.assert(result.containsKey(monitoringRuleWithNullValues.ruleId), 'Result should contain entries for one valid rule');
+        System.assert(result.containsKey(monitoringRuleWithNullValues.id), 'Result should contain entries for one valid rule');
     }
 
     // Helper method to create a monitoring rule with null collections
-    private static MonitoringUtil.MonitoringRule createMonitoringRuleWithNulls() {
+    private static RuleUtil.Rule createMonitoringRuleWithNulls() {
         Rule__c rule = new Rule__c(
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_MONITORING
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING
         );
         insert rule;
 
-        MonitoringUtil.MonitoringRule monitoringRule = new MonitoringUtil.MonitoringRule(rule);
+        RuleUtil.Rule monitoringRule = new RuleUtil.Rule(rule);
         // Explicitly set to null (even though they probably are already null)
         monitoringRule.recordIds = null;
         monitoringRule.groupRecordIds = null;
-        monitoringRule.ruleId = rule.Id;
+        monitoringRule.id = rule.Id;
 
         return monitoringRule;
     }
 
     // Helper method to create a monitoring rule with empty maps
-    private static MonitoringUtil.MonitoringRule createMonitoringRuleWithEmptyMaps() {
+    private static RuleUtil.Rule createMonitoringRuleWithEmptyMaps() {
         Rule__c rule = new Rule__c(
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_MONITORING
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING
         );
         insert rule;
 
-        MonitoringUtil.MonitoringRule monitoringRule = new MonitoringUtil.MonitoringRule(rule);
+        RuleUtil.Rule monitoringRule = new RuleUtil.Rule(rule);
         // Initialize with empty collections
         monitoringRule.recordIds = new Set<String>();
         monitoringRule.groupRecordIds = new Map<String, Set<String>>();
-        monitoringRule.ruleId = rule.Id;
+        monitoringRule.id = rule.Id;
 
         return monitoringRule;
     }
 
     // Helper method to create a monitoring rule with null values in groupRecordIds
-    private static MonitoringUtil.MonitoringRule createMonitoringRuleWithNullValues() {
+    private static RuleUtil.Rule createMonitoringRuleWithNullValues() {
         Log__c log = new Log__c(
             Summary__c = 'Test Log'
         );
@@ -3810,11 +4111,11 @@ public class MonitoringUtilTest {
 
         Rule__c rule = new Rule__c(
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_MONITORING
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING
         );
         insert rule;
 
-        MonitoringUtil.MonitoringRule monitoringRule = new MonitoringUtil.MonitoringRule(rule);
+        RuleUtil.Rule monitoringRule = new RuleUtil.Rule(rule);
         // Create a set with a valid ID
         Set<String> validSet = new Set<String>{log.Id};
 
@@ -3831,7 +4132,7 @@ public class MonitoringUtilTest {
         monitoringRule.groupRecordIds.put(null, validSet);  // This creates an entry with a null key
         monitoringRule.groupRecordIds.put('nullValueInSet', nullSet); // This creates an entry with a Set containing null
 
-        monitoringRule.ruleId = rule.Id;
+        monitoringRule.id = rule.Id;
 
         return monitoringRule;
     }
@@ -4107,7 +4408,7 @@ public class MonitoringUtilTest {
     static void testEvaluateLimitsRules_BasicSpike() {
         // Test limits monitoring with basic spike detection
         enableMonitoringPermissions();
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
         
         // Create test Limits__c records
         List<Limits__c> limitsRecords = new List<Limits__c>();
@@ -4150,11 +4451,11 @@ public class MonitoringUtilTest {
         Rule__c limitsRule = new Rule__c(
             Name__c = 'Test Limits Spike Rule',
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_LIMITS,
-            Subtype__c = MonitoringUtil.RULE_SUB_TYPE_SPIKE,
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_SPIKE,
             EventTimeInterval__c = 60, // 1 hour
             AggregateType__c = 'Count',
-            ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
             Threshold__c = 50, // Trigger if percentage change >= 50%
             FilterLogic__c = '1', // Minimal filter logic for processing
             SobjectType__c = null, // null for limits rules
@@ -4168,16 +4469,16 @@ public class MonitoringUtilTest {
             Rule__c = limitsRule.Id,
             Index__c = 1,
             FieldName__c = 'Id', // Dummy field that always exists
-            ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_NOT_EQUAL,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_NOT_EQUAL,
             Value__c = 'dummy', // Will always be true since Id is never 'dummy'
-            Comparison_Type__c = MonitoringUtil.COMPARISON_TYPE_VALUE,
-            Field_Type__c = MonitoringUtil.FIELD_TYPE_STRING
+            Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+            Field_Type__c = RuleUtil.FIELD_TYPE_STRING
         );
         insert dummyFilter;
 
         // Create action for the rule
         Action__c action = new Action__c(
-            Type__c = MonitoringUtil.ACTION_TYPE_EMAIL_NOTIFICATION,
+            Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION,
             EmailTo__c = 'test@example.com',
             Subject__c = 'Limits Alert: API Usage Spike',
             EmailBody__c = 'API usage has spiked above threshold'
@@ -4193,7 +4494,7 @@ public class MonitoringUtilTest {
         Test.startTest();
         
         // Execute limits evaluation
-        Map<Id, MonitoringUtil.Event> eventsMap = new Map<Id, MonitoringUtil.Event>();
+        Map<Id, RuleUtil.Event> eventsMap = new Map<Id, RuleUtil.Event>();
         MonitoringUtil.evaluateLimitsRules(
             testLogs, 
             new List<Id>{limitsRule.Id}, 
@@ -4225,14 +4526,14 @@ public class MonitoringUtilTest {
         ];
         
         System.assertEquals(1, eventActions.size(), 'Should create one event action');
-        System.assertEquals(MonitoringUtil.ACTION_TYPE_EMAIL_NOTIFICATION, eventActions[0].Action_Type__c, 'Should create email notification action');
+        System.assertEquals(Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION, eventActions[0].Action_Type__c, 'Should create email notification action');
     }
 
     @IsTest
     static void testEvaluateLimitsRules_PercentageThreshold() {
         // Test limits monitoring with percentage-based thresholds
         enableMonitoringPermissions();
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
         
         // Create test Limits__c records
         List<Limits__c> limitsRecords = new List<Limits__c>();
@@ -4269,11 +4570,11 @@ public class MonitoringUtilTest {
         Rule__c limitsRule = new Rule__c(
             Name__c = 'Test Limits Percentage Rule',
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_LIMITS,
-            Subtype__c = MonitoringUtil.RULE_SUB_TYPE_THRESHOLD,
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_THRESHOLD,
             EventTimeInterval__c = 60, // 1 hour
             AggregateType__c = 'Count',
-            ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
             Threshold__c = 80, // Trigger if usage >= 80% of org limit
             SobjectType__c = null, // null for limits rules
             Index__c = 1,
@@ -4286,17 +4587,17 @@ public class MonitoringUtilTest {
             Rule__c = limitsRule.Id,
             Index__c = 1,
             FieldName__c = 'DataStorageMB__c',
-            ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
             Value__c = '80%', // Alert when data storage >= 80% of org limit
-            Comparison_Type__c = MonitoringUtil.COMPARISON_TYPE_VALUE,
-            Field_Type__c = MonitoringUtil.FIELD_TYPE_NUMBER
+            Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+            Field_Type__c = RuleUtil.FIELD_TYPE_NUMBER
         );
         insert ruleFilter;
 
         Test.startTest();
         
         // Execute limits evaluation
-        Map<Id, MonitoringUtil.Event> eventsMap = new Map<Id, MonitoringUtil.Event>();
+        Map<Id, RuleUtil.Event> eventsMap = new Map<Id, RuleUtil.Event>();
         MonitoringUtil.evaluateLimitsRules(
             testLogs, 
             new List<Id>{limitsRule.Id}, 
@@ -4329,7 +4630,7 @@ public class MonitoringUtilTest {
     static void testEvaluateLimitsRules_NoMatchingRecords() {
         // Test limits monitoring when no records match the criteria
         enableMonitoringPermissions();
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
         
         // Create test Limits__c records with low values
         List<Limits__c> limitsRecords = new List<Limits__c>();
@@ -4366,11 +4667,11 @@ public class MonitoringUtilTest {
         Rule__c limitsRule = new Rule__c(
             Name__c = 'Test Limits High Threshold Rule',
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_LIMITS,
-            Subtype__c = MonitoringUtil.RULE_SUB_TYPE_SPIKE,
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_SPIKE,
             EventTimeInterval__c = 60,
             AggregateType__c = 'Count',
-            ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_GREATER_THEN,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_THEN,
             Threshold__c = 5, // Require more than 5 matching records
             SobjectType__c = null, // null for limits rules
             Index__c = 1,
@@ -4383,17 +4684,17 @@ public class MonitoringUtilTest {
             Rule__c = limitsRule.Id,
             Index__c = 1,
             FieldName__c = 'DailyApiRequests__c',
-            ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_GREATER_THEN,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_THEN,
             Value__c = '10000', // Much higher than our test value of 100
-            Comparison_Type__c = MonitoringUtil.COMPARISON_TYPE_VALUE,
-            Field_Type__c = MonitoringUtil.FIELD_TYPE_NUMBER
+            Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+            Field_Type__c = RuleUtil.FIELD_TYPE_NUMBER
         );
         insert ruleFilter;
 
         Test.startTest();
         
         // Execute limits evaluation
-        Map<Id, MonitoringUtil.Event> eventsMap = new Map<Id, MonitoringUtil.Event>();
+        Map<Id, RuleUtil.Event> eventsMap = new Map<Id, RuleUtil.Event>();
         MonitoringUtil.evaluateLimitsRules(
             testLogs, 
             new List<Id>{limitsRule.Id}, 
@@ -4418,7 +4719,7 @@ public class MonitoringUtilTest {
     static void testEvaluateLimitsRules_MultipleFields() {
         // Test limits monitoring with multiple field filters
         enableMonitoringPermissions();
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
         
         // Create two snapshots to allow spike detection across multiple fields
         DateTime testTime = DateTime.now();
@@ -4457,11 +4758,11 @@ public class MonitoringUtilTest {
         Rule__c limitsRule = new Rule__c(
             Name__c = 'Test Multiple Fields Rule',
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_LIMITS,
-            Subtype__c = MonitoringUtil.RULE_SUB_TYPE_SPIKE,
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_SPIKE,
             EventTimeInterval__c = 60,
             AggregateType__c = 'Count',
-            ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
             Threshold__c = 50, // Trigger if 50% spike in any field
             FilterLogic__c = '1', // Minimal filter logic (not used in spike calc)
             SobjectType__c = null, // null for limits rules
@@ -4475,17 +4776,17 @@ public class MonitoringUtilTest {
             Rule__c = limitsRule.Id,
             Index__c = 1,
             FieldName__c = 'Id',
-            ComparisonOperator__c = MonitoringUtil.COMPARISON_OPERATOR_NOT_EQUAL,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_NOT_EQUAL,
             Value__c = 'dummy',
-            Comparison_Type__c = MonitoringUtil.COMPARISON_TYPE_VALUE,
-            Field_Type__c = MonitoringUtil.FIELD_TYPE_STRING
+            Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+            Field_Type__c = RuleUtil.FIELD_TYPE_STRING
         );
         insert dummyFilter;
 
         Test.startTest();
         
         // Execute limits evaluation
-        Map<Id, MonitoringUtil.Event> eventsMap = new Map<Id, MonitoringUtil.Event>();
+        Map<Id, RuleUtil.Event> eventsMap = new Map<Id, RuleUtil.Event>();
         MonitoringUtil.evaluateLimitsRules(
             testLogs, 
             new List<Id>{limitsRule.Id}, 
@@ -4514,13 +4815,13 @@ public class MonitoringUtilTest {
         // Create a simple rule record for ID purposes
         Rule__c rule = new Rule__c(
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_MONITORING
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING
         );
         insert rule;
 
         // Create an action record
         Action__c action = new Action__c(
-            Action_Type__c = MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION,
+            Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_SLACK_NOTIFICATION,
             Body__c = 'Test notification body',
             SlackChannels__c = 'C07P14C5UC8',
             Subject__c = 'Test Event'
@@ -4536,9 +4837,9 @@ public class MonitoringUtilTest {
         Test.startTest();
 
         // Test the specific NPE scenario: MonitoringRule with null Set values in groupRecordIds
-        MonitoringUtil.MonitoringRule monitoringRule = new MonitoringUtil.MonitoringRule(rule);
-        monitoringRule.ruleType = MonitoringUtil.RULE_TYPE_MONITORING;
-        monitoringRule.aggregateTypeString = 'Count';
+        RuleUtil.Rule monitoringRule = new RuleUtil.Rule(rule);
+        monitoringRule.type = Constants.RULE_SOBJECT.TYPE_MONITORING;
+        monitoringRule.aggregateType = 'Count';
         monitoringRule.recordIds = new Set<String>();
         monitoringRule.groupFieldNames = new Set<String>{'Type__c'};
         
@@ -4547,10 +4848,10 @@ public class MonitoringUtilTest {
         monitoringRule.groupRecordIds.put('testKey1', null); // This would have caused NPE before the fix
         monitoringRule.groupRecordIds.put('testKey2', new Set<String>{testLog.Id});
         
-        MonitoringUtil.Action testAction = new MonitoringUtil.Action(action);
-        monitoringRule.actions = new List<MonitoringUtil.Action>{testAction};
+        RuleUtil.Action testAction = new RuleUtil.Action(action);
+        monitoringRule.actions = new List<RuleUtil.Action>{testAction};
 
-        List<MonitoringUtil.MonitoringRule> rules = new List<MonitoringUtil.MonitoringRule>{monitoringRule};
+        List<RuleUtil.Rule> rules = new List<RuleUtil.Rule>{monitoringRule};
         
         List<Event__c> events;
         Boolean methodExecutedSuccessfully = false;
@@ -4586,24 +4887,24 @@ public class MonitoringUtilTest {
         // Test archival rules with null archivalLogs
         Rule__c rule = new Rule__c(
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_ARCHIVAL
+            Type__c = Constants.RULE_SOBJECT.TYPE_ARCHIVAL
         );
         insert rule;
 
         Action__c action = new Action__c(
-            Action_Type__c = MonitoringUtil.ACTION_TYPE_LOCAL_ARCHIVAL,
+            Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_LOCAL_ARCHIVAL,
             Body__c = 'Test archival action'
         );
         insert action;
 
         Test.startTest();
 
-        MonitoringUtil.MonitoringRule archivalRule = new MonitoringUtil.MonitoringRule(rule);
-        archivalRule.ruleType = MonitoringUtil.RULE_TYPE_ARCHIVAL;
+        RuleUtil.Rule archivalRule = new RuleUtil.Rule(rule);
+        archivalRule.type = Constants.RULE_SOBJECT.TYPE_ARCHIVAL;
         archivalRule.archivalLogs = null; // This would have caused NPE before the fix
-        archivalRule.actions = new List<MonitoringUtil.Action>{new MonitoringUtil.Action(action)};
+        archivalRule.actions = new List<RuleUtil.Action>{new RuleUtil.Action(action)};
 
-        List<Event__c> events = MonitoringUtil.createEvents(new List<MonitoringUtil.MonitoringRule>{archivalRule});
+        List<Event__c> events = MonitoringUtil.createEvents(new List<RuleUtil.Rule>{archivalRule});
         
         Test.stopTest();
 
@@ -4616,21 +4917,21 @@ public class MonitoringUtilTest {
         // Test monitoring rule with various null fields
         Rule__c rule = new Rule__c(
             Active__c = true,
-            Type__c = MonitoringUtil.RULE_TYPE_MONITORING
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING
         );
         insert rule;
 
         Test.startTest();
 
-        MonitoringUtil.MonitoringRule nullFieldsRule = new MonitoringUtil.MonitoringRule(rule);
-        nullFieldsRule.ruleType = MonitoringUtil.RULE_TYPE_MONITORING;
-        nullFieldsRule.aggregateTypeString = null; // null aggregate type
+        RuleUtil.Rule nullFieldsRule = new RuleUtil.Rule(rule);
+        nullFieldsRule.type = Constants.RULE_SOBJECT.TYPE_MONITORING;
+        nullFieldsRule.aggregateType = null; // null aggregate type
         nullFieldsRule.recordIds = null; // null recordIds
         nullFieldsRule.groupFieldNames = null; // null groupFieldNames
         nullFieldsRule.groupRecordIds = null; // null groupRecordIds
         nullFieldsRule.actions = null; // null actions
 
-        List<Event__c> events = MonitoringUtil.createEvents(new List<MonitoringUtil.MonitoringRule>{nullFieldsRule});
+        List<Event__c> events = MonitoringUtil.createEvents(new List<RuleUtil.Rule>{nullFieldsRule});
         
         Test.stopTest();
 
@@ -4646,12 +4947,12 @@ public class MonitoringUtilTest {
     @IsTest
     static void testGetRulesFromCache_EmptyCache() {
         // Test when cache is completely empty
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
         
         Test.startTest();
-        List<MonitoringUtil.MonitoringRule> result = MonitoringUtil.getRulesFromCache(
+        List<RuleUtil.Rule> result = RuleUtil.getRulesFromCache(
             new List<Id>(), 
-            MonitoringUtil.RULE_TYPE_NOTIFICATION, 
+            Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 
             null
         );
         Test.stopTest();
@@ -4662,80 +4963,80 @@ public class MonitoringUtilTest {
     @IsTest
     static void testGetRulesFromCache_CacheHitWithNullRuleIds() {
         // Setup test rule and cache
-        Rule__c testRule = createTestRule(MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Issue');
+        Rule__c testRule = createTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Issue');
         insert testRule;
         
-        MonitoringUtil.MonitoringRule cachedRule = new MonitoringUtil.MonitoringRule(testRule);
-        Map<Id, MonitoringUtil.MonitoringRule> ruleMap = new Map<Id, MonitoringUtil.MonitoringRule>();
+        RuleUtil.Rule cachedRule = new RuleUtil.Rule(testRule);
+        Map<Id, RuleUtil.Rule> ruleMap = new Map<Id, RuleUtil.Rule>();
         ruleMap.put(testRule.Id, cachedRule);
         
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
-        MonitoringUtil.cachedRules.put(MonitoringUtil.RULE_TYPE_NOTIFICATION, ruleMap);
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
+        RuleUtil.cachedRules.put(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, ruleMap);
         
         Test.startTest();
-        List<MonitoringUtil.MonitoringRule> result = MonitoringUtil.getRulesFromCache(
+        List<RuleUtil.Rule> result = RuleUtil.getRulesFromCache(
             null, 
-            MonitoringUtil.RULE_TYPE_NOTIFICATION, 
+            Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 
             'Issue'
         );
         Test.stopTest();
         
         System.assertNotEquals(null, result, 'Should return cached rules when cache exists');
         System.assertEquals(1, result.size(), 'Should return one rule matching sobjectType');
-        System.assertEquals(testRule.Id, result[0].ruleId, 'Should return the correct rule');
+        System.assertEquals(testRule.Id, result[0].id, 'Should return the correct rule');
     }
 
     @IsTest
     static void testGetRulesFromCache_CacheHitWithSpecificRuleIds() {
         // Setup multiple test rules
-        Rule__c testRule1 = createTestRule(MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Issue');
-        Rule__c testRule2 = createTestRule(MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Log');
+        Rule__c testRule1 = createTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Issue');
+        Rule__c testRule2 = createTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Log');
         insert new List<Rule__c>{testRule1, testRule2};
         
         // Cache both rules
-        MonitoringUtil.MonitoringRule cachedRule1 = new MonitoringUtil.MonitoringRule(testRule1);
-        MonitoringUtil.MonitoringRule cachedRule2 = new MonitoringUtil.MonitoringRule(testRule2);
-        Map<Id, MonitoringUtil.MonitoringRule> ruleMap = new Map<Id, MonitoringUtil.MonitoringRule>();
+        RuleUtil.Rule cachedRule1 = new RuleUtil.Rule(testRule1);
+        RuleUtil.Rule cachedRule2 = new RuleUtil.Rule(testRule2);
+        Map<Id, RuleUtil.Rule> ruleMap = new Map<Id, RuleUtil.Rule>();
         ruleMap.put(testRule1.Id, cachedRule1);
         ruleMap.put(testRule2.Id, cachedRule2);
         
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
-        MonitoringUtil.cachedRules.put(MonitoringUtil.RULE_TYPE_NOTIFICATION, ruleMap);
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
+        RuleUtil.cachedRules.put(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, ruleMap);
         
         Test.startTest();
-        List<MonitoringUtil.MonitoringRule> result = MonitoringUtil.getRulesFromCache(
+        List<RuleUtil.Rule> result = RuleUtil.getRulesFromCache(
             new List<Id>{testRule1.Id}, 
-            MonitoringUtil.RULE_TYPE_NOTIFICATION, 
+            Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 
             'Issue'
         );
         Test.stopTest();
         
         System.assertNotEquals(null, result, 'Should return cached rules when cache exists');
         System.assertEquals(1, result.size(), 'Should return only the requested rule that matches sobjectType');
-        System.assertEquals(testRule1.Id, result[0].ruleId, 'Should return the correct rule');
+        System.assertEquals(testRule1.Id, result[0].id, 'Should return the correct rule');
     }
 
     @IsTest
     static void testGetRulesFromCache_CacheMissPartialHit() {
         // Setup test rule
-        Rule__c testRule1 = createTestRule(MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Issue');
+        Rule__c testRule1 = createTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Issue');
         insert testRule1;
         
         // Cache only one rule
-        MonitoringUtil.MonitoringRule cachedRule1 = new MonitoringUtil.MonitoringRule(testRule1);
-        Map<Id, MonitoringUtil.MonitoringRule> ruleMap = new Map<Id, MonitoringUtil.MonitoringRule>();
+        RuleUtil.Rule cachedRule1 = new RuleUtil.Rule(testRule1);
+        Map<Id, RuleUtil.Rule> ruleMap = new Map<Id, RuleUtil.Rule>();
         ruleMap.put(testRule1.Id, cachedRule1);
         
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
-        MonitoringUtil.cachedRules.put(MonitoringUtil.RULE_TYPE_NOTIFICATION, ruleMap);
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
+        RuleUtil.cachedRules.put(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, ruleMap);
         
         // Request both cached and non-cached rule IDs
         Id nonExistentRuleId = TestDataFactory.getFakeIds(Rule__c.SObjectType, 1)[0];
         
         Test.startTest();
-        List<MonitoringUtil.MonitoringRule> result = MonitoringUtil.getRulesFromCache(
+        List<RuleUtil.Rule> result = RuleUtil.getRulesFromCache(
             new List<Id>{testRule1.Id, nonExistentRuleId}, 
-            MonitoringUtil.RULE_TYPE_NOTIFICATION, 
+            Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 
             null
         );
         Test.stopTest();
@@ -4746,47 +5047,47 @@ public class MonitoringUtilTest {
     @IsTest
     static void testGetRulesFromCache_SObjectTypeFiltering() {
         // Setup test rules with different sobjectTypes
-        Rule__c issueRule = createTestRule(MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Issue');
-        Rule__c logRule = createTestRule(MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Log');
+        Rule__c issueRule = createTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Issue');
+        Rule__c logRule = createTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Log');
         insert new List<Rule__c>{issueRule, logRule};
         
         // Cache both rules
-        MonitoringUtil.MonitoringRule cachedIssueRule = new MonitoringUtil.MonitoringRule(issueRule);
-        MonitoringUtil.MonitoringRule cachedLogRule = new MonitoringUtil.MonitoringRule(logRule);
-        Map<Id, MonitoringUtil.MonitoringRule> ruleMap = new Map<Id, MonitoringUtil.MonitoringRule>();
+        RuleUtil.Rule cachedIssueRule = new RuleUtil.Rule(issueRule);
+        RuleUtil.Rule cachedLogRule = new RuleUtil.Rule(logRule);
+        Map<Id, RuleUtil.Rule> ruleMap = new Map<Id, RuleUtil.Rule>();
         ruleMap.put(issueRule.Id, cachedIssueRule);
         ruleMap.put(logRule.Id, cachedLogRule);
         
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
-        MonitoringUtil.cachedRules.put(MonitoringUtil.RULE_TYPE_NOTIFICATION, ruleMap);
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
+        RuleUtil.cachedRules.put(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, ruleMap);
         
         Test.startTest();
-        List<MonitoringUtil.MonitoringRule> issueResults = MonitoringUtil.getRulesFromCache(
+        List<RuleUtil.Rule> issueResults = RuleUtil.getRulesFromCache(
             null, 
-            MonitoringUtil.RULE_TYPE_NOTIFICATION, 
+            Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 
             'Issue'
         );
         
-        List<MonitoringUtil.MonitoringRule> logResults = MonitoringUtil.getRulesFromCache(
+        List<RuleUtil.Rule> logResults = RuleUtil.getRulesFromCache(
             null, 
-            MonitoringUtil.RULE_TYPE_NOTIFICATION, 
+            Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 
             'Log'
         );
         
-        List<MonitoringUtil.MonitoringRule> allResults = MonitoringUtil.getRulesFromCache(
+        List<RuleUtil.Rule> allResults = RuleUtil.getRulesFromCache(
             null, 
-            MonitoringUtil.RULE_TYPE_NOTIFICATION, 
+            Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 
             null
         );
         Test.stopTest();
         
         System.assertNotEquals(null, issueResults, 'Should return Issue rules');
         System.assertEquals(1, issueResults.size(), 'Should return one Issue rule');
-        System.assertEquals(issueRule.Id, issueResults[0].ruleId, 'Should return the Issue rule');
+        System.assertEquals(issueRule.Id, issueResults[0].id, 'Should return the Issue rule');
         
         System.assertNotEquals(null, logResults, 'Should return Log rules');
         System.assertEquals(1, logResults.size(), 'Should return one Log rule');
-        System.assertEquals(logRule.Id, logResults[0].ruleId, 'Should return the Log rule');
+        System.assertEquals(logRule.Id, logResults[0].id, 'Should return the Log rule');
         
         System.assertNotEquals(null, allResults, 'Should return all rules when sobjectType is null');
         System.assertEquals(2, allResults.size(), 'Should return both rules when sobjectType is null');
@@ -4795,28 +5096,28 @@ public class MonitoringUtilTest {
     @IsTest
     static void testGetRulesFromCache_DifferentRuleTypes() {
         // Setup test rules of different types
-        Rule__c notificationRule = createTestRule(MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Issue');
-        Rule__c monitoringRule = createTestRule(MonitoringUtil.RULE_TYPE_MONITORING, 'Log');
+        Rule__c notificationRule = createTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Issue');
+        Rule__c monitoringRule = createTestRule(Constants.RULE_SOBJECT.TYPE_MONITORING, 'Log');
         insert new List<Rule__c>{notificationRule, monitoringRule};
         
         // Cache notification rule only
-        MonitoringUtil.MonitoringRule cachedNotificationRule = new MonitoringUtil.MonitoringRule(notificationRule);
-        Map<Id, MonitoringUtil.MonitoringRule> notificationRuleMap = new Map<Id, MonitoringUtil.MonitoringRule>();
+        RuleUtil.Rule cachedNotificationRule = new RuleUtil.Rule(notificationRule);
+        Map<Id, RuleUtil.Rule> notificationRuleMap = new Map<Id, RuleUtil.Rule>();
         notificationRuleMap.put(notificationRule.Id, cachedNotificationRule);
         
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
-        MonitoringUtil.cachedRules.put(MonitoringUtil.RULE_TYPE_NOTIFICATION, notificationRuleMap);
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
+        RuleUtil.cachedRules.put(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, notificationRuleMap);
         
         Test.startTest();
-        List<MonitoringUtil.MonitoringRule> notificationResults = MonitoringUtil.getRulesFromCache(
+        List<RuleUtil.Rule> notificationResults = RuleUtil.getRulesFromCache(
             null, 
-            MonitoringUtil.RULE_TYPE_NOTIFICATION, 
+            Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 
             null
         );
         
-        List<MonitoringUtil.MonitoringRule> monitoringResults = MonitoringUtil.getRulesFromCache(
+        List<RuleUtil.Rule> monitoringResults = RuleUtil.getRulesFromCache(
             null, 
-            MonitoringUtil.RULE_TYPE_MONITORING, 
+            Constants.RULE_SOBJECT.TYPE_MONITORING, 
             null
         );
         Test.stopTest();
@@ -4830,13 +5131,13 @@ public class MonitoringUtilTest {
     @IsTest
     static void testGetRulesFromCache_NullCacheValue() {
         // Setup cache with null value for a rule type
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
-        MonitoringUtil.cachedRules.put(MonitoringUtil.RULE_TYPE_NOTIFICATION, null);
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
+        RuleUtil.cachedRules.put(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, null);
         
         Test.startTest();
-        List<MonitoringUtil.MonitoringRule> result = MonitoringUtil.getRulesFromCache(
+        List<RuleUtil.Rule> result = RuleUtil.getRulesFromCache(
             null, 
-            MonitoringUtil.RULE_TYPE_NOTIFICATION, 
+            Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 
             null
         );
         Test.stopTest();
@@ -4847,45 +5148,45 @@ public class MonitoringUtilTest {
     @IsTest
     static void testAddRulesToCache_NewRuleType() {
         // Test adding rules to cache for a new rule type
-        Rule__c testRule = createTestRule(MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Issue');
+        Rule__c testRule = createTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Issue');
         insert testRule;
         
-        MonitoringUtil.MonitoringRule rule = new MonitoringUtil.MonitoringRule(testRule);
+        RuleUtil.Rule rule = new RuleUtil.Rule(testRule);
         
         // Clear cache
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
         
         Test.startTest();
-        MonitoringUtil.addRulesToCache(new List<MonitoringUtil.MonitoringRule>{rule}, MonitoringUtil.RULE_TYPE_NOTIFICATION);
+        RuleUtil.addRulesToCache(new List<RuleUtil.Rule>{rule}, Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
         Test.stopTest();
         
-        System.assert(MonitoringUtil.cachedRules.containsKey(MonitoringUtil.RULE_TYPE_NOTIFICATION), 'Cache should contain the rule type');
-        Map<Id, MonitoringUtil.MonitoringRule> ruleMap = MonitoringUtil.cachedRules.get(MonitoringUtil.RULE_TYPE_NOTIFICATION);
+        System.assert(RuleUtil.cachedRules.containsKey(Constants.RULE_SOBJECT.TYPE_NOTIFICATION), 'Cache should contain the rule type');
+        Map<Id, RuleUtil.Rule> ruleMap = RuleUtil.cachedRules.get(Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
         System.assertNotEquals(null, ruleMap, 'Rule map should not be null');
         System.assert(ruleMap.containsKey(testRule.Id), 'Rule map should contain the rule');
-        System.assertEquals(testRule.Id, ruleMap.get(testRule.Id).ruleId, 'Cached rule should have correct ID');
+        System.assertEquals(testRule.Id, ruleMap.get(testRule.Id).id, 'Cached rule should have correct ID');
     }
 
     @IsTest
     static void testAddRulesToCache_ExistingRuleType() {
         // Test adding rules to cache for an existing rule type
-        Rule__c testRule1 = createTestRule(MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Issue');
-        Rule__c testRule2 = createTestRule(MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Log');
+        Rule__c testRule1 = createTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Issue');
+        Rule__c testRule2 = createTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Log');
         insert new List<Rule__c>{testRule1, testRule2};
         
-        MonitoringUtil.MonitoringRule rule1 = new MonitoringUtil.MonitoringRule(testRule1);
-        MonitoringUtil.MonitoringRule rule2 = new MonitoringUtil.MonitoringRule(testRule2);
+        RuleUtil.Rule rule1 = new RuleUtil.Rule(testRule1);
+        RuleUtil.Rule rule2 = new RuleUtil.Rule(testRule2);
         
         // Setup initial cache with first rule
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
-        MonitoringUtil.addRulesToCache(new List<MonitoringUtil.MonitoringRule>{rule1}, MonitoringUtil.RULE_TYPE_NOTIFICATION);
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
+        RuleUtil.addRulesToCache(new List<RuleUtil.Rule>{rule1}, Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
         
         Test.startTest();
         // Add second rule to existing cache
-        MonitoringUtil.addRulesToCache(new List<MonitoringUtil.MonitoringRule>{rule2}, MonitoringUtil.RULE_TYPE_NOTIFICATION);
+        RuleUtil.addRulesToCache(new List<RuleUtil.Rule>{rule2}, Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
         Test.stopTest();
         
-        Map<Id, MonitoringUtil.MonitoringRule> ruleMap = MonitoringUtil.cachedRules.get(MonitoringUtil.RULE_TYPE_NOTIFICATION);
+        Map<Id, RuleUtil.Rule> ruleMap = RuleUtil.cachedRules.get(Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
         System.assertEquals(2, ruleMap.size(), 'Cache should contain both rules');
         System.assert(ruleMap.containsKey(testRule1.Id), 'Cache should contain first rule');
         System.assert(ruleMap.containsKey(testRule2.Id), 'Cache should contain second rule');
@@ -4894,14 +5195,14 @@ public class MonitoringUtilTest {
     @IsTest
     static void testAddRulesToCache_EmptyRulesList() {
         // Test adding empty rules list to cache
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
         
         Test.startTest();
-        MonitoringUtil.addRulesToCache(new List<MonitoringUtil.MonitoringRule>(), MonitoringUtil.RULE_TYPE_NOTIFICATION);
+        RuleUtil.addRulesToCache(new List<RuleUtil.Rule>(), Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
         Test.stopTest();
         
-        System.assert(MonitoringUtil.cachedRules.containsKey(MonitoringUtil.RULE_TYPE_NOTIFICATION), 'Cache should contain the rule type');
-        Map<Id, MonitoringUtil.MonitoringRule> ruleMap = MonitoringUtil.cachedRules.get(MonitoringUtil.RULE_TYPE_NOTIFICATION);
+        System.assert(RuleUtil.cachedRules.containsKey(Constants.RULE_SOBJECT.TYPE_NOTIFICATION), 'Cache should contain the rule type');
+        Map<Id, RuleUtil.Rule> ruleMap = RuleUtil.cachedRules.get(Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
         System.assertNotEquals(null, ruleMap, 'Rule map should not be null');
         System.assertEquals(0, ruleMap.size(), 'Rule map should be empty');
     }
@@ -4909,14 +5210,14 @@ public class MonitoringUtilTest {
     @IsTest
     static void testAddRulesToCache_NullRulesList() {
         // Test adding null rules list to cache
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
         
         Test.startTest();
-        MonitoringUtil.addRulesToCache(null, MonitoringUtil.RULE_TYPE_NOTIFICATION);
+        RuleUtil.addRulesToCache(null, Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
         Test.stopTest();
         
-        System.assert(MonitoringUtil.cachedRules.containsKey(MonitoringUtil.RULE_TYPE_NOTIFICATION), 'Cache should contain the rule type');
-        Map<Id, MonitoringUtil.MonitoringRule> ruleMap = MonitoringUtil.cachedRules.get(MonitoringUtil.RULE_TYPE_NOTIFICATION);
+        System.assert(RuleUtil.cachedRules.containsKey(Constants.RULE_SOBJECT.TYPE_NOTIFICATION), 'Cache should contain the rule type');
+        Map<Id, RuleUtil.Rule> ruleMap = RuleUtil.cachedRules.get(Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
         System.assertNotEquals(null, ruleMap, 'Rule map should not be null');
         System.assertEquals(0, ruleMap.size(), 'Rule map should be empty');
     }
@@ -4924,21 +5225,21 @@ public class MonitoringUtilTest {
     @IsTest
     static void testCachingIntegration_GetRulesCallsCache() {
         // Integration test to verify that getRules properly uses cache
-        Rule__c testRule = createTestRule(MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Issue');
+        Rule__c testRule = createTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Issue');
         insert testRule;
         
         // Clear cache and verify rule is not cached initially
-        MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
         
         Test.startTest();
         // First call should query database and populate cache
-        List<MonitoringUtil.MonitoringRule> firstCallResults = MonitoringUtil.getNotificationRules(null, 'Issue');
+        List<RuleUtil.Rule> firstCallResults = RuleUtil.getNotificationRules(null, 'Issue');
         
         // Verify cache is now populated
-        System.assert(MonitoringUtil.cachedRules.containsKey(MonitoringUtil.RULE_TYPE_NOTIFICATION), 'Cache should be populated after first call');
+        System.assert(RuleUtil.cachedRules.containsKey(Constants.RULE_SOBJECT.TYPE_NOTIFICATION), 'Cache should be populated after first call');
         
         // Second call should use cache
-        List<MonitoringUtil.MonitoringRule> secondCallResults = MonitoringUtil.getRulesFromCache(null, MonitoringUtil.RULE_TYPE_NOTIFICATION, 'Issue');
+        List<RuleUtil.Rule> secondCallResults = RuleUtil.getRulesFromCache(null, Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 'Issue');
         Test.stopTest();
         
         System.assertNotEquals(null, firstCallResults, 'First call should return results');
@@ -4946,7 +5247,7 @@ public class MonitoringUtilTest {
         System.assertEquals(firstCallResults.size(), secondCallResults.size(), 'Both calls should return same number of results');
         
         if (!firstCallResults.isEmpty() && !secondCallResults.isEmpty()) {
-            System.assertEquals(firstCallResults[0].ruleId, secondCallResults[0].ruleId, 'Both calls should return same rule');
+            System.assertEquals(firstCallResults[0].id, secondCallResults[0].id, 'Both calls should return same rule');
         }
     }
 

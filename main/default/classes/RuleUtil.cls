@@ -66,12 +66,6 @@ public with sharing class RuleUtil {
 	public static final String KEY_MESSAGE_PARAMS_RULE_ID_NOT_FOUND = 'Rule Id not found';
 	public static final String DELETE_RULE_ACTION_MESSAGE_ACTION_RESULT = 'actionResult';
 
-	public static final String EVENT_RT_MONITORING = 'Monitoring';
-	public static final String EVENT_RT_ARCHIVAL = 'Archival';
-
-	public static final String ACTION_RT_MONITORING = 'Monitoring';
-	public static final String ACTION_RT_ARCHIVAL = 'Archival';
-
 	public enum RuleType {
 		MONITORING,
 		ARCHIVAL,
@@ -79,41 +73,40 @@ public with sharing class RuleUtil {
 		NOTIFICATION,
 		BROADCAST,
 		AZURE_DEV_OPS,
-        LIMITS
+		LIMITS
 	}
-	public static final String RULE_TYPE_MONITORING = 'Monitoring';
-	public static final String RULE_TYPE_ARCHIVAL = 'Archival';
-	public static final String RULE_TYPE_JIRA_UPDATE = 'JIRA Update';
-	public static final String RULE_TYPE_AZURE_DEV_OPS = 'Azure Dev Ops';
-	public static final String RULE_TYPE_NOTIFICATION = 'Notification';
-	public static final String RULE_TYPE_EVENT_MONITORING = 'Event Monitoring';
-	public static final String RULE_TYPE_BROADCAST = 'Broadcast';
-	public static final String RULE_TYPE_LIMITS = 'Limits';
-	public static final Set<String> IGNORE_RULE_TYPES_FOR_MONITORING_EVENTS = new Set<String>{RULE_TYPE_JIRA_UPDATE, RULE_TYPE_NOTIFICATION, RULE_TYPE_BROADCAST};
+
+	public static final Set<String> IGNORE_RULE_TYPES_FOR_MONITORING_EVENTS = new Set<String>{
+		Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE,
+		Constants.RULE_SOBJECT.TYPE_NOTIFICATION,
+		Constants.RULE_SOBJECT.TYPE_BROADCAST,
+		Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS
+	};
+
 	public static final Map<String, RuleType> MAP_RULE_TYPE = new Map<String, RuleType> {
-			RULE_TYPE_MONITORING => RuleType.MONITORING,
-			RULE_TYPE_ARCHIVAL => RuleType.ARCHIVAL,
-			RULE_TYPE_JIRA_UPDATE => RuleType.JIRA_UPDATE,
-			RULE_TYPE_NOTIFICATION => RuleType.NOTIFICATION,
-			RULE_TYPE_BROADCAST => RuleType.BROADCAST,
-			RULE_TYPE_AZURE_DEV_OPS => RuleType.AZURE_DEV_OPS,
-			RULE_TYPE_LIMITS => RuleType.LIMITS
+		Constants.RULE_SOBJECT.TYPE_MONITORING => RuleType.MONITORING,
+		Constants.RULE_SOBJECT.TYPE_ARCHIVAL => RuleType.ARCHIVAL,
+		Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE => RuleType.JIRA_UPDATE,
+		Constants.RULE_SOBJECT.TYPE_NOTIFICATION => RuleType.NOTIFICATION,
+		Constants.RULE_SOBJECT.TYPE_BROADCAST => RuleType.BROADCAST,
+		Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS => RuleType.AZURE_DEV_OPS,
+		Constants.RULE_SOBJECT.TYPE_LIMITS => RuleType.LIMITS
 	};
 
 	public static final Map<String, Boolean> MAP_RULES_ENABLED = new Map<String, Boolean> {
-			RULE_TYPE_MONITORING => ConfigUtil.SETTINGS.Monitoring_Enabled__c,
-			RULE_TYPE_ARCHIVAL => ConfigUtil.SETTINGS.Archival_Enabled__c,
-			RULE_TYPE_NOTIFICATION => PermissionsUtil.NotificationIntegrationEnabled,
-			RULE_TYPE_EVENT_MONITORING => PermissionsUtil.EventMonitoringEnabled && ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c,
-			RULE_TYPE_LIMITS => PermissionsUtil.LimitsMonitoringEnabled && ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c && ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c != null
+		Constants.RULE_SOBJECT.TYPE_MONITORING => ConfigUtil.SETTINGS.Monitoring_Enabled__c,
+		Constants.RULE_SOBJECT.TYPE_ARCHIVAL => ConfigUtil.SETTINGS.Archival_Enabled__c,
+		Constants.RULE_SOBJECT.TYPE_NOTIFICATION => PermissionsUtil.NotificationIntegrationEnabled,
+		Constants.RULE_SOBJECT.TYPE_EVENT_MONITORING => PermissionsUtil.EventMonitoringEnabled && ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c,
+		Constants.RULE_SOBJECT.TYPE_LIMITS => PermissionsUtil.LimitsMonitoringEnabled && ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c && ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c != null
 	};
 
 	public static final List<String> RULE_TYPES_FOR_IMPORT_EXPORT = new List<String>{
-		RULE_TYPE_MONITORING,
-		RULE_TYPE_ARCHIVAL,
-		RULE_TYPE_JIRA_UPDATE,
-		RULE_TYPE_AZURE_DEV_OPS,
-		RULE_TYPE_NOTIFICATION
+		Constants.RULE_SOBJECT.TYPE_MONITORING,
+		Constants.RULE_SOBJECT.TYPE_ARCHIVAL,
+		Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE,
+		Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS,
+		Constants.RULE_SOBJECT.TYPE_NOTIFICATION
 	};
 
 	public enum ComparisonOperator {
@@ -124,7 +117,8 @@ public with sharing class RuleUtil {
 		LESS_THAN,
 		LESS_OR_EQUAL,
 		CONTAINS,
-		DOESNT_CONTAIN
+		DOESNT_CONTAIN,
+		IS_CHANGED
 	}
 	public static final String COMPARISON_OPERATOR_EQUAL = 'Equal';
 	public static final String COMPARISON_OPERATOR_NOT_EQUAL = 'Not equal';
@@ -134,6 +128,7 @@ public with sharing class RuleUtil {
 	public static final String COMPARISON_OPERATOR_LESS_OR_EQUAL = 'Less or equal';
 	public static final String COMPARISON_OPERATOR_CONTAINS = 'Contains';
 	public static final String COMPARISON_OPERATOR_DOSENT_CONTAINS = 'Doesn\'t Contain';
+	public static final String COMPARISON_OPERATOR_ISCHANGED = 'Is Changed';
 	public static Map<String, ComparisonOperator> MAP_COMPARISON_OPERATOR_BY_STRING = new Map<String, ComparisonOperator> {
 			COMPARISON_OPERATOR_EQUAL => ComparisonOperator.EQUAL,
 			COMPARISON_OPERATOR_NOT_EQUAL => ComparisonOperator.NOT_EQUAL,
@@ -142,7 +137,8 @@ public with sharing class RuleUtil {
 			COMPARISON_OPERATOR_LESS_THAN => ComparisonOperator.LESS_THAN,
 			COMPARISON_OPERATOR_LESS_OR_EQUAL => ComparisonOperator.LESS_OR_EQUAL,
 			COMPARISON_OPERATOR_CONTAINS => ComparisonOperator.CONTAINS,
-			COMPARISON_OPERATOR_DOSENT_CONTAINS => ComparisonOperator.DOESNT_CONTAIN
+			COMPARISON_OPERATOR_DOSENT_CONTAINS => ComparisonOperator.DOESNT_CONTAIN,
+			COMPARISON_OPERATOR_ISCHANGED => ComparisonOperator.IS_CHANGED
 	};
 
 	public enum AggregateType {
@@ -180,7 +176,7 @@ public with sharing class RuleUtil {
 	}
 	public static final String FIELD_TYPE_DOUBLE = 'DOUBLE';
 	public static final String FIELD_TYPE_DATE = 'DATE';
-	public static final String FIELD_TYPE_DATETIME = 'Datetime';
+	public static final String FIELD_TYPE_DATETIME = 'DATETIME';
 	public static final String FIELD_TYPE_ID = 'ID';
 	public static final String FIELD_TYPE_REFERENCE = 'REFERENCE';
 	public static final String FIELD_TYPE_TEXTAREA = 'TEXTAREA';
@@ -206,9 +202,9 @@ public with sharing class RuleUtil {
 	public enum ActionSubtype {
 		DEFAULT_ACTION
 	}
-	public static final String ACTION_SUBTYPE_DEFAULT = 'Default';
+
 	public static final Map<String, ActionSubtype> MAP_ACTION_SUBTYPES_BY_STRINGS = new Map<String, ActionSubtype> {
-			ACTION_SUBTYPE_DEFAULT => ActionSubtype.DEFAULT_ACTION
+		Constants.ACTION_SOBJECT.SUBTYPE_DEFAULT => ActionSubtype.DEFAULT_ACTION
 	};
 
 	public enum ActionType {
@@ -224,84 +220,68 @@ public with sharing class RuleUtil {
 		JIRA_TICKET_COMMENT,
         AZURE_DEV_OPS_WORK_ITEM_COMMENT
 	}
-	public static final String ACTION_TYPE_TEAMS_NOTIFICATION = 'Teams Notification';
-	public static final String ACTION_TYPE_EMAIL_NOTIFICATION = 'Email Notification';
-	public static final String ACTION_TYPE_SLACK_NOTIFICATION = 'Slack Notification';
-	public static final String ACTION_TYPE_JIRA_NOTIFICATION = 'Jira Notification';
-	public static final String ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION = 'Azure Dev Ops Notification';
-	public static final String ACTION_TYPE_PAGERDUTY_NOTIFICATION = 'PagerDuty Notification';
-	public static final String ACTION_TYPE_REMOVAL = 'Removal';
-	public static final String ACTION_TYPE_LOCAL_ARCHIVAL = 'Local Archival';
-	public static final String ACTION_TYPE_EXTERNAL_ARCHIVAL = 'External Archival';
-	public static final String ACTION_SUBTYPE_NOTIFICATION = 'Notification';
-	public static final String ACTION_TYPE_JIRA_TICKET_COMMENT = 'JIRA Ticket Comment';
-    public static final String ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT = 'Azure Dev Ops Work Item Comment';
 
 	public static final Map<String, ActionType> MAP_ACTION_TYPES_BY_STRINGS = new Map<String, ActionType> {
-			ACTION_TYPE_EMAIL_NOTIFICATION => ActionType.EMAIL,
-			ACTION_TYPE_SLACK_NOTIFICATION => ActionType.SLACK,
-			ACTION_TYPE_JIRA_NOTIFICATION => ActionType.JIRA,
-			ACTION_TYPE_PAGERDUTY_NOTIFICATION => ActionType.PAGERDUTY,
-			ACTION_TYPE_REMOVAL => ActionType.REMOVAL,
-			ACTION_TYPE_LOCAL_ARCHIVAL => ActionType.ARCHIVAL_TO_BIG_OBJECT,
-			ACTION_TYPE_EXTERNAL_ARCHIVAL => ActionType.EXTERNAL_ARCHIVAL,
-			ACTION_TYPE_TEAMS_NOTIFICATION => ActionType.TEAMS,
-			ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION => ActionType.AZURE_DEV_OPS,
-			ACTION_TYPE_JIRA_TICKET_COMMENT => ActionType.JIRA_TICKET_COMMENT,
-        	ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT => ActionType.AZURE_DEV_OPS_WORK_ITEM_COMMENT
+		Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION => ActionType.EMAIL,
+		Constants.ACTION_SOBJECT.ACTION_TYPE_SLACK_NOTIFICATION => ActionType.SLACK,
+		Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION => ActionType.JIRA,
+		Constants.ACTION_SOBJECT.ACTION_TYPE_PAGERDUTY_NOTIFICATION => ActionType.PAGERDUTY,
+		Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL => ActionType.REMOVAL,
+		Constants.ACTION_SOBJECT.ACTION_TYPE_LOCAL_ARCHIVAL => ActionType.ARCHIVAL_TO_BIG_OBJECT,
+		Constants.ACTION_SOBJECT.ACTION_TYPE_EXTERNAL_ARCHIVAL => ActionType.EXTERNAL_ARCHIVAL,
+		Constants.ACTION_SOBJECT.ACTION_TYPE_TEAMS_NOTIFICATION => ActionType.TEAMS,
+		Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION => ActionType.AZURE_DEV_OPS,
+		Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT => ActionType.JIRA_TICKET_COMMENT,
+		Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT => ActionType.AZURE_DEV_OPS_WORK_ITEM_COMMENT
 	};
 	public static final Map<String, List<String>> MAP_ACTION_TYPES_BY_RULE_TYPE = new Map<String, List<String>> {
-			RULE_TYPE_MONITORING => new List<String> {
-					ACTION_TYPE_EMAIL_NOTIFICATION,
-					ACTION_TYPE_SLACK_NOTIFICATION,
-					ACTION_TYPE_JIRA_NOTIFICATION,
-					ACTION_TYPE_PAGERDUTY_NOTIFICATION,
-					ACTION_TYPE_TEAMS_NOTIFICATION,
-					ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
-					ACTION_TYPE_JIRA_TICKET_COMMENT,
-					ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
-			},
-			RULE_TYPE_ARCHIVAL => new List<String> {
-					ACTION_TYPE_REMOVAL,
-					ACTION_TYPE_LOCAL_ARCHIVAL,
-					ACTION_TYPE_EXTERNAL_ARCHIVAL
-			},
-			RULE_TYPE_JIRA_UPDATE => new List<String> {
-					ACTION_TYPE_JIRA_NOTIFICATION,
-					ACTION_TYPE_JIRA_TICKET_COMMENT
-			},
-			RULE_TYPE_AZURE_DEV_OPS => new List<String>{
-					ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
-					ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
-			},
-			RULE_TYPE_NOTIFICATION => new List<String> {
-					ACTION_TYPE_EMAIL_NOTIFICATION,
-					ACTION_TYPE_SLACK_NOTIFICATION,
-					ACTION_TYPE_PAGERDUTY_NOTIFICATION,
-					ACTION_TYPE_TEAMS_NOTIFICATION,
-					ACTION_TYPE_JIRA_TICKET_COMMENT,
-					ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
-			},
-			RULE_TYPE_BROADCAST => new List<String>(),
-			RULE_TYPE_EVENT_MONITORING => new List<String>(),
-			RULE_TYPE_LIMITS => new List<String> {
-					ACTION_TYPE_EMAIL_NOTIFICATION,
-					ACTION_TYPE_SLACK_NOTIFICATION,
-					ACTION_TYPE_JIRA_NOTIFICATION,
-					ACTION_TYPE_PAGERDUTY_NOTIFICATION,
-					ACTION_TYPE_TEAMS_NOTIFICATION,
-					ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
-					ACTION_TYPE_JIRA_TICKET_COMMENT,
-					ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
-			}
+		Constants.RULE_SOBJECT.TYPE_MONITORING => new List<String> {
+			Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_SLACK_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_PAGERDUTY_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_TEAMS_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
+		},
+		Constants.RULE_SOBJECT.TYPE_ARCHIVAL => new List<String> {
+			Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_LOCAL_ARCHIVAL,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_EXTERNAL_ARCHIVAL
+		},
+		Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE => new List<String> {
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT
+		},
+		Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS => new List<String>{
+			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
+		},
+		Constants.RULE_SOBJECT.TYPE_NOTIFICATION => new List<String> {
+			Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_SLACK_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_PAGERDUTY_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_TEAMS_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
+		},
+		Constants.RULE_SOBJECT.TYPE_BROADCAST => new List<String>(),
+		Constants.RULE_SOBJECT.TYPE_EVENT_MONITORING => new List<String>(),
+		Constants.RULE_SOBJECT.TYPE_LIMITS => new List<String> {
+			Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_SLACK_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_PAGERDUTY_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_TEAMS_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
+		}
 	};
 	public static final Map<String, String> MAP_ACTION_SUBTYPES = new Map<String, String> {
-			RULE_TYPE_NOTIFICATION => ACTION_SUBTYPE_NOTIFICATION
+		Constants.RULE_SOBJECT.TYPE_NOTIFICATION => Constants.ACTION_SOBJECT.SUBTYPE_NOTIFICATION
 	};
-
-	public static final String RULE_SUBTYPE_FREQUENCY = 'Frequency';
-	public static final String RULE_SUBTYPE_IMPACT = 'Impact';
-	public static final String RULE_SUBTYPE_SPIKE = 'Spike';
 
 	public final static List<String> RULE_FIELDS = new List<String>{
 			'Id', 'Name', 'Active__c', 'Description__c', 'Related_Id__c', 'CreatedBy.Name', 'Name__c', 'ComparisonOperator__c',
@@ -331,34 +311,85 @@ public with sharing class RuleUtil {
 			'Id', 'CreatedDate', 'Created_At__c'
 	};
 
+	private static final List<String> REQUIRED_ISSUE_RULE_FIELDS = new List<String> {
+			'Id', 'CreatedDate'
+	};
+	private static final List<String> REQUIRED_TRACE_RESULT_RULE_FIELDS = new List<String> {
+			'Id', 'CreatedDate'
+	};
+
+	private static Map<String, Set<String>> REQUIRED_SOBJECT_FIELDS_BY_NAME = new Map<String, Set<String>>{
+        String.valueOf(Log__c.SObjectType) => new Set<String>(REQUIRED_RULE_FIELDS),
+        String.valueOf(Issue__c.SObjectType) => new Set<String>(REQUIRED_ISSUE_RULE_FIELDS),
+        String.valueOf(Trace_Result__c.SObjectType) => new Set<String>(REQUIRED_TRACE_RESULT_RULE_FIELDS)
+    };
+
 	public static List<String> getLogFieldNames(List<Rule> rules) {
-		List<String> logFieldLocalNames = new List<String>();
-		List<String> logFields = getLogFields(rules);
-		for (String fieldName : logFields) {
-			logFieldLocalNames.add(fieldName.replace(ConfigUtil.nameSpacePrefix, ''));
+		return getSObjectFieldNames(getLogFields(rules), rules);
+	}
+
+	public static List<String> getSObjectFieldNames(List<String> sobjectFields, List<Rule> rules) {
+		List<String> result = new List<String>();
+		for(String fieldName : sobjectFields) {
+			String logFieldLocalName = fieldName.replace(ConfigUtil.nameSpacePrefix, '');
+			result.add(fieldName.replace(ConfigUtil.nameSpacePrefix, ''));
 		}
-		return logFieldLocalNames;
+		return result;
 	}
 
 	public static List<String> getLogFields(List<Rule> rules) {
-		Set<String> filterFields = new Set<String>(REQUIRED_RULE_FIELDS);
-		Schema.DescribeSObjectResult d = Log__c.sObjectType.getDescribe();
-		Map<String, Schema.SObjectField> fieldsMap = d.fields.getMap();
+		return getSObjectFields(Log__c.sObjectType.getDescribe(), rules);
+	}
+
+	public static List<String> getIssueFields(List<Rule> rules) {
+		return getSObjectFields(Issue__c.sObjectType.getDescribe(), rules);
+	}
+
+	public static List<String> getTraceResultFields(List<Rule> rules) {
+		return getSObjectFields(Trace_Result__c.sObjectType.getDescribe(), rules);
+	}
+
+	public static List<String> getSObjectFields(Schema.DescribeSObjectResult dsr, List<Rule> rules) {
+		Set<String> filterFields = REQUIRED_SOBJECT_FIELDS_BY_NAME.get(dsr.getName());
+
+		if(dsr.getName() == String.valueOf(Log__c.SObjectType)) {
+			filterFields.addAll(getLimitsFields());
+		}
+
+		Map<String, Schema.SObjectField> fieldsMap = dsr.fields.getMap();
 		Set<String> logFieldsSet = fieldsMap.keySet();
-		for (Rule rule : rules) {
-			for (RuleFilter filter : rule.ruleFilters) {
-				if (logFieldsSet.contains(filter.fieldName.toLowerCase())) {
+
+		for(Rule rule : rules) {
+			for(RuleFilter filter : rule.ruleFilters) {
+				if(logFieldsSet.contains(filter.fieldName.toLowerCase())) {
 					filterFields.add(filter.fieldName);
 				}
 			}
-			for (String groupFiledName : rule.groupFieldNames) {
-				if (logFieldsSet.contains(groupFiledName.toLowerCase())) {
-					filterFields.add(groupFiledName);
+			if(rule?.groupFieldNames != null) {
+				for(String groupFiledName : rule.groupFieldNames) {
+					if(logFieldsSet.contains(groupFiledName.toLowerCase())) {
+						filterFields.add(groupFiledName);
+					}
 				}
 			}
+			// remove extra created_at field
+			if(rule.type.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL)) {
+				filterFields.remove(Schema.SObjectType.Log__c.fields.Created_At__c.getName());
+			}
 		}
+
 		return new List<String>(filterFields);
 	}
+
+	public static List<String> getLimitsFields() {
+        List<String> result = new List<String>();
+        
+        // Add all fields from LimitsService.FIELD_MAP with relation prefix
+        for (Schema.DescribeFieldResult fieldDescribe : LimitsService.FIELD_MAP.values()) {
+            result.add('Limits__r.' + fieldDescribe.getLocalName());
+        }
+        return result;
+    }
 
 	public static List<Rule__c> getRules(Id ruleId, String ruleType) {
 		return getRules(ruleId, new List<String>{ruleType});
@@ -397,7 +428,7 @@ public with sharing class RuleUtil {
 				.selectFields(new Set<String>(ACTION_FIELDS))
 				.add(QBuilder.condition('Action_Type__c').isIn(actionTypes))
 				.add(String.isNotBlank(subtype) ? QBuilder.condition('Subtype__c').equalsTo(subtype) : null)
-				.add(String.isBlank(subtype) ? QBuilder.condition('Subtype__c').notEqualsTo(ACTION_SUBTYPE_NOTIFICATION) : null)
+				.add(String.isBlank(subtype) ? QBuilder.condition('Subtype__c').notEqualsTo(Constants.ACTION_SOBJECT.SUBTYPE_NOTIFICATION) : null)
 				.add(QBuilder.orderBy('CreatedDate').descending())
 				.build();
 		return Database.query(query);
@@ -405,9 +436,9 @@ public with sharing class RuleUtil {
 
 	public static List<String> addAllTicketingRuleTypes(String ruleType) {
         List<String> result = new List<String>();
-        if(ruleType == RuleUtil.RULE_TYPE_JIRA_UPDATE || ruleType == RuleUtil.RULE_TYPE_AZURE_DEV_OPS) {
-            result.add(RuleUtil.RULE_TYPE_JIRA_UPDATE);
-            result.add(RuleUtil.RULE_TYPE_AZURE_DEV_OPS);
+        if(ruleType == Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE || ruleType == Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS) {
+            result.add(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE);
+            result.add(Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS);
         }
         else {
             result.add(ruleType);
@@ -642,7 +673,7 @@ public with sharing class RuleUtil {
 				.selectFields(new Set<String>(RULE_ACTION_FIELDS))
 				.add(QBuilder.condition('Action__r.Action_Type__c').isIn(actionTypes))
 				.add(String.isNotBlank(subtype) ? QBuilder.condition('Action__r.Subtype__c').equalsTo(subtype) : null)
-				.add(String.isBlank(subtype) ? QBuilder.condition('Action__r.Subtype__c').notEqualsTo(ACTION_SUBTYPE_NOTIFICATION) : null)
+				.add(String.isBlank(subtype) ? QBuilder.condition('Action__r.Subtype__c').notEqualsTo(Constants.ACTION_SOBJECT.SUBTYPE_NOTIFICATION) : null)
 				.add(QBuilder.orderBy('CreatedDate').descending())
 				.build();
 		return Database.query(query);
@@ -662,7 +693,7 @@ public with sharing class RuleUtil {
 	public static Map<String, List<SelectOptionWrapper>> getActionTypes(String ruleType) {
 		Map<String, List<SelectOptionWrapper>> result = new Map<String, List<SelectOptionWrapper>>();
 		Map<String, Schema.RecordTypeInfo> mapRecordTypeInfoByName = Schema.SObjectType.Action__c.getRecordTypeInfosByName();
-		String recordTypeName = ruleType == ACTION_RT_ARCHIVAL ? ACTION_RT_ARCHIVAL : ACTION_RT_MONITORING;
+		String recordTypeName = ruleType.equals(Constants.ACTION_SOBJECT.RT_ARCHIVAL) ? Constants.ACTION_SOBJECT.RT_ARCHIVAL : Constants.ACTION_SOBJECT.RT_MONITORING;
 		if (mapRecordTypeInfoByName.containsKey(recordTypeName)) {
 			List<SelectOptionWrapper> selectOptions = new List<SelectOptionWrapper>();
 			for (String actionType : MAP_ACTION_TYPES_BY_RULE_TYPE.get(ruleType)) {
@@ -674,7 +705,7 @@ public with sharing class RuleUtil {
 	}
 
 	public static void updateOldJiraRuleActionTypeField() {
-		List<Rule__c> rules = getRules(null, RULE_TYPE_JIRA_UPDATE);
+		List<Rule__c> rules = getRules(null, Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE);
 		Map<Id, RuleAction__c> toDelete = new Map<Id, RuleAction__c>();
 		Map<Id, Action__c> toUpdate = new Map<Id, Action__c>();
 
@@ -706,7 +737,7 @@ public with sharing class RuleUtil {
 		List<Action__c> oldDefaultAction = [
 			SELECT Id, Subtype__c
 			FROM Action__c
-			WHERE Subtype__c = :ACTION_SUBTYPE_DEFAULT
+			WHERE Subtype__c = :Constants.ACTION_SOBJECT.SUBTYPE_DEFAULT
 			LIMIT 1
 		];
 		if (!oldDefaultAction.isEmpty()) {
@@ -735,7 +766,7 @@ public with sharing class RuleUtil {
 	public static Boolean isJiraRule(String ruleId) {
 		Boolean result = false;
 		if (String.isNotBlank(ruleId)) {
-			List<Rule> rules = getRuleWrappers(RULE_TYPE_JIRA_UPDATE);
+			List<Rule> rules = getRuleWrappers(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE);
 			for (Rule rule : rules) {
 				if (rule.id != null && Id.valueOf(rule.id) == Id.valueOf(ruleId)) {
 					result = true;
@@ -790,6 +821,319 @@ public with sharing class RuleUtil {
 		return actionResult;
 	}
 
+	public static List<Rule> getArchivalRules(List<Id> ruleIds) {
+		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null);
+		if(rules == null) {
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null);
+		}
+		return rules;
+	}
+
+	public static List<Rule> getMonitoringRules(List<Id> ruleIds) {
+		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_MONITORING, null);
+		if(rules == null) {
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_MONITORING, null);
+		}
+		return rules;
+	}
+
+	public static List<Rule> getJiraRules(List<Id> ruleIds) {
+		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, null);
+		if(rules == null) {
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, null);
+		}
+		return rules;
+	}
+
+	public static List<Rule> getAzureDevOpsRules(List<Id> ruleIds) {
+		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS, null);
+		if(rules == null) {
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS, null);
+		}
+		return rules;
+	}
+
+	public static List<Rule> getAzureDevOpsRules(List<Id> ruleIds, String sobjectType) {
+		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS, sobjectType);
+		if(rules == null) {
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS, sobjectType);
+		}
+		return rules;
+	}
+
+	public static List<Rule> getJiraRules(List<Id> ruleIds, String sobjectType) {
+		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, sobjectType);
+		if(rules == null) {
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, sobjectType);
+		}
+		return rules;
+	}
+
+	public static List<Rule> getNotificationRules(List<Id> ruleIds, String sobjectType) {
+		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_NOTIFICATION, sobjectType);
+		if(rules == null) {
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_NOTIFICATION, sobjectType);
+		}
+		return rules;
+	}
+
+	public static List<Rule> getNotificationRules(List<Id> ruleIds) {
+		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_NOTIFICATION, null);
+		if(rules == null) {
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_NOTIFICATION, null);
+		}
+		return rules;
+	}
+
+	public static List<Rule> getBroadcastRules(List<Id> ruleIds) {
+		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_BROADCAST, null);
+		if(rules == null) {
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_BROADCAST, null);
+		}
+		return rules;
+	}
+
+	public static List<Rule> getLimitsRules(List<Id> ruleIds) {
+		// When specific ruleIds are provided, bypass cache to avoid stale/empty cache issues
+		if (ruleIds != null) {
+			return getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_LIMITS, null);
+		}
+		List<Rule> rules = getRulesFromCache(null, Constants.RULE_SOBJECT.TYPE_LIMITS, null);
+		if (rules == null) {
+			rules = getRules(null, Constants.RULE_SOBJECT.TYPE_LIMITS, null);
+		}
+		return rules;
+	}
+
+	public static Map<String, Map<Id, Rule>> cachedRules = new Map<String, Map<Id, Rule>>();
+
+	public static List<Rule> getRulesFromCache(List<Id> ruleIds, String ruleType, String sobjectType) {
+		List<Rule> result;
+
+		Map<Id, Rule> rulesByType = cachedRules?.get(ruleType);
+		if(!cachedRules?.containsKey(ruleType) || rulesByType == null) {
+			// Cache miss - return null to trigger DB query
+			return null;
+		}
+		
+		if(ruleIds == null) {
+			// Return all cached rules for this type, filtered by sobjectType
+			result = new List<Rule>();
+			for(Rule rule : rulesByType.values()) {
+				if(sobjectType == null || rule.sobjectType == sobjectType) {
+					result.add(rule);
+				}
+			}
+		}
+		else {
+			result = new List<Rule>();
+			Set<Id> missingRuleIds = new Set<Id>();
+
+			for(Id ruleId : ruleIds) {
+				if(rulesByType.containsKey(ruleId)) {
+					Rule rule = rulesByType.get(ruleId);
+					if(sobjectType == null || rule.sobjectType == sobjectType) {
+						result.add(rule);
+					}
+				}
+				else {
+					missingRuleIds.add(ruleId);
+				}
+			}
+			
+			// If some rules are missing from cache, return null to trigger full DB query
+			if(!missingRuleIds.isEmpty()) {
+				return null;
+			}
+		}
+		return result;
+	}
+
+	public static void addRulesToCache(List<Rule> rules, String ruleType) {
+		Map<Id, Rule> existingRules = cachedRules.get(ruleType);
+		if(existingRules == null) {
+			existingRules = new Map<Id, Rule>();
+		}
+		
+		if(rules != null && !rules.isEmpty()) {
+			for(Rule rule : rules) {
+				if(rule != null && rule.id != null) {
+					existingRules.put(rule.id, rule);
+				}
+			}
+		}
+		
+		cachedRules.put(ruleType, existingRules);
+	}
+
+	private static List<Rule> getRules(List<Id> ruleIds, String ruleType, String sobjectType) {
+		List<Rule> result = new List<Rule>();
+
+		// Only query database if not already cached
+		List<Rule__c> rules = getRuleRecords(ruleIds, ruleType);
+		for(Rule__c rule : rules) {
+			Rule ruleWrapper = new Rule(rule)
+				.addFilters(rule.RuleFilters__r)
+				.addActions(rule.RuleActions__r);
+			addRulesToCache(new List<Rule>{ruleWrapper}, ruleType);
+
+			if(sobjectType == null || rule.SObjectType__c == sobjectType) {
+				result.add(ruleWrapper);
+			}
+		}
+		if((rules == null || rules.isEmpty()) && cachedRules?.get(ruleType) == null && ruleIds == null) {
+			addRulesToCache(new List<Rule>(), ruleType);
+		}
+		return result;
+	}
+
+	private static List<Rule__c> getRuleRecords(List<Id> ruleIds, String ruleType) {
+		List<Rule__c> rules;
+		Integer limitRules = 0;
+		if(ruleType.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL)) {
+			limitRules = PermissionsUtil.MaxArchivalRules;
+		}
+		else if(ruleType.equals(Constants.RULE_SOBJECT.TYPE_MONITORING)) {
+			limitRules = PermissionsUtil.MaxMonitoringRules;
+		}
+		else if(ruleType.equals(Constants.RULE_SOBJECT.TYPE_LIMITS)) {
+			limitRules = PermissionsUtil.MaxMonitoringRules;
+		}
+		else if(ruleType.equals(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE) || ruleType.equals(Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS)) {
+			limitRules = PermissionsUtil.MaxJiraRules;
+		}
+		else if(ruleType.equals(Constants.RULE_SOBJECT.TYPE_NOTIFICATION)) {
+			limitRules = PermissionsUtil.MaxNotificationRules;
+		}
+		else if (ruleType.equals(Constants.RULE_SOBJECT.TYPE_BROADCAST)) {
+			limitRules = PermissionsUtil.MaxConnectedOrgs;
+		}
+
+		if(ruleIds != null) {
+			rules = [
+				SELECT Id, AggregateInterval__c,
+					AggregateType__c,  ComparisonOperator__c,
+					Threshold__c, FilterLogic__c,
+					EventTimeInterval__c,
+					Type__c, Subtype__c, Related_Id__c, SObjectType__c,
+					Is_Update__c, Name__c, Description__c,
+					CreatedBy.Name, Active__c, Index__c,
+					Is_Not_Valid__c,
+				(SELECT Id, Index__c, ComparisonOperator__c,
+					FieldName__c, Value__c, Is_Old__c, 
+					Comparison_Type__c, Field_Type__c,
+					Rule__c
+				FROM RuleFilters__r ORDER BY Index__c ASC NULLS LAST
+				),
+				(SELECT Id, Action__r.Type__c,
+					Action__r.Action_Type__c,
+					Action__r.Subtype__c,
+					Action__r.Body__c,
+					Action__r.CreatedDate__c,
+					Action__r.Description__c,
+					Action__r.EmailBody__c,
+					Action__r.EmailCC__c,
+					Action__r.EmailTemplateId__c,
+					Action__r.EmailTo__c,
+					Action__r.JIRAAssignee__c,
+					Action__r.JIRAAssignee_Id__c,
+					Action__r.JIRAComponents__c,
+					Action__r.JIRAEpic__c,
+					Action__r.JIRAIssueType__c,
+					Action__r.JIRALabels__c,
+					Action__r.JIRAPriority__c,
+					Action__r.JIRAProject__c,
+					Action__r.SlackChannels__c,
+					Action__r.Subject__c,
+					Action__r.PagerDuty_Type__c,
+					Action__r.Team_Id__c,
+					Action__r.Channel_Id__c,
+					Action__r.Additional_Metadata__c,
+					Action__r.Iteration__c,
+					Action__r.Is_Update__c,
+					Action__r.RecordTypeId,
+					Action__r.Contact__c,
+					Action__r.Contact__r.Name,
+					Action__r.CreatedDate,
+					Action__r.CreatedBy.Name,
+					Action__r.Name__c,
+					Action__r.SobjectType__c,
+					Action__r.Name
+				FROM RuleActions__r
+				)
+				FROM Rule__c
+				WHERE Active__c = true
+					AND Is_Not_Valid__c = false
+					AND Id IN :ruleIds
+					AND Type__c = :ruleType
+				ORDER BY Index__c ASC nulls last
+				LIMIT :limitRules
+			];
+		}
+		else {
+			rules = [
+				SELECT Id, AggregateInterval__c,
+					AggregateType__c,  ComparisonOperator__c,
+					Threshold__c, FilterLogic__c,
+					EventTimeInterval__c,
+					Type__c, Subtype__c, Related_Id__c, SObjectType__c,
+					Is_Update__c, Name__c, Description__c,
+					CreatedBy.Name, Active__c, Index__c,
+					Is_Not_Valid__c,
+				(SELECT Id, Index__c, ComparisonOperator__c,
+					FieldName__c, Value__c, Is_Old__c,
+					Comparison_Type__c, Field_Type__c,
+					Rule__c
+				FROM RuleFilters__r ORDER BY Index__c ASC NULLS LAST
+				),
+				(SELECT Id, Action__r.Type__c,
+					Action__r.Action_Type__c,
+					Action__r.Subtype__c,
+					Action__r.Body__c,
+					Action__r.CreatedDate__c,
+					Action__r.Description__c,
+					Action__r.EmailBody__c,
+					Action__r.EmailCC__c,
+					Action__r.EmailTemplateId__c,
+					Action__r.EmailTo__c,
+					Action__r.JIRAAssignee__c,
+					Action__r.JIRAAssignee_Id__c,
+					Action__r.JIRAComponents__c,
+					Action__r.JIRAEpic__c,
+					Action__r.JIRAIssueType__c,
+					Action__r.JIRALabels__c,
+					Action__r.JIRAPriority__c,
+					Action__r.JIRAProject__c,
+					Action__r.SlackChannels__c,
+					Action__r.Subject__c,
+					Action__r.PagerDuty_Type__c,
+					Action__r.Team_Id__c,
+					Action__r.Channel_Id__c,
+					Action__r.Additional_Metadata__c,
+					Action__r.Iteration__c,
+					Action__r.Is_Update__c,
+					Action__r.RecordTypeId,
+					Action__r.Contact__c,
+					Action__r.Contact__r.Name,
+					Action__r.CreatedDate,
+					Action__r.CreatedBy.Name,
+					Action__r.Name__c,
+					Action__r.SobjectType__c,
+					Action__r.Name
+				FROM RuleActions__r
+				)
+				FROM Rule__c
+				WHERE
+					Active__c = true
+					AND Is_Not_Valid__c = false
+					AND Type__c = :ruleType
+				ORDER BY Index__c ASC nulls last
+				LIMIT :limitRules
+			];
+		}
+		return rules;
+	}
+
 	public class Rule {
 		public Id id;
 		public Id relatedId;
@@ -810,12 +1154,18 @@ public with sharing class RuleUtil {
 		public Decimal threshold;
 		public Decimal value;
 		public Set<String> groupFieldNames;
+		public List<Id> archivalLogs;
 		public List<RuleFilter> ruleFilters;
 		public List<RuleAction> ruleActions;
 		public List<Action> actions;
 		public Boolean isNotValid;
 
 		public Integer maxIndex;
+		public Id eventId;
+		public String criteria;
+		public Set<String> recordIds;
+		public Map<Integer, Map<String, Decimal>> groupValues;
+		public Map<String, Set<String>> groupRecordIds;
 
 		public Rule() {}
 
@@ -844,6 +1194,11 @@ public with sharing class RuleUtil {
 			this.maxIndex = rule.maxIndex;
 			this.isNotValid = rule.isNotValid;
 			this.isUpdateRule = (rule.isUpdateRule == null) ? false : rule.isUpdateRule;
+			this.criteria = rule.criteria;
+			this.archivalLogs = rule.archivalLogs;
+			this.recordIds = new Set<String>();
+			this.groupValues = new Map<Integer, Map<String, Decimal>>();
+			this.groupRecordIds = new Map<String, Set<String>>();
 		}
 
 		public Rule(Rule__c rule) {
@@ -871,6 +1226,11 @@ public with sharing class RuleUtil {
 			this.maxIndex = 0;
 			this.isNotValid = rule.Is_Not_Valid__c;
 			this.isUpdateRule = rule.Is_Update__c;
+			this.criteria = '';
+			this.archivalLogs = new List<Id>();
+			this.recordIds = new Set<String>();
+			this.groupValues = new Map<Integer, Map<String, Decimal>>();
+			this.groupRecordIds = new Map<String, Set<String>>();
 		}
 
 		public Rule__c getRule() {
@@ -894,33 +1254,6 @@ public with sharing class RuleUtil {
 			);
 		}
 
-		public MonitoringUtil.MonitoringRule toRule() {
-			MonitoringUtil.MonitoringRule result = new MonitoringUtil.MonitoringRule();
-			result.ruleType = this.type;
-			result.filterLogic = this.filterLogic;
-
-			result.actions = new List<MonitoringUtil.Action>();
-			for(Action ra : this.actions) {
-				MonitoringUtil.Action action = new MonitoringUtil.Action();
-				action.type = ra.type;
-				action.actionType = MonitoringUtil.MAP_ACTIONTYPES_BY_STRINGS.get(action.type);
-				result.actions.add(action);
-			}
-
-			result.filters = new List<MonitoringUtil.RuleFilter>();
-			for(RuleFilter rf : this.ruleFilters) {
-				MonitoringUtil.RuleFilter ruleFilter = new MonitoringUtil.RuleFilter();
-				ruleFilter.fieldName = ruleFilter.fieldName;
-				ruleFilter.fieldType = ruleFilter.fieldType;
-				ruleFilter.value = ruleFilter.value;
-				ruleFilter.index = ruleFilter.index;
-				ruleFilter.comparisonType = ruleFilter.comparisonType;
-				ruleFilter.comparisonOperator = ruleFilter.comparisonOperator;
-				result.filters.add(ruleFilter);
-			}
-			return result;
-		}
-
 		public Rule addRuleActions(List<RuleAction__c> ruleActions) {
 			for (RuleAction__c ruleAction : ruleActions) {
 				this.ruleActions.add(new RuleAction(ruleAction));
@@ -937,10 +1270,31 @@ public with sharing class RuleUtil {
 			return this;
 		}
 
+		public Rule addFilters(List<RuleFilter> rulesFilters) {
+			this.maxIndex = 0;
+			for (RuleFilter rf : rulesFilters) {
+				if (this.type.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL) && rf.index == 1) {
+					rf.value = minutesToLabel(rf.value);
+				}
+				switch on MAP_COMPARISON_TYPES_BY_STRINGS.get(rf.comparisonType) {
+					when VALUE {
+						this.ruleFilters.add(rf);
+						this.maxIndex = Math.max(this.maxIndex, Integer.valueOf(rf.index));
+					}
+					when FIELD {
+						this.groupFieldNames.add(rf.fieldName);
+					}
+				}
+			}
+			this.ruleFilters.sort();
+			this.buildDefaultANDFilter();
+			return this;
+		}
+
 		public Rule addFilters(List<RuleFilter__c> ruleFilters) {
 			for (RuleFilter__c ruleFilter : ruleFilters) {
-				RuleFilter ruleFilterWrapper = new RuleFilter(ruleFilter);
-				if (this.type == RULE_TYPE_ARCHIVAL && ruleFilterWrapper.index == 1) {
+				RuleFilter ruleFilterWrapper = new RuleFilter(ruleFilter, this.sObjectType);
+				if (this.type == Constants.RULE_SOBJECT.TYPE_ARCHIVAL && ruleFilterWrapper.index == 1) {
 					ruleFilterWrapper.value = minutesToLabel(ruleFilterWrapper.value);
 				}
 				switch on MAP_COMPARISON_TYPES_BY_STRINGS.get(ruleFilterWrapper.comparisonType) {
@@ -970,14 +1324,14 @@ public with sharing class RuleUtil {
 			if(String.isBlank(this.filterLogic)) {
                 List<Integer> indexFilter = new List<Integer>();
                 Integer indexesCount = getIndexesCount();
-                if(this.type == RULE_TYPE_ARCHIVAL) {
+                if(this.type == Constants.RULE_SOBJECT.TYPE_ARCHIVAL) {
                     indexesCount += -1;
                 }
                 for(Integer i = 1; i <= indexesCount; i++) {
                     indexFilter.add(i);
                 }
                 this.filterLogic = String.join(indexFilter, ' AND ');
-                if(this.type == RULE_TYPE_ARCHIVAL && String.isBlank(this.filterLogic)) {
+                if(this.type == Constants.RULE_SOBJECT.TYPE_ARCHIVAL && String.isBlank(this.filterLogic)) {
                     this.filterLogic = '1';
                 }
             }
@@ -1030,9 +1384,343 @@ public with sharing class RuleUtil {
 			}
 			return result;
 		}
+
+		public void applyFilters(
+				List<Log__c> logs,
+				Integer currentInterval,
+				Integer countIntervals,
+				DateTime runDateTime,
+				Map<Id, RuleUtil.Event> eventsMap) {
+
+			applyFilters(logs, currentInterval, countIntervals, runDateTime, eventsMap, true);
+		}
+
+		public void applyFilters(
+			List<Log__c> logs,
+			Integer currentInterval,
+			Integer countIntervals,
+			DateTime runDateTime,
+			Map<Id, RuleUtil.Event> eventsMap,
+			Boolean checkLogsInterval) {
+
+			Decimal intervalValue = 0;
+			Map<Integer, Map<String, Decimal>> intervalValues = new Map<Integer, Map<String, Decimal>>();
+			Map<Integer, Map<String, Set<String>>> impactIntervalValues = new Map<Integer, Map<String, Set<String>>>();
+
+			RuleUtil.Event lastEvent = eventsMap.get(this.id);
+			DateTime lastProcessDatetime = lastEvent != null ? lastEvent.createdDate : null;
+
+			for (Log__c log : logs) {
+				Map<String, Object> objectMap = log.getPopulatedFieldsAsMap();
+				if (checkLogsInterval && !inCurrentInterval(log.Created_At__c, runDateTime, lastProcessDatetime, this.eventTimeInterval)) {
+					continue;
+				}
+
+				List<Boolean> booleanValues = new Boolean[getIndexesCount()];
+				for (RuleFilter filter : this.ruleFilters) {
+					if (MAP_COMPARISON_TYPES_BY_STRINGS.get(filter.comparisonType) == ComparisonType.VALUE) {
+						Boolean booleanValue = filter.evaluateFilter(objectMap);
+						Integer index = Integer.valueOf(filter.index) - 1;
+						booleanValues.set(index, booleanValue);
+					}
+				}
+
+				Boolean rulesResult = (String.isNotBlank(this.filterLogic))
+					? FilterEvaluator.evaluate(this.filterLogic, booleanValues)
+					: true;
+
+				if (rulesResult) {
+					if (!this.groupFieldNames.isEmpty() || this.aggregateInterval != null || this.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_FREQUENCY)) {
+						if (this.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_IMPACT)) {
+							String groupKey = getGroupByKey(objectMap);
+							String countKey = getFisrtGroupByKey(objectMap);
+							if (String.isNotBlank(countKey) && countKey != 'null') {
+								Map<String, Set<String>> currentIntervalImpactIntervalValues = impactIntervalValues.get(currentInterval) != null
+									? impactIntervalValues.get(currentInterval)
+									: new Map<String, Set<String>>();
+
+								Set<String> unicCountKeys = currentIntervalImpactIntervalValues.get(groupKey) != null
+									? currentIntervalImpactIntervalValues.get(groupKey)
+									: new Set<String>();
+								unicCountKeys.add(countKey);
+								currentIntervalImpactIntervalValues.put(groupKey, unicCountKeys);
+								impactIntervalValues.put(currentInterval, currentIntervalImpactIntervalValues);
+
+								Set<String> intervalRecordIds = (this.groupRecordIds.get(groupKey) != null)
+									? this.groupRecordIds.get(groupKey)
+									: new Set<String>();
+								intervalRecordIds.add(log.Id);
+								this.groupRecordIds.put(groupKey, intervalRecordIds);
+							}
+						} else {
+							String key = getGroupKey(objectMap);
+							Map<String, Decimal> currentIntervalIntervalValues = intervalValues.get(currentInterval) != null
+								? intervalValues.get(currentInterval)
+								: new Map<String, Decimal>();
+							Decimal groupIntervalValue = (currentIntervalIntervalValues.get(key) != null) ? currentIntervalIntervalValues.get(key) : 0;
+							groupIntervalValue += 1;
+							currentIntervalIntervalValues.put(key, groupIntervalValue);
+							intervalValues.put(currentInterval, currentIntervalIntervalValues);
+
+							Set<String> intervalRecordIds = (this.groupRecordIds.get(key) != null)
+								? this.groupRecordIds.get(key)
+								: new Set<String>();
+							intervalRecordIds.add(log.Id);
+							this.groupRecordIds.put(key, intervalRecordIds);
+						}
+					} else {
+						intervalValue += 1;
+						this.recordIds.add(log.Id);
+					}
+				}
+			}
+			if (logs.isEmpty()) {
+				if (!this.groupFieldNames.isEmpty() || this.aggregateInterval != null || this.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_FREQUENCY)) {
+					this.groupValues.put(currentInterval, new Map<String, Decimal>{'' => 0});
+					this.groupRecordIds.put('', new Set<String>());
+				}
+			}
+			switch on MAP_AGGREGATE_TYPES_BY_STRINGS.get(this.aggregateType) {
+				when COUNT {
+					if (!this.groupFieldNames.isEmpty() || this.aggregateInterval != null || this.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_FREQUENCY)) {
+						if (this.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_IMPACT)) {
+							for (Integer interval : impactIntervalValues.keySet()) {
+								for (String countKey : impactIntervalValues.get(interval).keySet()) {
+									Integer unicKeySize = impactIntervalValues.get(interval).get(countKey).size();
+									Map<String, Decimal> intervalGroupValues = this.groupValues.get(interval) != null
+										? this.groupValues.get(interval)
+										: new Map<String, Decimal>();
+									intervalGroupValues.put(countKey, unicKeySize);
+									this.groupValues.put(interval, intervalGroupValues);
+								}
+							}
+						} else {
+							for (Integer interval : intervalValues.keySet()) {
+								Map<String, Decimal> intervalGroupValues = this.groupValues.get(interval) != null
+									? this.groupValues.get(interval)
+									: new Map<String, Decimal>();
+								Map<String, Decimal> currentIntervalValues = intervalValues.get(interval);
+								intervalGroupValues.putAll(currentIntervalValues);
+								this.groupValues.put(interval, intervalGroupValues);
+							}
+						}
+					} else {
+						this.value += Integer.valueOf(intervalValue);
+					}
+				}
+				when AVERAGE {
+					if (!this.groupFieldNames.isEmpty() || this.aggregateInterval != null || this.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_FREQUENCY)) {
+						if (this.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_IMPACT)) {
+							for (Integer interval : impactIntervalValues.keySet()) {
+								for (String countKey : impactIntervalValues.get(interval).keySet()) {
+									Integer unicKeySize1 = impactIntervalValues.get(interval).get(countKey).size();
+
+									Decimal unicKeySize2 = (this.groupValues.get(interval) != null
+										&& this.groupValues.get(interval).get(countKey) != null)
+											? this.groupValues.get(interval).get(countKey)
+											: 0;
+									Decimal resultValue = unicKeySize1 + unicKeySize2;
+									Map<String, Decimal> intervalGroupValues = this.groupValues.get(interval) != null
+										? this.groupValues.get(interval)
+										: new Map<String, Decimal>();
+									intervalGroupValues.put(countKey, resultValue);
+									this.groupValues.put(interval, intervalGroupValues);
+								}
+							}
+						} else {
+							for (Integer interval : intervalValues.keySet()) {
+								for (String key : intervalValues.get(interval).keySet()) {
+									Decimal keyValue1 = intervalValues.get(interval).get(key);
+									Decimal keyValue2 = (this.groupValues.get(interval) != null
+										&& this.groupValues.get(interval).get(key) != null)
+											? this.groupValues.get(interval).get(key)
+											: 0;
+									Decimal resultValue = keyValue1 + keyValue2;
+									Map<String, Decimal> intervalGroupValues = this.groupValues.get(interval) != null
+											? this.groupValues.get(interval)
+											: new Map<String, Decimal>();
+									intervalGroupValues.put(key, resultValue);
+									this.groupValues.put(interval, intervalGroupValues);
+								}
+							}
+						}
+						if (currentInterval == countIntervals) {
+							for (Integer interval : this.groupValues.keySet()) {
+								for (String key : this.groupValues.get(interval).keySet()) {
+									Decimal keyValue = this.groupValues.get(interval).get(key);
+									keyValue = keyValue / countIntervals;
+									this.groupValues.get(interval).put(key, keyValue);
+								}
+							}
+						}
+					} else {
+						this.value += intervalValue;
+						if (currentInterval == countIntervals) {
+							this.value = this.value / countIntervals;
+						}
+					}
+				}
+			}
+		}
+
+		public Boolean isUpdateRule() {
+			return this.isUpdateRule;
+		}
+
+		public DateTime nextRunTime(DateTime currentTime) {
+			return this.eventTimeInterval != null ? currentTime.addMinutes(Integer.valueOf(this.eventTimeInterval)) : null;
+		}
+
+		public Set<ActionType> getRuleActionTypes() {
+			Set<ActionType> result = new Set<ActionType>();
+			for (Action action : this.actions) {
+				result.add(MAP_ACTION_TYPES_BY_STRINGS.get(action.type));
+			}
+			return result;
+		}
+
+		public void populateCriteria() {
+			List<String> filterValues = new String[getIndexesCount()];
+			for (RuleFilter filter : this.ruleFilters) {
+				if (MAP_COMPARISON_TYPES_BY_STRINGS.get(filter.comparisonType) == ComparisonType.VALUE) {
+					if (this.type.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL) && filter.index == 1) {
+						Integer index = this.ruleFilters.size() - 1;
+						filterValues.set(index, filter.getStringFilter());
+					} else {
+						Integer index = Integer.valueOf(filter.index) - (this.type.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL) ? 2 : 1);
+						filterValues.set(index, filter.getStringFilter());
+					}
+				}
+			}
+			if (String.isNotBlank(this.filterLogic) && this.type.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL)) {
+				ConfigUtil.BooleanExpressionParser parser = new ConfigUtil.BooleanExpressionParser(this.filterLogic);
+				Set<String> existOperands = parser.getOperands();
+				if (!existOperands.contains(String.valueOf(this.ruleFilters.size()))) {
+					parser.addOperand(String.valueOf(this.ruleFilters.size()));
+					this.filterLogic = parser.toConditionString();
+				}
+			}
+			this.criteria = (String.isNotBlank(this.filterLogic))
+				? FilterEvaluator.substituteValues(this.filterLogic, filterValues)
+				: '';
+
+			if (!this.groupFieldNames.isEmpty()) {
+				this.criteria += ' GROUP BY ' + String.join(new List<String>(this.groupFieldNames), ',');
+			}
+		}
+
+		public Set<Id> applyNotificationRules(List<SObject> records) {
+			return applyNotificationRules(records, null, null);
+		}
+
+		public Set<Id> applyNotificationRules(List<SObject> records, Schema.SObjectField subField) {
+			return applyNotificationRules(records, null, null);
+		}
+
+		public Set<Id> applyNotificationRules(List<SObject> records, Schema.SObjectField subField, Map<Id, SObject> oldRecords) {
+			Set<Id> result = new Set<Id>();
+			for (SObject record : records) {
+				Id recordId = (Id)record.get('Id');
+				Map<String, Object> objectMap = (subField != null)
+					? record.getSObject(subField).getPopulatedFieldsAsMap()
+					: record.getPopulatedFieldsAsMap();
+				Map<String, Object> oldObjectMap = (oldRecords != null && oldRecords.containsKey(recordId) && oldRecords.get(recordId) != null)
+					? oldRecords.get(recordId).getPopulatedFieldsAsMap()
+					: null;
+				List<Boolean> booleanValues = new Boolean[getIndexesCount()];
+
+				for (RuleFilter filter : this.ruleFilters) {
+					if (MAP_COMPARISON_TYPES_BY_STRINGS.get(filter.comparisonType) == ComparisonType.VALUE) {
+						Boolean booleanValue = false;
+						if (MAP_COMPARISON_OPERATOR_BY_STRING.get(filter.comparisonOperator) == RuleUtil.ComparisonOperator.IS_CHANGED) {
+							Object oldValue = oldRecords?.get(recordId)?.get(filter.fieldName);
+							Object newValue = record?.get(filter.fieldName);
+							booleanValue = oldValue != newValue;
+						} else {
+							booleanValue = filter.evaluateFilter((oldObjectMap != null && filter.isOld) ? oldObjectMap : objectMap);
+						}
+						Integer index = Integer.valueOf(filter.index) - 1;
+						booleanValues.set(index, booleanValue);
+					}
+				}
+				Boolean rulesResult = (String.isNotBlank(this.filterLogic))
+					? FilterEvaluator.evaluate(this.filterLogic, booleanValues)
+					: true;
+
+				if (rulesResult) {
+					result.add(String.valueOf(record.get('Id')));
+				}
+			}
+			return result;
+		}
+
+		public void applyArchivalRules(List<Log__c> logs) {
+			for (Log__c log : logs) {
+				Map<String, Object> objectMap = log.getPopulatedFieldsAsMap();
+				List<Boolean> booleanValues = new Boolean[getIndexesCount()];
+
+				for (RuleFilter filter : this.ruleFilters) {
+					if (MAP_COMPARISON_TYPES_BY_STRINGS.get(filter.comparisonType) == ComparisonType.VALUE) {
+						Integer index = Integer.valueOf(filter.index) - 1;
+						if (filter.isFilterable || filter.index == 1) {
+							booleanValues.set(index, true);
+						} else {
+							Boolean booleanValue = filter.evaluateFilter(objectMap);
+							booleanValues.set(index, booleanValue);
+						}
+					}
+				}
+
+				Boolean rulesResult = (String.isNotBlank(this.filterLogic))
+					? FilterEvaluator.evaluate(this.filterLogic, booleanValues)
+					: true;
+
+				if (rulesResult) {
+					this.archivalLogs.add(log.Id);
+				}
+			}
+		}
+
+		private String getFisrtGroupByKey(Map<String, Object> objectMap) {
+			String result = '';
+			List<String> groupFieldsLocal = new List<String>{(new List<String>(this.groupFieldNames)).get(0)};
+			for (String fieldName : groupFieldsLocal) {
+				result += String.valueOf(objectMap.get(fieldName));
+			}
+			return result;
+		}
+
+		private String getGroupKey(Map<String, Object> objectMap) {
+			String result = '';
+			for (String fieldName : this.groupFieldNames) {
+				result += String.valueOf(objectMap.get(fieldName));
+			}
+			return result;
+		}
+
+		private String getGroupByKey(Map<String, Object> objectMap) {
+			String result = '';
+			List<String> groupFieldsLocal = new List<String>(this.groupFieldNames);
+			if (this.groupFieldNames.size() > 1) {
+				groupFieldsLocal.remove(0);
+			}
+			for (String fieldName : groupFieldsLocal) {
+				result += String.valueOf(objectMap.get(fieldName));
+			}
+			return result;
+		}
 	}
 
-	public class RuleFilter implements Comparable{
+	public static Map<RuleUtil.ComparisonOperator, QCondition.ComparisonOperator> FILTER_TO_CONDITION_MAP = new Map<RuleUtil.ComparisonOperator, QCondition.ComparisonOperator>{
+        RuleUtil.ComparisonOperator.EQUAL => QCondition.ComparisonOperator.EQUALS,
+        RuleUtil.ComparisonOperator.NOT_EQUAL => QCondition.ComparisonOperator.NOT_EQUALS,
+        RuleUtil.ComparisonOperator.GREATER_THAN => QCondition.ComparisonOperator.GREATER_THAN,
+        RuleUtil.ComparisonOperator.GREATER_OR_EQUAL => QCondition.ComparisonOperator.GREATER_OR_EQUAL,
+        RuleUtil.ComparisonOperator.LESS_THAN => QCondition.ComparisonOperator.LESS_THAN,
+        RuleUtil.ComparisonOperator.LESS_OR_EQUAL => QCondition.ComparisonOperator.LESS_OR_EQUAL
+    };
+
+	public class RuleFilter implements Comparable {
 		public Id id;
 		public Id ruleId;
 		public String value;
@@ -1045,10 +1733,53 @@ public with sharing class RuleUtil {
 		public Decimal index;
 		public Boolean isFilterable;
 		public Boolean isOld;
+		public String sobjectType;
 
 		public RuleFilter() {}
 
+		public RuleFilter(Decimal index, String comparisonType, String comparisonOperator, String fieldName, String value, String sobjectType, Boolean isOld) {
+			this.index = index;
+			this.comparisonType = comparisonType;
+			this.comparisonOperator = comparisonOperator;
+			this.fieldName = fieldName;
+			this.value = value;
+			this.isOld = isOld;
+
+			Boolean isLogField = sobjectType == null
+				&& String.isNotBlank(this.fieldName)
+				&& ConfigUtil.MAP_LOG_FIELDS.get(this.fieldName.toLowerCase()) != null;
+			Boolean isIssueField = (sobjectType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME || sobjectType == Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME)
+				&& String.isNotBlank(this.fieldName)
+				&& ConfigUtil.MAP_ISSUE_FIELDS.get(this.fieldName.toLowerCase()) != null;
+			Boolean isTraceResultField = sobjectType == Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME
+				&& String.isNotBlank(this.fieldName)
+				&& ConfigUtil.MAP_TRACE_RESULT_FIELDS.get(this.fieldName.toLowerCase()) != null;
+
+			Schema.DescribeFieldResult fieldDR;
+
+			if (isLogField) {
+                this.fieldType = String.valueOf(ConfigUtil.MAP_LOG_FIELDS.get(this.fieldName.toLowerCase()).getType());
+                fieldDR = ConfigUtil.MAP_LOG_FIELDS.get(this.fieldName.toLowerCase());
+            }
+			else if (isIssueField) {
+				this.fieldType = String.valueOf(ConfigUtil.MAP_ISSUE_FIELDS.get(this.fieldName.toLowerCase()).getType());
+				fieldDR = ConfigUtil.MAP_ISSUE_FIELDS.get(this.fieldName.toLowerCase());
+			}
+			else if (isTraceResultField) {
+				this.fieldType = String.valueOf(ConfigUtil.MAP_TRACE_RESULT_FIELDS.get(this.fieldName.toLowerCase()).getType());
+				fieldDR = ConfigUtil.MAP_TRACE_RESULT_FIELDS.get(this.fieldName.toLowerCase());
+			}
+
+			this.isFilterable = fieldDR != null && fieldDR.isFilterable()
+				&& MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) != RuleUtil.ComparisonOperator.CONTAINS
+				&& MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) != RuleUtil.ComparisonOperator.DOESNT_CONTAIN;
+		}
+
 		public RuleFilter(RuleFilter__c ruleFilter) {
+			this(ruleFilter, null);
+		}
+
+		public RuleFilter(RuleFilter__c ruleFilter, String sobjectType) {
 			this.id = ruleFilter.Id;
 			this.ruleId = ruleFilter.Rule__c;
 			this.value = ruleFilter.Value__c;
@@ -1058,9 +1789,30 @@ public with sharing class RuleUtil {
 			this.comparisonOperator = ruleFilter.ComparisonOperator__c;
 			this.index = ruleFilter.Index__c;
 			this.isOld = ruleFilter.Is_Old__c == null ? false : ruleFilter.Is_Old__c;
+			this.sobjectType = sobjectType;
 
-			this.isFilterable = ConfigUtil.MAP_LOG_FIELDS.containsKey(this.fieldName.toLowerCase())
-				&& ConfigUtil.MAP_LOG_FIELDS.get(this.fieldName.toLowerCase()).isFilterable()
+			Boolean isLogField = sobjectType == null
+				&& String.isNotBlank(this.fieldName)
+				&& ConfigUtil.MAP_LOG_FIELDS.containsKey(this.fieldName.toLowerCase());
+			Boolean isIssueField = (sobjectType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME || sobjectType == Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME)
+				&& String.isNotBlank(this.fieldName)
+				&& ConfigUtil.MAP_ISSUE_FIELDS.containsKey(this.fieldName.toLowerCase());
+			Boolean isTraceResultField = sobjectType == Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME
+				&& String.isNotBlank(this.fieldName)
+				&& ConfigUtil.MAP_TRACE_RESULT_FIELDS.containsKey(this.fieldName.toLowerCase());
+
+			Schema.DescribeFieldResult fieldDR;
+			if (isLogField) {
+				fieldDR = ConfigUtil.MAP_LOG_FIELDS.get(this.fieldName.toLowerCase());
+			}
+			else if (isIssueField) {
+				fieldDR = ConfigUtil.MAP_ISSUE_FIELDS.get(this.fieldName.toLowerCase());
+			}
+			else if (isTraceResultField) {
+				fieldDR = ConfigUtil.MAP_TRACE_RESULT_FIELDS.get(this.fieldName.toLowerCase());
+			}
+
+			this.isFilterable = fieldDR != null && fieldDR.isFilterable()
 				&& MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) != RuleUtil.ComparisonOperator.CONTAINS
 				&& MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) != RuleUtil.ComparisonOperator.DOESNT_CONTAIN;
 		}
@@ -1078,6 +1830,37 @@ public with sharing class RuleUtil {
 				Is_Old__c = (isOld == null ? false : isOld)
 			);
 		}
+
+		public QCondition toQCondition() {
+            QCondition.ComparisonOperator comparisonOperator = FILTER_TO_CONDITION_MAP.get(MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator));
+            return toQCondition(comparisonOperator);
+        }
+
+        public QCondition toQCondition(QCondition.ComparisonOperator comparisonOperator) {
+            QCondition condition = new QCondition(this.fieldName);
+            Object fieldValue = this.value;
+			RuleUtil.FieldType fieldType = this.getFieldType();
+            switch on fieldType {
+                when FT_DOUBLE, FT_NUMBER {
+                    fieldValue = Decimal.valueOf(this.value);
+                }
+                when FT_DATE {
+                    fieldValue = Date.valueOf(this.value);
+                }
+                when FT_DATETIME {
+                    fieldValue = Datetime.valueOf(this.value);
+                }
+                when FT_BOOLEAN {
+                    fieldValue = Boolean.valueOf(this.value);
+                }
+            }
+            comparisonOperator = comparisonOperator == null ? QCondition.ComparisonOperator.NOP : comparisonOperator;
+            condition.setOperatorValue(
+                comparisonOperator,
+                fieldValue
+            );
+            return condition;
+        }
 
 		public String getStringFilter() {
 			String result = '';
@@ -1115,12 +1898,8 @@ public with sharing class RuleUtil {
 
 		public Boolean evaluateFilter(Map<String, Object> objectMap) {
 			Boolean result = false;
-			RuleUtil.FieldType fieldType;
-			if (String.isNotBlank(this.fieldName)
-					&& ConfigUtil.MAP_LOG_FIELDS.get(this.fieldName.toLowerCase()) != null) {
-				String displayType = String.valueOf(ConfigUtil.MAP_LOG_FIELDS.get(this.fieldName.toLowerCase()).getType());
-				fieldType = MAP_FIELD_TYPES_BY_STRINGS.get(displayType);
-			}
+			RuleUtil.FieldType fieldType = this.getFieldType();
+			
 			switch on fieldType {
 				when FT_BOOLEAN {
 					switch on MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) {
@@ -1288,12 +2067,37 @@ public with sharing class RuleUtil {
 		}
 
 		public Integer compareTo(Object compareTo) {
-            RuleFilter that = (RuleFilter)compareTo;
-            if (this.index == that.index) return 0;
-            if (this.index == null) return 1;
-            if (that.index == null) return -1;
-            return (this.index > that.index) ? 1 : -1;
-        }
+			RuleFilter that = (RuleFilter)compareTo;
+			if (this.index == that.index) return 0;
+			if (this.index == null) return 1;
+			if (that.index == null) return -1;
+			return (this.index > that.index) ? 1 : -1;
+		}
+
+		public RuleUtil.FieldType getFieldType() {
+			RuleUtil.FieldType fieldType;
+			if (String.isNotBlank(this.fieldName)) {
+				Boolean isLogField = this.sobjectType == null
+					&& ConfigUtil.MAP_LOG_FIELDS.get(this.fieldName.toLowerCase()) != null;
+				Boolean isIssueField = (this.sobjectType == Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME || this.sobjectType == Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME)
+					&& ConfigUtil.MAP_ISSUE_FIELDS.get(this.fieldName.toLowerCase()) != null;
+				Boolean isTraceResultField = this.sobjectType == Constants.TRACE_RESULT_SOBJECT.SOBJECT_TYPE_NAME
+					&& ConfigUtil.MAP_TRACE_RESULT_FIELDS.get(this.fieldName.toLowerCase()) != null;
+
+				String displayType;
+				if (isLogField) {
+					displayType = String.valueOf(ConfigUtil.MAP_LOG_FIELDS.get(this.fieldName.toLowerCase()).getType());
+				}
+				else if (isIssueField) {
+					displayType = String.valueOf(ConfigUtil.MAP_ISSUE_FIELDS.get(this.fieldName.toLowerCase()).getType());
+				}
+				else if (isTraceResultField) {
+					displayType = String.valueOf(ConfigUtil.MAP_TRACE_RESULT_FIELDS.get(this.fieldName.toLowerCase()).getType());
+				}
+				fieldType = MAP_FIELD_TYPES_BY_STRINGS.get(displayType);
+			}
+			return fieldType;
+		}
 	}
 
 	public class RuleAction {
@@ -1503,7 +2307,7 @@ public with sharing class RuleUtil {
 					JIRALabels__c = jiraLabels,
 					JIRAIssueType__c = jiraIssueType,
 					JIRAEpic__c = jiraEpic,
-					JIRAComponents__c = type == ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION ? area : jiraComponents,
+					JIRAComponents__c = type == Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION ? area : jiraComponents,
 					Iteration__c = iteration,
 					Additional_Metadata__c = additionalMetadata,
 					Name__c = actionName,
@@ -1998,14 +2802,25 @@ public with sharing class RuleUtil {
 				// If this is not the last field in the path, it's a relationship field
 				// Try both the field name as-is and with 'Id' suffix for relationship fields
 				else if (i < fieldParts.size() - 1) {
-					// For relationship fields, try the field name with 'Id' suffix first
-					if (fieldMap.containsKey(fieldName + 'Id')) {
+					// For relationship fields ending with __r, convert to __c to find the lookup field
+					String lookupFieldName = fieldName;
+					if (fieldName.endsWith('__r')) {
+						lookupFieldName = fieldName.substring(0, fieldName.length() - 3) + '__c';
+					}
+					
+					// For relationship fields, try different variations
+					if (fieldMap.containsKey(lookupFieldName)) {
+						actualFieldName = lookupFieldName;
+					} else if (fieldMap.containsKey(fieldName + 'Id')) {
 						actualFieldName = fieldName + 'Id';
 					} else if (fieldMap.containsKey(fieldName)) {
 						actualFieldName = fieldName;
 					} else {
 						// Try case-insensitive lookup
-						actualFieldName = findFieldCaseInsensitive(fieldMap, fieldName);
+						actualFieldName = findFieldCaseInsensitive(fieldMap, lookupFieldName);
+						if (actualFieldName == null) {
+							actualFieldName = findFieldCaseInsensitive(fieldMap, fieldName);
+						}
 						if (actualFieldName == null) {
 							actualFieldName = findFieldCaseInsensitive(fieldMap, fieldName + 'Id');
 						}
@@ -2193,6 +3008,12 @@ public with sharing class RuleUtil {
 					return 'string';
 				}
 
+				// Handle relationship field traversal (e.g., Parent__r.CreatedDate)
+				if (fieldName.contains('.')) {
+					return getSalesforceFieldTypeForRelationship(objectType, fieldName);
+				}
+
+				// Handle direct field access
 				Schema.DescribeSObjectResult objectDescribe = objectType.getDescribe();
 				Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
 				
@@ -2201,39 +3022,128 @@ public with sharing class RuleUtil {
 					return 'string';
 				}
 
-				Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
-				Schema.DisplayType displayType = fieldDescribe.getType();
-
-				// Map Salesforce field types to our runtime types
-				switch on displayType {
-					when INTEGER, LONG {
-						return 'integer';
-					}
-					when DOUBLE, CURRENCY, PERCENT {
-						return 'decimal';
-					}
-					when DATE {
-						return 'date';
-					}
-					when DATETIME {
-						return 'datetime';
-					}
-					when BOOLEAN {
-						return 'boolean';
-					}
-					when URL {
-						return 'url';
-					}
-					when MULTIPICKLIST {
-						return 'multivalue';
-					}
-					when else {
-						return 'string';
-					}
-				}
+				return mapSalesforceTypeToRuntimeType(field.getDescribe().getType());
 			} catch (Exception e) {
 				// If field lookup fails, default to string
 				return 'string';
+			}
+		}
+
+		/**
+		 * Gets the Salesforce field type for relationship field traversal
+		 */
+		private String getSalesforceFieldTypeForRelationship(Schema.SObjectType currentObjectType, String fieldPath) {
+			try {
+				List<String> fieldParts = fieldPath.split('\\.');
+				Schema.SObjectType currentType = currentObjectType;
+				
+				for (Integer i = 0; i < fieldParts.size(); i++) {
+					String fieldName = fieldParts[i];
+					Schema.DescribeSObjectResult objectDescribe = currentType.getDescribe();
+					Map<String, Schema.SObjectField> fieldMap = objectDescribe.fields.getMap();
+					
+					String actualFieldName;
+					
+					// Handle special case for 'Link' suffix
+					if (fieldName.endsWith('Link')) {
+						actualFieldName = 'Id';
+					}
+					// If this is not the last field in the path, it's a relationship field
+					else if (i < fieldParts.size() - 1) {
+						// For relationship fields ending with __r, convert to __c to find the lookup field
+						String lookupFieldName = fieldName;
+						if (fieldName.endsWith('__r')) {
+							lookupFieldName = fieldName.substring(0, fieldName.length() - 3) + '__c';
+						}
+						
+						// For relationship fields, try different variations
+						if (fieldMap.containsKey(lookupFieldName)) {
+							actualFieldName = lookupFieldName;
+						} else if (fieldMap.containsKey(fieldName + 'Id')) {
+							actualFieldName = fieldName + 'Id';
+						} else if (fieldMap.containsKey(fieldName)) {
+							actualFieldName = fieldName;
+						} else {
+							// Try case-insensitive lookup
+							actualFieldName = findFieldCaseInsensitive(fieldMap, lookupFieldName);
+							if (actualFieldName == null) {
+								actualFieldName = findFieldCaseInsensitive(fieldMap, fieldName);
+							}
+							if (actualFieldName == null) {
+								actualFieldName = findFieldCaseInsensitive(fieldMap, fieldName + 'Id');
+							}
+							if (actualFieldName == null) {
+								return 'string';
+							}
+						}
+					} else {
+						// For the last field in the path, use the field name as-is
+						actualFieldName = fieldName;
+					}
+					
+					Schema.SObjectField field = fieldMap.get(actualFieldName);
+					if (field == null) {
+						return 'string';
+					}
+
+					// If this is the last field in the path, return its type
+					if (i == fieldParts.size() - 1) {
+						return mapSalesforceTypeToRuntimeType(field.getDescribe().getType());
+					}
+
+					// If this is not the last field, traverse to the referenced object
+					Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+					List<Schema.sObjectType> referenceTo = fieldDescribe.getReferenceTo();
+					if (referenceTo.isEmpty()) {
+						return 'string';
+					}
+					
+					// Move to the referenced object for the next iteration
+					currentType = referenceTo[0];
+				}
+				
+				return 'string';
+			} catch (Exception e) {
+				return 'string';
+			}
+		}
+
+		/**
+		 * Maps Salesforce field types to runtime types
+		 */
+		private String mapSalesforceTypeToRuntimeType(Schema.DisplayType displayType) {
+			// Map Salesforce field types to our runtime types
+			switch on displayType {
+				when INTEGER, LONG {
+					return 'integer';
+				}
+				when DOUBLE, CURRENCY, PERCENT {
+					return 'decimal';
+				}
+				when DATE {
+					return 'date';
+				}
+				when DATETIME {
+					return 'datetime';
+				}
+				when BOOLEAN {
+					return 'boolean';
+				}
+				when URL {
+					return 'url';
+				}
+				when MULTIPICKLIST {
+					return 'multivalue';
+				}
+				when TEXTAREA {
+					return 'textarea';
+				}
+				when STRING, PICKLIST, EMAIL, PHONE {
+					return 'string';
+				}
+				when else {
+					return 'string';
+				}
 			}
 		}
 
@@ -2280,10 +3190,14 @@ public with sharing class RuleUtil {
 					'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
 					'datetime'
 				},
+				'textarea' => new Set<String>{
+					'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
+					'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
+					'string'
+				},
 				'url' => new Set<String>{
 					'com.atlassian.jira.plugin.system.customfieldtypes:url',
 					'com.atlassian.jira.plugin.system.customfieldtypes:textfield',
-					'com.atlassian.jira.plugin.system.customfieldtypes:textarea',
 					'url'
 				},
 				'multivalue' => new Set<String>{
@@ -2312,8 +3226,8 @@ public with sharing class RuleUtil {
 		 * Checks if this action is JIRA-related
 		 */
 		private Boolean isJiraAction() {
-			return type == ACTION_TYPE_JIRA_NOTIFICATION || 
-				   type == ACTION_TYPE_JIRA_TICKET_COMMENT;
+			return type == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION || 
+				   type == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT;
 		}
 
 	}
@@ -2362,5 +3276,4 @@ public with sharing class RuleUtil {
 			return (this.objectName + '.' + this.fieldName).hashCode();
 		}
 	}
-
 }

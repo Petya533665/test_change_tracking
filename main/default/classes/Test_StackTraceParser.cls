@@ -221,16 +221,57 @@ public class Test_StackTraceParser {
                 for (FlowDataStructures.FlowEdge  flowEdge : flowEdges) {
                     // goto route
                     if (flowEdge.target == 'Account_Selection_Scree') {
-                        System.assertEquals(true, flowEdge.indexes.contains(7));
+                        System.assertEquals(true, flowEdge.indexes.contains(8));
                     }
                     // create opp route
                     if (flowEdge.target == 'Createopp') {
-                        System.assertEquals(true, flowEdge.indexes.contains(12));
+                        System.assertEquals(true, flowEdge.indexes.contains(13));
                     }
                 }
             }
         }
     }
+
+	@IsTest
+	static void test_handle_flow_error_with_skip() {
+
+		Test_LogService.initSettings();
+
+		//ErrorEmailHandler
+		Messaging.InboundEmail email = new Messaging.InboundEmail() ;
+		Messaging.InboundEnvelope env = new Messaging.InboundEnvelope();
+
+		List<string> emails = new List<string>{'testemail1@gmail.com'};
+
+		email.subject = 'An error occurred with your "DY_Screen_Flow_Update_Communication_Prefs" flow';
+		email.fromAddress = 'system@salesforce.com';
+		email.toAddresses = emails;
+		email.htmlBody = Test_LogService.getTestStub('FLOW_STACKTRACE_HANDLED_ERROR_WITH_LOGGING');
+
+		Test.startTest();
+		StackTraceParser.corg = ConnectedOrgService.getConnectedOrgById(Test_LogService.CONNECETED_ORG_NAME);
+		Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(Test_LogService.getTestStub('FLOW_STACKTRACE_HANDLED_ERROR_WITH_LOGGING_METADATA')));
+
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.putAll(createPostProcessingMock('DY_Screen_Flow_Update_Communication_Prefs', 'testnewmp', 3));
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		LogTriggerHelper.runPostProcessingBatchInTest = true;
+
+		LogService.CUSTOM_SKIP_TEST_VALUE = true;
+
+		ErrorEmailHandler testInbound = new ErrorEmailHandler();
+		testInbound.handleInboundEmail(email, env);
+		Test.stopTest();
+
+		Inbound_Email__c inboundEmail = [SELECT Id, Error__c, Log__c FROM Inbound_Email__c LIMIT 1];
+		System.assertEquals(null, inboundEmail.Error__c, 'No error should be populated');
+		System.assertEquals(null, inboundEmail.Log__c, 'No log should be created');
+
+		List<Log__c> logs = [SELECT Id FROM Log__c LIMIT 1];
+		System.assertEquals(0, logs.size(), 'No logs should be created');
+	}
 
     @IsTest
     static void test_handle_flow_handled_error_with_logging() {
@@ -961,6 +1002,48 @@ public class Test_StackTraceParser {
     }
 
     @IsTest
+    private static void testParseScheduledFlowStackTraceWithDebuggerMode() {
+
+        Test_LogService.initSettings(); 
+
+        Test.startTest();
+
+        StackTraceParser.corg = ConnectedOrgService.getConnectedOrgById(Test_LogService.CONNECETED_ORG_NAME);
+
+        Test.setMock(WebServiceMock.class, new YourWebServiceMockImpl(Test_LogService.getTestStub('FLOW_SCHEDULED_STACKTRACE_METADATA_IN_DEBUG_MODE')));
+        String stacktrace = String.valueOf(Test_LogService.getTestStub('FLOW_SCHEDULED_STACKTRACE_IN_DEBUG_MODE'));
+        FlowDataStructures.Flow flow = FlowService.parseFlowStackTrace(stacktrace);
+        System.assertNotEquals(null, flow);
+        System.assertNotEquals(null, flow.elements);
+        System.assertNotEquals(null, flow.edges);
+        System.assertEquals(true, flow.elements.containsKey('Chatter_for_opportunity'));
+        Test.stopTest();
+
+        Map<String, FlowDataStructures.FlowElement> elements = flow.elements;
+        FlowDataStructures.FlowElement createOppElement = flow.elements.get('Chatter_for_opportunity');
+        System.assertNotEquals(null, createOppElement);
+        System.assertEquals(true, createOppElement.executed);
+
+        Map<String, Set<FlowDataStructures.FlowEdge>> edges = flow.edges;
+        System.assertNotEquals(null, edges);
+        System.assertEquals(true, edges.containsKey('start'));
+
+        Set<FlowDataStructures.FlowEdge> startEdges = edges.get('start');
+        System.assertNotEquals(null, startEdges);
+        System.assertEquals(true, startEdges.size() == 3);
+        
+        FlowDataStructures.FlowEdge edgeFromStartToFirstElement = null;
+        for(FlowDataStructures.FlowEdge edge : startEdges) {
+            if (edge.target == 'Chatter_for_opportunity') {
+                edgeFromStartToFirstElement = edge;
+            }
+        }
+        System.assertNotEquals(null, edgeFromStartToFirstElement);
+        System.assertEquals(true, edgeFromStartToFirstElement.indexes.size() == 1);
+        System.assertEquals(true, edgeFromStartToFirstElement.indexes.contains(1));
+    }
+
+    @IsTest
     private static void testFlowParserFromManagedPackage() {
 
         Test_LogService.initSettings();
@@ -1227,9 +1310,14 @@ public class Test_StackTraceParser {
     private static Map<String, HttpCalloutMock> getPendingJobsMock() {
         Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
 
+        final List<String> JOB_STATUSES = new List<String>{
+            Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUS_QUEUED,
+            Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUS_PROCESSING,
+            Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUS_PREPARING
+        };
         String query = new QBuilder(AsyncApexJob.SObjectType)
             .selectFields(LogPostProcessingService.ASYNC_JOB_FIELDS)
-            .add(QBuilder.condition('Status').isIn(new String[] {'Processing','Preparing','Queued'}))
+            .add(QBuilder.condition('Status').isIn(JOB_STATUSES))
             .add(QBuilder.condition('JobType').notEqualsTo('BatchApexWorker'))
             .addLimit(1000)
             .build();
@@ -3173,5 +3261,61 @@ public class Test_StackTraceParser {
         System.assert(String.isNotBlank(log.Salesforce_License_Type_Name__c));
         System.assert(String.isNotBlank(log.Role_Id__c));
         System.assert(String.isNotBlank(log.Role_Name__c));
+    }
+
+    @IsTest
+    static void test_error_email_handler_should_create_log_and_inbound_email() {
+        Test_LogService.initSettings();
+
+        // Create an Apex error email that will trigger post processing
+        String orgId = Test_LogService.CONNECETED_ORG_NAME;
+        String userId = UserInfo.getUserId();
+        String jobId = '707fi000008E26a';
+
+        String apexErrorContent = 'Apex script unhandled exception by user/organization: ' + userId.left(15) + '/' + orgId.left(15) + '\n\n' +
+                                'Organization: homerlsd (homerlsd-dev-ed.develop.my.salesforce.com).\n\n' +
+                                'Failed to process Queueable job for class TestBatchOne for job ID ' + jobId + '.\n\n' +
+                                'caused by: System.NullPointerException: Attempt to de-reference a null object\n\n' +
+                                'Class.TestBatchOne.execute: line 4, column 1\n\n';
+
+        // Create inbound email with Apex error
+        Messaging.InboundEmail email = new Messaging.InboundEmail();
+        Messaging.InboundEnvelope env = new Messaging.InboundEnvelope();
+        
+        email.subject = 'Developer script exception from homerlsd : TestBatchOne for job ID ' + jobId + '. : Attempt to de-reference a null object';
+        email.fromAddress = 'system@salesforce.com';
+        email.toAddresses = new List<String>{'test@pharos.com'};
+        email.plainTextBody = apexErrorContent;
+        
+        Messaging.InboundEmail.Header dateHeader = new Messaging.InboundEmail.Header();
+        dateHeader.name = 'Date';
+        dateHeader.value = '01 Jun 2023 14:31:46 -0700';
+        email.headers = new List<Messaging.InboundEmail.Header>{dateHeader};
+
+        // Setup mocks for post processing
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        endpoint2TestResp.putAll(createPostProcessingMock(null, null, 1));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        // Enable post processing batch to run in test
+        LogTriggerHelper.runPostProcessingBatchInTest = true;
+
+        Test.startTest();
+        
+        ErrorEmailHandler testInbound = new ErrorEmailHandler();
+        testInbound.handleInboundEmail(email, env);
+        
+        Test.stopTest();
+
+        // Verify that a log was created
+        List<Log__c> logs = [SELECT Id, Category__c, Summary__c, Post_Processing_Status__c, Async_Job_Id__c FROM Log__c WHERE Category__c = 'Apex' LIMIT 1];
+        System.assertNotEquals(null, logs[0].Async_Job_Id__c, 'Async job ID should be populated');
+        System.assertEquals(1, logs.size(), 'One Apex log should be created');
+        
+        // Verify inbound email record was created correctly
+        List<Inbound_Email__c> inboundEmails = [SELECT Id, Error__c, Log__c FROM Inbound_Email__c WHERE Log__c = :logs[0].Id];
+        System.assertEquals(1, inboundEmails.size(), 'Inbound email record should be created');
+        System.assertEquals(logs[0].Id, inboundEmails[0].Log__c, 'Should be linked to our log');
     }
 }

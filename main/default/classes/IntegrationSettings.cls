@@ -49,9 +49,10 @@ public with sharing class IntegrationSettings {
             if (mdtSettings != null) {
                 HttpUtils.HttpURLParameters bodyParams = new HttpUtils.HttpURLParameters();
                 bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_ID, mdtSettings.Client_Id__c);
-                bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_RESPONSE_TYPE, 'Assertion');
+                bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_RESPONSE_TYPE, GraphAPIService.GRAPH_API_TOKEN_RESPONSE_TYPE_CODE);
                 bodyParams.addParameter(HttpUtils.HTTP_URL_PARAM_REDIRECT_URI, LoggerSettingsController.PHAROS_OUATH_CALLBACK_PROXY);
-                bodyParams.addEncodedParameterWithFixedWhitespace(HttpUtils.HTTP_URL_PARAM_SCOPE, mdtSettings.Extended_Scope__c);
+                bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_RESPONSE_MODE, GraphAPIService.GRAPH_API_TOKEN_RESPONSE_MODE_QUERY);
+                bodyParams.addEncodedParameterWithFixedWhitespace(HttpUtils.HTTP_URL_PARAM_SCOPE, GraphAPIService.AZURE_DEVOPS_API_SCOPE);
 
                 Map<String, Object> state = new Map<String, Object>{
                     'redirectUrl' => ConfigUtil.URL_VF_CALLBACK_PAGE_SETTINGS,
@@ -59,7 +60,7 @@ public with sharing class IntegrationSettings {
                 };
 
                 bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_STATE, EncodingUtil.base64Encode(Blob.valueOf(JSON.serialize(state))));
-                azureDevOpsSettings.oAuthEndpoint = AzureService.AZURE_DEVOPS_API_AUTHORIZE_ENDPOINT + bodyParams.toStringParameters('?');
+                azureDevOpsSettings.oAuthEndpoint = GraphAPIService.GRAPH_API_AUTHORIZE_ENDPOINT + bodyParams.toStringParameters('?');
                 
                 try {
                     AzureService.AzureDevOpsMyProfile myProfile = AzureService.getMyProfile(AzureService.OAUTH_API_TOKEN);
@@ -227,7 +228,7 @@ public with sharing class IntegrationSettings {
     public class Jira {
 
         public final String ERROR_MESSAGE_JIRA_CONNECTION_COULD_NOT_BE_ESTABLISHED = 
-            'Jira connection could not be established, please check the Logs tab for more details. Or add a custom priority mapping via custom settings.';
+            'Jira connection could not be established, please check the Logs tab for more details.';
         public final String ERROR_MESSAGE_JIRA_TOKEN_IS_EMPTY_OR_INVALID = 'Jira Token is empty or invalid';
 
         public JIRA_FORM_TYPE getFormType(Object jiraSettingsObject) {
@@ -319,6 +320,8 @@ public with sharing class IntegrationSettings {
                 ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c = jiraSettings.apiToken;
             }
 
+            Boolean hasPrioritySchemesError = false;
+
             if (ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c != null
                 && String.isNotBlank(JiraService.JIRA_OAUTH_TOKEN)) {
                 try {
@@ -326,10 +329,23 @@ public with sharing class IntegrationSettings {
                     JiraService.JIRA_API_URL = null;
                     
                     JiraService.JiraServiceInterface service = JiraService.getService(true);
+                    // for hosted instances, use v2 API
+                    if (jiraSettings.username != JiraService.JIRA_CLOUD_OAUTH_USERNAME) {
+                        JiraService.API_REST_BASE =  JiraService.JIRA_API_URL + JiraService.API_REST + JiraService.API_VERSION_V2;
+                    }
                     JiraService.validateConnectionToJiraSettings();
                     jiraSettings.projects = service.getProjects();
                     jiraSettings.priorities = service.getPriorities();
-                    jiraSettings.prioritySchemes = service.getPrioritySchemes();
+
+                    try {
+                        jiraSettings.prioritySchemes = service.getPrioritySchemes();
+                    } catch(Exception e) {
+                        if (e.getMessage()?.startsWith('403:')) {
+                            hasPrioritySchemesError = true;
+                        }
+                        throw e;
+                    }
+                    
                     jiraSettings.isConnectionValid = true;
                 }
                 catch(Exception e) {
@@ -337,7 +353,12 @@ public with sharing class IntegrationSettings {
                         Log__c errorLog = Logger.getInstance().getInternalError(e, null, AdminService.class.getName(), 'validateJiraSetting');
                         errorLog.Summary__c = ('Failed Jira Authentication: ' + errorLog.Summary__c).abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH);
                         Logger.getInstance().internalError(errorLog, true);
-                        throw new IntegrationSettingsException(ERROR_MESSAGE_JIRA_CONNECTION_COULD_NOT_BE_ESTABLISHED);
+
+                        String errorMessage = ERROR_MESSAGE_JIRA_CONNECTION_COULD_NOT_BE_ESTABLISHED;
+                        if (hasPrioritySchemesError) {
+                            errorMessage += ' Add a custom priority mapping via custom settings.';
+                        }
+                        throw new IntegrationSettingsException(errorMessage);
                     }
                     else {
                         jiraSettings.connectionErrorMessage = e.getMessage();

@@ -30,6 +30,7 @@ public with sharing class LoggerSettingsController {
             if (e instanceof HttpUtils.HttpUtilsException) {
                 AdminService.debugSession((HttpUtils.HttpUtilsException)e, 'generateTokenForConnectedOrg');
             }
+            Logger.getInstance().addInternalError(e, LoggerSettingsController.class.getName(), 'generateTokenForConnectedOrg');
         }
         Logger.getInstance().flush();
         return JSON.serialize(output);
@@ -73,7 +74,9 @@ public with sharing class LoggerSettingsController {
         } catch (Exception e) {
             output.put('status', 'error');
             output.put('message', e.getMessage());
+            Logger.getInstance().addInternalError(e, LoggerSettingsController.class.getName(), 'generateTokenForSlack');
         }
+        Logger.getInstance().flush();
         return JSON.serialize(output);
     }
 
@@ -117,28 +120,33 @@ public with sharing class LoggerSettingsController {
         } catch (Exception e) {
             output.put('status', 'error');
             output.put('message', e.getMessage());
+            Logger.getInstance().addInternalError(e, LoggerSettingsController.class.getName(), 'generateTokenForGraph');
         }
+        Logger.getInstance().flush();
         return JSON.serialize(output);
     }
 
-    //https://learn.microsoft.com/en-us/azure/devops/integrate/get-started/authentication/oauth?toc=%2Fazure%2Fdevops%2Fmarketplace-extensibility%2Ftoc.json&view=azure-devops
     @RemoteAction
     public static String generateTokenForAzureDevOps (String inputJson) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(inputJson);
         Map<String, Object> output = new Map<String, Object>();
         try {
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.GRAPH_API_TOKEN_REQUEST_NAME, Constants.REMOTE_SITE_SETTINGS.GRAPH_API_TOKEN_REQUEST_URL, Constants.REMOTE_SITE_SETTINGS.GRAPH_API_TOKEN_REQUEST_DESCRIPTION);
+            AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.GRAPH_API_REQUEST_NAME, Constants.REMOTE_SITE_SETTINGS.GRAPH_API_REQUEST_URL, Constants.REMOTE_SITE_SETTINGS.GRAPH_API_REQUEST_DESCRIPTION);
+
             AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.AZURE_DO_API_TOKEN_REQUEST_NAME, Constants.REMOTE_SITE_SETTINGS.AZURE_DO_API_TOKEN_REQUEST_URL, Constants.REMOTE_SITE_SETTINGS.AZURE_DO_API_TOKEN_REQUEST_DESCRIPTION);
             AdminService.upsertRemoteSiteSetting(Constants.REMOTE_SITE_SETTINGS.AZURE_DO_REST_API_NAME, Constants.REMOTE_SITE_SETTINGS.AZURE_DO_REST_API_URL, Constants.REMOTE_SITE_SETTINGS.AZURE_DO_REST_API_DESCRIPTION);
-
+            
             OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(AzureService.AZURE_DEVOPS_API_SETTINGS_NAME);
-            String extendedClientSecret = [SELECT Extended_Client_Secret__c FROM OAuthSettings__mdt WHERE DeveloperName =:AzureService.AZURE_DEVOPS_API_SETTINGS_NAME LIMIT 1].Extended_Client_Secret__c;
-            String endpoint = AzureService.AZURE_DEVOPS_API_GET_TOKEN_ENDPOINT;
+            String endpoint = GraphAPIService.GRAPH_API_GET_TOKEN_ENDPOINT;
             HttpUtils.HttpURLParameters bodyParams = new HttpUtils.HttpURLParameters();
-            bodyParams.addParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_ASSERTATION_TYPE, HttpUtils.HTTP_URL_PARAM_CLIENT_ASSERTATION_TYPE_VALUE_JWT);
-            bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_ASSERTATION, extendedClientSecret);
-            bodyParams.addParameter(HttpUtils.HTTP_URL_PARAM_GRANT_TYPE, HttpUtils.HTTP_URL_PARAM_GRANT_TYPE_VALUE_JWT);
-            bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_ASSERTATION, (String)input.get('code'));
-            bodyParams.addParameter(HttpUtils.HTTP_URL_PARAM_REDIRECT_URI, (String)input.get('return_url'));
+            bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CODE, (String)input.get('code'));
+            bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_ID, mdtSettings.Client_Id__c);
+            bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_SECRET, mdtSettings.Client_Secret__c);
+            bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_GRANT_TYPE, GraphAPIService.GRAPH_API_TOKEN_GRANT_TYPE_AUTHORIZATION_CODE);
+            bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_RESPONSE_TYPE, GraphAPIService.GRAPH_API_TOKEN_RESPONSE_TYPE_CODE);
+            bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_REDIRECT_URI, (String)input.get('return_url'));
+            bodyParams.addEncodedParameterWithFixedWhitespace(HttpUtils.HTTP_URL_PARAM_SCOPE, GraphAPIService.AZURE_DEVOPS_API_SCOPE);
 
             String b = HttpUtils.post(
                 endpoint,
@@ -170,7 +178,9 @@ public with sharing class LoggerSettingsController {
         } catch (Exception e) {
             output.put('status', 'error');
             output.put('message', e.getMessage());
+            Logger.getInstance().addInternalError(e, LoggerSettingsController.class.getName(), 'generateTokenForAzureDevOps');
         }
+        Logger.getInstance().flush();
         return JSON.serialize(output);
     }
 
@@ -208,7 +218,9 @@ public with sharing class LoggerSettingsController {
         } catch (Exception e) {
             output.put('status', 'error');
             output.put('message', e.getMessage());
+            Logger.getInstance().addInternalError(e, LoggerSettingsController.class.getName(), 'generateTokenForGitHub');
         }
+        Logger.getInstance().flush();
         return JSON.serialize(output);
     }
 
@@ -293,7 +305,9 @@ public with sharing class LoggerSettingsController {
         } catch (Exception e) {
             output.put('status', 'error');
             output.put('message', e.getMessage());
+            Logger.getInstance().addInternalError(e, LoggerSettingsController.class.getName(), 'generateTokenForJira');
         }
+        Logger.getInstance().flush();
         return JSON.serialize(output);
     }
 

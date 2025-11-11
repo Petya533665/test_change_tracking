@@ -180,7 +180,7 @@ public with sharing class GitHubCommitBatch extends DatabaseUtils.PharosBatchImp
             if(PermissionsUtil.GitHubIntegrationEnabled && PermissionsUtil.ChangeTrackingEnabled) {
                 AWSGitServiceRequest request = new AWSGitServiceRequest(corg, packageXML);
                 Map<String, String> headers = GitHubUtils.authHeaders();
-                headers.putAll(HttpUtils.getHeadersContentTypeJSON());
+                headers.putAll(HttpUtils.getHeadersWithApiKeyAndJson());
 
                 String b = HttpUtils.post(
                     GitHubUtils.AWS_GIT_SERVICE_ENDPOINT,

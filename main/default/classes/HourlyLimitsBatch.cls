@@ -1,4 +1,4 @@
-public class HourlyLimitsBatch extends DatabaseUtils.PharosBatchImpl implements Database.Batchable<SObject>, Schedulable, Database.Stateful {
+public class HourlyLimitsBatch extends DatabaseUtils.PharosBatchImpl implements Database.Batchable<SObject>, Schedulable, Database.Stateful, Database.AllowsCallouts {
 
     public static final String CATEGORY = 'Pharos';
     public static final String TYPE = 'HourlyLimitsBatch';
@@ -30,7 +30,7 @@ public class HourlyLimitsBatch extends DatabaseUtils.PharosBatchImpl implements 
     }
 
     public override Boolean initialValidation() {
-        return PermissionsUtil.MonitoringEnabled && ConfigUtil.SETTINGS.Monitoring_Enabled__c && needToRunBatch();
+        return PermissionsUtil.LimitsMonitoringEnabled && ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c && needToRunBatch();
     }
 
     public override Integer getIterationsCount() {
@@ -64,16 +64,44 @@ public class HourlyLimitsBatch extends DatabaseUtils.PharosBatchImpl implements 
         catch (Exception e) {
             loggerInstance?.addInternalError(e, null, 'HourlyLimitsBatch', '.finish');
         }
-        loggerInstance?.flush();
+        loggerInstance?.flushAsync();
     }
 
+    @TestVisible
     private static Boolean needToRunBatch() {
-        // Check if it's time to run the batch (hourly)
+        // Check if it's time to run the batch based on configured frequency
         DateTime lastRun = getLastHourlyLimitsRunTime();
         DateTime now = DateTime.now();
         
-        // Run if no previous run or if more than 55 minutes have passed
-        return lastRun == null || lastRun.addMinutes(55) <= now;
+        // Get the configured frequency in hours (default to 1 hour if not set or invalid)
+        Integer frequencyHours = getFrequencyHours();
+        Integer freqTolerance = 5;
+        
+        // Run if no previous run or if the configured frequency period has passed
+        return lastRun == null || lastRun.addHours(frequencyHours).addMinutes(-freqTolerance) <= now;
+    }
+
+    public static Integer getFrequencyHours() {
+        // Get the configured frequency, default to 1 hour if not set or invalid
+        String frequencyStr = ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c;
+        Integer frequency = 1; // Default to 1 hour
+        Integer maxFrequency = 23; // Maximum frequency is 23 hours
+        Integer minFrequency = 1; // Minimum frequency is 1 hour
+        
+        if (String.isNotBlank(frequencyStr)) {
+            try {
+                Integer configuredFrequencyMinutes = Integer.valueOf(frequencyStr);
+                Integer configuredFrequencyHours = configuredFrequencyMinutes / 60;
+                // Validate range: 1-23 hours
+                if (configuredFrequencyHours >= minFrequency && configuredFrequencyHours <= maxFrequency) {
+                    frequency = configuredFrequencyHours;
+                }
+            }
+            // use default if invalid
+            catch (Exception e) {}
+        }
+        
+        return frequency;
     }
 
     private static DateTime getLastHourlyLimitsRunTime() {

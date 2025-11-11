@@ -1,5 +1,9 @@
 public class EventMonitoringProcessors {
 
+    // Static map to track logs count per event type per hour to fix the logs limit bug
+    // Key format: eventType + ':' + hourKey (YYYY-MM-DD-HH)
+    private static Map<String, Integer> globalLogsCountPerHour = new Map<String, Integer>();
+
     // Map of event type to event log processor class
     public static Map<String, Type> processorTypes = new Map<String, Type>{ 
         EventLogProcessors.EVENT_TYPE_API => SOAPApiEventLogProcessor.class,
@@ -195,12 +199,43 @@ public class EventMonitoringProcessors {
             this.eventType = eventType;
             this.thresholdManagerInstance = ThresholdManager.getInstance();
             this.logsLimitPerHour = thresholdManagerInstance.logsLimitPerHour.get(this.eventType);
-            this.currentLogsCount = 0;
+            
+            // Initialize currentLogsCount from global tracking map
+            String hourKey = getCurrentHourKey();
+            String globalKey = this.eventType + ':' + hourKey;
+            this.currentLogsCount = EventMonitoringProcessors.globalLogsCountPerHour.get(globalKey);
+            if (this.currentLogsCount == null) {
+                this.currentLogsCount = 0;
+                EventMonitoringProcessors.globalLogsCountPerHour.put(globalKey, 0);
+            }
 
             this.eventLogBuilder = LogBuilder.getInstance()
                 .type(eventType)
                 .category(getLogCategory(eventType))
                 .area(getLogArea(eventType));
+        }
+        
+        /**
+         * Get current hour key for tracking logs per hour
+         * Format: YYYY-MM-DD-HH
+         */
+        private String getCurrentHourKey() {
+            DateTime now = DateTime.now();
+            return now.format('yyyy-MM-dd-HH');
+        }
+        
+        /**
+         * Increment the global logs count for this event type and hour
+         */
+        private void incrementGlobalLogsCount() {
+            String hourKey = getCurrentHourKey();
+            String globalKey = this.eventType + ':' + hourKey;
+            Integer currentCount = EventMonitoringProcessors.globalLogsCountPerHour.get(globalKey);
+            if (currentCount == null) {
+                currentCount = 0;
+            }
+            EventMonitoringProcessors.globalLogsCountPerHour.put(globalKey, currentCount + 1);
+            this.currentLogsCount = currentCount + 1;
         }
 
         public List<Log__c> findMatches(List<EventLogProcessors.IBaseEventData> events, EventLogProcessors.FieldMetadataConfig fieldMetadataConfig) {
@@ -219,7 +254,8 @@ public class EventMonitoringProcessors {
                         Log__c logRecord = createLogRecord(metric, value, config, event);
                         if (logRecord != null) {
                             matches.add(logRecord);
-                            currentLogsCount++;
+                            // Use the new global tracking method instead of simple increment
+                            incrementGlobalLogsCount();
                         }
                     }
                 }
@@ -277,18 +313,28 @@ public class EventMonitoringProcessors {
         }
 
         protected virtual LogBuilder baseLogBuilder(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
-            return this.eventLogBuilder
+            DateTime eventTimestamp = ((BaseEventData)event).timestamp;
+            Double eventTimestampMillis = eventTimestamp != null ? Double.valueOf(eventTimestamp.getTime()) : null;
+            
+            // Create a fresh LogBuilder for each event to avoid timestamp conflicts
+            return LogBuilder.getInstance()
+                .type(this.eventType)
+                .category(getLogCategory(this.eventType))
+                .area(getLogArea(this.eventType))
                 .summary(getSummary(metric, value, config, event))
                 .details(getDetails(metric, value, config, event))
                 .attribute(Schema.SObjectType.Log__c.fields.User_Id__c.getName(), ((BaseEventData)event).userId)
                 .attribute(Schema.SObjectType.Log__c.fields.Organization_Id__c.getName(), ((BaseEventData)event).organizationId)
-                .attribute(Schema.SObjectType.Log__c.fields.Created_At__c.getName(), ((BaseEventData)event).timestamp)
-                .attribute(Schema.SObjectType.Log__c.fields.Request_Id_External__c.getName(), ((BaseEventData)event).requestId);
+                .attribute(Schema.SObjectType.Log__c.fields.Created_At__c.getName(), eventTimestamp)
+                .attribute(Schema.SObjectType.Log__c.fields.Request_Id_External__c.getName(), ((BaseEventData)event).requestId)
+                // Set Created_Timestamp__c with full millisecond precision for accurate deduplication
+                .attribute(Schema.SObjectType.Log__c.fields.Created_Timestamp__c.getName(), eventTimestampMillis);
         }
         
         protected virtual Log__c createLogRecord(String metric, Object value, ThresholdConfig config, EventLogProcessors.IBaseEventData event) {
-            this.eventLogBuilder = baseLogBuilder(metric, value, config, event);
-            return this.eventLogBuilder.tracePoint().build();
+            // Create a fresh LogBuilder for each event to avoid timestamp conflicts
+            LogBuilder freshLogBuilder = baseLogBuilder(metric, value, config, event);
+            return freshLogBuilder.tracePoint().build();
         }
     }
 

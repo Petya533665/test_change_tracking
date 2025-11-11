@@ -109,8 +109,9 @@ public with sharing class LogServiceScheduler implements Schedulable, Database.A
             'BulkAPIJobBatchScheduler' => ConfigUtil.PHAROS_SETTINGS.Archival_Scheduler_Cron_Exp__c
     };
 
+    @TestVisible
     private static String buildLimitsBatchFrequencyHours() {
-        String frequency = (String.isNotBlank(ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c)) ? ConfigUtil.SETTINGS.Limits_Monitoring_Frequency__c : '0';
+        String frequency = String.valueOf(HourlyLimitsBatch.getFrequencyHours());
         Boolean isEnabled = PermissionsUtil.LimitsMonitoringEnabled && ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c;
         return isEnabled ? frequency : '0';
     }

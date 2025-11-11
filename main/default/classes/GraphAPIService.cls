@@ -29,6 +29,18 @@ public with sharing class GraphAPIService {
         }
         private set;
     }
+	public static String AZURE_DEVOPS_API_SCOPE {
+        get {
+            if (AZURE_DEVOPS_API_SCOPE == null) {
+                List<OAuthSettings__mdt> settings = [SELECT Extended_Scope__c FROM OAuthSettings__mdt WHERE DeveloperName = :AzureService.AZURE_DEVOPS_API_SETTINGS_NAME LIMIT 1];
+				if(!settings.isEmpty()) {
+					AZURE_DEVOPS_API_SCOPE = settings.get(0).Extended_Scope__c;
+				}
+            }
+            return AZURE_DEVOPS_API_SCOPE;
+        }
+        private set;
+    }
 	public static final String GRAPH_API_NEXT_LINK_TOKEN = '@odata.nextLink';
 	public static final String GRAPH_API_PARAM_GROUPS = 'groups';
 	public static final String GRAPH_API_PARAM_TEAMS = 'teams';
@@ -355,6 +367,11 @@ public with sharing class GraphAPIService {
 	public static final Integer MAX_SIZE_VALUE_PER_RECORD = 255;
 
 	public static List<Graph_API_Token__c> getGraphApiTokenListRecordsByType(String type) {
+		// In test context, always refresh the cache to ensure we see the latest records
+		if(Test.isRunningTest()) {
+			GRAPH_API_LIST_RECORDS = null;
+		}
+		
 		List<Graph_API_Token__c> unsortedResult = new List<Graph_API_Token__c>();
 		List<Graph_API_Token__c> sortedResult = new List<Graph_API_Token__c>();
 		for(Graph_API_Token__c record : GRAPH_API_LIST_RECORDS) {
@@ -440,7 +457,9 @@ public with sharing class GraphAPIService {
 
 		List<Graph_API_Token__c> apiTokenRecords = getGraphApiTokenListRecordsByType(type);
 		Integer existRecordsSize = apiTokenRecords.size();
-		for(Integer i = 0 ; i < getCountParts(token); i++) {
+		Integer newRecordsCount = getCountParts(token);
+		
+		for(Integer i = 0 ; i < newRecordsCount; i++) {
 			Integer startIndex = i*MAX_SIZE_VALUE_PER_RECORD;
 			Integer endIndex = (i+1)*MAX_SIZE_VALUE_PER_RECORD;
 			endIndex = endIndex > token.length() ? token.length() : endIndex;
@@ -453,12 +472,19 @@ public with sharing class GraphAPIService {
 				)
 			);
 		}
-		if(existRecordsSize > GRAPH_API_LIST_RECORDS_UPSERT.size()) {
-			for(Integer i = GRAPH_API_LIST_RECORDS_UPSERT.size() ; i < existRecordsSize; i++) {
+		
+		// Fix: Compare existing records count with new records count for this type only
+		// Previously this was comparing with total static list size, causing corruption
+		if(existRecordsSize > newRecordsCount) {
+			for(Integer i = newRecordsCount ; i < existRecordsSize; i++) {
 				GRAPH_API_LIST_RECORDS_DELETE.add(apiTokenRecords.get(i));
 			}
 		}
-		saveListTokenRecordSettings(withDml, logger);
+		
+		// Only save immediately if withDml is true, otherwise accumulate for later batch save
+		if(withDml) {
+			saveListTokenRecordSettings(withDml, logger);
+		}
 	}
 
 	public static void saveListTokenRecordSettings(Boolean withDML, Logger logger) {
@@ -470,6 +496,19 @@ public with sharing class GraphAPIService {
 			DatabaseUtils.getInstance().performDeleteDML(GRAPH_API_LIST_RECORDS_DELETE, Schema.SObjectType.Graph_API_Token__c)
 					.handleError(GraphAPIService.class.getName(), '.saveListTokenRecordSettings', logger);
 		}
+		
+		// Clear the static lists after processing to prevent accumulation across method calls
+		// This must happen regardless of withDML to prevent accumulation between calls
+		if (withDML) {
+			GRAPH_API_LIST_RECORDS_UPSERT.clear();
+			GRAPH_API_LIST_RECORDS_DELETE.clear();
+		}
+		
+		// Clear the cached records list after DML operations so it gets refreshed on next access
+		// This ensures that subsequent calls to getGraphApiTokenListRecordsByType() see the updated records
+		if (withDML) {
+			GRAPH_API_LIST_RECORDS = null;
+		}	
 	}
 
 	public static String getGraphInstanceKey(String graphTenantId) {

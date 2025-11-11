@@ -1094,8 +1094,7 @@ public with sharing class FlowLogServiceTest {
         String expectedOutput = 
             '└── Start [Start] → Start_wait1_PostPreLog\n' +
             '    └── Start_wait1_PostPreLog [Action] → wait1\n' +
-            '        └── wait1 [Wait] → DEFAULT:wait1_PostLog\n' +
-            '            └── wait1_PostLog [Action] → END\n' +
+            '        └── wait1 [Wait] → DEFAULT:END\n' +
             '[Disconnected]\n' +
             '└── decision1 [Decision] → DEFAULT:END\n' +
             '└── action1 [Action] → END';
@@ -1119,8 +1118,7 @@ public with sharing class FlowLogServiceTest {
         String expectedOutput = 
             '└── Start [Start] → Start_wait1_PostPreLog\n' +
             '    └── Start_wait1_PostPreLog [Action] → wait1\n' +
-            '        └── wait1 [Wait] → DEFAULT:wait1_PostLog, Events:[Event1->wait1_Event1_path1_PostPreLog]\n' +
-            '            ├── wait1_PostLog [Action] → END\n' +
+            '        └── wait1 [Wait] → DEFAULT:END, Events:[Event1->wait1_Event1_path1_PostPreLog]\n' +
             '            └── wait1_Event1_path1_PostPreLog [Action] → path1\n' +
             '                └── path1 [Record Create] → path1_PostLog\n' +
             '                    └── path1_PostLog [Action] → END\n' +
@@ -1187,8 +1185,7 @@ public with sharing class FlowLogServiceTest {
         String expectedOutput = 
             '└── Start [Start] → Start_wait1_PostPreLog\n' +
             '    └── Start_wait1_PostPreLog [Action] → wait1\n' +
-            '        └── wait1 [Wait] → DEFAULT:wait1_PostLog, Events:[wait1_Event->wait1_wait1_Event_collection1_PostPreLog]\n' +
-            '            ├── wait1_PostLog [Action] → END\n' +
+            '        └── wait1 [Wait] → DEFAULT:END, Events:[wait1_Event->wait1_wait1_Event_collection1_PostPreLog]\n' +
             '            └── wait1_wait1_Event_collection1_PostPreLog [Action] → collection1\n' +
             '                └── collection1 [Collection Processor] → collection1_PostLog\n' +
             '                    └── collection1_PostLog [Action] → END';
@@ -2403,7 +2400,10 @@ public with sharing class FlowLogServiceTest {
 
         // Validate wait connectors
         for(MetadataService.FlowWait wait : flow.waits) {
-            validateConnector(wait.defaultConnector, wait.name, validTargets, connectedElements);
+            // Wait elements can have null defaultConnector if they only use events
+            if(wait.defaultConnector != null) {
+                validateConnector(wait.defaultConnector, wait.name, validTargets, connectedElements);
+            }
             for(MetadataService.FlowWaitEvent event : wait.waitEvents) {
                 validateConnector(event.connector, event.name, validTargets, connectedElements);
             }

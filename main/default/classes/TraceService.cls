@@ -15,14 +15,16 @@ public without sharing class TraceService extends DatabaseUtils.PharosBatchImpl 
     public static final Integer MAX_SIZE_OF_USED_DEBUG_LOGS = 1000*1000*1000; // 1,000 MB of debug logs
     public static final Decimal REQUIRED_PERCENT_FREE_SPACE = 0.50; // 50%, 500 MB
 
-    public static final String DEBUG_LOG_SERVICE_CHUNK_ENDPOINT = 'https://traceapi.pharos.ai/chunk/DebugLogServiceChunk';
+    public static final String DEBUG_LOG_SERVICE_CHUNK_ENDPOINT = 'https://traceapi.pharos.ai/debug-log-service-chunk';
 
-    public static final String DEBUG_LOG_SERVICE_ENDPOINT = 'https://traceapi.pharos.ai/DebugLogService';
+    public static final String DEBUG_LOG_SERVICE_ENDPOINT = 'https://traceapi.pharos.ai/debug-log-service';
+
     public static final String DEBUG_LOG_SERVICE_NAME = 'Pharos_ai_Trace_Api_Service';
     public static final String DEBUG_LOG_SERVICE_DESCRIPTION = 'Pharos Trace Api Service';
     public static final String SFDC_SERVET_FILE_DOWNLOAD = '/servlet/servlet.FileDownload?file=';
 
     public static final Integer MAX_LOCAL_LOG_LENGTH = 5000000;
+
 
     public Connected_Org__c corg;
 
@@ -567,7 +569,7 @@ public without sharing class TraceService extends DatabaseUtils.PharosBatchImpl 
 
     public static DateTime getLastProcessedLogTime() {
         DateTime dt = Debug_Log_Service_Flag__c.getOrgDefaults()?.Last_Processed_Log__c;
-        return  (dt == null) ? DateTime.now().addDays(-1) : dt;
+        return  (dt == null) ? DateTime.now().addHours(-1) : dt;
     }
 
     public static Set<String> getActiveTracedEntityIds() {
@@ -926,7 +928,7 @@ public without sharing class TraceService extends DatabaseUtils.PharosBatchImpl 
                 String b = HttpUtils.post(
                     DEBUG_LOG_SERVICE_CHUNK_ENDPOINT,
                     JSON.serialize(request),
-                    HttpUtils.getHeadersContentTypeJSON(),
+                    HttpUtils.getHeadersWithApiKeyAndJson(),
                     200
                 );
                 result = (DebugLogServiceChunkResponse)JSON.deserialize(b, DebugLogServiceChunkResponse.class);
@@ -962,7 +964,7 @@ public without sharing class TraceService extends DatabaseUtils.PharosBatchImpl 
                 String b = HttpUtils.post(
                     DEBUG_LOG_SERVICE_ENDPOINT,
                     JSON.serialize(request),
-                    HttpUtils.getHeadersContentTypeJSON(),
+                    HttpUtils.getHeadersWithApiKeyAndJson(),
                     200
                 );
                 result = (DebugLogServiceResponse)JSON.deserialize(b, DebugLogServiceResponse.class);

@@ -1,20 +1,79 @@
+/**
+ * HoltwintersForecastController - Controller for Holt-Winters forecasting operations and configuration
+ * 
+ * This controller provides the main interface for Holt-Winters forecasting functionality,
+ * handling configuration management, forecast generation, and integration with external
+ * services. It serves as the primary entry point for forecasting operations from
+ * Lightning Web Components and other Salesforce interfaces.
+ * 
+ * Key Features:
+ * - Forecast configuration management (enable/disable settings)
+ * - User activity forecast generation with automatic parameter optimization
+ * - Large dataset processing with intelligent batching
+ * - Remote site settings management for external API access
+ * - Comprehensive error handling and validation
+ * - Integration with HoltwintersForecastLambdaService for business logic
+ * 
+ * Configuration Management:
+ * The controller manages forecast settings through custom settings and automatically
+ * configures remote site settings when forecasting is enabled. It handles the
+ * enablement/disabling of external API access based on feature flags.
+ * 
+ * Usage Examples:
+ * 
+ * // Get current forecast configuration
+ * Map<String, Object> settings = HoltwintersForecastController.getForecastSetting();
+ * Boolean isEnabled = (Boolean) settings.get('isEnabledForecast');
+ * 
+ * // Update forecast configuration
+ * String configJson = '{"isEnabledForecast": true}';
+ * Map<String, Object> result = HoltwintersForecastController.updateForecastSetting(configJson);
+ * 
+ * // Generate user activity forecast
+ * Map<String, Object> forecastResult = HoltwintersForecastController.generateUserActivityForecast(
+ *     'a0CQy00000ogy31MAA', 7, 90);
+ * 
+ * // Process large datasets with automatic batching
+ * List<Map<String, Datetime>> dateRanges = HoltwintersForecastController.getLogsCountByDayLargeDataset(
+ *     'a0CQy00000ogy31MAA', '2024-01-01', '2024-01-31');
+ * 
+ * // Create automatic trace requests based on forecast data
+ * Map<String, Object> traceResult = HoltwintersForecastController.createAutoTraceRequests(
+ *     'a0CQy00000ogy31MAA', 7);
+ * 
+ * Performance Considerations:
+ * - Default forecast period: 7 days
+ * - Default lookback period: 90 days
+ * - Automatic batching for datasets exceeding governor limits
+ * - Remote site settings automatically managed
+ * - Comprehensive error handling for external API calls
+ * 
+ * @author Salesforce Development Team
+ * @since API Version 62.0
+ * @version 1.1
+ * @see HoltwintersForecastLambdaService - Core forecasting business logic
+ * @see ConfigUtil - Configuration utility for custom settings
+ * @see AdminService - Administrative service for remote site management
+ * @see Constants - Application constants and configuration values
+ */
 public with sharing class HoltwintersForecastController {
 
     // Static variables for forecast configuration
     private static final Integer DEFAULT_FORECAST_DAYS = 7;
     private static final Integer DEFAULT_LOOKBACK_DAYS = 90;
 
-    public static String getForecastSetting() {
+    public static Map<String, Object> getForecastSetting() {
         Map<String, Object> forecastSetting = new Map<String, Object> {
             'isEnabledForecast' => ConfigUtil.PHAROS_SETTINGS.EnableForecast__c
         };
 
-        return JSON.serialize(forecastSetting);
+        return forecastSetting;
     }
 
-    public static String updateForecastSetting(String forecastSettingJSON) {
+    public static Map<String, Object> updateForecastSetting(String forecastSettingJSON) {
         Map<String, Object> forecastSetting = (Map<String, Object>) JSON.deserializeUntyped(forecastSettingJSON);
         ConfigUtil.PHAROS_SETTINGS.EnableForecast__c = (Boolean) forecastSetting.get('isEnabledForecast');
+
         Boolean isEnabledRemoteSiteSetting = ConfigUtil.PHAROS_SETTINGS.EnableNotificationCharts__c
             || ConfigUtil.PHAROS_SETTINGS.EnableForecast__c;
 
@@ -39,7 +98,7 @@ public with sharing class HoltwintersForecastController {
             'isUpdate' => true
         };
 
-        return JSON.serialize(forecastSetting);
+        return forecastSetting;
     }
 
     public static Map<String, Object> getIsEnabledHoltwinters() {
@@ -76,6 +135,7 @@ public with sharing class HoltwintersForecastController {
     }
 
     public static Map<String, Object> getUserIdToDateTime(String parametersJSON) {
+
         try {
             HoltwintersForecastParameters params = (HoltwintersForecastParameters) JSON.deserialize(parametersJSON, HoltwintersForecastParameters.class);
             params.setDefaultDates();
@@ -128,19 +188,13 @@ public with sharing class HoltwintersForecastController {
                 WHERE Issue__c = :params.issueId
                     AND Type__c = 'AutoTrace'
             ];
-            HoltwintersForecastLambdaClient.SeasonalityType seasonalityType = HoltwintersForecastLambdaClient.SeasonalityType.WEEKLY;
 
-            List<HoltwintersForecastLambdaClient.LogEntry> logsData = (List<HoltwintersForecastLambdaClient.LogEntry>) JSON.deserialize(
-                params.logsData, List<HoltwintersForecastLambdaClient.LogEntry>.class
-            );
-            
-            HoltwintersForecastLambdaClient.LambdaResponse response = HoltwintersForecastLambdaService.generateUserActivityForecast(
-                logsData,
-                seasonalityType,
+            HoltwintersForecastLambdaClient.LambdaResponse response = HoltwintersForecastLambdaService.forecastUserActivityFromCompressedLogs(
+                params.logsData,
+                HoltwintersForecastLambdaClient.SeasonalityType.WEEKLY,
                 DEFAULT_FORECAST_DAYS,
                 DEFAULT_LOOKBACK_DAYS
             );
-
             // Create AutoTrace requests based on forecast response
             Integer traceRequestsCreated = 0;
             String resultMessage = 'No forecast data available';
@@ -165,7 +219,6 @@ public with sharing class HoltwintersForecastController {
                         }
                     }
                 }
-                
                 // Save trace requests to database
                 if (!traceRequestsToCreate.isEmpty()) {
                     Map<String, Object> saveResult = saveTraceRequestsToDatabase(traceRequestsToCreate, traceRequestsToDelete);
@@ -215,6 +268,9 @@ public with sharing class HoltwintersForecastController {
             if (traceRequest.endDate < currentTime) {
                 traceRequest.startDate = traceRequest.startDate.addDays(1);
                 traceRequest.endDate = traceRequest.endDate.addDays(1);
+            } else if (currentTime < traceRequest.endDate && currentTime > traceRequest.startDate) {
+                traceRequest.startDate = currentTime;
+                traceRequest.endDate = traceRequest.endDate.addHours(1);
             }
         }
     }

@@ -37,12 +37,12 @@ public with sharing class IssueJiraTaskController {
         RuleUtil.Action action = (RuleUtil.Action)JSON.deserialize(JSON.serialize(input.get('action')), RuleUtil.Action.class);
         Id issueId = (Id)JSON.deserialize(JSON.serialize(input.get('logId')), Id.class);
 		TicketingService service;
-		if (action.type == RuleUtil.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION) {
+		if (action.type == Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION) {
 			service = new TicketingService(TicketingService.TICKETING_SERVICE_TYPE.AZURE_DEV_OPS, null);
-		} else if (action.type == RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION) {
+		} else if (action.type == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION) {
 			service = new TicketingService(TicketingService.TICKETING_SERVICE_TYPE.JIRA, null);
 		}
-		TicketingService.TicketingServiceInputData data = new TicketingService.TicketingServiceInputData(issueId, action.getAction(RuleUtil.ACTION_RT_MONITORING));
+		TicketingService.TicketingServiceInputData data = new TicketingService.TicketingServiceInputData(issueId, action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING));
 
 		JiraSyncBatch.skipSync = true;
 		TicketingService.TicketCreateResult result = service.createTicket(data);

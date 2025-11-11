@@ -145,7 +145,6 @@ public with sharing class ConfigUtil {
     public static final String TICKET_CREATE_ERROR_STATUS = 'Error';
 
     // From AdminService
-    public static final Set<String> MERGE_FIELDS_SKIP_FIELD_NAMES = new Set<String> {'isdeleted'};
     public static final String SOAP_ENDPOINT_PREFIX = '/services/Soap/m/';
     public static final String REST_API_ITEMS_KEY_NEXT_RECORDS_URL = 'nextRecordsUrl';
     public static final String TOOLING_ITEMS_KEY_RECORDS = 'records';
@@ -766,8 +765,6 @@ public with sharing class ConfigUtil {
     public static final String CREATE_META_REQUEST_DATA_KEY_ISSUE_TYPE_ID = 'issueTypeId';
     public static final String CREATE_META_REQUEST_DATA_KEY_ISSUE_TYPE_IDS = 'issueTypeIds';
     public static final String CREATE_META_REQUEST_DATA_KEY_META = 'meta';
-    public static final String CREATE_META_REQUEST_DATA_KEY_LOG_FIELDS = 'logFields';
-    public static final String CREATE_META_REQUEST_DATA_KEY_ISSUE_FIELDS = 'issueFields';
     public static final String CREATE_META_REQUEST_DATA_KEY_COMPONENTS = 'components';
     public static final String CREATE_META_REQUEST_DATA_KEY_EPICS = 'epics';
     public static final String CREATE_META_REQUEST_DATA_KEY_PRIORITIES = 'priorities';

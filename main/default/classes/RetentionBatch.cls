@@ -22,14 +22,14 @@ public with sharing class RetentionBatch extends DatabaseUtils.PharosBatchImpl i
 	}
 
 	public override Integer getIterationsCount() {
-		return [SELECT COUNT() FROM Rule__c WHERE Type__c = :MonitoringUtil.RULE_TYPE_ARCHIVAL AND Active__c = TRUE LIMIT :PermissionsUtil.MaxArchivalRules];
+		return [SELECT COUNT() FROM Rule__c WHERE Type__c = :Constants.RULE_SOBJECT.TYPE_ARCHIVAL AND Active__c = TRUE LIMIT :PermissionsUtil.MaxArchivalRules];
 	}
 
 	public Database.QueryLocator start(Database.BatchableContext bc) {
 		return Database.getQueryLocator([
 				SELECT Id, Type__c
 				FROM Rule__c
-				WHERE Type__c = :MonitoringUtil.RULE_TYPE_ARCHIVAL
+				WHERE Type__c = :Constants.RULE_SOBJECT.TYPE_ARCHIVAL
 				AND Active__c = TRUE
 				ORDER BY Index__c
 				LIMIT :PermissionsUtil.MaxArchivalRules
@@ -41,15 +41,15 @@ public with sharing class RetentionBatch extends DatabaseUtils.PharosBatchImpl i
 			return; // Skip processing for empty scope
 		}
 		
-		List<MonitoringUtil.MonitoringRule> rules = MonitoringUtil.getArchivalRules(new List<Id>{scope.get(0).Id});
-		Map<Id, MonitoringUtil.Event> mapEventsByIds = MonitoringUtil.getLastCreatedEventsMap();
-		List<String> logFields = MonitoringUtil.getLogFieldNames(rules);
+		List<RuleUtil.Rule> rules = RuleUtil.getArchivalRules(new List<Id>{scope.get(0).Id});
+		Map<Id, RuleUtil.Event> mapEventsByIds = MonitoringUtil.getLastCreatedEventsMap();
+		List<String> logFields = RuleUtil.getLogFieldNames(rules);
 		Datetime currentTime = Datetime.now();
-		Integer shiftMinutes = Integer.valueOf(rules.get(0).eventTypeInterval);
+		Integer shiftMinutes = Integer.valueOf(rules.get(0).eventTimeInterval);
 		Datetime ruleStartTime = currentTime.addMinutes(-shiftMinutes);
 		Datetime lastProcessedDatetime = null;
-		for (MonitoringUtil.MonitoringRule rule : rules) {
-			MonitoringUtil.Event event = mapEventsByIds.get(rule.ruleId);
+		for (RuleUtil.Rule rule : rules) {
+			RuleUtil.Event event = mapEventsByIds.get(rule.id);
 			lastProcessedDatetime = (event != null) ? event.createdDate.addMinutes(-shiftMinutes) : null;
 		}
 		QBuilder qbCount = getArchivalLogsQuery(rules.get(0), new Set<String>{'COUNT()'}, lastProcessedDatetime, ruleStartTime);
@@ -75,24 +75,24 @@ public with sharing class RetentionBatch extends DatabaseUtils.PharosBatchImpl i
 		}
 	}
 
-	public static QBuilder getArchivalLogsQuery(MonitoringUtil.MonitoringRule rule, Set<String> logFields, Datetime lastProcessedDatetime, Datetime ruleStartTime) {
+	public static QBuilder getArchivalLogsQuery(RuleUtil.Rule rule, Set<String> logFields, Datetime lastProcessedDatetime, Datetime ruleStartTime) {
 		ConfigUtil.BooleanExpressionParser parser = new ConfigUtil.BooleanExpressionParser(rule.filterLogic);
 		QBuilder qb = new QBuilder(Log__c.SObjectType)
             .selectFields(new Set<String>(logFields));
 		Integer filtrableFields = 0;
-		for(MonitoringUtil.RuleFilter rf : rule.filters) {
+		for(RuleUtil.RuleFilter rf : rule.ruleFilters) {
 			if(rf.index == 1) continue;
-			if(rf.comparisonType == MonitoringUtil.ComparisonType.VALUE && rf.isFilterable) {
+			if(RuleUtil.MAP_COMPARISON_TYPES_BY_STRINGS.get(rf.comparisonType) == RuleUtil.ComparisonType.VALUE && rf.isFilterable) {
 				qb.add(rf.toQCondition());
 				filtrableFields++;
 			}
-			else if(!rf.isFilterable) {
+			else if(RuleUtil.MAP_COMPARISON_TYPES_BY_STRINGS.get(rf.comparisonType) != RuleUtil.ComparisonType.FIELD && !rf.isFilterable) {
 				parser.removeOperand(String.valueOf(rf.index - 1));
 				qb.add(rf.toQCondition());
 			}
         }
 		qb.add(QBuilder.condition('Created_At__c').isLessThan(':ruleStartTime'));
-		if(rule.filters.size() > 1) {
+		if(rule.ruleFilters.size() > 1) {
 			parser.addOperand();
 		}
 		if(lastProcessedDatetime != null) {

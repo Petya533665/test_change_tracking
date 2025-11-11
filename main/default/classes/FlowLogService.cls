@@ -1199,17 +1199,13 @@ public class FlowLogService {
 
     private void handleWaitElement(FlowElement waitElement, Map<String, FlowElement> flowElements) {
         String defaultTarget = waitElement.getDefaultTarget();
+        
+        // Only create default path logging if default path exists
         if (defaultTarget != null) {
             FlowElement postPreLog = createLogElement(POST_PRE_LOG_MARKER, waitElement, defaultTarget, flowElements);
             postPreLog.setTargetReference(defaultTarget, null);
             flowElements.put(postPreLog.getName(), postPreLog);
             waitElement.setDefaultTarget(postPreLog.getName(), null);
-        }
-        else {
-            FlowElement postLog = createLogElement(POST_LOG_MARKER, waitElement, null, flowElements);
-            postLog.setTargetReference(null, null);
-            flowElements.put(postLog.getName(), postLog);
-            waitElement.setDefaultTarget(postLog.getName(), null);
         }
 
         String faultTarget = waitElement.getFaultTarget();
@@ -1220,7 +1216,7 @@ public class FlowLogService {
             waitElement.setFaultTarget(faultPostPreLog.getName(), null);
         }        
 
-        // Handle decision rules
+        // Handle wait events
         Map<String, FlowElement> waitEventElements = waitElement.getEvents();
         if (waitEventElements != null) {
             Map<String, FlowElement> updatedWaitEventElements = new Map<String, FlowElement>();            
@@ -2740,7 +2736,7 @@ public class FlowLogService {
                 if (event.connector != null) {
 
                     FlowElement eventElement = new FlowElement();
-                    eventElement.setName(event.name);
+                    eventElement.setName(event.name ?? waitElement.name);
                     eventElement.setLabel(event.label);
                     eventElement.setType(ELEMENT_TYPE_WAIT_EVENT);
                     eventElement.setCoordinates(waitElement.locationX, waitElement.locationY);
@@ -2748,7 +2744,7 @@ public class FlowLogService {
                     eventElement.setDescription(event.description);
                     eventElement.setWaitEventMetadata(event);
                     // Add event to events map
-                    eventElements.put(event.name, eventElement);
+                    eventElements.put(event.name ?? waitElement.name, eventElement);
 
                 }
             }
@@ -4447,10 +4443,12 @@ public class FlowLogService {
                 // Update location Y
                 wait.locationY = element.getY();
 
-                // Update rule connectors
+                // Update wait event connectors
                 if (wait.waitEvents != null && element.getEvents() != null) {
                     for (MetadataService.FlowWaitEvent event : wait.waitEvents) {
-                        FlowElement eventTargetElement = element.getEvents().get(event.name);
+                        // Use the same fallback logic as when creating the event element
+                        String eventElementName = event.name != null ? event.name : wait.name;
+                        FlowElement eventTargetElement = element.getEvents().get(eventElementName);
                         if (eventTargetElement == null) continue;
 
                         event.connector = updateConnectorTargetReference(event.connector, eventTargetElement);
@@ -4571,28 +4569,6 @@ public class FlowLogService {
                 apexCall.connector = updateConnectorTargetReference(apexCall.connector, element);
                 apexCall.faultConnector = updateConnectorFaultTarget(apexCall.faultConnector, element);                
                 apexCall.locationY = element.getY();
-            }
-        }
-
-        // Update wait connectors
-        if (context.flow.waits != null) {
-            for (MetadataService.FlowWait wait : context.flow.waits) {
-                FlowElement element = context.flowElements.get(wait.name);
-                if (element == null) continue;
-
-                wait.defaultConnector = updateConnectorDefaultTarget(wait.defaultConnector, element);
-                wait.faultConnector = updateConnectorFaultTarget(wait.faultConnector, element);
-                wait.locationY = element.getY();
-                // Handle wait event connectors
-                if (wait.waitEvents != null) {
-                    for (MetadataService.FlowWaitEvent event : wait.waitEvents) {
-                        // Get target from flowElements map based on event name/type
-                        FlowElement eventElement = context.flowElements.get(event.name);
-                        if (eventElement == null) continue;
-
-                        event.connector = updateConnectorTargetReference(event.connector, eventElement);
-                    }
-                }
             }
         }
 

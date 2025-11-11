@@ -95,17 +95,6 @@ public with sharing class IssueTriggerHandler {
 		}
 		DatabaseUtils.getInstance().performUpdateDML(existIssues, Schema.SObjectType.Issue__c)
 				.handleError(IssueTriggerHandler.class.getName(), '.onAfterInsert');
-		// TODO 1643
-		// DevOps Center
-		try {
-			if (!Test.isRunningTest()) {
-				Set<String> setIssueIds = new Set<String>();
-				for (Issue__c issue : newIssues) {
-					setIssueIds.add(issue.Id);
-				}
-				DevOpsCenterBatch.getInstance(setIssueIds).startBatch();
-			}
-		} catch (Exception e) {}
 	}
 
 	public static void onBeforeUpdate(List<Issue__c> newIssues, Map<Id, Issue__c> oldIssuesMap) {

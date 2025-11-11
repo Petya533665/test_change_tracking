@@ -1,16 +1,38 @@
 /**
- * HoltwintersForecastLambdaClient - Generates user activity forecasts using Holt-Winters algorithm via AWS Lambda
+ * HoltwintersForecastLambdaClient - Low-level client for Holt-Winters forecasting via AWS Lambda
  * 
- * AWS Lambda Function: holtwinters-forecast-lambda (v1.0.12)
- * ECR Repository: 385795226412.dkr.ecr.us-west-1.amazonaws.com/holtwinters-forecast-lambda
+ * This client provides direct integration with AWS Lambda services for Holt-Winters exponential
+ * smoothing forecasting. It handles HTTP communication, data serialization, response processing,
+ * and error management for external forecasting operations.
  * 
- * Features:
+ * AWS Lambda Integration:
+ * - Function: holtwinters-forecast-lambda (v1.0.12)
+ * - ECR Repository: 385795226412.dkr.ecr.us-west-1.amazonaws.com/holtwinters-forecast-lambda
+ * - Region: us-west-1
+ * - Timeout: 15 minutes
+ * - Memory: 3GB
+ * 
+ * Key Features:
  * - Configurable forecast periods (1-30 days)
- * - Multiple seasonality types (daily, weekly, monthly, auto)
- * - ZIP file support for large datasets (95% compression)
- * - Top 3 activity periods per day
- * - Centered time ranges around peak hours
- * - User attribution in responses
+ * - Multiple seasonality types (DAILY, WEEKLY, MONTHLY, AUTO)
+ * - ZIP file support for large datasets (95% compression ratio)
+ * - Top 3 activity periods per day with confidence scoring
+ * - Centered time ranges around detected peak hours
+ * - User attribution and activity correlation
+ * - Comprehensive error handling and validation
+ * 
+ * Algorithm Implementation:
+ * The Lambda function implements Holt-Winters triple exponential smoothing:
+ * - Level smoothing: Captures baseline activity trends
+ * - Trend smoothing: Identifies increasing/decreasing patterns
+ * - Seasonal smoothing: Detects recurring daily/weekly cycles
+ * - Confidence scoring: Provides reliability metrics for predictions
+ * 
+ * Data Processing:
+ * - Input: Compressed log data or LogEntry arrays
+ * - Processing: Statistical analysis and pattern recognition
+ * - Output: Structured forecast data with time ranges and confidence levels
+ * - Compression: Automatic ZIP compression for datasets > 1MB
  * 
  * Lambda Response Format:
  * - Success: {
@@ -66,6 +88,28 @@
  * 
  * // Check if forecast was successful
  * Boolean isSuccess = client.isSuccess();
+ * 
+ * Performance Considerations:
+ * - Maximum forecast period: 30 days
+ * - Recommended minimum data: 72 log entries
+ * - Automatic compression for datasets > 1MB
+ * - Lambda timeout: 15 minutes
+ * - Memory allocation: 3GB
+ * - Concurrent execution: Up to 1000 requests
+ * 
+ * Error Handling:
+ * - HoltwintersForecastException for invalid parameters
+ * - LambdaErrorResponse for AWS service errors
+ * - Comprehensive validation for input data
+ * - Graceful degradation for insufficient data
+ * 
+ * @author Salesforce Development Team
+ * @since API Version 62.0
+ * @version 1.0.12
+ * @see HoltwintersForecastLambdaService - High-level service wrapper
+ * @see HoltwintersForecastController - Controller interface
+ * @see LogEntry - Data transfer object for log entries
+ * @see LambdaResponse - Response object containing forecast results
  */
 public with sharing class HoltwintersForecastLambdaClient {
    
@@ -152,56 +196,95 @@ public with sharing class HoltwintersForecastLambdaClient {
     private LambdaErrorResponse errorResponse;
     private Boolean isSuccessful;
 
-    private static final Map<String, String> AUTH_HEADERS {
-        get {
-            if (AUTH_HEADERS == null) {
-                AUTH_HEADERS = new Map<String, String>();
-                AWS_Token__mdt mdtSettings = AWS_Token__mdt.getInstance('AWSToken');
-                if(mdtSettings != null) {
-                    AUTH_HEADERS.put('x-api-key', mdtSettings.Token__c);
-                }
-            }
-            return AUTH_HEADERS;
-        }
-        private set;
-    }
-
-    private static final Map<String, String> HEADERS {
-        get {
-            if (HEADERS == null) {
-                HEADERS = new Map<String, String>();
-                HEADERS.putAll(AUTH_HEADERS);
-                HEADERS.put('Content-Type', 'application/json; charset=utf-8');
-            }
-            return HEADERS;
-        }
-        private set;
-    }
 
     public HoltwintersForecastLambdaClient() {
         // Default constructor
     }
 
-    /**
-     * Generate user activity forecast using Holt-Winters algorithm with default forecast and lookback periods
-     * @param logsData List of LogEntry objects with userId and timestamp
-     * @param seasonalityType Seasonality type enum (DAILY, WEEKLY, MONTHLY, AUTO)
-     * @return HoltwintersForecastLambdaClient instance for method chaining
-     */
-    public HoltwintersForecastLambdaClient generateUserActivityForecast(List<LogEntry> logsData, SeasonalityType seasonalityType) {
-        return generateUserActivityForecast(logsData, seasonalityType, DEFAULT_FORECAST_DAYS, DEFAULT_LOOKBACK_DAYS);
-    }
+
 
     /**
-     * Generate user activity forecast using Holt-Winters algorithm with custom forecast period
+     * Generate user activity forecast using Holt-Winters algorithm with custom forecast and lookback periods
      * @param logsData List of LogEntry objects with userId and timestamp
      * @param seasonalityType Seasonality type enum (DAILY, WEEKLY, MONTHLY, AUTO)
      * @param forecastDays Number of days to forecast (1-30, default: 7)
+     * @param lookbackDays Number of days back to analyze for forecasting (1-365, default: 30)
      * @return HoltwintersForecastLambdaClient instance for method chaining
      */
-    public HoltwintersForecastLambdaClient generateUserActivityForecast(List<LogEntry> logsData, SeasonalityType seasonalityType, Integer forecastDays) {
-        return generateUserActivityForecast(logsData, seasonalityType, forecastDays, DEFAULT_LOOKBACK_DAYS);
+    public HoltwintersForecastLambdaClient forecastUserActivityFromCompressedLogs(String logsData, SeasonalityType seasonalityType, Integer forecastDays, Integer lookbackDays) {
+
+        if (logsData == null || String.isBlank(logsData)) {
+            throw new HoltwintersForecastException('Logs data is required and cannot be empty');
+        }
+
+        if (seasonalityType == null) {
+            seasonalityType = HoltwintersForecastLambdaClient.SeasonalityType.AUTO;
+        }
+
+        // Validate forecast days (1-30 range)
+        if (forecastDays == null || forecastDays < MIN_FORECAST_DAYS || forecastDays > MAX_FORECAST_DAYS) {
+            forecastDays = DEFAULT_FORECAST_DAYS; // Default to 7 days for invalid values
+        }
+
+        // Validate lookback days (1-365 range)
+        if (lookbackDays == null || lookbackDays < MIN_LOOKBACK_DAYS || lookbackDays > MAX_LOOKBACK_DAYS) {
+            lookbackDays = DEFAULT_LOOKBACK_DAYS; // Default to 30 days for invalid values
+        }
+
+        Datetime currentTime = System.now();
+        Datetime startDate = currentTime.addDays(-lookbackDays);
+
+        Map<String, Object> requestPayload = new Map<String, Object>{
+            'logs' => logsData,
+            'seasonality_type' => seasonalityType.name().toLowerCase(),
+            'forecast_days' => forecastDays,
+            //'lookback_days' => lookbackDays,
+            'start_date' => startDate.format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\''),
+            'end_date' => currentTime.format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+        };
+
+        String payload = JSON.serialize(requestPayload);
+
+        String response = HttpUtils.post(
+            URL_ENDPOINT,
+            payload,
+            HttpUtils.getHeadersWithApiKeyAndJson(),
+            200
+        );
+
+        if (String.isBlank(response)) {
+            throw new HoltwintersForecastException('Empty response from Lambda function');
+        }
+        // Try to parse as successful response first
+        try {
+            this.lambdaResponse = (LambdaResponse) JSON.deserialize(response, LambdaResponse.class);
+            this.isSuccessful = true;
+
+        } catch (Exception e) {
+            // Try to parse as error response
+            Map<String, Object> errorMap = (Map<String, Object>) JSON.deserializeUntyped(response);
+
+            if (errorMap.containsKey('message') && errorMap.containsKey('error')) {
+                this.errorResponse = new LambdaErrorResponse();
+                this.errorResponse.message = (String) errorMap.get('message');
+                this.errorResponse.error = (String) errorMap.get('error');
+                this.errorResponse.statusCode = 500; // Default error status code
+                this.isSuccessful = false;
+
+                throw new HoltwintersForecastException('Lambda Error: ' + this.errorResponse.message + ' - ' + this.errorResponse.error);
+            } else {
+                // Unknown response format
+                throw new HoltwintersForecastException('Invalid response format from Lambda function');
+            }
+        }
+
+        if (this.lambdaResponse == null || this.lambdaResponse.forecast == null || this.lambdaResponse.forecast.isEmpty()) {
+            throw new HoltwintersForecastException('No valid activity forecast data found in Lambda response');
+        }
+
+        return this;
     }
+
 
     /**
      * Generate user activity forecast using Holt-Winters algorithm with custom forecast and lookback periods
@@ -249,7 +332,7 @@ public with sharing class HoltwintersForecastLambdaClient {
             String response = HttpUtils.post(
                 URL_ENDPOINT,
                 payload,
-                HEADERS,
+                HttpUtils.getHeadersWithApiKeyAndJson(),
                 200
             );
 
@@ -347,10 +430,6 @@ public with sharing class HoltwintersForecastLambdaClient {
         }
         throw new HoltwintersForecastException('No execution statistics available. Call generateUserActivityForecast() first.');
     }
-
-
-
-
 
     /**
      * Check if the forecast generation was successful

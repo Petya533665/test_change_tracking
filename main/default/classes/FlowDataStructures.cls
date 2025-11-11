@@ -114,6 +114,9 @@ public with sharing class FlowDataStructures {
             else if(type.containsIgnoreCase('ROLL BACK RECORDS')) {
                 return 'FlowRecordRollback';
             }
+            else if(type.containsIgnoreCase('POST TO CHATTER')) {
+                return 'FlowActionCall';
+            }
 
             return '';
         }
@@ -396,6 +399,32 @@ public with sharing class FlowDataStructures {
                         nextFlowElement = flow.elements?.get(edge.target);
                         edge.addIndex(edgeIndex++);
                         break;
+                    }
+                }
+            }
+            // in debug mode, we need to find the first element in the stacktrace and use it to find the next element
+            else if (!stackTraceInfo.stacktraceElements?.isEmpty()) {
+                FlowStacktraceElement firstStackTraceElement = stackTraceInfo.stacktraceElements[0];
+                FlowElement matchedElement = null;
+
+                // find element by name or label
+                for (FlowElement element : flow.elements.values()) {
+                    if (element.name == firstStackTraceElement.nameOrLabel || element.label == firstStackTraceElement.nameOrLabel) {
+                        if (String.isBlank(firstStackTraceElement.apiType) || 
+                            element.actionType == firstStackTraceElement.apiType) {
+                            matchedElement = element;
+                            break;
+                        }
+                    }
+                }
+
+                if (matchedElement != null) {
+                    for (FlowEdge edge : edges) {
+                        if (edge.target == matchedElement.name || edge.target == matchedElement.label) {
+                            nextFlowElement = flow.elements?.get(edge.target);
+                            edge.addIndex(edgeIndex++);
+                            break;
+                        }
                     }
                 }
             }

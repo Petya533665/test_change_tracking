@@ -3,7 +3,10 @@ public with sharing class EventMonitoringUtil {
     
     private static final String INTERVAL_HOURLY = 'Hourly';
     private static final String INTERVAL_DAILY = 'Daily';
-    
+
+    // Hourly log files have a shorter delay; they typically show activity that happened 3 to 6 hours earlier.
+    public static Integer DEFAULT_DELAY_CSV_FILE_GENERATION = 3; // default 3 hours
+
     public EventMonitoringUtil() {}
 
     @TestVisible

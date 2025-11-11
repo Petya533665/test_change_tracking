@@ -125,27 +125,6 @@ public without sharing class AdminService {
         return Templates.ISSUE_SOBJECT.DEFAULT_TICKET_COMMENT_ACTION;
     }
 
-    // Webhook template methods
-    public static Map<String, String> getDefaultWebhookActionTemplate() {
-        return Templates.LOG_SOBJECT.DEFAULT_WEBHOOK_ACTION;
-    }
-
-    public static Map<String, String> getIssueDefaultWebhookActionTemplate() {
-        return Templates.ISSUE_SOBJECT.DEFAULT_WEBHOOK_ACTION;
-    }
-
-    public static Map<String, String> getIssueDefaultWebhookUpdateActionTemplate() {
-        return Templates.ISSUE_SOBJECT.DEFAULT_WEBHOOK_UPDATE_ACTION;
-    }
-
-    public static Map<String, String> getDefaultMonitoringWebhookActionTemplate() {
-        return Templates.EVENT_SOBJECT.DEFAULT_WEBHOOK_ACTION;
-    }
-
-    public static Map<String, String> getTraceResultDefaultWebhookActionTemplate() {
-        return Templates.TRACE_RESULT_SOBJECT.DEFAULT_WEBHOOK_ACTION;
-    }
-
     public static List<MergeField> getSobjectFields(Schema.DescribeSObjectResult d, String dType, Schema.DescribeFieldResult parent, Schema.DescribeSObjectResult parentObject, Integer depth) {
         depth = depth + 1;
         List<MergeField> result = new List<MergeField>();
@@ -360,8 +339,7 @@ public without sharing class AdminService {
             'IssueTrackingEnabled' => PermissionsUtil.IssueTrackingEnabled,
             'MetadataChatEnabled' => PermissionsUtil.MetadataChatEnabled,
             'AutoChartEnabled' => PermissionsUtil.AutoChartEnabled,
-            'ForecastEnabled' => PermissionsUtil.ForecastEnabled,
-            'WebhookIntegrationEnabled' => PermissionsUtil.WebhookIntegrationEnabled
+            'ForecastEnabled' => PermissionsUtil.ForecastEnabled
         };
         return result;
     }
@@ -491,6 +469,24 @@ public without sharing class AdminService {
         corg.Title__c = d.name;
         corg.Description__c = d.description;
         corg.Data_Direction__c = d.dataDirection;
+        DatabaseUtils.getInstance().performUpdateDML(new List<Connected_Org__c>{corg}, Schema.SObjectType.Connected_Org__c, true);
+
+        Map<String, Object> output = new Map<String, Object>();
+        output.put(ConfigUtil.CONNECTION_ORG_KEY_CORG, new ConnectedOrgDTO(corg));
+        output.put(ConfigUtil.CONNECTION_ORG_KEY_CLIENT_KEY, ConfigUtil.CONNECTED_ORGS_SETTINGS.Client_Key__c);
+        output.put('useManagedApp', ConfigUtil.CONNECTED_ORGS_SETTINGS.Use_Managed_App__c);
+        return output;
+    }
+
+    public static Object resetConnectedOrgOauth(Object payload) {
+        ConnectedOrgDTO d = (ConnectedOrgDTO)JSON.deserialize(JSON.serialize(payload), ConnectedOrgDTO.class);
+        Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(d.orgId);
+        if (corg == null) {
+            throw new AdminServiceException(ConfigUtil.EXCEPTION_CONNECTED_ORG_NOT_FOUND);
+        }
+        corg.Access_Token__c = null;
+        corg.Refresh_Token__c = null;
+        corg.Token_Refreshed_At__c = null;
         DatabaseUtils.getInstance().performUpdateDML(new List<Connected_Org__c>{corg}, Schema.SObjectType.Connected_Org__c, true);
 
         Map<String, Object> output = new Map<String, Object>();
@@ -658,180 +654,15 @@ public without sharing class AdminService {
         );
     }
 
-    /**
-     * Extract base URL (protocol + domain) from a webhook URL
-     * @param webhookUrl The full webhook URL
-     * @return Base URL (e.g., https://example.com)
-     */
-    public static String extractWebhookBaseUrl(String webhookUrl) {
-        if (String.isBlank(webhookUrl)) {
-            return null;
-        }
-        
-        try {
-            // Find the third slash to get protocol + domain
-            Integer firstSlash = webhookUrl.indexOf('://');
-            if (firstSlash == -1) {
-                return null;
-            }
-            Integer thirdSlash = webhookUrl.indexOf('/', firstSlash + 3);
-            if (thirdSlash == -1) {
-                return webhookUrl; // URL is just protocol + domain
-            }
-            return webhookUrl.substring(0, thirdSlash);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    /**
-     * Generate Remote Site Setting name for a webhook URL
-     * @param webhookUrl The webhook URL
-     * @return Remote Site Setting name
-     */
-    public static String generateWebhookRemoteSiteName(String webhookUrl) {
-        String baseUrl = extractWebhookBaseUrl(webhookUrl);
-        if (String.isBlank(baseUrl)) {
-            return null;
-        }
-        
-        // Extract domain from URL and create a safe name
-        String domain = baseUrl.replace('https://', '').replace('http://', '').replace('.', '_').replace(':', '_').replace('/', '_').replace('-', '_');
-        return 'Webhook_' + domain.left(30); // Limit to 30 chars + prefix = ~39 chars (max is 40)
-    }
-
-    /**
-     * Create Remote Site Settings for webhook URLs (synchronous batch operation - called BEFORE DML)
-     * @param webhookUrls Set of webhook URLs to process
-     */
-    public static void upsertWebhookRemoteSiteSettings(Set<String> webhookUrls) {
-        if (webhookUrls == null || webhookUrls.isEmpty()) {
-            return;
-        }
-        
-        // Batch process all unique base URLs (no callout in loop)
-        Set<String> processedBaseUrls = new Set<String>();
-        
-        for (String webhookUrl : webhookUrls) {
-            if (String.isBlank(webhookUrl)) {
-                continue;
-            }
-            
-            String baseUrl = extractWebhookBaseUrl(webhookUrl);
-            String remoteSiteName = generateWebhookRemoteSiteName(webhookUrl);
-            
-            // Only process each unique base URL once
-            if (String.isNotBlank(baseUrl) && String.isNotBlank(remoteSiteName) && !processedBaseUrls.contains(baseUrl)) {
-                try {
-                    upsertRemoteSiteSetting(
-                        remoteSiteName,
-                        baseUrl,
-                        'Auto-generated for webhook action'
-                    );
-                    processedBaseUrls.add(baseUrl);
-                } catch (Exception e) {
-                    Logger.getInstance()?.addInternalError(
-                        e, 
-                        AdminService.class.getName(), 
-                        'upsertWebhookRemoteSiteSettings - URL: ' + webhookUrl
-                    );
-                }
-            }
-        }
-    }
-
-    /**
-     * Delete Remote Site Settings for webhook URLs if not used by other actions (synchronous batch operation - called BEFORE DML)
-     * This method queries existing actions to determine which Remote Site Settings will be unused AFTER the pending delete.
-     * @param webhookUrlsToCheck Set of webhook URLs to check
-     * @param actionIdsToExclude Set of action IDs that will be deleted (exclude from usage check)
-     */
-    public static void deleteWebhookRemoteSiteSettings(Set<String> webhookUrlsToCheck, Set<Id> actionIdsToExclude) {
-        if (webhookUrlsToCheck == null || webhookUrlsToCheck.isEmpty()) {
-            return;
-        }
-        
-        // Get all currently active webhook URLs, EXCLUDING the ones that will be deleted
-        Set<String> activeBaseUrls = new Set<String>();
-        String actionType = Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION;
-        
-        List<Action__c> activeActions;
-        if (actionIdsToExclude != null && !actionIdsToExclude.isEmpty()) {
-            activeActions = [
-                SELECT Webhook_URL__c 
-                FROM Action__c 
-                WHERE Action_Type__c = :actionType 
-                AND Webhook_URL__c != null 
-                AND Id NOT IN :actionIdsToExclude
-            ];
-        } else {
-            activeActions = [
-                SELECT Webhook_URL__c 
-                FROM Action__c 
-                WHERE Action_Type__c = :actionType 
-                AND Webhook_URL__c != null
-            ];
-        }
-        
-        for (Action__c action : activeActions) {
-            String baseUrl = extractWebhookBaseUrl(action.Webhook_URL__c);
-            if (String.isNotBlank(baseUrl)) {
-                activeBaseUrls.add(baseUrl);
-            }
-        }
-        
-        // Process each URL to potentially delete
-        Set<String> processedBaseUrls = new Set<String>();
-        Map<String, MetadataServiceUtil.RemoteSiteSettingsWrapper> createdRemoteSiteSettings = getRemoteSiteSettingsMap();
-        
-        for (String webhookUrl : webhookUrlsToCheck) {
-            if (String.isBlank(webhookUrl)) {
-                continue;
-            }
-            
-            String baseUrl = extractWebhookBaseUrl(webhookUrl);
-            if (String.isBlank(baseUrl) || processedBaseUrls.contains(baseUrl)) {
-                continue; // Already processed this base URL
-            }
-            
-            // Check if this base URL will still be in use AFTER the delete
-            if (activeBaseUrls.contains(baseUrl)) {
-                continue; // Still in use, don't delete
-            }
-            
-            // Get the Remote Site Setting name
-            String remoteSiteName = generateWebhookRemoteSiteName(webhookUrl);
-            if (String.isBlank(remoteSiteName)) {
-                continue;
-            }
-            
-            // Find and delete the Remote Site Setting
-            try {
-                for (MetadataServiceUtil.RemoteSiteSettingsWrapper rss : createdRemoteSiteSettings.values()) {
-                    if (rss.SiteName == remoteSiteName || rss.SiteName == ConfigUtil.prefixCurrentOrgNamespace(remoteSiteName)) {
-                        MetadataServiceUtil.deleteRemoteSiteSettingsMetadata(
-                            new List<String>{ConfigUtil.prefixCurrentOrgNamespace(rss.SiteName)}
-                        );
-                        processedBaseUrls.add(baseUrl);
-                        break;
-                    }
-                }
-            } catch (Exception e) {
-                Logger.getInstance()?.addInternalError(
-                    e, 
-                    AdminService.class.getName(), 
-                    'deleteWebhookRemoteSiteSettings - URL: ' + webhookUrl
-                );
-            }
-        }
-    }
-
     public static Boolean checkRemoteSiteSettings() {
         Boolean result = true;
         try {
             Map<String, MetadataServiceUtil.RemoteSiteSettingsWrapper> createdRemoteSiteSettings = getRemoteSiteSettingsMap();
             for(DefaultRemoteSiteSetting drss : defaultRemoteSiteSettings) {
-                result = (result && createdRemoteSiteSettings.containsKey(drss.url) && createdRemoteSiteSettings.get(drss.url).SiteName == drss.name);
+                result = createdRemoteSiteSettings.containsKey(drss.url);
+                if (!result) {
+                    break;
+                }
             }
         }
         catch(Exception e) {
@@ -868,7 +699,7 @@ public without sharing class AdminService {
     }
 
     private static Boolean isEmailServicesAvailable() {
-        Map<String, ApexEmailNotification> apexEmailNotificationByEmail = emailServicesSelector.apexEmailNotificationByEmail;
+        Map<String, ApexEmailNotification> apexEmailNotificationByEmail = getApexEmailNotificationByEmailMap();
         List<EmailServicesFunction> availableEmailServices = emailServicesSelector.getPackageEmailServicesFunctions();
         List<EmailServicesAddress> availableEmailServicesAddresses = emailServicesSelector.getPackageAllAddresses();
 
@@ -956,7 +787,7 @@ public without sharing class AdminService {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         Boolean incomingValue = Boolean.valueOf(input.get(ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE));
 
-        Map<String, ApexEmailNotification> apexEmailNotificationByEmail = emailServicesSelector.apexEmailNotificationByEmail;
+        Map<String, ApexEmailNotification> apexEmailNotificationByEmail = getApexEmailNotificationByEmailMap();
         List<EmailServicesFunction> availableEmailServices = emailServicesSelector.getPackageEmailServicesFunctions();
 
         Id functionId;
@@ -983,16 +814,11 @@ public without sharing class AdminService {
             
             List<EmailServicesAddress> emailServicesAddresses = emailServicesSelector.getPackageAllAddresses();
             if (emailServicesAddresses.isEmpty()) {
-                b = EmailServicesService.emailServicesAddressService.createEmailServicesAddress(functionId);
-                try {
-                    response = (SObjectsCreateResponse)JSON.deserialize(b, SObjectsCreateResponse.class);
-                }
-                catch(Exception e) {
-                    throw new AdminServiceException(b);
-                }
+                createEmailServicesAddress(functionId);
             } else {
                 List<EmailServicesAddress> addressesToDelete = new List<EmailServicesAddress>();
                 EmailServicesAddress addressToUpdate;
+                Boolean isEmailAddressMatched = false;
 
                 if (apexEmailNotificationByEmail.isEmpty()) {
                     addressToUpdate = emailServicesAddresses.get(0);
@@ -1001,6 +827,8 @@ public without sharing class AdminService {
                 } else {
                     for (EmailServicesAddress currentEmailServicesAddress : emailServicesAddresses) {
                         if (apexEmailNotificationByEmail.containsKey(EmailServicesService.emailServicesAddressService.getEmailFromEmailServiceAddress(currentEmailServicesAddress))) {
+                            isEmailAddressMatched = true;
+                            
                             if (!currentEmailServicesAddress.IsActive) {
                                 addressToUpdate = currentEmailServicesAddress;
                             }
@@ -1014,18 +842,37 @@ public without sharing class AdminService {
 
                 if (addressToUpdate != null) {
                     EmailServicesService.emailServicesAddressService.updateEmailServicesAddress(addressToUpdate);
+                } else if (!isEmailAddressMatched) {
+                    createEmailServicesAddress(functionId);
                 }
             }
 
             try {
                 String errorEmailServiceAddress = getPackageEmailServiceFunctionEmailAddress();
-                upsertApexEmailNotification(errorEmailServiceAddress, apexEmailNotificationByEmail.get(errorEmailServiceAddress));
+                ApexEmailNotification apexEmailNotification;
+                
+                if (apexEmailNotificationByEmail.size() == 1 && !apexEmailNotificationByEmail.containsKey(errorEmailServiceAddress)) {
+                    apexEmailNotification = apexEmailNotificationByEmail.get(new List<String>(apexEmailNotificationByEmail.keySet()).get(0));
+                } else {
+                    apexEmailNotification = apexEmailNotificationByEmail.get(errorEmailServiceAddress);
+                }
+                upsertApexEmailNotification(errorEmailServiceAddress, apexEmailNotification);
             }
             catch(Exception e) {
                 throw new AdminServiceException(e);
             }
         }
         return getEmailServiceData();
+    }
+
+    public static void createEmailServicesAddress(Id functionId) {
+        String b = EmailServicesService.emailServicesAddressService.createEmailServicesAddress(functionId);
+        try {
+            SObjectsCreateResponse response = (SObjectsCreateResponse)JSON.deserialize(b, SObjectsCreateResponse.class);
+        }
+        catch(Exception e) {
+            throw new AdminServiceException(b);
+        }
     }
 
     public static void upsertApexEmailNotification(String errorEmailServiceAddress, ApexEmailNotification apexEmailNotification) {
@@ -1532,24 +1379,26 @@ public without sharing class AdminService {
     public static Map<String, Object> getConfigurationOverviewData() {
         Map<String, Object> data = Constants.UI.CONFIGURATION_OVERVIEW_DATA;
 
-
+        // Remote Site Settings
         if (isRemoteSiteSettingsSetupCompleted()) {
             data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG0, true);
             data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
 
+        // Error Tracking
         if (isEmailServiceFunctionSetupCompleted()) {
             data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG1, true);
             data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
 
+        // Connected Orgs
         if (isConnectionOrgsSetupCompleted()) {
             data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG2, true);
             data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PASSTHROUGHT_MODE_ENABLED, ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c);
             data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
 
-        // Add percents for Integrations
+        // Integrations
         Integer integrationsPercentCompleted = getIntegrationsPercentCompleted();
         if (integrationsPercentCompleted > 0) {
             data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG3, true);
@@ -1568,6 +1417,7 @@ public without sharing class AdminService {
                 data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
             }
         }
+
         // Log Retention
         if (ConfigUtil.SETTINGS.Archival_Enabled__c) {
             if (isArchivalRulesSetupCompleted()) {
@@ -1576,12 +1426,13 @@ public without sharing class AdminService {
             }
         }
 
+        // Triton
         if (new PlatformEventSubscriberConfigService(Log_Event__e.SobjectType).isPlatformEventConfigSetupCompleted()) {
             data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG7, true);
             data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS, ((Integer)data.get(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_PROGRESS)) + 1);
         }
 
-        // Notifications section
+        // Notifications
         if (PermissionsUtil.NotificationIntegrationEnabled) {
             if (isNotificationsSetupCompleted()) {
                 data.put(Constants.UI.CONFIGURATION_OVERVIEW_DATA_KEY_FLAG8, true);
@@ -1786,7 +1637,6 @@ public without sharing class AdminService {
             Schema.sObjectType.Issue__c.fields.Executable_Rules__c.getSObjectField(),
             Schema.sObjectType.Issue__c.fields.Key__c.getSObjectField(),
             Schema.sObjectType.Issue__c.fields.Category_Icon__c.getSObjectField(),
-            Schema.sObjectType.Issue__c.fields.Analysis_Status__c.getSObjectField(),
             Schema.sObjectType.Issue__c.fields.Analysis_Statuses_Details__c.getSObjectField(),
             Schema.sObjectType.Issue__c.fields.Issue_Analysis__c.getSObjectField(),
             Schema.sObjectType.Issue__c.fields.Source_Control_Metadata__c.getSObjectField(),
@@ -2180,8 +2030,7 @@ public without sharing class AdminService {
             //'Jira' => ConfigUtil.SETTINGS.Auto_Jira_Task__c,
             ConfigUtil.SLACK_SERVICE_NAME => ConfigUtil.SLACK_SETTINGS.Slack_Enabled__c,
             ConfigUtil.PAGER_DUTY_SERVICE_NAME => ConfigUtil.PAGER_DUTY_SETTINGS.PagerDuty_Enabled__c,
-            ConfigUtil.TEAMS_SERVICE_NAME => ConfigUtil.GRAPH_API_SETTINGS.Enabled__c,
-            ConfigUtil.WEBHOOK_SERVICE_NAME => PermissionsUtil.WebhookIntegrationEnabled
+            ConfigUtil.TEAMS_SERVICE_NAME => ConfigUtil.GRAPH_API_SETTINGS.Enabled__c
         };
     }
     //log-categories
@@ -2686,27 +2535,6 @@ public without sharing class AdminService {
             && !input.containsKey(RuleUtil.KEY_ACTIONS)
             && !input.containsKey(RuleUtil.KEY_RULE_FILTERS);
         RuleUtil.Rule deserializedRuleWrapper = (RuleUtil.Rule)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE)), RuleUtil.Rule.class);
-        
-        // FIRST: Create Remote Site Settings for webhook actions (BEFORE any DML)
-        // Collect all webhook URLs and make synchronous callout(s)
-        if (!isOnlyRuleData && PermissionsUtil.WebhookIntegrationEnabled 
-            && input.get(RuleUtil.KEY_ACTIONS) != null) {
-            Set<String> webhookUrls = new Set<String>();
-            List<RuleUtil.Action> actions = (List<RuleUtil.Action>)JSON.deserialize(
-                JSON.serialize(input.get(RuleUtil.KEY_ACTIONS)), 
-                List<RuleUtil.Action>.class
-            );
-            for (RuleUtil.Action actionWrapper : actions) {
-                if (actionWrapper.type == Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION 
-                    && String.isNotBlank(actionWrapper.webhookUrl)) {
-                    webhookUrls.add(actionWrapper.webhookUrl);
-                }
-            }
-            if (!webhookUrls.isEmpty()) {
-                // Make synchronous callout(s) BEFORE any DML operations
-                upsertWebhookRemoteSiteSettings(webhookUrls);
-            }
-        }
         if(!isOnlyRuleData) {
             RuleUtil.Rule ruleWrapper = getMonitoringRuleWrapper(deserializedRuleWrapper, input);
             if(ruleWrapper != null) {
@@ -3404,7 +3232,7 @@ public without sharing class AdminService {
             return true;
         }
 
-        Map<String, ApexEmailNotification> apexEmailNotificationByEmail = emailServicesSelector.apexEmailNotificationByEmail;
+        Map<String, ApexEmailNotification> apexEmailNotificationByEmail = getApexEmailNotificationByEmailMap();
 
         List<EmailServicesAddress> addressesToDelete = new List<EmailServicesAddress>();
         EmailServicesAddress addressToUpdate;
@@ -3468,7 +3296,7 @@ public without sharing class AdminService {
             List<PharosRunningUserEmailServiceInfoWrapper> emailServiceInfoWrappers =
                 new List<PharosRunningUserEmailServiceInfoWrapper>();
 
-            Map<String, ApexEmailNotification> apexEmailNotificationByEmail = emailServicesSelector.apexEmailNotificationByEmail;
+            Map<String, ApexEmailNotification> apexEmailNotificationByEmail = getApexEmailNotificationByEmailMap();
             List<EmailServicesAddress> addresses = emailServicesSelector.getPackageAllActiveAddresses();
             Map<Id, User> userNameByUserIdMap = new Map<Id, User>(getUsersByUserIds(getEmailServicesAddressRunAsUserIds(addresses)));
             for (EmailServicesAddress currentEmailServicesAddress : addresses) {
@@ -3532,6 +3360,14 @@ public without sharing class AdminService {
 
     private static List<User> getUsersByUserIds(Set<Id> userIds) {
         return [SELECT Name FROM User WHERE Id IN :userIds];
+    }
+
+    private static Map<String, ApexEmailNotification> getApexEmailNotificationByEmailMap() {
+        Map<String, ApexEmailNotification> apexEmailNotificationByEmail = new Map<String, ApexEmailNotification>();
+        for (ApexEmailNotification currentApexEmailNotification : emailServicesSelector.getApexEmailNotificationsWithNotBlankEmail()) {
+            apexEmailNotificationByEmail.put(currentApexEmailNotification.Email, currentApexEmailNotification);
+        }
+        return apexEmailNotificationByEmail;
     }
 
     public class MetadataChatSettings {

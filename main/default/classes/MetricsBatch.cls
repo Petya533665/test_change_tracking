@@ -176,13 +176,13 @@ public with sharing class MetricsBatch extends DatabaseUtils.PharosBatchImpl imp
         result.put(START_BIT_OF_EMAIL_TO_CASE_ENABLED, apiSettings.emailToCaseEnabled ? 1 : 0);
         result.put(START_BIT_OF_AUTOMATED_FLOW_TRACKING_ENABLED, apiSettings.automatedFlowTrackingEnabled ? 1 : 0);
 
-        Integer countMonitoringRule = getCountRulesByType(MonitoringUtil.RULE_TYPE_MONITORING, 7);
+        Integer countMonitoringRule = getCountRulesByType(Constants.RULE_SOBJECT.TYPE_MONITORING, 7);
         add3Bits(START_BIT_OF_COUNT_MONITORING_RULES, countMonitoringRule, result);
-        Integer countNotificationRule = getCountRulesByType(MonitoringUtil.RULE_TYPE_NOTIFICATION, 3);
+        Integer countNotificationRule = getCountRulesByType(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, 3);
         add3Bits(START_BIT_OF_COUNT_NOTIFICATION_RULES, countNotificationRule, result);
-        Integer countArchivalRule = getCountRulesByType(MonitoringUtil.RULE_TYPE_ARCHIVAL, 3);
+        Integer countArchivalRule = getCountRulesByType(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, 3);
         add2Bits(START_BIT_OF_COUNT_ARCHIVAL_RULES, countArchivalRule, result);
-        Integer countBroadcastRule = getCountRulesByType(MonitoringUtil.RULE_TYPE_BROADCAST, 3);
+        Integer countBroadcastRule = getCountRulesByType(Constants.RULE_SOBJECT.TYPE_BROADCAST, 3);
         add2Bits(START_BIT_OF_COUNT_BROADCAST_RULES, countBroadcastRule, result);
 
         Boolean batchErrorTrackingEnabled = ConfigUtil.SETTINGS.Batch_Error_Tracking_Enabled__c;

@@ -66,14 +66,30 @@ public with sharing class GanttChartController {
         return result;
     }
 
-    public static final String TRITON_LOG_LEVEL_FIELDS_NAME = 'Log_Level__c';
+    public static String TRITON_LOG_LEVEL_FIELDS_NAME = 'Log_Level__c';
+
+    private static String tritonField;
+
+    public static void resetTritonField() {
+        tritonField = null;
+    }
+
+    public static void setTritonField(String value) {
+        if (String.isNotBlank(value)) {
+            tritonField = value;
+        }
+    }
+
+    private static String getTritonField() {
+        return tritonField ?? TRITON_LOG_LEVEL_FIELDS_NAME;
+    }
 
     public static final Boolean TRITON_LOG_LEVEL_AVAILABLE {
         get {
             if(TRITON_LOG_LEVEL_AVAILABLE == null) {
                 Map<String, Schema.SObjectField> logFieldMap = Schema.SObjectType.Log__c.fields.getMap();
-                TRITON_LOG_LEVEL_AVAILABLE = (logFieldMap?.containsKey(TRITON_LOG_LEVEL_FIELDS_NAME.toLowerCase()))
-                    || (logFieldMap?.containsKey(ConfigUtil.prefixCurrentOrgNamespace(TRITON_LOG_LEVEL_FIELDS_NAME).toLowerCase()));
+                TRITON_LOG_LEVEL_AVAILABLE = (logFieldMap?.containsKey(getTritonField().toLowerCase()))
+                    || (logFieldMap?.containsKey(ConfigUtil.prefixCurrentOrgNamespace(getTritonField()).toLowerCase()));
             }
             return TRITON_LOG_LEVEL_AVAILABLE;
         }
@@ -86,10 +102,10 @@ public with sharing class GanttChartController {
                 Map<String, Schema.SObjectField> logFieldMap = Schema.SObjectType.Log__c.fields.getMap();
                 // check Log_Level__c
                 // check orgnamespace__Log_Level__c
-                String logFieldNameWithNameSpace = (logFieldMap?.containsKey(TRITON_LOG_LEVEL_FIELDS_NAME.toLowerCase()))
-                    ? TRITON_LOG_LEVEL_FIELDS_NAME.toLowerCase()
-                    : ((logFieldMap?.containsKey(ConfigUtil.prefixCurrentOrgNamespace(TRITON_LOG_LEVEL_FIELDS_NAME).toLowerCase()))
-                        ? ConfigUtil.prefixCurrentOrgNamespace(TRITON_LOG_LEVEL_FIELDS_NAME).toLowerCase() : null);
+                String logFieldNameWithNameSpace = (logFieldMap?.containsKey(getTritonField().toLowerCase()))
+                    ? getTritonField().toLowerCase()
+                    : ((logFieldMap?.containsKey(ConfigUtil.prefixCurrentOrgNamespace(getTritonField()).toLowerCase()))
+                        ? ConfigUtil.prefixCurrentOrgNamespace(getTritonField()).toLowerCase() : null);
                 
                 TRITON_LOG_LEVEL_FIELD_DESCRIBE = Schema.SObjectType.Log__c.fields.getMap()?.get(logFieldNameWithNameSpace)?.getDescribe();
             }

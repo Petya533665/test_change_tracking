@@ -1,4 +1,7 @@
 global with sharing class EventsChartsWrapperController {
+
+	private static final Integer EVENT_CHART_MAX_RECORDS = 9000;
+
 	public Boolean isDev { get; set; }
 	public Rule__c currentRule { get; set; }
 	public Event__c currentEvent { get; set; }
@@ -70,10 +73,7 @@ global with sharing class EventsChartsWrapperController {
 		];
 		String ruleId = event.Rule__c;
 		Rule__c currentRule = event.Rule__r;
-		Boolean stdInterval = false;
-		if(currentRule.Subtype__c == 'Impact') {
-			stdInterval = true;
-		}
+
         DateTime eventTime = event.CreatedDate;
         DateTime startTime = eventTime.addMinutes(-60);
         DateTime endTime = eventTime.addMinutes(60);
@@ -82,7 +82,7 @@ global with sharing class EventsChartsWrapperController {
         startTime = eventTime.addMinutes(-shiftMinutes);
 		endTime = eventTime.addMinutes(shiftMinutes);
 		
-		return JSON.serialize(MonitoringUtil.getChartData(ruleId, event.Id, startTime, endTime, stdInterval));
+		return JSON.serialize(getChartData(ruleId, event.Id, startTime, endTime));
 	}
 	
 	// ===== #3 chart (Logs Timing)
@@ -135,6 +135,142 @@ global with sharing class EventsChartsWrapperController {
 
         return JSON.serialize(eventLogs);
     }
+
+	private static ChartData getChartData(Id ruleId, Id eventId, DateTime startTime, DateTime endTime) {
+		List<RuleUtil.Rule> rules = RuleUtil.getMonitoringRules(new List<Id>{ruleId});
+		if(rules.get(0).subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_SPIKE)) {
+			ChartData result = new ChartData();
+			List<String> logFields = RuleUtil.getLogFieldNames(rules);
+			logFields.add('Created_At__c');
+			logFields.add('Hash_1__c');
+			logFields.add('Summary__c');
+			String eventLogsQuery = new QBuilder(Log__c.SObjectType)
+				.selectFields(new Set<String>(logFields))
+				.add(QBuilder.condition('Created_At__c').isGreaterOrEquals(':startTime'))
+				.add(QBuilder.condition('Created_At__c').isLessOrEquals(':endTime'))
+				.add(QBuilder.orderBy('Created_At__c').ascending())
+				.addLimit(EVENT_CHART_MAX_RECORDS)
+				.build();
+			ChartData resultData = new ChartData();
+			for(Log__c log : rules.get(0).applyRuleFilters(Database.query(eventLogsQuery))) {
+				resultData.logs.add(new Map<String, Object> {'CreatedDate' => log.Created_At__c});
+			}
+
+			resultData.countLogs = resultData.logs.size();
+			return resultData;
+		}
+		else {
+			return getImpactChartData(ruleId, eventId, startTime, endTime);
+		}
+	}
+
+	public static ChartData getImpactChartData(Id ruleId, Id eventId, DateTime startTime, DateTime endTime) {
+		ChartData result = new ChartData();
+
+		List<RuleUtil.Rule> rules = RuleUtil.getMonitoringRules(new List<Id>{ruleId});
+		Rule__c rule = [SELECT Id, EventTimeInterval__c FROM Rule__c WHERE Id = :ruleId];
+		Event__c event = [SELECT Id, CreatedDate, Records__c FROM Event__c WHERE Id = :eventId];
+		Set<String> eventRecordIds = new Set<String>(parseIds(event.Records__c));
+		Integer eventInterval = Integer.valueOf(rule.EventTimeInterval__c);
+		DateTime eventEndDate = event.CreatedDate;
+		DateTime eventStartDate = eventEndDate.addMinutes(-eventInterval);
+
+		List<Log__c> logsBeforeEvent = getLogs(rules, startTime, eventStartDate, EVENT_CHART_MAX_RECORDS/2);
+		List<Log__c> logsAfterEvent = getLogs(rules, eventEndDate, endTime, EVENT_CHART_MAX_RECORDS/2);
+		Map<Long, List<Log__c>> logsBefore = splitLogsBySeconds(logsBeforeEvent);
+		Map<Long, List<Log__c>> logsAfter = splitLogsBySeconds(logsAfterEvent);
+
+		List<String> logFields = RuleUtil.getLogFieldNames(rules);
+		logFields.add('Created_At__c');
+		String eventLogsQuery = new QBuilder(Log__c.SObjectType)
+			.selectFields(new Set<String>(logFields))
+			.add(QBuilder.condition('Id').isIn(':eventRecordIds'))
+			.addLimit(EVENT_CHART_MAX_RECORDS)
+			.build();
+		List<Log__c> eventLogs = Database.query(eventLogsQuery);
+		Map<Long, List<Log__c>> logsEvent = new Map<Long, List<Log__c>>{eventEndDate.getTime() => eventLogs};
+
+		addIntervalsToChart(rules, result, logsBefore);
+		addIntervalsToChart(rules, result, logsEvent);
+		addIntervalsToChart(rules, result, logsAfter);
+		result.countLogs = logsBeforeEvent.size() + logsAfterEvent.size() + eventLogs.size();
+
+		return result;
+	}
+
+	private static void addIntervalsToChart(List<RuleUtil.Rule> rules, ChartData result, Map<Long, List<Log__c>> logsByInterval) {
+		for(Long datetimeLong : logsByInterval.keySet()) {
+			RuleUtil.Rule cloneRule = rules.get(0).clone();
+
+			List<Log__c> logsInterval = logsByInterval.get(datetimeLong);
+			cloneRule.value = 0;
+			cloneRule.groupValues = new Map<Integer, Map<String, Decimal>>();
+			MonitoringUtil.applyRulesFilters(new List<RuleUtil.Rule>{cloneRule}, logsInterval, DateTime.now(), new Map<Id, RuleUtil.Event>(), false);
+
+			ChartDataInterval interval = new ChartDataInterval();
+			interval.logValues = cloneRule.groupValues;
+			interval.value = cloneRule.value;
+			if(!interval.logValues.isEmpty()) {
+				interval.value = 0;
+				for(Map<String, Decimal> intervalCounts : interval.logValues.values()) {
+					for(Decimal listCounts : intervalCounts.values()) {
+						interval.value += listCounts;
+					}
+				}
+			}
+			result.mapIntervals.put(datetimeLong, interval);
+		}
+	}
+
+	public static Map<Long, List<Log__c>> splitLogsBySeconds(List<Log__c> logs) {
+
+		Map<Long, List<Log__c>> result = new Map<Long, List<Log__c>>();
+		for(Log__c log : logs) {
+
+			Long roundedMills = log.Created_At__c.getTime();
+			List<Log__c> logsByMills = result.get(roundedMills) != null
+					? result.get(roundedMills)
+					: new List<Log__c>();
+
+			logsByMills.add(log);
+			result.put(roundedMills, logsByMills);
+		}
+		return result;
+	}
+
+	private static  List<Log__c> getLogs(List<RuleUtil.Rule> rules, DateTime startTime, DateTime endTime, Integer limitLogs) {
+		List<String> logFields = RuleUtil.getLogFieldNames(rules);
+		logFields.add('Created_At__c');
+		String query = new QBuilder(Log__c.SObjectType)
+				.selectFields(new Set<String>(logFields))
+				.add(QBuilder.condition('Created_At__c').isGreaterOrEquals(':startTime'))
+				.add(QBuilder.condition('Created_At__c').isLessOrEquals(':endTime'))
+				.addLimit(limitLogs)
+				.build();
+		List<Log__c> logs = Database.query(query);
+		return logs;
+	}
+
+	public class ChartData {
+		public Map<Long, ChartDataInterval> mapIntervals;
+		public List<Map<String, Object>> logs;
+		public Integer countLogs;
+		public ChartData() {
+			this.mapIntervals = new Map<Long, ChartDataInterval>();
+			this.logs = new List<Map<String, Object>>();
+			this.countLogs = 0;
+		}
+	}
+
+	public class ChartDataInterval {
+		public Decimal value;
+		public Map<Integer, Map<String, Decimal>> logValues;
+
+		public ChartDataInterval() {
+			this.logValues = new Map<Integer, Map<String, Decimal>>();
+			this.value = 0;
+		}
+	}
 
 	@RemoteAction
     global static String remoteActionHandler(String input) {

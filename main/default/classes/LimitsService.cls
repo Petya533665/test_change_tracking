@@ -97,7 +97,7 @@ public with sharing class LimitsService {
             SELECT COUNT()
             FROM AsyncApexJob
             WHERE JobType = 'BatchApex'
-            AND Status = 'Holding'
+            AND Status = :Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUS_HOLDING
         ];
     }
 
@@ -141,6 +141,11 @@ public with sharing class LimitsService {
 		
 		// Group logs that need limits records
 		for (Log__c log : newLogs) {
+			// Skip non-hourly limits batch logs
+			if (log.Category__c != HourlyLimitsBatch.CATEGORY || log.Type__c != HourlyLimitsBatch.TYPE) {
+				continue;
+			}
+			
 			if (log.Created_Timestamp__c != null && log.Limits__c == null) {
 				String orgId = log.Organization_Id__c;
 				Boolean isLocalOrg = orgId == UserInfo.getOrganizationId().left(15);
@@ -215,7 +220,11 @@ public with sharing class LimitsService {
 			
 			// Assign the newly created limits records back to the logs
 			for (Log__c log : newLogs) {
-				if (log.Created_Timestamp__c != null && log.Limits__c == null) {
+				// Only assign to hourly snapshot logs
+				if (log.Category__c == HourlyLimitsBatch.CATEGORY && 
+					log.Type__c == HourlyLimitsBatch.TYPE &&
+					log.Created_Timestamp__c != null && 
+					log.Limits__c == null) {
 					String orgId = log.Organization_Id__c;
 					Limits__c createdLimit = limitsByOrgId.get(orgId);
 					if (createdLimit != null) {
