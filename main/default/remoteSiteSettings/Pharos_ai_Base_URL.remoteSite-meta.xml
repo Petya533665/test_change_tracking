@@ -3,5 +3,5 @@
     <description>Pharos.ai callback URL in this org</description>
     <disableProtocolSecurity>false</disableProtocolSecurity>
     <isActive>true</isActive>
-    <url>https://2208t8-dev-ed.develop.my.salesforce.com</url>
+    <url>https://petro-dev-pharos-dev-ed.develop.my.salesforce.com</url>
 </RemoteSiteSetting>
