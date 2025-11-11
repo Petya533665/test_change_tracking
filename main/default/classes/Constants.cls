@@ -5,8 +5,18 @@ public with sharing class Constants {
         private set;
     }
 
+    public static final ActionSobject ACTION_SOBJECT {
+        get { return ACTION_SOBJECT == null ? (ACTION_SOBJECT = new ActionSobject()) : ACTION_SOBJECT; }
+        private set;
+    }
+
     public static final AIEventSObject AI_EVENT_SOBJECT { 
         get { return AI_EVENT_SOBJECT == null ? (AI_EVENT_SOBJECT = new AIEventSObject()) : AI_EVENT_SOBJECT; }
+        private set;
+    }
+
+    public static final EventSObject EVENT_SOBJECT { 
+        get { return EVENT_SOBJECT == null ? (EVENT_SOBJECT = new EventSObject()) : EVENT_SOBJECT; }
         private set;
     }
 
@@ -55,6 +65,11 @@ public with sharing class Constants {
         private set;
     }
 
+    public static final RuleSObject RULE_SOBJECT {
+        get { return RULE_SOBJECT == null ? (RULE_SOBJECT = new RuleSObject()) : RULE_SOBJECT; }
+        private set;
+    }
+
     public static final StaticResourceSObject STATIC_RESOURCE_SOBJECT {
         get { return STATIC_RESOURCE_SOBJECT == null ? (STATIC_RESOURCE_SOBJECT = new StaticResourceSObject()) : STATIC_RESOURCE_SOBJECT; }
         private set;
@@ -89,6 +104,12 @@ public with sharing class Constants {
 
         public final String DATETIME_FORMAT = 'yyyy-MM-dd HH:mm:ss';
 
+        public final String NOTIFICATION_INTEGRATION_STATUS_PENDING = 'Pending';
+        public final String NOTIFICATION_INTEGRATION_STATUS_FAILED = 'Failed';
+        public final String NOTIFICATION_INTEGRATION_STATUS_COMPLETED = 'Completed';
+
+        public final String JIRA_INTEGRATION_STATUS_PENDING = 'Ticket Pending';
+
         public final Map<String, String> RFC2822_MONTHS = new Map<String, String> {
             'Jan' => '01',
             'Feb' => '02',
@@ -105,11 +126,44 @@ public with sharing class Constants {
         };
     }
 
+    public inherited sharing class ActionSObject extends SObjectTypeConstants {
+        public final String RT_MONITORING = 'Monitoring';
+        public final String RT_ARCHIVAL = 'Archival';
+
+        public final String SUBTYPE_DEFAULT = 'Default';
+        public final String SUBTYPE_NOTIFICATION = 'Notification';
+
+        public final String ACTION_TYPE_TEAMS_NOTIFICATION = 'Teams Notification';
+        public final String ACTION_TYPE_EMAIL_NOTIFICATION = 'Email Notification';
+        public final String ACTION_TYPE_SLACK_NOTIFICATION = 'Slack Notification';
+        public final String ACTION_TYPE_JIRA_NOTIFICATION = 'Jira Notification';
+        public final String ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION = 'Azure Dev Ops Notification';
+        public final String ACTION_TYPE_PAGERDUTY_NOTIFICATION = 'PagerDuty Notification';
+        public final String ACTION_TYPE_REMOVAL = 'Removal';
+        public final String ACTION_TYPE_LOCAL_ARCHIVAL = 'Local Archival';
+        public final String ACTION_TYPE_EXTERNAL_ARCHIVAL = 'External Archival';
+        public final String ACTION_TYPE_JIRA_TICKET_COMMENT = 'JIRA Ticket Comment';
+        public final String ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT = 'Azure Dev Ops Work Item Comment';
+        
+        private ActionSObject() {
+            this.objectType = Action__c.SObjectType;
+        }
+    }
+
     public inherited sharing class AIEventSObject extends SObjectTypeConstants {
         public final String TRIGGER_NAME_AI_EVENT = 'AiEventTrigger';
 
         private AIEventSObject() {
             this.objectType = AI_Event__e.SObjectType;
+        }
+    }
+
+    public inherited sharing class EventSObject extends SObjectTypeConstants {
+        public final String RT_MONITORING = 'Monitoring';
+        public final String RT_ARCHIVAL = 'Archival';
+
+        private EventSObject() {
+            this.objectType = Event__c.SObjectType;
         }
     }
 
@@ -548,9 +602,11 @@ public with sharing class Constants {
         public final String ASYNC_APEX_JOB_PROCESS_STATUS_PREPARING = 'Preparing';
         public final String ASYNC_APEX_JOB_PROCESS_STATUS_QUEUED = 'Queued';
         public final String ASYNC_APEX_JOB_PROCESS_STATUS_HOLDING = 'Holding';
+        public final String ASYNC_APEX_JOB_PROCESS_STATUS_COMPLETED = 'Completed';
 
         public final String ASYNC_APEX_JOB_PROCESS_TYPE_SCHEDULED_APEX = 'ScheduledApex';
         public final String ASYNC_APEX_JOB_PROCESS_TYPE_BATCH_APEX_WORKER = 'BatchApexWorker';
+        public final String ASYNC_APEX_JOB_PROCESS_TYPE_BATCH_APEX = 'BatchApex';
     
         public final String CRON_EXP_DEBUG_LOG_SERVICE_SCHEDULER_1 = '0 55 * * * ?';
         public final String CRON_EXP_DEBUG_LOG_SERVICE_SCHEDULER_2 = '0 25 * * * ?';
@@ -709,6 +765,26 @@ public with sharing class Constants {
         public final String JIRA_CLOUD_API_URL = 'https://api.atlassian.com';
         public final String JIRA_CLOUD_OAUTH_NAME = 'Pharos_ai_JIRA_CLOUD_OAUTH_URL';
         public final String JIRA_CLOUD_OAUTH_DESCRIPTION = 'Pharos.ai - Jira integration OAuth URL';
+    }
+
+    public inherited sharing class RuleSObject extends SObjectTypeConstants {
+        public final String SUB_TYPE_FREQUENCY = 'Frequency';
+        public final String SUB_TYPE_IMPACT = 'Impact';
+        public final String SUB_TYPE_SPIKE = 'Spike';
+        public final String SUB_TYPE_THRESHOLD = 'Threshold';
+
+        public final String TYPE_MONITORING = 'Monitoring';
+        public final String TYPE_ARCHIVAL = 'Archival';
+        public final String TYPE_JIRA_UPDATE = 'JIRA Update';
+        public final String TYPE_AZURE_DEV_OPS = 'Azure Dev Ops';
+        public final String TYPE_NOTIFICATION = 'Notification';
+        public final String TYPE_EVENT_MONITORING = 'Event Monitoring';
+        public final String TYPE_BROADCAST = 'Broadcast';
+        public final String TYPE_LIMITS = 'Limits';
+
+        private RuleSObject() {
+            this.objectType = Rule__c.SObjectType;
+        }
     }
 
     public inherited sharing class StaticResourceSObject extends SObjectTypeConstants {

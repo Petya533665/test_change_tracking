@@ -122,17 +122,27 @@ public with sharing class AIAnalysisService {
 
 	public void issueStatus() {
 		List<AnalysisStatusDetails> analysisStatusesDetails = new List<AnalysisStatusDetails>();
-		issue.Analysis_Status__c = NOT_STARTED_STATUS;
+
+		if (String.isBlank(issue.Analysis_Status__c)) issue.Analysis_Status__c = NOT_STARTED_STATUS;
+
+		String status;
 		for (AIAnalysisServiceInterface strategy : this.strategies.values()) {
 			AnalysisStatusDetails analysisStatusDetails = strategy.getAnalysisStatusDetails();
-			if (analysisStatusDetails.status == IN_PROGRESS_STATUS) issue.Analysis_Status__c = IN_PROGRESS_STATUS;
-			if (issue.Analysis_Status__c != IN_PROGRESS_STATUS
-					&& analysisStatusDetails.status == COMPLETED_STATUS) issue.Analysis_Status__c = COMPLETED_STATUS;
-			if (issue.Analysis_Status__c != IN_PROGRESS_STATUS
-					&& issue.Analysis_Status__c != COMPLETED_STATUS
-					&& analysisStatusDetails.status == FAILED_STATUS) issue.Analysis_Status__c = FAILED_STATUS;
+			if (analysisStatusDetails.status == IN_PROGRESS_STATUS && status != PENDING_STATUS) status = IN_PROGRESS_STATUS;
+			if (analysisStatusDetails.status == PENDING_STATUS) status = PENDING_STATUS;
 			analysisStatusesDetails.add(analysisStatusDetails);
 		}
+		if (status != IN_PROGRESS_STATUS && status != PENDING_STATUS) {
+			for (AIAnalysisServiceInterface strategy : this.strategies.values()) {
+				AnalysisStatusDetails analysisStatusDetails = strategy.getAnalysisStatusDetails();
+
+				if (analysisStatusDetails.status == COMPLETED_STATUS) status = COMPLETED_STATUS;
+
+				if (issue.Analysis_Status__c != COMPLETED_STATUS
+						&& analysisStatusDetails.status == FAILED_STATUS) status = FAILED_STATUS;
+			}
+		}
+		issue.Analysis_Status__c = status;
 		issue.Analysis_Statuses_Details__c = JSON.serialize(analysisStatusesDetails);
 	}
 
@@ -228,13 +238,13 @@ public with sharing class AIAnalysisService {
 					|| (analysisStatusDetails.status == IN_PROGRESS_STATUS && isTimeoutOver())
 					|| (analysisStatusDetails.status == PENDING_STATUS && isTimeoutOver())
 			) {
-				changeStatus(IN_PROGRESS_STATUS);
+				changeStatus(IN_PROGRESS_STATUS, null);
 				setLastAnalysisTimestamp();
 			}
 		}
 		public virtual void Pending() {
 			if (analysisStatusDetails.status == IN_PROGRESS_STATUS) {
-				changeStatus(PENDING_STATUS);
+				changeStatus(PENDING_STATUS, null);
 			}
 		}
 		public virtual void analysis() {
@@ -395,6 +405,7 @@ public with sharing class AIAnalysisService {
 
 	public static final String OPEN_AI_MODEL = 'o3';
 
+
 	public interface RequestInterface {
 		void startAnalysis();
 	}
@@ -424,7 +435,7 @@ public with sharing class AIAnalysisService {
 				HttpUtils.post(
 						AI_ANALYSIS_ENDPOINT,
 						JSON.serialize(this),
-						HttpUtils.getHeadersContentTypeJSON(),
+						HttpUtils.getHeadersWithApiKeyAndJson(),
 						200
 				);
 			}

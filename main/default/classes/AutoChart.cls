@@ -323,7 +323,7 @@ public with sharing class AutoChart {
                 );
                 
                 // Get the action type enum
-                MonitoringUtil.ActionType actionType = MonitoringUtil.MAP_ACTIONTYPES_BY_STRINGS.get(actionFields.Action_Type__c);
+                RuleUtil.ActionType actionType = RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(actionFields.Action_Type__c);
                 
                 if (actionType != null) {
                     SObject record = getRecordById(recordId);
@@ -351,7 +351,7 @@ public with sharing class AutoChart {
                 );
                 
                 // Get the action type enum
-                MonitoringUtil.ActionType actionType = MonitoringUtil.MAP_ACTIONTYPES_BY_STRINGS.get(actionFields.Action_Type__c);
+                RuleUtil.ActionType actionType = RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(actionFields.Action_Type__c);
                 
                 if (actionType != null) {
                     SObject record = getRecordById(recordId);
@@ -414,10 +414,10 @@ public with sharing class AutoChart {
     
     /**
      * Check if action contains AutoChart merge fields
-     * @param action MonitoringUtil.Action to check
+     * @param action RuleUtil.Action to check
      * @return true if AutoChart fields are found
      */
-    public static Boolean containsAutoChartFields(MonitoringUtil.Action action) {
+    public static Boolean containsAutoChartFields(RuleUtil.Action action) {
         // Check if AutoChart feature is enabled
         if (!AutoChart.isEnabled) {
             return false;
@@ -437,10 +437,10 @@ public with sharing class AutoChart {
     
     /**
      * Extract chart types from action fields
-     * @param action MonitoringUtil.Action to extract from
+     * @param action RuleUtil.Action to extract from
      * @return List of chart type strings
      */
-    public static List<String> extractChartTypesFromAction(MonitoringUtil.Action action) {
+    public static List<String> extractChartTypesFromAction(RuleUtil.Action action) {
         List<String> chartTypes = new List<String>();
         
         // Check if AutoChart feature is enabled
@@ -514,14 +514,14 @@ public with sharing class AutoChart {
         }
         
         // Get notification rules and extract AutoChart actions
-        List<MonitoringUtil.MonitoringRule> notificationRules = MonitoringUtil.getNotificationRules(executableRulesIds, ruleSobjectType);
+        List<RuleUtil.Rule> notificationRules = RuleUtil.getNotificationRules(executableRulesIds, ruleSobjectType);
         
         Integer iterationCounter = 1;
         Integer autoChartActionsFound = 0;
         
-        for (MonitoringUtil.MonitoringRule rule : notificationRules) {
+        for (RuleUtil.Rule rule : notificationRules) {
             if (rule.actions != null) {
-                for (MonitoringUtil.Action action : rule.actions) {
+                for (RuleUtil.Action action : rule.actions) {
                     // Check if this action contains AutoChart merge fields
                     if (containsAutoChartFields(action)) {
                         autoChartActionsFound++;

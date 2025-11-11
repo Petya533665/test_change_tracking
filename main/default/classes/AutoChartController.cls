@@ -1,11 +1,11 @@
 public with sharing class AutoChartController {
 
-    public static String  getAutoChartSetting() {
+    public static Map<String, Object> getAutoChartSetting() {
         Map<String, Object> autoChartSetting = new Map<String, Object> {
             'isEnableNotificationCharts' => ConfigUtil.PHAROS_SETTINGS.EnableNotificationCharts__c
         };
 
-        return JSON.serialize(autoChartSetting);
+        return autoChartSetting;
     }
 
     public static String  updateAutoChartSetting(String autoChartSettingJSON) {

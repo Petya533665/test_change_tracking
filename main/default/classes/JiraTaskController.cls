@@ -33,19 +33,18 @@ public with sharing class JiraTaskController {
 	}
 
 	public static TicketingService.TicketCreateResult createTask(Object payload) {
-		CreateJiraTicketRequest data = (CreateJiraTicketRequest)JSON.deserialize(JSON.serialize(payload), CreateJiraTicketRequest.class);
 		Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(payload));
 		RuleUtil.Action action = (RuleUtil.Action)JSON.deserialize(JSON.serialize(input.get('action')), RuleUtil.Action.class);
 		String logId = (String)JSON.deserialize(JSON.serialize(input.get('logId')), String.class);
 
 		TicketingService service;
-		if (action.type == RuleUtil.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION) {
+		if (action.type == Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION) {
 			service = new TicketingService(TicketingService.TICKETING_SERVICE_TYPE.AZURE_DEV_OPS, null);
-		} else if (action.type == RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION) {
+		} else if (action.type == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION) {
 			service = new TicketingService(TicketingService.TICKETING_SERVICE_TYPE.JIRA, null);
 		}
 		JiraSyncBatch.skipSync = true;
-		TicketingService.TicketCreateResult result = service.createTicket(new TicketingService.TicketingServiceInputData(logId, action.getAction(RuleUtil.ACTION_RT_MONITORING)));
+		TicketingService.TicketCreateResult result = service.createTicket(new TicketingService.TicketingServiceInputData(logId, action.getAction(Constants.ACTION_SOBJECT.RT_MONITORING)));
 		result.url = JiraService.toCustomJiraUiEndpoint(result?.url);
 		return result;
 	}
@@ -149,15 +148,4 @@ public with sharing class JiraTaskController {
 		public String error;
 		public String stack;
 	}
-
-	public class CreateJiraTicketRequest {
-		public RuleUtil.Action action;
-		public String logId;
-	}
-
-	public class CreateTaskResponse {
-		public String ticketUrl;
-		public String error;
-	}
-
 }

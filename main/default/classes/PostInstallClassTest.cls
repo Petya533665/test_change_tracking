@@ -28,7 +28,7 @@ private class PostInstallClassTest {
 		insert newLog;
 
 		Issue__c issue = LogTriggerHandlerTest.createIssue(newLog.Id, 'somehash1');
-		issue.Jira_Integration_Status__c = MonitoringUtil.JIRA_INTEGRATION_STATUS_PENDING;
+		issue.Jira_Integration_Status__c = Constants.GLOBAL_VARIABLE.JIRA_INTEGRATION_STATUS_PENDING;
 		insert issue;
 
 		Test.startTest();
@@ -38,10 +38,10 @@ private class PostInstallClassTest {
 
 		issue = [SELECT Jira_Integration_Status__c FROM Issue__c WHERE Id = :issue.Id LIMIT 1];
 		if(success) {
-			System.assertEquals(MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_FAILED, issue.Jira_Integration_Status__c);
+			System.assertEquals(Constants.GLOBAL_VARIABLE.NOTIFICATION_INTEGRATION_STATUS_FAILED, issue.Jira_Integration_Status__c);
 		}
 		else {
-			System.assertEquals(MonitoringUtil.JIRA_INTEGRATION_STATUS_PENDING, issue.Jira_Integration_Status__c);
+			System.assertEquals(Constants.GLOBAL_VARIABLE.JIRA_INTEGRATION_STATUS_PENDING, issue.Jira_Integration_Status__c);
 		}
 		
 	}
@@ -86,10 +86,10 @@ private class PostInstallClassTest {
 		Rule__c testRule = new Rule__c();
         testRule.Active__c = true;
         testRule.Index__c = 0;
-	    testRule.Type__c = RuleUtil.RULE_TYPE_JIRA_UPDATE;
+	    testRule.Type__c = Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE;
         insert testRule;
 
-        Action__c action = new Action__c(Type__c = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION);
+        Action__c action = new Action__c(Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION);
 		insert action;
 		
         RuleAction__c en1 = new RuleAction__c();

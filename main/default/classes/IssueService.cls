@@ -70,7 +70,7 @@ public with sharing class IssueService {
 					issue.Status__c = ISSUE_STATUS_NEW;
 					issue.Resolved_On__c = null;
 					if (String.isNotBlank(issue.Executable_Rules__c)) {
-						issue.Jira_Integration_Status__c = MonitoringUtil.JIRA_INTEGRATION_STATUS_PENDING;
+						issue.Jira_Integration_Status__c = Constants.GLOBAL_VARIABLE.JIRA_INTEGRATION_STATUS_PENDING;
 					}
 					issueToReRunTicketing.put(issue.Key__c, issue);
 				}
@@ -92,17 +92,17 @@ public with sharing class IssueService {
 			}
 		}
 		if(!issueToReRunTicketing.isEmpty()) {
-			List<MonitoringUtil.MonitoringRule> jiraRules = MonitoringUtil.getJiraRules(null, MonitoringUtil.RULE_ISSUE_SOBJECT_TYPE_FIELD);
-			List<MonitoringUtil.MonitoringRule> azureDevOpsRules = MonitoringUtil.getAzureDevOpsRules(null, MonitoringUtil.RULE_ISSUE_SOBJECT_TYPE_FIELD);
+			List<RuleUtil.Rule> jiraRules = RuleUtil.getJiraRules(null, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
+			List<RuleUtil.Rule> azureDevOpsRules = RuleUtil.getAzureDevOpsRules(null, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
 
 			for(Issue__c issue : issueToReRunTicketing.values()) {
 				NotificationService.ExecutableRulesConfig config = NotificationService.getExecutableRuleConfig(issue);
 				String ruleId;
 				if(JiraSyncBatch.isJiraTaskUrl(issue.Bug_Tracker__c) && !jiraRules.isEmpty()) {
-					ruleId = jiraRules.get(0).ruleId;
+					ruleId = jiraRules.get(0).id;
 				}
 				else if(JiraSyncBatch.isAzureDevOpsTaskUrl(issue.Bug_Tracker__c) && !azureDevOpsRules.isEmpty()) {
-					ruleId = azureDevOpsRules.get(0).ruleId;
+					ruleId = azureDevOpsRules.get(0).id;
 				}
 				if(String.isNotBlank(ruleId)) {
 					config.addToReRun(ruleId);

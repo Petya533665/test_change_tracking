@@ -422,6 +422,12 @@ public with sharing class IntegrationSettingsTest {
             IntegrationSettings.JIRA.saveJiraSettings(inputSettings);
         Test.stopTest();
 
+        for (HttpRequest request : multiCalloutMock.getRequests()) {
+            if (request.getEndpoint().startsWith(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT)) {
+                Assert.areEqual(true, request.getEndpoint().contains('/api/2/'), 'should be v2 api');
+            }
+        }
+
         Assert.areEqual(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT, ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c);
         Assert.areEqual('someusername', ConfigUtil.JIRA_SETTINGS.Jira_Username__c);
         Assert.areEqual('sometoken', ConfigUtil.JIRA_SETTINGS.Jira_API_Token__c);
@@ -462,6 +468,12 @@ public with sharing class IntegrationSettingsTest {
         Test.startTest();
             IntegrationSettings.JIRA.saveJiraSettings(inputSettings);
         Test.stopTest();
+
+        for (HttpRequest request : multiCalloutMock.getRequests()) {
+            if (request.getEndpoint().startsWith(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT)) {
+                Assert.areEqual(true, request.getEndpoint().contains('/api/2/'), 'should be v2 api');
+            }
+        }
 
         Assert.areEqual('https://someurl.com', ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c);
         Assert.areEqual(null, ConfigUtil.JIRA_SETTINGS.Jira_Username__c);
@@ -515,6 +527,12 @@ public with sharing class IntegrationSettingsTest {
         Test.startTest();
             IntegrationSettings.JIRA.saveJiraSettings(inputSettings);
         Test.stopTest();
+
+        for (HttpRequest request : multiCalloutMock.getRequests()) {
+            if (request.getEndpoint().startsWith(JiraNotificationBatchTest.JIRA_MOCK_REST_ENDPOINT)) {
+                Assert.areEqual(true, request.getEndpoint().contains('/api/2/'), 'should be v2 api');
+            }
+        }
 
         Assert.areEqual('https://someurl.com', ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c);
         Assert.areEqual(null, ConfigUtil.JIRA_SETTINGS.Jira_Username__c);

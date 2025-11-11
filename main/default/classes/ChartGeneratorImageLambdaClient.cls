@@ -41,31 +41,6 @@ public with sharing class ChartGeneratorImageLambdaClient {
     private Map<String, String> chartImages;
     private LambdaErrorResponse errorResponse;
 
-    private static final Map<String, String> AUTH_HEADERS {
-        get {
-            if (AUTH_HEADERS == null) {
-                AUTH_HEADERS = new Map<String, String>();
-                AWS_Token__mdt mdtSettings = AWS_Token__mdt.getInstance('AWSToken');
-                if(mdtSettings != null) {
-                    AUTH_HEADERS.put('x-api-key', mdtSettings.Token__c);
-                }
-            }
-            return AUTH_HEADERS;
-        }
-        private set;
-    }
-
-    private static final Map<String, String> HEADERS {
-        get {
-            if (HEADERS == null) {
-                HEADERS = new Map<String, String>();
-                HEADERS.putAll(AUTH_HEADERS);
-                HEADERS.put('Content-Type', 'application/json; charset=utf-8');
-            }
-            return HEADERS;
-        }
-        private set;
-    }
 
     public ChartGeneratorImageLambdaClient() {
     }
@@ -85,7 +60,7 @@ public with sharing class ChartGeneratorImageLambdaClient {
             String response = HttpUtils.post(
                 URL_ENDPOINT,
                 chartConfig,
-                HEADERS,
+                HttpUtils.getHeadersWithApiKeyAndJson(),
                 200
             );
 

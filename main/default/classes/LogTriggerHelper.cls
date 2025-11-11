@@ -231,6 +231,7 @@ public with sharing class LogTriggerHelper {
 
     public static void onAfterDelete(Map<Id, Log__c> oldLogsMap) {
         deleteIssue(oldLogsMap);
+        deleteLimits(oldLogsMap);
         deleteLogIndexes(oldLogsMap);
     }
 
@@ -295,6 +296,35 @@ public with sharing class LogTriggerHelper {
                 .handleError(LogTriggerHelper.class.getName(), '.deleteIssue');
         DatabaseUtils.getInstance().performUpdateDML(issuesToUpdate, Schema.SObjectType.Issue__c)
                 .handleError(LogTriggerHelper.class.getName(), '.deleteIssue');
+    }
+
+    private static void deleteLimits(Map<Id, Log__c> oldLogsMap) {
+        Set<Id> limitsIds = new Set<Id>();
+        for (Log__c log : oldLogsMap.values()) {
+            if (String.isNotBlank(log.Limits__c)) {
+                limitsIds.add(log.Limits__c);
+            }
+        }
+        if (!limitsIds.isEmpty()) {
+            // Check if any other logs are still using these limits records
+            List<AggregateResult> aggregateResults = [
+                SELECT Limits__c limits_id, COUNT(Id) count_id 
+                FROM Log__c 
+                WHERE Limits__c IN :limitsIds 
+                GROUP BY Limits__c
+            ];
+            
+            // If a limits record is still referenced by other logs, don't delete it
+            for (AggregateResult ar : aggregateResults) {
+                limitsIds.remove((Id)ar.get('limits_id'));
+            }
+            
+            // Delete only orphaned limits records
+            if (!limitsIds.isEmpty()) {
+                DatabaseUtils.getInstance().performDeleteDML(new List<Id>(limitsIds), Schema.SObjectType.Limits__c)
+                        .handleError(LogTriggerHelper.class.getName(), '.deleteLimits');
+            }
+        }
     }
 
 }

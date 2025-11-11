@@ -167,6 +167,10 @@ public class TestDataFactory {
         public HttpResponse getResponse(String endpoint) {
             return this.responseMap.get(endpoint);
         }
+
+        public List<HttpRequest> getRequests() {
+            return new List<HttpRequest>(this.requestMap.values());
+        }
     }
 
     public class MultiRequestMockException extends Exception {}
@@ -278,7 +282,7 @@ public class TestDataFactory {
         rn1.Subject__c = 'test';
         rn1.EmailBody__c = 'test';
         rn1.EmailTo__c = 'test@test.com';
-        rn1.Action_Type__c = MonitoringUtil.ACTION_TYPE_EMAIL_NOTIFICATION;
+        rn1.Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION;
         rn1.SobjectType__c = sobjectType;
         insert rn1;
         return rn1;
@@ -297,7 +301,7 @@ public class TestDataFactory {
         }
         rn1.Team_Id__c = 'testTeamId';
         rn1.Channel_Id__c = 'testChannelId';
-        rn1.Action_Type__c = MonitoringUtil.ACTION_TYPE_TEAMS_NOTIFICATION;
+        rn1.Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_TEAMS_NOTIFICATION;
         rn1.SobjectType__c = sobjectType;
         insert rn1;
         return rn1;
@@ -311,7 +315,7 @@ public class TestDataFactory {
         rn1.Subject__c = 'test';
         rn1.Body__c = 'test';
         rn1.SlackChannels__c = '@test';
-        rn1.Action_Type__c = MonitoringUtil.ACTION_TYPE_SLACK_NOTIFICATION;
+        rn1.Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_SLACK_NOTIFICATION;
         rn1.SobjectType__c = sobjectType;
         insert rn1;
         return rn1;
@@ -324,7 +328,7 @@ public class TestDataFactory {
         Action__c rn1 = createNotificationRuleAction();
         rn1.Subject__c = 'test';
         rn1.Body__c = 'test';
-        rn1.Action_Type__c = MonitoringUtil.ACTION_TYPE_PAGERDUTY_NOTIFICATION;
+        rn1.Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_PAGERDUTY_NOTIFICATION;
         rn1.PagerDuty_Type__c = pagerDutyType;
         rn1.SobjectType__c = sobjectType;
         insert rn1;
@@ -336,7 +340,7 @@ public class TestDataFactory {
         Action__c rn1 = new Action__c();
         rn1.RecordTypeId = recordtypeId;
         rn1.Description__c = 'test';
-        rn1.Subtype__c = MonitoringUtil.RULE_TYPE_NOTIFICATION;
+        rn1.Subtype__c = Constants.RULE_SOBJECT.TYPE_NOTIFICATION;
         return rn1;
     }
 
@@ -363,7 +367,7 @@ public class TestDataFactory {
     public static Rule__c createNotificationRule(Action__c action, String sobjecttype, String subType, Boolean isUpdate) {
         Rule__c mr1 = new Rule__c();
         mr1.Active__c = true;
-        mr1.Type__c = MonitoringUtil.RULE_TYPE_NOTIFICATION;
+        mr1.Type__c = Constants.RULE_SOBJECT.TYPE_NOTIFICATION;
         mr1.Index__c = 1;
         mr1.SobjectType__c = sobjecttype;
         mr1.Subtype__c = subType;
@@ -424,7 +428,7 @@ public class TestDataFactory {
         Rule__c mr1 = new Rule__c();
         mr1.Index__c = 0;
         mr1.Active__c = true;
-        mr1.Type__c =  MonitoringUtil.RULE_TYPE_JIRA_UPDATE;
+        mr1.Type__c =  Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE;
         insert mr1;
         return mr1;
     }
@@ -477,14 +481,14 @@ public class TestDataFactory {
     public static Rule__c createArchivalRule(Boolean isValidRule, Boolean isValidFilters) {
         Rule__c mr1 = new Rule__c();
         mr1.Active__c = true;
-        mr1.Type__c = MonitoringUtil.RULE_TYPE_ARCHIVAL;
+        mr1.Type__c = Constants.RULE_SOBJECT.TYPE_ARCHIVAL;
         if(isValidRule) {
             mr1.EventTimeInterval__c = 60;
             mr1.FilterLogic__c = '1';
         }
         insert mr1;
 
-        Id recordtypeId = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(MonitoringUtil.RULE_TYPE_ARCHIVAL).getRecordtypeId();
+        Id recordtypeId = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(Constants.RULE_SOBJECT.TYPE_ARCHIVAL).getRecordtypeId();
 
         Action__c rn1 = new Action__c();
         rn1.RecordTypeId = recordtypeId;
@@ -524,10 +528,10 @@ public class TestDataFactory {
         Rule__c mr1 = new Rule__c();
         mr1.Active__c = true;
         mr1.Index__c = 0;
-	    mr1.Type__c = isValidRule ? RuleUtil.RULE_TYPE_JIRA_UPDATE : null;
+	    mr1.Type__c = isValidRule ? Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE : null;
         insert mr1;
 
-        Action__c action = new Action__c(Action_Type__c = RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION);
+        Action__c action = new Action__c(Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION);
         RuleAction__c en1 = new RuleAction__c();
         en1.Action__c = action.Id;
         en1.Rule__c = mr1.Id;

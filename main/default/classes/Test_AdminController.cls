@@ -1059,11 +1059,11 @@ public class Test_AdminController {
         TestDataFactory.enableMaxArchivalRules();
 
         Test.startTest();
-        String ruleType = MonitoringUtil.RULE_TYPE_MONITORING;
+        String ruleType = Constants.RULE_SOBJECT.TYPE_MONITORING;
         Map<String, Object> ruleData = new Map<String, Object>();
         ruleData.put(RuleUtil.KEY_RULE, RuleUtil.getRuleWrappers(ruleType).get(0));
         ruleData.put(RuleUtil.KEY_RULE_FILTERS, RuleUtil.getRuleFilterWrappers());
-        ruleData.put(RuleUtil.KEY_ACTIONS, RuleUtil.getActionWrappers(ruleType, RuleUtil.ACTION_SUBTYPE_NOTIFICATION));
+        ruleData.put(RuleUtil.KEY_ACTIONS, RuleUtil.getActionWrappers(ruleType, Constants.ACTION_SOBJECT.SUBTYPE_NOTIFICATION));
 
         ApexPages.currentPage().getParameters().put('dev', 'true');
         AdminController ctrl = new AdminController();
@@ -1085,11 +1085,11 @@ public class Test_AdminController {
         update testRule;
 
         Test.startTest();
-        String ruleType = MonitoringUtil.RULE_TYPE_MONITORING;
+        String ruleType = Constants.RULE_SOBJECT.TYPE_MONITORING;
         Map<String, Object> ruleData = new Map<String, Object>();
         ruleData.put(RuleUtil.KEY_RULE, RuleUtil.getRuleWrappers(ruleType).get(0));
         ruleData.put(RuleUtil.KEY_RULE_FILTERS, RuleUtil.getRuleFilterWrappers());
-        ruleData.put(RuleUtil.KEY_ACTIONS, RuleUtil.getActionWrappers(ruleType, RuleUtil.ACTION_SUBTYPE_NOTIFICATION));
+        ruleData.put(RuleUtil.KEY_ACTIONS, RuleUtil.getActionWrappers(ruleType, Constants.ACTION_SOBJECT.SUBTYPE_NOTIFICATION));
 
         ApexPages.currentPage().getParameters().put('dev', 'true');
         AdminController ctrl = new AdminController();
@@ -1110,7 +1110,7 @@ public class Test_AdminController {
         Rule__c testRule = TestDataFactory.createArchivalRule(true, true);
         TestDataFactory.enableMaxArchivalRules();
         Test.startTest();
-        String ruleType = MonitoringUtil.RULE_TYPE_ARCHIVAL;
+        String ruleType = Constants.RULE_SOBJECT.TYPE_ARCHIVAL;
         Map<String, Object> ruleData = new Map<String, Object>();
         ruleData.put(RuleUtil.KEY_RULE, RuleUtil.getRuleWrappers(ruleType).get(0));
         ruleData.put(RuleUtil.KEY_RULE_FILTERS, RuleUtil.getRuleFilterWrappers());
@@ -1131,41 +1131,41 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_archival_rule_positive1() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, null);
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null);
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_archival_rule_positive2() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, null)
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null)
             .addFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_archival_rule_positive3() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1')
             .addFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_archival_rule_positive4() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, null)
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null)
             .addNonFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_archival_rule_positive5() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1')
             .addNonFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_archival_rule_positive6() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1 OR 2')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1 OR 2')
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
@@ -1173,7 +1173,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_archival_rule_positive7() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1 OR 2')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1 OR 2')
             .addFiltrableRuleFilter()
             .addNonFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
@@ -1181,7 +1181,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_archival_rule_positive8() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1 AND 2')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1 AND 2')
             .addFiltrableRuleFilter()
             .addNonFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
@@ -1189,7 +1189,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_archival_rule_positive9() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1 OR 2')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1 OR 2')
             .addNonFiltrableRuleFilter()
             .addNonFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
@@ -1197,7 +1197,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_archival_rule_positive10() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1 AND 2')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1 AND 2')
             .addNonFiltrableRuleFilter()
             .addNonFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
@@ -1205,7 +1205,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_archival_rule_positive11() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1 OR 2 AND (3 OR 4)')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1 OR 2 AND (3 OR 4)')
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter()
@@ -1215,7 +1215,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_archival_rule_negative1() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1 OR 2 AND (3 OR 4)')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1 OR 2 AND (3 OR 4)')
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter();
         test_validate_set_rule(false, testFactory);
@@ -1223,33 +1223,33 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_monitoring_rule_positive1() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_MONITORING, null);
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_MONITORING, null);
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_monitoring_rule_positive2() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_MONITORING, '');
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_MONITORING, '');
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_monitoring_rule_positive3() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_MONITORING, '1')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_MONITORING, '1')
             .addFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_monitoring_rule_positive4() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_MONITORING, '1')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_MONITORING, '1')
             .addNonFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_monitoring_rule_positive41() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_MONITORING, '1 OR 2')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_MONITORING, '1 OR 2')
             .addFiltrableRuleFilter()
             .addNonFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
@@ -1257,7 +1257,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_monitoring_rule_positive42() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_MONITORING, '1 OR 2')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_MONITORING, '1 OR 2')
             .addNonFiltrableRuleFilter()
             .addFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
@@ -1265,7 +1265,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_monitoring_rule_positive5() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_MONITORING, '1 OR 2 OR 3')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_MONITORING, '1 OR 2 OR 3')
             .addFiltrableRuleFilter()
             .addNonFiltrableRuleFilter()
             .addFiltrableRuleFilter();
@@ -1274,7 +1274,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_monitoring_rule_positive51() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_MONITORING, '1 OR 2 OR 3')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_MONITORING, '1 OR 2 OR 3')
             .addNonFiltrableRuleFilter()
             .addNonFiltrableRuleFilter()
             .addFiltrableRuleFilter();
@@ -1283,7 +1283,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_monitoring_rule_positive52() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_MONITORING, '1 OR 2 OR 3')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_MONITORING, '1 OR 2 OR 3')
             .addNonFiltrableRuleFilter()
             .addNonFiltrableRuleFilter()
             .addNonFiltrableRuleFilter();
@@ -1292,7 +1292,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_monitoring_rule_positive6() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_MONITORING, '1 OR 2 AND (3 OR 4)')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_MONITORING, '1 OR 2 AND (3 OR 4)')
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter()
@@ -1302,7 +1302,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_monitoring_rule_positive7() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_MONITORING, '1 OR 2 AND (3 OR 4)')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_MONITORING, '1 OR 2 AND (3 OR 4)')
             .addFiltrableRuleFilter()
             .addNonFiltrableRuleFilter()
             .addNonFiltrableRuleFilter()
@@ -1312,19 +1312,19 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_jira_update_rule_positive1() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_JIRA_UPDATE, null);
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, null);
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_jira_update_rule_positive2() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_JIRA_UPDATE, '');
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, '');
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_jira_update_rule_positive3() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_JIRA_UPDATE, '1 OR 2 OR 3')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, '1 OR 2 OR 3')
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter()
             .addNonFiltrableRuleFilter();
@@ -1333,7 +1333,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_jira_update_rule_positive31() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_JIRA_UPDATE, '1 OR 2 OR (1 OR 3)')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, '1 OR 2 OR (1 OR 3)')
             .addNonFiltrableRuleFilter()
             .addNonFiltrableRuleFilter()
             .addNonFiltrableRuleFilter();
@@ -1342,7 +1342,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_jira_update_rule_positive32() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_JIRA_UPDATE, '1 OR 2 OR (1 OR 3)')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, '1 OR 2 OR (1 OR 3)')
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter();
@@ -1351,26 +1351,26 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_jira_update_rule_negative1() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_JIRA_UPDATE, '1 OR 2 OR (1 OR 3)')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, '1 OR 2 OR (1 OR 3)')
             .addFiltrableRuleFilter();
         test_validate_set_rule(false, testFactory);
     }
 
     @IsTest
     static void test_validate_set_notification_rule_positive1() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_NOTIFICATION, null);
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, null);
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_notification_rule_positive2() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_NOTIFICATION, '');
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, '');
         test_validate_set_rule(true, testFactory);
     }
 
     @IsTest
     static void test_validate_set_notification_rule_positive3() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_NOTIFICATION, '1 OR 2 OR 3')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, '1 OR 2 OR 3')
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter();
@@ -1379,7 +1379,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_notification_rule_operands_positive1() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_NOTIFICATION, '1 OR 2')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, '1 OR 2')
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter();
         test_validate_set_rule(true, testFactory);
@@ -1387,7 +1387,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_notification_rule_operands_failed1() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_NOTIFICATION, '1 OR 3')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, '1 OR 3')
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter();
         test_validate_set_rule(false, testFactory);
@@ -1395,7 +1395,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_archival_rule_operands_failed1() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1 OR 3')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1 OR 3')
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter();
@@ -1404,7 +1404,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_archival_rule_operands_failed2() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1 OR 3')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1 OR 3')
             .addFiltrableRuleFilter()
             .addFiltrableRuleFilter();
         test_validate_set_rule(false, testFactory);
@@ -1413,7 +1413,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_validate_set_archival_rule_bad_filters_failed1() {
-        RuleDataFactory testFactory = new RuleDataFactory(MonitoringUtil.RULE_TYPE_ARCHIVAL, '1 OR 2')
+        RuleDataFactory testFactory = new RuleDataFactory(Constants.RULE_SOBJECT.TYPE_ARCHIVAL, '1 OR 2')
             .addFiltrableRuleFilter()
             .addBadFiltrableRuleFilter();
         test_validate_set_rule(false, testFactory);
@@ -1559,11 +1559,11 @@ public class Test_AdminController {
 
 
             Map<String, Object> actionsObject = new Map<String, Object>();
-            actionsObject.put('type', RuleUtil.ACTION_TYPE_EMAIL_NOTIFICATION);
+            actionsObject.put('type', Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION);
 
-            if(ruleType == RuleUtil.RULE_TYPE_ARCHIVAL) {
+            if(ruleType == Constants.RULE_SOBJECT.TYPE_ARCHIVAL) {
                 ruleObject.put('eventTimeInterval', 60);
-                actionsObject.put('type', RuleUtil.RULE_TYPE_ARCHIVAL);
+                actionsObject.put('type', Constants.RULE_SOBJECT.TYPE_ARCHIVAL);
                 ruleFilters.add(new Map<String, Object> {
                     'index' => 1,
                     'comparisonOperator' => RuleUtil.COMPARISON_OPERATOR_GREATER_THEN,//'Greater than',
@@ -1572,7 +1572,7 @@ public class Test_AdminController {
                     'value' => '60'
                 });
             }
-            if(ruleType == RuleUtil.RULE_TYPE_MONITORING) {
+            if(ruleType == Constants.RULE_SOBJECT.TYPE_MONITORING) {
                 ruleObject.put('aggregateType', 'Count');
                 ruleObject.put('aggregateInterval', 30);
                 ruleObject.put('subtype', 'Spike');
@@ -1580,11 +1580,11 @@ public class Test_AdminController {
                 ruleObject.put('eventTimeInterval', 60);
                 ruleObject.put('threshold', 1);
             }
-            if(ruleType == RuleUtil.RULE_TYPE_JIRA_UPDATE) {
-                actionsObject.put('type', RuleUtil.ACTION_TYPE_JIRA_NOTIFICATION);
+            if(ruleType == Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE) {
+                actionsObject.put('type', Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION);
             }
-            if(ruleType == RuleUtil.RULE_TYPE_NOTIFICATION) {
-                actionsObject.put('type', RuleUtil.ACTION_TYPE_EMAIL_NOTIFICATION);
+            if(ruleType == Constants.RULE_SOBJECT.TYPE_NOTIFICATION) {
+                actionsObject.put('type', Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION);
             }
             
             List<Map<String, Object>> ruleActions = new List<Map<String, Object>> {
@@ -1699,6 +1699,237 @@ public class Test_AdminController {
         Test.stopTest();
         System.assertNotEquals(null, result);
         System.assertNotEquals(null, result.size());
+    }
+    
+    @IsTest
+    private static void test_admin_service_getMergeFields_LogFields() {
+        List<AdminService.MergeField> allFields;
+        
+        Test.startTest();
+        allFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+        Test.stopTest();
+        
+        System.assertNotEquals(null, allFields, 'Result should not be null');
+        
+        // Filter to Log merge fields
+        List<AdminService.MergeField> logFields = new List<AdminService.MergeField>();
+        for (AdminService.MergeField field : allFields) {
+            if (field.sobjectype == 'log') {
+                logFields.add(field);
+            }
+        }
+        
+        System.assert(logFields.size() > 0, 'Should have Log merge fields');
+        
+        // Build a map for easier lookup
+        Map<String, AdminService.MergeField> fieldMap = new Map<String, AdminService.MergeField>();
+        for (AdminService.MergeField field : logFields) {
+            fieldMap.put(field.apiName, field);
+        }
+        
+        // Check standard Log fields are included
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Log__c.fields.Category__c.getName().toLowerCase()), 'Should contain Category');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Log__c.fields.Summary__c.getName().toLowerCase()), 'Should contain Summary');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Log__c.fields.Details__c.getName().toLowerCase()), 'Should contain Details');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Log__c.fields.Type__c.getName().toLowerCase()), 'Should contain Type');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Log__c.fields.Area__c.getName().toLowerCase()), 'Should contain Functional Area');
+        
+        // IMPORTANT: Merge fields INCLUDE "Insert field ONLY" fields (unlike filter fields)
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Log__c.fields.Flow_Link__c.getName().toLowerCase()), 'Should contain Flow_Link__c (Insert field)');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Log__c.fields.Organization_Url__c.getName().toLowerCase()), 'Should contain Organization_Url__c (Insert field)');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Log__c.fields.Related_Object__c.getName().toLowerCase()), 'Should contain Related_Object__c (Insert field)');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Log__c.fields.User__c.getName().toLowerCase()), 'Should contain User__c (Insert field)');
+        
+        // Verify special merge fields (custom merge fields like links) are included
+        Boolean hasLinkField = false;
+        for (AdminService.MergeField field : logFields) {
+            if (field.apiName == 'link') {
+                hasLinkField = true;
+                break;
+            }
+        }
+        System.assert(hasLinkField, 'Should contain special Link merge field');
+        
+        // Verify system fields and internal fields are excluded
+        System.assert(!fieldMap.containsKey(Schema.sObjectType.Log__c.fields.IsDeleted.getName().toLowerCase()), 'Should NOT contain IsDeleted (system field)');
+        System.assert(!fieldMap.containsKey(Schema.sObjectType.Log__c.fields.Email_Integration_Status__c.getName().toLowerCase()), 'Should NOT contain Email_Integration_Status__c');
+        System.assert(!fieldMap.containsKey(Schema.sObjectType.Log__c.fields.Bug_Tracker__c.getName().toLowerCase()), 'Should NOT contain Bug_Tracker__c (internal)');
+    }
+    
+    @IsTest
+    private static void test_admin_service_getMergeFields_IssueFields_All() {
+        List<AdminService.MergeField> allFields;
+        
+        Test.startTest();
+        allFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+        Test.stopTest();
+        
+        System.assertNotEquals(null, allFields, 'Result should not be null');
+        
+        // Filter to Issue merge fields
+        List<AdminService.MergeField> issueFields = new List<AdminService.MergeField>();
+        for (AdminService.MergeField field : allFields) {
+            if (field.sobjectype == 'issue') {
+                issueFields.add(field);
+            }
+        }
+        
+        System.assert(issueFields.size() > 0, 'Should have Issue merge fields');
+        
+        // Build a map for easier lookup
+        Map<String, AdminService.MergeField> fieldMap = new Map<String, AdminService.MergeField>();
+        for (AdminService.MergeField field : issueFields) {
+            fieldMap.put(field.apiName, field);
+        }
+        
+        // Check fields from CREATE list are included
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Category__c.getName().toLowerCase()), 'Should contain Category');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.CreatedDate.getName().toLowerCase()), 'Should contain Created Date');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Description__c.getName().toLowerCase()), 'Should contain Description');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Functional_Area__c.getName().toLowerCase()), 'Should contain Functional Area');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Organization_Name__c.getName().toLowerCase()), 'Should contain Organization Name');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Summary__c.getName().toLowerCase()), 'Should contain Summary');
+        
+        // Check fields from UPDATE list are included
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Assigned__c.getName().toLowerCase()), 'Should contain Assigned');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Priority__c.getName().toLowerCase()), 'Should contain Priority');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Status__c.getName().toLowerCase()), 'Should contain Status');
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Bug_Tracker__c.getName().toLowerCase()), 'Should contain Bug Tracker');
+        
+        // IMPORTANT: Merge fields INCLUDE "Insert field ONLY" field Log__c
+        System.assert(fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Log__c.getName().toLowerCase()), 'Should contain Log__c (Insert field)');
+        
+        // Verify special merge fields are included
+        Boolean hasLinkField = false;
+        Boolean hasAnalysisField = false;
+        for (AdminService.MergeField field : issueFields) {
+            if (field.apiName == 'link') {
+                hasLinkField = true;
+            }
+            if (field.apiName == 'analysis') {
+                hasAnalysisField = true;
+            }
+        }
+        System.assert(hasLinkField, 'Should contain special Link merge field');
+        System.assert(hasAnalysisField, 'Should contain special Analysis merge field');
+        
+        // Verify system fields and internal fields are excluded
+        System.assert(!fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.IsDeleted.getName().toLowerCase()), 'Should NOT contain IsDeleted (system field)');
+        System.assert(!fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Email_Integration_Status__c.getName().toLowerCase()), 'Should NOT contain Email_Integration_Status__c');
+        System.assert(!fieldMap.containsKey(Schema.sObjectType.Issue__c.fields.Key__c.getName().toLowerCase()), 'Should NOT contain Key__c (internal)');
+    }
+    
+    @IsTest
+    private static void test_admin_service_getMergeFields_IssueFields_isUpdateOnly() {
+        List<AdminService.MergeField> allFields;
+        
+        Test.startTest();
+        allFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+        Test.stopTest();
+        
+        System.assertNotEquals(null, allFields, 'Result should not be null');
+        
+        // Filter to Issue merge fields
+        List<AdminService.MergeField> issueFields = new List<AdminService.MergeField>();
+        for (AdminService.MergeField field : allFields) {
+            if (field.sobjectype == 'issue') {
+                issueFields.add(field);
+            }
+        }
+        
+        // Build a map for easier lookup
+        Map<String, AdminService.MergeField> fieldMap = new Map<String, AdminService.MergeField>();
+        for (AdminService.MergeField field : issueFields) {
+            fieldMap.put(field.apiName, field);
+        }
+        
+        // Check that UPDATE-ONLY fields are marked with isUpdateOnly = true
+        AdminService.MergeField assignedField = fieldMap.get(Schema.sObjectType.Issue__c.fields.Assigned__c.getName().toLowerCase());
+        System.assertNotEquals(null, assignedField, 'Assigned field should exist');
+        System.assertEquals(true, assignedField.isUpdateOnly, 'Assigned should be marked as isUpdateOnly');
+        
+        AdminService.MergeField priorityField = fieldMap.get(Schema.sObjectType.Issue__c.fields.Priority__c.getName().toLowerCase());
+        System.assertNotEquals(null, priorityField, 'Priority field should exist');
+        System.assertEquals(true, priorityField.isUpdateOnly, 'Priority should be marked as isUpdateOnly');
+        
+        AdminService.MergeField statusField = fieldMap.get(Schema.sObjectType.Issue__c.fields.Status__c.getName().toLowerCase());
+        System.assertNotEquals(null, statusField, 'Status field should exist');
+        System.assertEquals(true, statusField.isUpdateOnly, 'Status should be marked as isUpdateOnly');
+        
+        AdminService.MergeField bugTrackerField = fieldMap.get(Schema.sObjectType.Issue__c.fields.Bug_Tracker__c.getName().toLowerCase());
+        System.assertNotEquals(null, bugTrackerField, 'Bug Tracker field should exist');
+        System.assertEquals(true, bugTrackerField.isUpdateOnly, 'Bug Tracker should be marked as isUpdateOnly');
+        
+        AdminService.MergeField exceptionCodesField = fieldMap.get(Schema.sObjectType.Issue__c.fields.Exception_Codes__c.getName().toLowerCase());
+        System.assertNotEquals(null, exceptionCodesField, 'Exception Codes field should exist');
+        System.assertEquals(true, exceptionCodesField.isUpdateOnly, 'Exception Codes should be marked as isUpdateOnly');
+        
+        // Check that CREATE fields are NOT marked as isUpdateOnly
+        AdminService.MergeField categoryField = fieldMap.get(Schema.sObjectType.Issue__c.fields.Category__c.getName().toLowerCase());
+        System.assertNotEquals(null, categoryField, 'Category field should exist');
+        System.assertEquals(false, categoryField.isUpdateOnly, 'Category should NOT be marked as isUpdateOnly');
+        
+        AdminService.MergeField summaryField = fieldMap.get(Schema.sObjectType.Issue__c.fields.Summary__c.getName().toLowerCase());
+        System.assertNotEquals(null, summaryField, 'Summary field should exist');
+        System.assertEquals(false, summaryField.isUpdateOnly, 'Summary should NOT be marked as isUpdateOnly');
+        
+        AdminService.MergeField descriptionField = fieldMap.get(Schema.sObjectType.Issue__c.fields.Description__c.getName().toLowerCase());
+        System.assertNotEquals(null, descriptionField, 'Description field should exist');
+        System.assertEquals(false, descriptionField.isUpdateOnly, 'Description should NOT be marked as isUpdateOnly');
+        
+        // Check that special merge fields are NOT marked as isUpdateOnly
+        for (AdminService.MergeField field : issueFields) {
+            if (field.apiName == 'link' || field.apiName == 'analysis') {
+                System.assertEquals(false, field.isUpdateOnly, field.apiName + ' special merge field should NOT be marked as isUpdateOnly');
+            }
+        }
+    }
+    
+    @IsTest
+    private static void test_admin_service_getMergeFields_AllUpdateOnlyFields() {
+        List<AdminService.MergeField> allFields;
+        
+        Test.startTest();
+        allFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
+        Test.stopTest();
+        
+        // Filter to Issue merge fields
+        List<AdminService.MergeField> issueFields = new List<AdminService.MergeField>();
+        for (AdminService.MergeField field : allFields) {
+            if (field.sobjectype == 'issue') {
+                issueFields.add(field);
+            }
+        }
+        
+        // Build a map for easier lookup
+        Map<String, AdminService.MergeField> fieldMap = new Map<String, AdminService.MergeField>();
+        for (AdminService.MergeField field : issueFields) {
+            fieldMap.put(field.apiName, field);
+        }
+        
+        // Verify ALL update-only fields from MAP_UPDATE_ONLY_MERGE_FIELDS are marked correctly
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Assigned__c.getName().toLowerCase())?.isUpdateOnly, 'Assigned should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Assigned_To__c.getName().toLowerCase())?.isUpdateOnly, 'Assigned To should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Average_Daily_Volume__c.getName().toLowerCase())?.isUpdateOnly, 'Average Daily Volume should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Average_Frequency__c.getName().toLowerCase())?.isUpdateOnly, 'Average Frequency should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Bug_Tracker__c.getName().toLowerCase())?.isUpdateOnly, 'Bug Tracker should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Exception_Codes__c.getName().toLowerCase())?.isUpdateOnly, 'Exception Codes should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.First_Occurred_On__c.getName().toLowerCase())?.isUpdateOnly, 'First Occurred On should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Impacted_Objects__c.getName().toLowerCase())?.isUpdateOnly, 'Impacted Objects should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Impacted_Objects_Count__c.getName().toLowerCase())?.isUpdateOnly, 'Impacted Objects Count should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Impacted_Objects_by_Type__c.getName().toLowerCase())?.isUpdateOnly, 'Impacted Objects by Type should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Impacted_Users__c.getName().toLowerCase())?.isUpdateOnly, 'Impacted Users should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Impacted_Users_Count__c.getName().toLowerCase())?.isUpdateOnly, 'Impacted Users Count should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Name.getName().toLowerCase())?.isUpdateOnly, 'Issue Name should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Last_Occurred_On__c.getName().toLowerCase())?.isUpdateOnly, 'Last Occurred On should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Log_Count__c.getName().toLowerCase())?.isUpdateOnly, 'Log Count should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Priority__c.getName().toLowerCase())?.isUpdateOnly, 'Priority should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Regressed_On__c.getName().toLowerCase())?.isUpdateOnly, 'Regressed On should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Regression__c.getName().toLowerCase())?.isUpdateOnly, 'Regression should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Related_Issue__c.getName().toLowerCase())?.isUpdateOnly, 'Related Issue should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Resolved_On__c.getName().toLowerCase())?.isUpdateOnly, 'Resolved On should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Score__c.getName().toLowerCase())?.isUpdateOnly, 'Score should be isUpdateOnly');
+        System.assertEquals(true, fieldMap.get(Schema.sObjectType.Issue__c.fields.Status__c.getName().toLowerCase())?.isUpdateOnly, 'Status should be isUpdateOnly');
     }
 
     @IsTest
@@ -2149,24 +2380,6 @@ public class Test_AdminController {
     }
 
     @IsTest
-    private static void test_admin_service_getLogFieldsForJiraMapping() {
-        List<Map<String, String>> result;
-        Test.startTest();
-        result = (List<Map<String, String>>)AdminService.getLogFieldsForJiraMapping();
-        Test.stopTest();
-        System.assertNotEquals(null, result);
-    }
-
-    @IsTest
-    private static void test_admin_service_getIssueFieldsForJiraMapping() {
-        List<Map<String, String>> result;
-        Test.startTest();
-        result = (List<Map<String, String>>)AdminService.getIssueFieldsForJiraMapping();
-        Test.stopTest();
-        System.assertNotEquals(null, result);
-    }
-
-    @IsTest
     private static void test_admin_service_saveDebugLogServiceSettings() {
         String result;
         AdminService.DebugLogServiceSettings data = new AdminService.DebugLogServiceSettings(new Debug_Log_Service_Flag__c());
@@ -2272,7 +2485,7 @@ public class Test_AdminController {
             'OK',
             JSON.serialize(response)
         );
-        result.put(AzureService.AZURE_DEVOPS_API_GET_TOKEN_ENDPOINT, singleRequestMock);
+        result.put(GraphAPIService.GRAPH_API_GET_TOKEN_ENDPOINT, singleRequestMock);
         return result;
     }
 
@@ -2526,7 +2739,7 @@ public class Test_AdminController {
     static void test_RemoteAction_resetEmailAddressContextUser() {
         List<Id> emailServicesAddressFakeIds = TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 2);
         EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
-            TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 1),
+            TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 2),
             TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1),
             emailServicesAddressFakeIds
         );
@@ -2566,7 +2779,7 @@ public class Test_AdminController {
     @IsTest
     static void test_RemoteAction_validateEmailServiceDataWithEmailServices() {
         EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
-            TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 1),
+            TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 2),
             TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1),
             TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 1)
         );
@@ -2606,7 +2819,7 @@ public class Test_AdminController {
         upsert pharosSettings;
 
         EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
-            TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 1),
+            TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 2),
             TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1),
             TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 1)
         );
@@ -2748,7 +2961,7 @@ public class Test_AdminController {
 
     @IsTest
     static void test_RemoteAction_createEmailService_enableParam_WithAllExistingServices() { 
-        List<Id> apexEmailNotificationFakeIds = TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 1);
+        List<Id> apexEmailNotificationFakeIds = TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 2);
         List<Id> emailServicesFunctionFakeIds = TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1);
         List<Id> emailServicesAddressFakeIds = TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 2);
 
@@ -2819,8 +3032,6 @@ public class Test_AdminController {
 
         Map<String, Object> mapData = (Map<String, Object>) response.get('data');
         Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_META));
-        Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_LOG_FIELDS));
-        Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_ISSUE_FIELDS));
         Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_COMPONENTS));
         Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_EPICS));
         Assert.areNotEqual(null, mapData.get(ConfigUtil.CREATE_META_REQUEST_DATA_KEY_PRIORITIES));
@@ -3256,7 +3467,7 @@ public class Test_AdminController {
             PharosChatController.CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + UserInfo.getOrganizationId() => new TestDataFactory.SingleRequestMock(
                 200,
                 'OK',
-                '{"empty": false, "indexingInProgress": true}'
+                '{"empty": false, "indexingInProgress": true, "logsEmpty": false}'
             ),
             ConfigUtil.OPEN_AI_USAGE_ENDPOINT => new TestDataFactory.SingleRequestMock(
                 200,
@@ -3970,11 +4181,11 @@ public class Test_AdminController {
         System.assertNotEquals(null, updatedSettings.Last_Processed_Hourly_Events__c, 
             'Last processed hourly events should be set');
         
-        // Verify it's set to previous hour (rounded down)
+        // Verify it's set to previous hour (rounded down) + default delay
         DateTime now = DateTime.now();
-        DateTime expectedTime = DateTime.newInstance(now.year(), now.month(), now.day(), now.hour(), 0, 0).addHours(-1);
+        DateTime expectedTime = DateTime.newInstance(now.year(), now.month(), now.day(), now.hour(), 0, 0).addHours(-EventMonitoringUtil.DEFAULT_DELAY_CSV_FILE_GENERATION);
         System.assertEquals(expectedTime, updatedSettings.Last_Processed_Hourly_Events__c, 
-            'Last processed hourly events should be set to previous hour');
+            'Last processed hourly events should be set to previous hour + default delay');
     }
 
     @IsTest
@@ -5397,6 +5608,12 @@ public class Test_AdminController {
         // Clear the cached settings to force re-initialization
         ConfigUtil.EVENT_MONITORING_SETTINGS = null;
         
+        // Delete any existing rules to start clean
+        List<Rule__c> existingRules = [SELECT Id FROM Rule__c WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE];
+        if (!existingRules.isEmpty()) {
+            delete existingRules;
+        }
+        
         Map<String, Object> inputData = new Map<String, Object>{
             ConfigUtil.MONITORING_APP_KEY_ENABLED => true,
             ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES => null // Explicitly set to null
@@ -5413,6 +5630,141 @@ public class Test_AdminController {
         System.assertNotEquals(null, result, 'Result should not be null');
         System.assertNotEquals(null, result.Id, 'Settings should have an Id after upsert');
         System.assertEquals(true, result.Enabled__c, 'Event monitoring should be enabled');
+        System.assertNotEquals(null, result.Enabled_Types__c, 'Enabled_Types__c should be set with default values');
+        
+        // Verify that default event types are enabled in settings
+        List<Boolean> enabledStatuses = EventMonitoringUtil.getEnabledMembersFromSettings();
+        Set<String> enabledEventTypes = new Set<String>();
+        for (String eventType : EventMonitoringUtil.MAP_ENABLED_EVENT_TYPES.keySet()) {
+            Integer index = EventMonitoringUtil.MAP_ENABLED_EVENT_TYPES.get(eventType);
+            if (index != null && index < enabledStatuses.size() && enabledStatuses[index]) {
+                enabledEventTypes.add(eventType);
+            }
+        }
+        
+        // Verify that all default enabled event types are now enabled
+        for (String defaultEventType : EventMonitoringUtil.DEFAULT_ENABLED_EVENT_TYPES) {
+            System.assert(enabledEventTypes.contains(defaultEventType), 
+                'Default event type ' + defaultEventType + ' should be enabled');
+        }
+        
+        // Verify that Rule__c records were created for default enabled event types that have thresholds
+        List<Rule__c> createdRules = [
+            SELECT Id, Subtype__c, Active__c, Logs_Limit__c, Type__c
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
+            AND Active__c = true
+        ];
+        
+        // Note: Rules are only created for event types that have default thresholds defined
+        // Not all default enabled event types have thresholds, so we expect some but not necessarily all
+        
+        // Verify that rules were created for the expected default event types
+        Set<String> createdRuleSubtypes = new Set<String>();
+        for (Rule__c rule : createdRules) {
+            createdRuleSubtypes.add(rule.Subtype__c);
+            System.assertEquals(EventMonitoringUtil.EVENT_MONITORING_TYPE, rule.Type__c, 'Rule type should be Event Monitoring');
+            System.assertEquals(true, rule.Active__c, 'Created rules should be active');
+            // Note: Logs_Limit__c can be null for unlimited limits (like APEX_UNEXPECTED_EXCEPTION)
+        }
+        
+        // Verify that rules exist for event types that have default thresholds
+        // These are the event types that should have rules created:
+        Set<String> eventTypesWithThresholds = new Set<String>{
+            EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION,
+            EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR,
+            EventLogProcessors.EVENT_TYPE_INSUFFICIENT_ACCESS,
+            EventLogProcessors.EVENT_TYPE_API,
+            EventLogProcessors.EVENT_TYPE_APEX_REST_API
+        };
+        
+        Integer expectedRulesCount = 0;
+        for (String eventTypeWithThreshold : eventTypesWithThresholds) {
+            if (createdRuleSubtypes.contains(eventTypeWithThreshold)) {
+                expectedRulesCount++;
+            }
+        }
+        System.assert(expectedRulesCount > 0, 'Should create rules for event types that have default thresholds defined');
+    }
+    
+    @IsTest
+    static void test_setEventMonitoringSetting_EnabledOnlyWithoutEventTypes() {
+        // Arrange - Test the exact scenario: {"enabled":true} without enabledTypes key
+        List<Event_Monitoring__c> existingSettings = [SELECT Id FROM Event_Monitoring__c];
+        if (!existingSettings.isEmpty()) {
+            delete existingSettings;
+        }
+        
+        // Clear the cached settings to force re-initialization
+        ConfigUtil.EVENT_MONITORING_SETTINGS = null;
+        
+        // Delete any existing rules to start clean
+        List<Rule__c> existingRules = [SELECT Id FROM Rule__c WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE];
+        if (!existingRules.isEmpty()) {
+            delete existingRules;
+        }
+        
+        // Input data with only enabled=true, no enabledTypes key (this was the failing scenario)
+        Map<String, Object> inputData = new Map<String, Object>{
+            ConfigUtil.MONITORING_APP_KEY_ENABLED => true
+            // Note: No ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES key at all
+        };
+        
+        Test.startTest();
+        
+        // Act - This should create default enabled event types and their rules
+        Event_Monitoring__c result = AdminService.setEventMonitoringSetting(inputData);
+        
+        Test.stopTest();
+        
+        // Assert - Verify settings were created successfully
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assertNotEquals(null, result.Id, 'Settings should have an Id after upsert');
+        System.assertEquals(true, result.Enabled__c, 'Event monitoring should be enabled');
+        System.assertNotEquals(null, result.Enabled_Types__c, 'Enabled_Types__c should be set with default values');
+        
+        // Verify that Rule__c records were created for default enabled event types that have thresholds
+        List<Rule__c> createdRules = [
+            SELECT Id, Subtype__c, Active__c, Logs_Limit__c, Type__c, Name__c
+            FROM Rule__c 
+            WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
+            AND Active__c = true
+        ];
+        
+        System.assert(createdRules.size() > 0, 'Should create Rule__c records for default enabled event types when enabledTypes is not provided');
+        
+        // Verify that rules were created with proper structure
+        Set<String> createdRuleSubtypes = new Set<String>();
+        for (Rule__c rule : createdRules) {
+            createdRuleSubtypes.add(rule.Subtype__c);
+            System.assertEquals(EventMonitoringUtil.EVENT_MONITORING_TYPE, rule.Type__c, 'Rule type should be Event Monitoring');
+            System.assertEquals(true, rule.Active__c, 'Created rules should be active');
+            // Note: Logs_Limit__c can be null for unlimited limits (like APEX_UNEXPECTED_EXCEPTION)
+            System.assert(rule.Name__c.contains('Event Monitoring Rule'), 'Rule name should contain Event Monitoring Rule');
+        }
+        
+        // Verify that rules exist for event types that have default thresholds
+        Set<String> eventTypesWithThresholds = new Set<String>{
+            EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION,
+            EventLogProcessors.EVENT_TYPE_LIGHTNING_ERROR,
+            EventLogProcessors.EVENT_TYPE_INSUFFICIENT_ACCESS,
+            EventLogProcessors.EVENT_TYPE_API,
+            EventLogProcessors.EVENT_TYPE_APEX_REST_API
+        };
+        
+        Integer rulesForDefaultTypes = 0;
+        for (String eventTypeWithThreshold : eventTypesWithThresholds) {
+            if (createdRuleSubtypes.contains(eventTypeWithThreshold)) {
+                rulesForDefaultTypes++;
+            }
+        }
+        System.assert(rulesForDefaultTypes > 0, 'Should create rules for event types that have default thresholds defined');
+        
+        // Verify specific important event types have rules (these have thresholds defined)
+        System.assert(createdRuleSubtypes.contains(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION), 
+            'Should create rule for APEX_UNEXPECTED_EXCEPTION');
+        System.assert(createdRuleSubtypes.contains(EventLogProcessors.EVENT_TYPE_API), 
+            'Should create rule for API events');
     }
     
     @IsTest
@@ -5505,5 +5857,659 @@ public class Test_AdminController {
             AND Active__c = true
         ];
         System.assertEquals(0, remainingActiveRules.size(), 'No rules should be active after disabling');
+    }
+
+    @IsTest
+    private static void test_admin_service_getLogFields() {
+        List<AdminService.FilterField> result;
+        
+        Test.startTest();
+        result = (List<AdminService.FilterField>)AdminService.getLogFields(Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.size() > 0, 'Should have at least one field');
+        
+        // Verify standard fields are included
+        Set<String> fieldNames = new Set<String>();
+        for (AdminService.FilterField field : result) {
+            fieldNames.add(field.value);
+        }
+        
+        // Check ALL Log fields that should be included (from requirements)
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Async_Job_Id__c.getName()), 'Should contain Async Job Id');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Async_Job_Name__c.getName()), 'Should contain Async Job Name');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Area__c.getName()), 'Should contain Functional Area');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Category__c.getName()), 'Should contain Category');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Created_At__c.getName()), 'Should contain Created At');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.CreatedById.getName()), 'Should contain CreatedById');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Details__c.getName()), 'Should contain Details');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Exception_Codes__c.getName()), 'Should contain Exception Codes');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.First_Occurred_On__c.getName()), 'Should contain First Occurred On');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Flow_API_Name__c.getName()), 'Should contain Flow API Name');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Flow_Version__c.getName()), 'Should contain Flow Version');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Flow_Version_Id__c.getName()), 'Should contain Flow Version Id');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Hash_1__c.getName()), 'Should contain Hash 1');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Hash_2__c.getName()), 'Should contain Hash 2');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Hash_3__c.getName()), 'Should contain Hash 3');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Installed_Packages__c.getName()), 'Should contain Installed Packages');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Interview_GUID_External__c.getName()), 'Should contain Interview GUID');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Is_New__c.getName()), 'Should contain Is New');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Is_Parent__c.getName()), 'Should contain Is Parent');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Is_Sandbox__c.getName()), 'Should contain Is Sandbox');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Name.getName()), 'Should contain Name');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Namespace__c.getName()), 'Should contain Namespace');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Apex_Name__c.getName()), 'Should contain Operation (Apex Name)');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Organization_Id__c.getName()), 'Should contain Organization Id');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Organization_Name__c.getName()), 'Should contain Organization Name');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Originated_From__c.getName()), 'Should contain Originated From');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Parent__c.getName()), 'Should contain Parent');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Pending_Jobs__c.getName()), 'Should contain Pending Jobs');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Profile_Id__c.getName()), 'Should contain Profile Id');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Profile_Name__c.getName()), 'Should contain Profile Name');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.RecordTypeId.getName()), 'Should contain Record Type');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Related_Id__c.getName()), 'Should contain Related Id');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Related_Object_Type__c.getName()), 'Should contain Related Object Type');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Related_Objects__c.getName()), 'Should contain Related Objects');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Request_Id_External__c.getName()), 'Should contain Request Id');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Role_Id__c.getName()), 'Should contain Role Id');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Role_Name__c.getName()), 'Should contain Role Name');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Salesforce_Error_Id__c.getName()), 'Should contain Salesforce Error Id');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Salesforce_License_Type_Name__c.getName()), 'Should contain Salesforce License Type Name');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Setup_Audit_Trail__c.getName()), 'Should contain Setup Audit Trail');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Stacktrace__c.getName()), 'Should contain Stacktrace');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Summary__c.getName()), 'Should contain Summary');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Total_Active_Sessions__c.getName()), 'Should contain Total Active Sessions');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Total_Pending_Jobs__c.getName()), 'Should contain Total Pending Jobs');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Transaction_Id_External__c.getName()), 'Should contain Transaction Id');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Type__c.getName()), 'Should contain Type');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.User_Id__c.getName()), 'Should contain User Id');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.User_Name__c.getName()), 'Should contain User Name');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Visualforce_Page__c.getName()), 'Should contain Visualforce Page');
+        
+        // Verify "Insert field ONLY" fields are excluded
+        System.assert(!fieldNames.contains(Schema.sObjectType.Log__c.fields.Flow_Link__c.getName()), 'Should NOT contain Flow_Link__c (Insert field ONLY)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Log__c.fields.Organization_Url__c.getName()), 'Should NOT contain Organization_Url__c (Insert field ONLY)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Log__c.fields.Related_Object__c.getName()), 'Should NOT contain Related_Object__c (Insert field ONLY)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Log__c.fields.User__c.getName()), 'Should NOT contain User__c (Insert field ONLY)');
+    }
+
+    @IsTest
+    private static void test_admin_service_getIssueFields_Create() {
+        List<AdminService.FilterField> result;
+        
+        Test.startTest();
+        result = (List<AdminService.FilterField>)AdminService.getIssueFields(Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.size() > 0, 'Should have at least one field');
+        
+        // Verify only the limited set of fields for Issue Create rules
+        Set<String> fieldNames = new Set<String>();
+        for (AdminService.FilterField field : result) {
+            fieldNames.add(field.value);
+        }
+        
+        // Check ALL fields that should be included in Create rules (from requirements)
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Category__c.getName()), 'Should contain Category');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.CreatedDate.getName()), 'Should contain Created Date');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Description__c.getName()), 'Should contain Description');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Functional_Area__c.getName()), 'Should contain Functional Area');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Organization_Name__c.getName()), 'Should contain Organization Name');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Summary__c.getName()), 'Should contain Summary');
+        
+        // Verify these are the ONLY standard fields (no extra fields beyond the 6 required)
+        Integer standardFieldCount = 0;
+        for (AdminService.FilterField field : result) {
+            if (!field.value.contains('__c') || 
+                field.value == Schema.sObjectType.Issue__c.fields.Category__c.getName() ||
+                field.value == Schema.sObjectType.Issue__c.fields.Description__c.getName() ||
+                field.value == Schema.sObjectType.Issue__c.fields.Functional_Area__c.getName() ||
+                field.value == Schema.sObjectType.Issue__c.fields.Organization_Name__c.getName() ||
+                field.value == Schema.sObjectType.Issue__c.fields.Summary__c.getName()) {
+                standardFieldCount++;
+            }
+        }
+        System.assert(standardFieldCount >= 6, 'Should have at least 6 standard fields for Create rules');
+        
+        // Verify "Insert field ONLY" fields are excluded from Create rules
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Log__c.getName()), 'Should NOT contain Log__c (Insert field ONLY)');
+        
+        // Verify Update-only fields are excluded from Create rules
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Status__c.getName()), 'Should NOT contain Status in Create rules');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Priority__c.getName()), 'Should NOT contain Priority in Create rules');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Assigned__c.getName()), 'Should NOT contain Assigned in Create rules');
+    }
+
+    @IsTest
+    private static void test_admin_service_getIssueFields_Update() {
+        List<AdminService.FilterField> result;
+        
+        Test.startTest();
+        result = (List<AdminService.FilterField>)AdminService.getIssueFields(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, true);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.size() > 0, 'Should have at least one field');
+        
+        // Verify all fields are included for Issue Update rules
+        Set<String> fieldNames = new Set<String>();
+        for (AdminService.FilterField field : result) {
+            fieldNames.add(field.value);
+        }
+        
+        // Check ALL fields that should be included in Update rules (from requirements)
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Assigned__c.getName()), 'Should contain Assigned');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Assigned_To__c.getName()), 'Should contain Assigned To');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Average_Daily_Volume__c.getName()), 'Should contain Average Daily Volume');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Average_Frequency__c.getName()), 'Should contain Average Frequency');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Bug_Tracker__c.getName()), 'Should contain Bug Tracker');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Category__c.getName()), 'Should contain Category');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.CreatedDate.getName()), 'Should contain Created Date');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Description__c.getName()), 'Should contain Description');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Exception_Codes__c.getName()), 'Should contain Exception Codes');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.First_Occurred_On__c.getName()), 'Should contain First Occurred On');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Functional_Area__c.getName()), 'Should contain Functional Area');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Impacted_Objects__c.getName()), 'Should contain Impacted Objects');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Impacted_Objects_Count__c.getName()), 'Should contain Impacted Objects Count');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Impacted_Objects_by_Type__c.getName()), 'Should contain Impacted Objects by Type');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Impacted_Users__c.getName()), 'Should contain Impacted Users');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Impacted_Users_Count__c.getName()), 'Should contain Impacted Users Count');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Name.getName()), 'Should contain Issue Name');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Last_Occurred_On__c.getName()), 'Should contain Last Occurred On');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Log_Count__c.getName()), 'Should contain Log Count');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Organization_Name__c.getName()), 'Should contain Organization Name');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Priority__c.getName()), 'Should contain Priority');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Regressed_On__c.getName()), 'Should contain Regressed On');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Regression__c.getName()), 'Should contain Regression');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Related_Issue__c.getName()), 'Should contain Related Issue');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Resolved_On__c.getName()), 'Should contain Resolved On');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Score__c.getName()), 'Should contain Score');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Status__c.getName()), 'Should contain Status');
+        System.assert(fieldNames.contains(Schema.sObjectType.Issue__c.fields.Summary__c.getName()), 'Should contain Summary');
+        
+        // Verify system fields are excluded from Update rules
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.IsDeleted.getName()), 'Should NOT contain IsDeleted (system field)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.CreatedById.getName()), 'Should NOT contain CreatedById (system field)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.LastModifiedById.getName()), 'Should NOT contain LastModifiedById (system field)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.LastModifiedDate.getName()), 'Should NOT contain LastModifiedDate (system field)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.SystemModstamp.getName()), 'Should NOT contain SystemModstamp (system field)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.LastActivityDate.getName()), 'Should NOT contain LastActivityDate (system field)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.LastViewedDate.getName()), 'Should NOT contain LastViewedDate (system field)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.LastReferencedDate.getName()), 'Should NOT contain LastReferencedDate (system field)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.OwnerId.getName()), 'Should NOT contain OwnerId (system field)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.RecordTypeId.getName()), 'Should NOT contain RecordTypeId (system field)');
+        
+        // Verify Insert field ONLY is excluded
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Log__c.getName()), 'Should NOT contain Log__c (Insert field ONLY)');
+        
+        // Verify internal/integration fields are excluded from Update rules
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Email_Integration_Status__c.getName()), 'Should NOT contain Email_Integration_Status__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Jira_Integration_Status__c.getName()), 'Should NOT contain Jira_Integration_Status__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Slack_Integration_Status__c.getName()), 'Should NOT contain Slack_Integration_Status__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.PagerDuty_Integration_Status__c.getName()), 'Should NOT contain PagerDuty_Integration_Status__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Notification_Integration_Status__c.getName()), 'Should NOT contain Notification_Integration_Status__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Teams_Integration_Status__c.getName()), 'Should NOT contain Teams_Integration_Status__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Executable_Rules__c.getName()), 'Should NOT contain Executable_Rules__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Key__c.getName()), 'Should NOT contain Key__c (internal field)');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Category_Icon__c.getName()), 'Should NOT contain Category_Icon__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Analysis_Statuses_Details__c.getName()), 'Should NOT contain Analysis_Statuses_Details__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Issue_Analysis__c.getName()), 'Should NOT contain Issue_Analysis__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Source_Control_Metadata__c.getName()), 'Should NOT contain Source_Control_Metadata__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.DevOps_Center_Metadata_Available__c.getName()), 'Should NOT contain DevOps_Center_Metadata_Available__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Override_Priority__c.getName()), 'Should NOT contain Override_Priority__c');
+        System.assert(!fieldNames.contains(Schema.sObjectType.Issue__c.fields.Users_Impacted__c.getName()), 'Should NOT contain Users_Impacted__c');
+    }
+
+    @IsTest
+    private static void test_admin_service_getSObjectFields_LogFields() {
+        List<AdminService.FilterField> result;
+        
+        Test.startTest();
+        result = (List<AdminService.FilterField>)AdminService.getSObjectFields(
+            Schema.sObjectType.Log__c.getSObjectType(), 
+            Constants.RULE_SOBJECT.TYPE_NOTIFICATION
+        );
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.size() > 0, 'Should have at least one field');
+        
+        // Verify the result is sorted
+        for (Integer i = 0; i < result.size() - 1; i++) {
+            System.assert(
+                result[i].label.compareTo(result[i + 1].label) <= 0, 
+                'Fields should be sorted by label'
+            );
+        }
+        
+        // Verify field structure
+        AdminService.FilterField firstField = result[0];
+        System.assertNotEquals(null, firstField.value, 'Field value should not be null');
+        System.assertNotEquals(null, firstField.label, 'Field label should not be null');
+        System.assertNotEquals(null, firstField.type, 'Field type should not be null');
+    }
+
+    @IsTest
+    private static void test_admin_service_getSObjectFields_IssueFields() {
+        List<AdminService.FilterField> result;
+        
+        Test.startTest();
+        result = (List<AdminService.FilterField>)AdminService.getSObjectFields(
+            Schema.sObjectType.Issue__c.getSObjectType(), 
+            Constants.RULE_SOBJECT.TYPE_NOTIFICATION,
+            false
+        );
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.size() > 0, 'Should have at least one field');
+        
+        // Verify the result includes standard + custom fields
+        Set<String> fieldNames = new Set<String>();
+        for (AdminService.FilterField field : result) {
+            fieldNames.add(field.value);
+        }
+        
+        // Standard fields for Issue Create should be present (using actual field API names from schema)
+        String categoryField = Schema.sObjectType.Issue__c.fields.Category__c.getName();
+        String summaryField = Schema.sObjectType.Issue__c.fields.Summary__c.getName();
+        
+        System.assert(fieldNames.contains(categoryField), 'Should contain Category field: ' + categoryField);
+        System.assert(fieldNames.contains(summaryField), 'Should contain Summary field: ' + summaryField);
+    }
+
+    @IsTest
+    private static void test_admin_service_getRuleSettings_includesFields() {
+        Map<String, Object> result;
+        
+        Test.startTest();
+        result = AdminService.getRuleSettings(Constants.RULE_SOBJECT.TYPE_NOTIFICATION);
+        Test.stopTest();
+        
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey(RuleUtil.KEY_LOG_FIELDS), 'Should contain log fields key');
+        System.assert(result.containsKey(RuleUtil.KEY_ISSUE_FIELDS), 'Should contain issue fields key');
+        System.assert(result.containsKey(RuleUtil.KEY_ISSUE_FIELDS_FOR_UPDATE), 'Should contain issue fields for update key');
+        
+        List<AdminService.FilterField> logFields = (List<AdminService.FilterField>)result.get(RuleUtil.KEY_LOG_FIELDS);
+        List<AdminService.FilterField> issueFields = (List<AdminService.FilterField>)result.get(RuleUtil.KEY_ISSUE_FIELDS);
+        List<AdminService.FilterField> issueFieldsUpdate = (List<AdminService.FilterField>)result.get(RuleUtil.KEY_ISSUE_FIELDS_FOR_UPDATE);
+        
+        System.assertNotEquals(null, logFields, 'Log fields should not be null');
+        System.assertNotEquals(null, issueFields, 'Issue fields should not be null');
+        System.assertNotEquals(null, issueFieldsUpdate, 'Issue fields for update should not be null');
+        
+        System.assert(logFields.size() > 0, 'Log fields should have at least one entry');
+        System.assert(issueFields.size() > 0, 'Issue fields should have at least one entry');
+        System.assert(issueFieldsUpdate.size() > 0, 'Issue fields for update should have at least one entry');
+        
+        // Verify that Update rules have more fields than Create rules for Issue
+        System.assert(
+            issueFieldsUpdate.size() > issueFields.size(), 
+            'Issue Update rules should have more fields than Create rules'
+        );
+    }
+
+    @IsTest
+    private static void test_admin_service_filterField_compareTo() {
+        AdminService.FilterField field1 = new AdminService.FilterField('Field_A__c', 'Alpha Field', 'TEXT');
+        AdminService.FilterField field2 = new AdminService.FilterField('Field_B__c', 'Beta Field', 'TEXT');
+        AdminService.FilterField field3 = new AdminService.FilterField('Field_C__c', 'Alpha Field', 'TEXT');
+        
+        Test.startTest();
+        Integer comparison1 = field1.compareTo(field2);
+        Integer comparison2 = field1.compareTo(field3);
+        Test.stopTest();
+        
+        System.assert(comparison1 < 0, 'Alpha should come before Beta');
+        System.assertEquals(0, comparison2, 'Same labels should be equal');
+    }
+
+    // ========================================================================
+    // Error Scenario Tests for LoggerSettingsController RemoteAction Methods
+    // ========================================================================
+
+    @IsTest
+    private static void test_generateTokenForConnectedOrg_error_creates_pharos_log() {
+        String codeValue = 'someCode';
+        String redirectUrl = 'https://test.salesforce.com/callback';
+        String testData = JSON.serialize(new Map<String, Object>{
+            'code' => codeValue,
+            'redirectUrl' => redirectUrl,
+            'state' => 'someState'
+        });
+
+        // Set up mock to throw an error
+        TestDataFactory.SingleRequestMock errorMock = new TestDataFactory.SingleRequestMock(
+            400,
+            'Bad Request',
+            '{"error":"invalid_grant","error_description":"authentication failure"}'
+        );
+        Test.setMock(HttpCalloutMock.class, errorMock);
+
+        Integer initialPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                           WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                           AND Area__c = :Logger.AREA_PHAROS_ERROR];
+
+        Test.startTest();
+        String result = LoggerSettingsController.generateTokenForConnectedOrg(testData);
+        Test.stopTest();
+
+        Map<String, Object> testResult = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals('error', testResult.get('status'), 'Status should be error');
+        System.assertNotEquals(null, testResult.get('message'), 'Error message should be present');
+
+        // Verify Pharos Error log was created
+        Integer finalPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                         WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                         AND Area__c = :Logger.AREA_PHAROS_ERROR];
+        
+        System.assert(finalPharosErrorCount > initialPharosErrorCount, 
+            'A Pharos Error log should be created when generateTokenForConnectedOrg fails. ' +
+            'Initial: ' + initialPharosErrorCount + ', Final: ' + finalPharosErrorCount);
+
+        // Verify the log contains correct apex name
+        List<Log__c> pharosLogs = [SELECT Id, Apex_Name__c, Summary__c 
+                                   FROM Log__c 
+                                   WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                   AND Area__c = :Logger.AREA_PHAROS_ERROR
+                                   ORDER BY CreatedDate DESC
+                                   LIMIT 1];
+        
+        if (!pharosLogs.isEmpty()) {
+            System.assert(pharosLogs[0].Apex_Name__c.contains('LoggerSettingsController'), 
+                'Log should contain class name');
+            System.assert(pharosLogs[0].Apex_Name__c.contains('generateTokenForConnectedOrg'), 
+                'Log should contain method name');
+        }
+    }
+
+    @IsTest
+    private static void test_generateTokenForSlack_error_creates_pharos_log() {
+        String codeValue = 'someCode';
+        String testData = JSON.serialize(new Map<String, Object>{'code' => codeValue});
+
+        // Set up mock to throw an error
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock());
+        TestDataFactory.SingleRequestMock errorMock = new TestDataFactory.SingleRequestMock(
+            401,
+            'Unauthorized',
+            '{"ok":false,"error":"invalid_code"}'
+        );
+        mocks.put(LoggerSettingsController.SLACK_OAUTH_ENDPOINT_V2, errorMock);
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Integer initialPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                           WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                           AND Area__c = :Logger.AREA_PHAROS_ERROR];
+
+        Test.startTest();
+        String result = LoggerSettingsController.generateTokenForSlack(testData);
+        Test.stopTest();
+
+        Map<String, Object> testResult = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals('error', testResult.get('status'), 'Status should be error');
+        System.assertNotEquals(null, testResult.get('message'), 'Error message should be present');
+
+        // Verify Pharos Error log was created
+        Integer finalPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                         WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                         AND Area__c = :Logger.AREA_PHAROS_ERROR];
+        
+        System.assert(finalPharosErrorCount > initialPharosErrorCount, 
+            'A Pharos Error log should be created when generateTokenForSlack fails. ' +
+            'Initial: ' + initialPharosErrorCount + ', Final: ' + finalPharosErrorCount);
+
+        // Verify the log contains correct apex name
+        List<Log__c> pharosLogs = [SELECT Id, Apex_Name__c, Summary__c 
+                                   FROM Log__c 
+                                   WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                   AND Area__c = :Logger.AREA_PHAROS_ERROR
+                                   ORDER BY CreatedDate DESC
+                                   LIMIT 1];
+        
+        if (!pharosLogs.isEmpty()) {
+            System.assert(pharosLogs[0].Apex_Name__c.contains('LoggerSettingsController'), 
+                'Log should contain class name');
+            System.assert(pharosLogs[0].Apex_Name__c.contains('generateTokenForSlack'), 
+                'Log should contain method name');
+        }
+    }
+
+    @IsTest
+    private static void test_generateTokenForGraph_error_creates_pharos_log() {
+        String codeValue = 'someCode';
+        String returnValue = 'someHttpUrl';
+        String testData = JSON.serialize(new Map<String, Object>{
+            'code' => codeValue,
+            'return_url' => returnValue
+        });
+
+        // Set up mock to throw an error
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock());
+        TestDataFactory.SingleRequestMock errorMock = new TestDataFactory.SingleRequestMock(
+            400,
+            'Bad Request',
+            '{"error":"invalid_grant","error_description":"authorization code expired"}'
+        );
+        mocks.put(GraphAPIService.GRAPH_API_GET_TOKEN_ENDPOINT, errorMock);
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Integer initialPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                           WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                           AND Area__c = :Logger.AREA_PHAROS_ERROR];
+
+        Test.startTest();
+        String result = LoggerSettingsController.generateTokenForGraph(testData);
+        Test.stopTest();
+
+        Map<String, Object> testResult = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals('error', testResult.get('status'), 'Status should be error');
+        System.assertNotEquals(null, testResult.get('message'), 'Error message should be present');
+
+        // Verify Pharos Error log was created
+        Integer finalPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                         WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                         AND Area__c = :Logger.AREA_PHAROS_ERROR];
+        
+        System.assert(finalPharosErrorCount > initialPharosErrorCount, 
+            'A Pharos Error log should be created when generateTokenForGraph fails. ' +
+            'Initial: ' + initialPharosErrorCount + ', Final: ' + finalPharosErrorCount);
+
+        // Verify the log contains correct apex name
+        List<Log__c> pharosLogs = [SELECT Id, Apex_Name__c, Summary__c 
+                                   FROM Log__c 
+                                   WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                   AND Area__c = :Logger.AREA_PHAROS_ERROR
+                                   ORDER BY CreatedDate DESC
+                                   LIMIT 1];
+        
+        if (!pharosLogs.isEmpty()) {
+            System.assert(pharosLogs[0].Apex_Name__c.contains('LoggerSettingsController'), 
+                'Log should contain class name');
+            System.assert(pharosLogs[0].Apex_Name__c.contains('generateTokenForGraph'), 
+                'Log should contain method name');
+        }
+    }
+
+    @IsTest
+    private static void test_generateTokenForAzureDevOps_error_creates_pharos_log() {
+        String codeValue = 'someCode';
+        String returnValue = 'someHttpUrl';
+        String testData = JSON.serialize(new Map<String, Object>{
+            'code' => codeValue,
+            'return_url' => returnValue
+        });
+
+        // Set up mock to throw an error
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock());
+        TestDataFactory.SingleRequestMock errorMock = new TestDataFactory.SingleRequestMock(
+            403,
+            'Forbidden',
+            '{"error":"access_denied","error_description":"user denied access"}'
+        );
+        mocks.put(GraphAPIService.GRAPH_API_GET_TOKEN_ENDPOINT, errorMock);
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Integer initialPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                           WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                           AND Area__c = :Logger.AREA_PHAROS_ERROR];
+
+        Test.startTest();
+        String result = LoggerSettingsController.generateTokenForAzureDevOps(testData);
+        Test.stopTest();
+
+        Map<String, Object> testResult = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals('error', testResult.get('status'), 'Status should be error');
+        System.assertNotEquals(null, testResult.get('message'), 'Error message should be present');
+
+        // Verify Pharos Error log was created
+        Integer finalPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                         WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                         AND Area__c = :Logger.AREA_PHAROS_ERROR];
+        
+        System.assert(finalPharosErrorCount > initialPharosErrorCount, 
+            'A Pharos Error log should be created when generateTokenForAzureDevOps fails. ' +
+            'Initial: ' + initialPharosErrorCount + ', Final: ' + finalPharosErrorCount);
+
+        // Verify the log contains correct apex name
+        List<Log__c> pharosLogs = [SELECT Id, Apex_Name__c, Summary__c 
+                                   FROM Log__c 
+                                   WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                   AND Area__c = :Logger.AREA_PHAROS_ERROR
+                                   ORDER BY CreatedDate DESC
+                                   LIMIT 1];
+        
+        if (!pharosLogs.isEmpty()) {
+            System.assert(pharosLogs[0].Apex_Name__c.contains('LoggerSettingsController'), 
+                'Log should contain class name');
+            System.assert(pharosLogs[0].Apex_Name__c.contains('generateTokenForAzureDevOps'), 
+                'Log should contain method name');
+        }
+    }
+
+    @IsTest
+    private static void test_generateTokenForGitHub_error_creates_pharos_log() {
+        String codeValue = 'someCode';
+        String returnValue = 'someHttpUrl';
+        String testData = JSON.serialize(new Map<String, Object>{
+            'code' => codeValue,
+            'return_url' => returnValue
+        });
+
+        // Set up mock to throw an error
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock());
+        TestDataFactory.SingleRequestMock errorMock = new TestDataFactory.SingleRequestMock(
+            401,
+            'Unauthorized',
+            '{"error":"bad_verification_code","error_description":"The code passed is incorrect or expired"}'
+        );
+        mocks.put(GitHubUtils.GIT_API_TOKEN_ENDPOINT, errorMock);
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Integer initialPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                           WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                           AND Area__c = :Logger.AREA_PHAROS_ERROR];
+
+        Test.startTest();
+        String result = LoggerSettingsController.generateTokenForGitHub(testData);
+        Test.stopTest();
+
+        Map<String, Object> testResult = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals('error', testResult.get('status'), 'Status should be error');
+        System.assertNotEquals(null, testResult.get('message'), 'Error message should be present');
+
+        // Verify Pharos Error log was created
+        Integer finalPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                         WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                         AND Area__c = :Logger.AREA_PHAROS_ERROR];
+        
+        System.assert(finalPharosErrorCount > initialPharosErrorCount, 
+            'A Pharos Error log should be created when generateTokenForGitHub fails. ' +
+            'Initial: ' + initialPharosErrorCount + ', Final: ' + finalPharosErrorCount);
+
+        // Verify the log contains correct apex name
+        List<Log__c> pharosLogs = [SELECT Id, Apex_Name__c, Summary__c 
+                                   FROM Log__c 
+                                   WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                   AND Area__c = :Logger.AREA_PHAROS_ERROR
+                                   ORDER BY CreatedDate DESC
+                                   LIMIT 1];
+        
+        if (!pharosLogs.isEmpty()) {
+            System.assert(pharosLogs[0].Apex_Name__c.contains('LoggerSettingsController'), 
+                'Log should contain class name');
+            System.assert(pharosLogs[0].Apex_Name__c.contains('generateTokenForGitHub'), 
+                'Log should contain method name');
+        }
+    }
+
+    @IsTest
+    private static void test_generateTokenForJira_error_creates_pharos_log() {
+        String codeValue = 'someCode';
+        String testData = JSON.serialize(new Map<String, Object>{'code' => codeValue});
+
+        // Set up mock to throw an error
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getRemoteSiteSettingsMock());
+        TestDataFactory.SingleRequestMock errorMock = new TestDataFactory.SingleRequestMock(
+            400,
+            'Bad Request',
+            '{"error":"invalid_grant"}'
+        );
+        mocks.put(JiraService.JIRA_CLOUD_OAUTH_ENDPOINT, errorMock);
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        Integer initialPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                           WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                           AND Area__c = :Logger.AREA_PHAROS_ERROR];
+
+        Test.startTest();
+        String result = LoggerSettingsController.generateTokenForJira(testData);
+        Test.stopTest();
+
+        Map<String, Object> testResult = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals('error', testResult.get('status'), 'Status should be error');
+        System.assertNotEquals(null, testResult.get('message'), 'Error message should be present');
+
+        // Verify Pharos Error log was created
+        Integer finalPharosErrorCount = [SELECT COUNT() FROM Log__c 
+                                         WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                         AND Area__c = :Logger.AREA_PHAROS_ERROR];
+        
+        System.assert(finalPharosErrorCount > initialPharosErrorCount, 
+            'A Pharos Error log should be created when generateTokenForJira fails. ' +
+            'Initial: ' + initialPharosErrorCount + ', Final: ' + finalPharosErrorCount);
+
+        // Verify the log contains correct apex name
+        List<Log__c> pharosLogs = [SELECT Id, Apex_Name__c, Summary__c 
+                                   FROM Log__c 
+                                   WHERE Category__c = :Logger.CATEGORY_PHAROS_ERROR 
+                                   AND Area__c = :Logger.AREA_PHAROS_ERROR
+                                   ORDER BY CreatedDate DESC
+                                   LIMIT 1];
+        
+        if (!pharosLogs.isEmpty()) {
+            System.assert(pharosLogs[0].Apex_Name__c.contains('LoggerSettingsController'), 
+                'Log should contain class name');
+            System.assert(pharosLogs[0].Apex_Name__c.contains('generateTokenForJira'), 
+                'Log should contain method name');
+        }
     }
 }

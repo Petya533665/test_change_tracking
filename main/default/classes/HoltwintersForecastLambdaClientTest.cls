@@ -258,7 +258,7 @@ private class HoltwintersForecastLambdaClientTest {
 
         // Act
         Test.startTest();
-        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
         HoltwintersForecastLambdaClient.LambdaResponse result = client.getLambdaResponse();
         Test.stopTest();
 
@@ -278,7 +278,7 @@ private class HoltwintersForecastLambdaClientTest {
 
         // Act
         Test.startTest();
-        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.WEEKLY, 14);
+        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.WEEKLY, 14, 60);
         HoltwintersForecastLambdaClient.LambdaResponse result = client.getLambdaResponse();
         Test.stopTest();
 
@@ -316,7 +316,7 @@ private class HoltwintersForecastLambdaClientTest {
         // Act & Assert
         Test.startTest();
         try {
-            client.generateUserActivityForecast(emptyLogsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+            client.generateUserActivityForecast(emptyLogsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
             System.assert(false, 'Should have thrown an exception');
         } catch (HoltwintersForecastLambdaClient.HoltwintersForecastException e) {
             System.assert(e.getMessage().contains('Logs data is required'), 'Should contain error message about empty logs');
@@ -332,7 +332,7 @@ private class HoltwintersForecastLambdaClientTest {
         // Act & Assert
         Test.startTest();
         try {
-            client.generateUserActivityForecast(null, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+            client.generateUserActivityForecast(null, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
             System.assert(false, 'Should have thrown an exception');
         } catch (HoltwintersForecastLambdaClient.HoltwintersForecastException e) {
             System.assert(e.getMessage().contains('Logs data is required'), 'Should contain error message about null logs');
@@ -352,7 +352,7 @@ private class HoltwintersForecastLambdaClientTest {
         // Act & Assert
         Test.startTest();
         try {
-            client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+            client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
             System.assert(false, 'Should have thrown an exception');
         } catch (HoltwintersForecastLambdaClient.HoltwintersForecastException e) {
             System.assert(e.getMessage().contains('Error'), 'Should contain error message');
@@ -371,7 +371,7 @@ private class HoltwintersForecastLambdaClientTest {
 
         // Act
         Test.startTest();
-        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
         HoltwintersForecastLambdaClient.LambdaResponse lambdaResponse = client.getLambdaResponse();
         Test.stopTest();
 
@@ -407,7 +407,7 @@ private class HoltwintersForecastLambdaClientTest {
 
         // Act
         Test.startTest();
-        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
         HoltwintersForecastLambdaClient.LambdaResponse result = client.getLambdaResponse();
         Test.stopTest();
 
@@ -427,7 +427,7 @@ private class HoltwintersForecastLambdaClientTest {
 
         // Act
         Test.startTest();
-        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
         HoltwintersForecastLambdaClient.LambdaResponse result = client.getLambdaResponse();
         Test.stopTest();
 
@@ -447,7 +447,7 @@ private class HoltwintersForecastLambdaClientTest {
 
         // Act
         Test.startTest();
-        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
         HoltwintersForecastLambdaClient.LambdaResponse result = client.getLambdaResponse();
         Test.stopTest();
 
@@ -469,7 +469,7 @@ private class HoltwintersForecastLambdaClientTest {
 
         // Act
         Test.startTest();
-        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
         Boolean isSuccess = client.isSuccess();
         Test.stopTest();
 
@@ -502,7 +502,7 @@ private class HoltwintersForecastLambdaClientTest {
 
         // Act
         Test.startTest();
-        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
         HoltwintersForecastLambdaClient.LambdaErrorResponse errorResponse = client.getErrorResponse();
         Test.stopTest();
 
@@ -556,7 +556,7 @@ private class HoltwintersForecastLambdaClientTest {
 
         // Act
         Test.startTest();
-        client.generateUserActivityForecast(logsData, null); // null seasonality type should default to AUTO
+        client.generateUserActivityForecast(logsData, null, 7, 30); // null seasonality type should default to AUTO
         HoltwintersForecastLambdaClient.LambdaResponse result = client.getLambdaResponse();
         Test.stopTest();
 
@@ -577,11 +577,11 @@ private class HoltwintersForecastLambdaClientTest {
         // Act
         Test.startTest();
         // Test with invalid forecast days (out of range)
-        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 0); // Invalid: too low
+        client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 0, 30); // Invalid: too low
         HoltwintersForecastLambdaClient.LambdaResponse result1 = client.getLambdaResponse();
         
         HoltwintersForecastLambdaClient client2 = new HoltwintersForecastLambdaClient();
-        client2.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 50); // Invalid: too high
+        client2.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 50, 30); // Invalid: too high
         HoltwintersForecastLambdaClient.LambdaResponse result2 = client2.getLambdaResponse();
         Test.stopTest();
 
@@ -627,7 +627,7 @@ private class HoltwintersForecastLambdaClientTest {
         // Act & Assert
         Test.startTest();
         try {
-            client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+            client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
             System.assert(false, 'Exception should have been thrown for empty response');
         } catch (HoltwintersForecastLambdaClient.HoltwintersForecastException e) {
             System.assertEquals('Empty response from Lambda function', e.getMessage(), 'Expected empty response error');
@@ -647,7 +647,7 @@ private class HoltwintersForecastLambdaClientTest {
         // Act & Assert
         Test.startTest();
         try {
-            client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+            client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
             System.assert(false, 'Exception should have been thrown for invalid JSON');
         } catch (HoltwintersForecastLambdaClient.HoltwintersForecastException e) {
             System.assert(e.getMessage().contains('Error calling Lambda function'), 'Expected error calling lambda function message');
@@ -715,7 +715,7 @@ private class HoltwintersForecastLambdaClientTest {
         // Act & Assert
         Test.startTest();
         try {
-            client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY);
+            client.generateUserActivityForecast(logsData, HoltwintersForecastLambdaClient.SeasonalityType.DAILY, 7, 30);
             System.assert(false, 'Exception should have been thrown for HTTP error');
         } catch (HoltwintersForecastLambdaClient.HoltwintersForecastException e) {
             System.assert(e.getMessage().contains('Error calling Lambda function'), 'Expected HTTP error message');

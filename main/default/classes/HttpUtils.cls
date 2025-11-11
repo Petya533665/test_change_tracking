@@ -109,10 +109,6 @@ public with sharing class HttpUtils {
         Http h = new Http();
         HttpResponse res = h.send(req);
         debugHttpResponse(res);
-        while (res.getStatusCode() == 302) {
-            req.setEndpoint(res.getHeader('Location'));
-            res = new Http().send(req);
-        }
         if (res.getStatusCode() == expectedResponseCode) {
 	        if (String.isNotBlank(res.getHeader('Content-Type')) && res.getHeader('Content-Type').toLowerCase().contains('zip')) {
 		        try {
@@ -166,32 +162,28 @@ public with sharing class HttpUtils {
 	}
 
     public static String patch(String url, String body, Map<String, String> headers, Integer expectedResponseCode) {
-        return postput('PATCH', url, body, headers, expectedResponseCode, null);
+        return postput('PATCH', url, body, headers, expectedResponseCode);
     }
 
     public static String del(String url, Map<String, String> headers, Integer expectedResponceCode) {
-        return postput('DELETE', url, null, headers, expectedResponceCode, null);
+        return postput('DELETE', url, null, headers, expectedResponceCode);
     }
 
     public static String post(String url, String body, Map<String, String> headers, Integer expectedResponceCode) {
-        return postput('POST', url, body, headers, expectedResponceCode, null);
-    }
-
-    public static String post(String url, String body, Map<String, String> headers, Integer expectedResponceCode, MetadataService.RemoteSiteSetting rssInstance) {
-        return postput('POST', url, body, headers, expectedResponceCode, rssInstance);
+        return postput('POST', url, body, headers, expectedResponceCode);
     }
 
 	public static String postputBlobBody(String url, Blob body, Map<String, String> headers, Integer expectedResponceCode) {
-		return postputBlobBody('POST', url, body, headers, expectedResponceCode, null);
+		return postputBlobBody('POST', url, body, headers, expectedResponceCode);
 	}
 
     public static String put(String url, String body, Map<String, String> headers, Integer expectedResponseCode) {
-        return postput('PUT', url, body, headers, expectedResponseCode, null);
+        return postput('PUT', url, body, headers, expectedResponseCode);
     }
 
     public static Map<String, String> responseHeaders = new Map<String, String>();
 
-    public static String postput(String method, String url, String body, Map<String, String> headers, Integer expectedResponseCode, MetadataService.RemoteSiteSetting rssInstance) {
+    public static String postput(String method, String url, String body, Map<String, String> headers, Integer expectedResponseCode) {
         HTTPRequest req = new HTTPRequest();
         req.setEndpoint(url);
         req.setMethod(method);
@@ -209,14 +201,6 @@ public with sharing class HttpUtils {
         Http h = new Http();
         HttpResponse res = h.send(req);
         debugHttpResponse(res);
-        while (res.getStatusCode() == 302) {
-            req.setEndpoint(res.getHeader('Location'));
-            if(rssInstance != null) {
-                rssInstance.url = res.getHeader('Location');
-                MetadataServiceUtil.upsertRemoteSiteSettingsMetadata(rssInstance);
-            }
-            res = new Http().send(req);
-        }
         if (res.getStatusCode() == expectedResponseCode) {
             for(String headerKey : res.getHeaderKeys()) {
                 responseHeaders.put(headerKey, res.getHeader(headerKey));
@@ -227,7 +211,7 @@ public with sharing class HttpUtils {
         }
     }
 
-	public static String postputBlobBody(String method, String url, Blob body, Map<String, String> headers, Integer expectedResponseCode, MetadataService.RemoteSiteSetting rssInstance) {
+	public static String postputBlobBody(String method, String url, Blob body, Map<String, String> headers, Integer expectedResponseCode) {
 		HTTPRequest req = new HTTPRequest();
 		req.setEndpoint(url);
 		req.setMethod(method);
@@ -245,14 +229,6 @@ public with sharing class HttpUtils {
 		Http h = new Http();
 		HttpResponse res = h.send(req);
 		debugHttpResponse(res);
-		while (res.getStatusCode() == 302) {
-			req.setEndpoint(res.getHeader('Location'));
-			if(rssInstance != null) {
-				rssInstance.url = res.getHeader('Location');
-				MetadataServiceUtil.upsertRemoteSiteSettingsMetadata(rssInstance);
-			}
-			res = new Http().send(req);
-		}
 		if (res.getStatusCode() == expectedResponseCode) {
 			for(String headerKey : res.getHeaderKeys()) {
 				responseHeaders.put(headerKey, res.getHeader(headerKey));
@@ -278,10 +254,6 @@ public with sharing class HttpUtils {
         req.setTimeout(120000);
         Http h = new Http();
         HttpResponse res = h.send(req);
-        while (res.getStatusCode() == 302) {
-            req.setEndpoint(res.getHeader('Location'));
-            res = new Http().send(req);
-        }
         return res;
     }
 

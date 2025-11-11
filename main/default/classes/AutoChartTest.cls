@@ -12,7 +12,6 @@ private class AutoChartTest {
         private Map<String, String> chartDataStorage = new Map<String, String>();
         private Map<String, Map<String, String>> chartImagesStorage = new Map<String, Map<String, String>>();
         private Map<String, Integer> notificationAttempts = new Map<String, Integer>();
-        private DateTime notificationTimestamp = System.now();
         
         public NotificationService.ActionIteration getIterationContext(String recordId) {
             return iterationContexts.get(recordId);
@@ -50,14 +49,6 @@ private class AutoChartTest {
         
         public Set<String> getRecordsWithNotificationAttempts() {
             return notificationAttempts.keySet();
-        }
-        
-        public void setNotificationTimestamp(DateTime timestamp) {
-            this.notificationTimestamp = timestamp;
-        }
-        
-        public DateTime getNotificationTimestamp() {
-            return this.notificationTimestamp;
         }
         
         public void storeChartData(String recordId, String chartData) {
@@ -389,7 +380,7 @@ private class AutoChartTest {
             Body__c = 'Test {!System_Auto_Chart.MEMORY_USAGE_CHART} and {!System_Auto_Chart.ERROR_RATE_CHART}'
         );
         
-        MonitoringUtil.Action chartActionWrapper = new MonitoringUtil.Action();
+        RuleUtil.Action chartActionWrapper = new RuleUtil.Action();
         chartActionWrapper.fields = chartAction;
         
         // Test with chart fields - result depends on feature flag state
@@ -402,7 +393,7 @@ private class AutoChartTest {
             Body__c = 'This is a regular notification message'
         );
         
-        MonitoringUtil.Action regularActionWrapper = new MonitoringUtil.Action();
+        RuleUtil.Action regularActionWrapper = new RuleUtil.Action();
         regularActionWrapper.fields = regularAction;
         
         // Test without chart fields
@@ -410,7 +401,7 @@ private class AutoChartTest {
         System.assertEquals(false, hasNoChartFields, 'Should not detect chart fields in regular action');
         
         // Test with null action
-        MonitoringUtil.Action nullAction = new MonitoringUtil.Action();
+        RuleUtil.Action nullAction = new RuleUtil.Action();
         Boolean nullResult = AutoChart.containsAutoChartFields(nullAction);
         System.assertEquals(false, nullResult, 'Should return false for null action fields');
     }
@@ -427,7 +418,7 @@ private class AutoChartTest {
             Body__c = 'Test {!System_Auto_Chart.MEMORY_USAGE_CHART} and {!System_Auto_Chart.ERROR_RATE_CHART}'
         );
         
-        MonitoringUtil.Action actionWrapper = new MonitoringUtil.Action();
+        RuleUtil.Action actionWrapper = new RuleUtil.Action();
         actionWrapper.fields = chartAction;
         
         List<String> chartTypes = AutoChart.extractChartTypesFromAction(actionWrapper);
@@ -448,7 +439,7 @@ private class AutoChartTest {
             Body__c = 'This is a regular notification message'
         );
         
-        MonitoringUtil.Action regularWrapper = new MonitoringUtil.Action();
+        RuleUtil.Action regularWrapper = new RuleUtil.Action();
         regularWrapper.fields = regularAction;
         
         List<String> noChartTypes = AutoChart.extractChartTypesFromAction(regularWrapper);
@@ -702,7 +693,7 @@ private class AutoChartTest {
         System.assertEquals(2, complexResult.autoChartFields.size());
         
         // Test containsAutoChartFields with edge cases
-        MonitoringUtil.Action edgeAction = new MonitoringUtil.Action();
+        RuleUtil.Action edgeAction = new RuleUtil.Action();
         edgeAction.fields = new Action__c(
             Subject__c = 'Contains {!System_Auto_Chart.} invalid pattern',
             Body__c = 'And {!NotChart.VALID} non-chart field'
@@ -870,7 +861,7 @@ private class AutoChartTest {
         
         // Test that containsAutoChartFields returns false when feature is disabled
         // We can't easily change the feature flag in tests, so we test the current behavior
-        MonitoringUtil.Action testAction = new MonitoringUtil.Action();
+        RuleUtil.Action testAction = new RuleUtil.Action();
         testAction.fields = new Action__c(Subject__c = 'Test {!System_Auto_Chart.TEST}');
         
         Boolean result = AutoChart.containsAutoChartFields(testAction);
@@ -944,7 +935,7 @@ private class AutoChartTest {
         Test.startTest();
         
         // Test getAutoChartSetting
-        String getResult = AutoChartController.getAutoChartSetting();
+        String getResult = JSON.serialize(AutoChartController.getAutoChartSetting());
         System.assertNotEquals(null, getResult, 'getAutoChartSetting result should not be null');
         
         // Test updateAutoChartSetting

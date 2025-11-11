@@ -102,4 +102,74 @@ private class ManageTokensBatchTest {
 		);
 		return singleRequestMock;
 	}
+
+	/**
+	 * Test to reproduce the exact bug scenario: OLD tokens > NEW refreshed tokens
+	 * This reproduces the condition that caused refresh_token4 to have only 12 characters.
+	 * 
+	 * SCENARIO: When old tokens are longer than new refreshed tokens, static list accumulation
+	 * causes mixing of old and new token parts, leading to corruption.
+	 */
+	@IsTest
+	static void testTokenCorruptionWhenOldTokensLongerThanNew() {
+		enableTeamsIntegration();
+		ConfigUtil.GRAPH_API_SETTINGS.Enabled__c = true;
+		ConfigUtil.GRAPH_API_SETTINGS.Tenant_Id__c = TEST_GRAPH_API_TENANT_ID;
+		upsert ConfigUtil.GRAPH_API_SETTINGS;
+
+		// Set up LONG existing tokens (simulating old tokens in production)
+		String longExistingApiToken = 'oldLongApiToken' + 'a'.repeat(1000); // 1016 chars → 5 records
+		String longExistingRefreshToken = 'oldLongRefreshToken' + 'r'.repeat(800); // 820 chars → 4 records
+		
+		GraphAPIService.putApiTokenToSettings(longExistingApiToken, true, null);
+		GraphAPIService.putApiRefreshTokenToSettings(longExistingRefreshToken, true, null);
+
+		// Mock OAuth response with SHORTER new tokens (simulating token refresh)
+		String shortNewApiToken = 'newShortApiToken' + 'a'.repeat(200); // 217 chars → 1 record
+		String shortNewRefreshToken = 'newShortRefreshToken' + 'r'.repeat(100); // 120 chars → 1 record
+
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.put(GraphAPIService.GRAPH_API_GET_TOKEN_ENDPOINT, getOldLongerThanNewTokenMock(shortNewApiToken, shortNewRefreshToken));
+		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		Test.startTest();
+		
+		// Trigger token refresh - this is where the bug would manifest
+		// Without the fix: static lists accumulate, causing corruption
+		GraphAPIService.GRAPH_API_LIST_RECORDS_UPSERT = null;
+		GraphAPIService.GRAPH_API_LIST_RECORDS_DELETE = null;
+		ManageTokensBatch.getInstance().startBatch();
+		
+		Test.stopTest();
+		
+		// Verify the tokens were refreshed correctly without corruption
+		GraphAPIService.GRAPH_API_LIST_RECORDS = null;
+		
+		String actualApiToken = GraphAPIService.getApiTokenFromSettings();
+		String actualRefreshToken = GraphAPIService.getApiRefreshTokenFromSettings();
+		
+		// CRITICAL ASSERTIONS: These will FAIL when the bug is present
+		System.assertEquals(shortNewApiToken.length(), actualApiToken.length(), 
+			'CRITICAL BUG: API token length corrupted! Expected ' + shortNewApiToken.length() + ' chars (new short token), ' +
+			'but got ' + actualApiToken.length() + ' chars. This indicates mixing of old long token parts with new short token parts.');
+		
+		System.assertEquals(shortNewRefreshToken.length(), actualRefreshToken.length(), 
+			'CRITICAL BUG: Refresh token length corrupted! Expected ' + shortNewRefreshToken.length() + ' chars (new short token), ' +
+			'but got ' + actualRefreshToken.length() + ' chars. This is exactly like the refresh_token4=12chars issue.');
+		
+		// Verify exact content match
+		System.assertEquals(shortNewApiToken, actualApiToken, 
+			'API token content corrupted! Expected new short token but got mixed content from static list accumulation.');
+		
+		System.assertEquals(shortNewRefreshToken, actualRefreshToken, 
+			'Refresh token content corrupted! This is the exact scenario that caused refresh_token4=12chars in your debug log.');
+	}
+
+	private static TestDataFactory.SingleRequestMock getOldLongerThanNewTokenMock(String newApiToken, String newRefreshToken) {
+		ConnectedOrgService.AuthTokenResponse response = new ConnectedOrgService.AuthTokenResponse();
+		response.access_token = newApiToken;
+		response.refresh_token = newRefreshToken;
+		return new TestDataFactory.SingleRequestMock(200, 'OK', JSON.serialize(response));
+	}
 }

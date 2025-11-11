@@ -208,12 +208,7 @@ public with sharing class GitHubUtils {
     }
 
     public static Map<String, String> authHeaders() {
-        Map<String, String> result = new Map<String, String>();
-        AWS_Token__mdt mdtSettings = AWS_Token__mdt.getInstance('AWSToken');
-        if(mdtSettings != null) {
-            result.put('x-api-key', mdtSettings.Token__c);
-        }
-        return result;
+        return HttpUtils.getHeadersWithApiKey();
     }
 
     public static Map<String, String> getGitApiHeaders() {

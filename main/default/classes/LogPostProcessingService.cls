@@ -429,7 +429,6 @@ public with sharing class LogPostProcessingService {
 			result.addError(e);
 			logger?.addInternalError(e, log.Id, LogPostProcessingService.class.getName(), '.fillOrgLimitsEnhanced');
 		}
-		
 	}
 	public static final String ERROR_MESSAGE_FLOW_NOT_FOUND = 'WebService returned a SOAP Fault: type and fullNames must be specified for items to read';
 
@@ -724,7 +723,7 @@ public with sharing class LogPostProcessingService {
 	}
 	public static void fillParent(Log__c log, Logger logger) {
 		try {
-			List<Log__c> logs = [SELECT Id, Parent__c FROM Log__c WHERE Parent__c != :log?.Id AND Interview_GUID_External__c = :log.Interview_GUID_External__c LIMIT 1];
+			List<Log__c> logs = [SELECT Id, Parent__c FROM Log__c WHERE Id != :log.Id AND Parent__c != :log?.Id AND Interview_GUID_External__c = :log.Interview_GUID_External__c LIMIT 1];
 			if (!logs.isEmpty()) {
 				PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Is_Parent__c, false);
 				PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Parent__c, logs[0].Parent__c);
@@ -1017,9 +1016,14 @@ public with sharing class LogPostProcessingService {
 	}
 
 	public static List<AsyncApexJob> getPendingJobsInfoFromOrg(Connected_Org__c corg) {
+		final List<String> JOB_STATUSES = new List<String>{
+			Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUS_QUEUED,
+			Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUS_PROCESSING,
+			Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUS_PREPARING
+		};
 		String query = new QBuilder(AsyncApexJob.SObjectType)
 				.selectFields(ASYNC_JOB_FIELDS)
-				.add(QBuilder.condition('Status').isIn(new String[] {'Processing','Preparing','Queued'}))
+				.add(QBuilder.condition('Status').isIn(JOB_STATUSES))
 				.add(QBuilder.condition('JobType').notEqualsTo('BatchApexWorker'))
 				.addLimit(1000)
 				.build();

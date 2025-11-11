@@ -33,10 +33,10 @@ public without sharing class PostInstallClass implements InstallHandler {
 	public static void clearPendingIssues() {
 		List<Issue__c> issues = [SELECT Id, Jira_Integration_Status__c 
 			FROM Issue__c 
-			WHERE Jira_Integration_Status__c = :MonitoringUtil.JIRA_INTEGRATION_STATUS_PENDING
+			WHERE Jira_Integration_Status__c = :Constants.GLOBAL_VARIABLE.JIRA_INTEGRATION_STATUS_PENDING
 		];
 		for(Issue__c issue : issues) {
-			issue.Jira_Integration_Status__c = MonitoringUtil.NOTIFICATION_INTEGRATION_STATUS_FAILED;
+			issue.Jira_Integration_Status__c = Constants.GLOBAL_VARIABLE.NOTIFICATION_INTEGRATION_STATUS_FAILED;
 		}
 		Database.update(issues, false);
 	}

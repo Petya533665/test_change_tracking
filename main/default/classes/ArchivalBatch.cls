@@ -38,7 +38,7 @@ public with sharing class ArchivalBatch extends DatabaseUtils.PharosBatchImpl im
 		Set<Id> logIds = getLogIdsByRuleFilters(scope);
 		if(!logIds.isEmpty()) {
 			String actionType = eventAction.Action_Type__c != null ? eventAction.Action_Type__c : eventAction.Type__c;
-			switch on MonitoringUtil.MAP_ACTIONTYPES_BY_STRINGS.get(actionType) {
+			switch on RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(actionType) {
 				when REMOVAL {
 					removeLogs(logIds);
 				}
@@ -80,12 +80,12 @@ public with sharing class ArchivalBatch extends DatabaseUtils.PharosBatchImpl im
 	public class ArchivalLogsQueryHelper {
 		public Datetime ruleStartTime;
 		public Datetime lastProcessedDatetime;
-		public List<MonitoringUtil.MonitoringRule> rules;
+		public List<RuleUtil.Rule> rules;
 		public List<String> logFields;
 
 		public ArchivalLogsQueryHelper(EventAction__c eventAction) {
-			this.rules = MonitoringUtil.getArchivalRules(new List<Id>{eventAction.Event__r.Rule__c});
-			this.logFields = MonitoringUtil.getLogFields(this.rules);
+			this.rules = RuleUtil.getArchivalRules(new List<Id>{eventAction.Event__r.Rule__c});
+			this.logFields = RuleUtil.getLogFields(this.rules);
 			List<Event__c> events = [
 				SELECT Id, CreatedDate
 				FROM Event__c
@@ -94,10 +94,10 @@ public with sharing class ArchivalBatch extends DatabaseUtils.PharosBatchImpl im
 				LIMIT 2
 			];
 			Datetime currentTime = Datetime.now();
-			Integer shiftMinutes = Integer.valueOf(this.rules.get(0).eventTypeInterval);
+			Integer shiftMinutes = Integer.valueOf(this.rules.get(0).eventTimeInterval);
 			this.ruleStartTime = currentTime.addMinutes(-shiftMinutes);
 			Datetime lastProcessedDatetime = null;
-			for (MonitoringUtil.MonitoringRule rule : this.rules) {
+			for (RuleUtil.Rule rule : this.rules) {
 				Event__c event = events.size() == 2 ? events.get(1) : null;
 				this.lastProcessedDatetime = (event != null) ? event.CreatedDate.addMinutes(-shiftMinutes) : null;
 			}
@@ -124,8 +124,8 @@ public with sharing class ArchivalBatch extends DatabaseUtils.PharosBatchImpl im
 	public Set<Id> getLogIdsByRuleFilters(List<SObject> scope) {
 		Set<Id> result = new Set<Id>();
 		List<Log__c> logs = (List<Log__c>)scope;
-		List<MonitoringUtil.MonitoringRule> rules = MonitoringUtil.getArchivalRules(new List<Id>{this.eventAction.Event__r.Rule__c});
-		for (MonitoringUtil.MonitoringRule rule : rules) {
+		List<RuleUtil.Rule> rules = RuleUtil.getArchivalRules(new List<Id>{this.eventAction.Event__r.Rule__c});
+		for (RuleUtil.Rule rule : rules) {
 			rule.applyArchivalRules(logs);
 			if (!rule.archivalLogs.isEmpty()) {
 				result.addAll(rule.archivalLogs);
@@ -202,7 +202,7 @@ public with sharing class ArchivalBatch extends DatabaseUtils.PharosBatchImpl im
 	}
 
 	public static Map<Id, Log__c> getSObjectLogs(Set<Id> logIds, Boolean excludeTextAreaFields) {
-		String logName = MonitoringUtil.getPackageLogObjectName();
+		String logName = Constants.LOG_SOBJECT.SOBJECT_TYPE_NAME;
 		List<String> logFields = getLogFields(excludeTextAreaFields);
 		String queryString = 'SELECT ' + String.join(logFields, ',') + ' FROM ' + logName + ' WHERE Id IN :logIds';
 		List<Log__c> logsTE = (List<Log__c>)Database.query(queryString);

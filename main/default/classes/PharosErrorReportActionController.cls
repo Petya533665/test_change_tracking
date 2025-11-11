@@ -1,5 +1,10 @@
 public with sharing class PharosErrorReportActionController {
 
+	@TestVisible
+	private static final String KEY_REPORTED_TO_PHAROS_ON = 'reportedToPharosOn';
+	@TestVisible
+	private static final String KEY_CREATED_BY_NAME = 'createdByName';
+
 	@AuraEnabled(Cacheable=true)
 	public static Boolean isAvailableSingleEmail() {
 		Boolean EmailDeliverabilityEnabled = true;
@@ -18,8 +23,8 @@ public with sharing class PharosErrorReportActionController {
 		if (!logs.isEmpty()) {
 			List<Log_Index__c> logIndexes = [SELECT Id, Reported_to_Pharos_On__c, CreatedBy.Name FROM Log_Index__c WHERE Hash__c = :logs[0].Hash_1__c AND Reported_to_Pharos_On__c != NULL];
 			if (!logIndexes.isEmpty()) {
-				reportedInfo.put('reportedToPharosOn', logIndexes[0].Reported_to_Pharos_On__c);
-				reportedInfo.put('createdByName', logIndexes[0].CreatedBy.Name);
+				reportedInfo.put(KEY_REPORTED_TO_PHAROS_ON, logIndexes[0].Reported_to_Pharos_On__c);
+				reportedInfo.put(KEY_CREATED_BY_NAME, logIndexes[0].CreatedBy.Name);
 			}
 		}
 		return reportedInfo;

@@ -144,6 +144,7 @@ public with sharing class AIAnalysis {
 						Impacted_Users_Count__c,
 						Average_Frequency__c,
 						Issue_Analysis__c,
+						Analysis_Status__c,
 						Analysis_Statuses_Details__c,
 						Log__c,
 						Log__r.Type__c,

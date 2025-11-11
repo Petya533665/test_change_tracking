@@ -116,6 +116,66 @@ public class AIAnalysisTest {
 		System.assertEquals(AIAnalysisService.PENDING_STATUS, basicAnalysisStatus);
 	}
 
+	@IsTest
+	private static void testAnalysisPendingToCompleted() {
+		testAnalysisPending('success', AIAnalysisService.COMPLETED_STATUS);
+	}
+
+	@IsTest
+	private static void testAnalysisPendingToFailed() {
+		testAnalysisPending(AIAnalysisService.AWS_ERROR_STATUS, AIAnalysisService.FAILED_STATUS);
+	}
+
+	private static void testAnalysisPending(String aws_status, String analysis_status) {
+		enableIssuePermissions();
+		createPharosLog();
+		List<Issue__c> issues = [SELECT Id, Analysis_Status__c, Analysis_Statuses_Details__c FROM Issue__c];
+
+		issues[0].Analysis_Status__c = AIAnalysisService.PENDING_STATUS;
+		issues[0].Analysis_Statuses_Details__c = issueAnalysisDetails;
+
+		List<AIAnalysisService.AnalysisStatusDetails> analysisStatusesDetails =
+				(List<AIAnalysisService.AnalysisStatusDetails>)JSON.deserialize(
+						issues[0].Analysis_Statuses_Details__c,
+						List<AIAnalysisService.AnalysisStatusDetails>.class
+				);
+
+		String basicAnalysisStatus = null;
+		for (AIAnalysisService.AnalysisStatusDetails asd : analysisStatusesDetails) {
+			if (asd.analysis == AIAnalysisService.BASIC_ANALYSIS) {
+				basicAnalysisStatus = asd.status;
+				break;
+			}
+		}
+		System.assertEquals(AIAnalysisService.PENDING_STATUS, basicAnalysisStatus);
+		Test.startTest();
+		AI_Event__e event = new AI_Event__e();
+		event.Analysis__c = AIAnalysisService.BASIC_ANALYSIS;
+		event.Record_Id__c = issues[0].Id;
+		event.Result__c = 'Test Data';
+		event.Status__c = aws_status;
+		EventBus.publish(new List<AI_Event__e>{
+				event
+		});
+		Test.stopTest();
+		issues = [SELECT Id, Analysis_Statuses_Details__c FROM Issue__c WHERE Id = :issues[0].Id];
+		analysisStatusesDetails =
+				(List<AIAnalysisService.AnalysisStatusDetails>)JSON.deserialize(
+						issues[0].Analysis_Statuses_Details__c,
+						List<AIAnalysisService.AnalysisStatusDetails>.class
+				);
+
+		basicAnalysisStatus = null;
+		for (AIAnalysisService.AnalysisStatusDetails asd : analysisStatusesDetails) {
+			if (asd.analysis == AIAnalysisService.BASIC_ANALYSIS) {
+				basicAnalysisStatus = asd.status;
+				break;
+			}
+		}
+		System.assertEquals(analysis_status, basicAnalysisStatus);
+	}
+
+	private static String issueAnalysisDetails = '[{"status":"Pending","message":null,"lastAnalysisTimestamp":1761750279470,"analysis":"basic"},{"status":"Configuration Required","message":"Code and flow analysis requires Change Tracking feature to be enabled in Pharos Admin -> Change Tracking.  If that menu option is not available please contact success@pharos.ai for enablement.","lastAnalysisTimestamp":null,"analysis":"code_explain"},{"status":"Not Applicable","message":null,"lastAnalysisTimestamp":null,"analysis":"flow"},{"status":"Not Applicable","message":null,"lastAnalysisTimestamp":null,"analysis":"flow_explain"},{"status":"Configuration Required","message":"Code and flow analysis requires Change Tracking feature to be enabled in Pharos Admin -> Change Tracking.  If that menu option is not available please contact success@pharos.ai for enablement.","lastAnalysisTimestamp":null,"analysis":"audit_trail"}]';
 
 	@IsTest
 	private static void testStartAnalysis_invocable_negative() {
@@ -199,7 +259,10 @@ public class AIAnalysisTest {
 		Test.stopTest();
 		System.assertEquals(1, [SELECT Id FROM ContentDocumentLink WHERE LinkedEntityId = :issues[0].Id].size());
 	}
-
+	
+	
+	
+	
 	@IsTest
 	private static void testGetAnalysis() {
 		enableIssuePermissions();
@@ -223,71 +286,65 @@ public class AIAnalysisTest {
 
 	@IsTest
 	private static void testBasicAnalysisHtml() {
-		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.BASIC, getTestStub('BASIC_ANALYSIS_RESPONSE'));
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.BASIC, Test_LogService.getTestStub('BASIC_ANALYSIS_RESPONSE'));
 		responseInterface.setContext('LWC');
-		System.assertEquals(getTestStub('BASIC_ANALYSIS_HTML').trim(), responseInterface.getFormattedData().trim());
+		System.assertEquals(Test_LogService.getTestStub('BASIC_ANALYSIS_HTML').trim(), responseInterface.getFormattedData().trim());
 	}
 
 	@IsTest
 	private static void testExplainAnalysisHtml() {
-		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.CODE_EXPLAIN, getTestStub('EXPLAIN_ANALYSIS_RESPONSE'));
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.CODE_EXPLAIN, Test_LogService.getTestStub('EXPLAIN_ANALYSIS_RESPONSE'));
 		responseInterface.setContext('LWC');
-		System.assertEquals(getTestStub('EXPLAIN_ANALYSIS_HTML').trim(), responseInterface.getFormattedData().trim());
+		System.assertEquals(Test_LogService.getTestStub('EXPLAIN_ANALYSIS_HTML').trim(), responseInterface.getFormattedData().trim());
 	}
 
 	@IsTest
 	private static void testAuditTrailAnalysisHtml() {
-		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.AUDIT_TRAIL, getTestStub('AUDIT_TRAIL_ANALYSIS_RESPONSE'));
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.AUDIT_TRAIL, Test_LogService.getTestStub('AUDIT_TRAIL_ANALYSIS_RESPONSE'));
 		responseInterface.setContext('LWC');
-		System.assertEquals(getTestStub('AUDIT_TRAIL_ANALYSIS_HTML').trim(), responseInterface.getFormattedData().trim());
+		System.assertEquals(Test_LogService.getTestStub('AUDIT_TRAIL_ANALYSIS_HTML').trim(), responseInterface.getFormattedData().trim());
 	}
 
 	@IsTest
 	private static void testBasicAnalysisJiraMarkdown() {
-		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.BASIC, getTestStub('BASIC_ANALYSIS_RESPONSE'));
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.BASIC, Test_LogService.getTestStub('BASIC_ANALYSIS_RESPONSE'));
 		responseInterface.setContext('JIRA');
-		System.assertEquals(getTestStub('BASIC_ANALYSIS_JIRA_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
+		System.assertEquals(Test_LogService.getTestStub('BASIC_ANALYSIS_JIRA_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
 	}
 
 	@IsTest
 	private static void testExplainAnalysisJiraMarkdown() {
-		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.CODE_EXPLAIN, getTestStub('EXPLAIN_ANALYSIS_RESPONSE'));
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.CODE_EXPLAIN, Test_LogService.getTestStub('EXPLAIN_ANALYSIS_RESPONSE'));
 		responseInterface.setContext('JIRA');
-		System.assertEquals(getTestStub('EXPLAIN_ANALYSIS_JIRA_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
+		System.assertEquals(Test_LogService.getTestStub('EXPLAIN_ANALYSIS_JIRA_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
 	}
 
 	@IsTest
 	private static void testAuditTrailAnalysisJiraMarkdown() {
-		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.AUDIT_TRAIL, getTestStub('AUDIT_TRAIL_ANALYSIS_RESPONSE'));
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.AUDIT_TRAIL, Test_LogService.getTestStub('AUDIT_TRAIL_ANALYSIS_RESPONSE'));
 		responseInterface.setContext('JIRA');
-		System.assertEquals(getTestStub('AUDIT_TRAIL_ANALYSIS_JIRA_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
+		System.assertEquals(Test_LogService.getTestStub('AUDIT_TRAIL_ANALYSIS_JIRA_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
 	}
 
 	@IsTest
 	private static void testBasicAnalysisSlackMarkdown() {
-		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.BASIC, getTestStub('BASIC_ANALYSIS_RESPONSE'));
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.BASIC, Test_LogService.getTestStub('BASIC_ANALYSIS_RESPONSE'));
 		responseInterface.setContext('SLACK');
-		System.assertEquals(getTestStub('BASIC_ANALYSIS_SLACK_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
+		System.assertEquals(Test_LogService.getTestStub('BASIC_ANALYSIS_SLACK_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
 	}
 
 	@IsTest
 	private static void testExplainAnalysisSlackMarkdown() {
-		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.CODE_EXPLAIN, getTestStub('EXPLAIN_ANALYSIS_RESPONSE'));
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.CODE_EXPLAIN, Test_LogService.getTestStub('EXPLAIN_ANALYSIS_RESPONSE'));
 		responseInterface.setContext('SLACK');
-		System.assertEquals(getTestStub('EXPLAIN_ANALYSIS_SLACK_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
+		System.assertEquals(Test_LogService.getTestStub('EXPLAIN_ANALYSIS_SLACK_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
 	}
 
 	@IsTest
 	private static void testAuditTrailAnalysisSlackMarkdown() {
-		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.AUDIT_TRAIL, getTestStub('AUDIT_TRAIL_ANALYSIS_RESPONSE'));
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.AUDIT_TRAIL, Test_LogService.getTestStub('AUDIT_TRAIL_ANALYSIS_RESPONSE'));
 		responseInterface.setContext('SLACK');
-		System.assertEquals(getTestStub('AUDIT_TRAIL_ANALYSIS_SLACK_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
-	}
-
-	public static String getTestStub(String name) {
-		String testStub = [SELECT Body FROM StaticResource WHERE Name = 'TestStubs'].Body.toString();
-		Map<String, Object> testStubMap = (Map<String, Object>)JSON.deserializeUntyped(testStub);
-		return (String)testStubMap.get(name);
+		System.assertEquals(Test_LogService.getTestStub('AUDIT_TRAIL_ANALYSIS_SLACK_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
 	}
 
 	private static TestDataFactory.SingleRequestMock basicAnalysisMock() {

@@ -229,7 +229,7 @@ public class AutoChartControllerTest {
         
         // When
         Test.startTest();
-        String result = AutoChartController.getAutoChartSetting();
+        String result = JSON.serialize(AutoChartController.getAutoChartSetting());
         Test.stopTest();
         
         // Then
@@ -248,7 +248,7 @@ public class AutoChartControllerTest {
         
         // When
         Test.startTest();
-        String result = AutoChartController.getAutoChartSetting();
+        String result = JSON.serialize(AutoChartController.getAutoChartSetting());
         Test.stopTest();
         
         // Then

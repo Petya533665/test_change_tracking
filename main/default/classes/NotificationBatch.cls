@@ -105,15 +105,6 @@ public with sharing class NotificationBatch extends DatabaseUtils.PharosBatchImp
         contextManager.clearChartImages(recordId);
     }
 
-    // Missing methods for timestamp tracking
-    public void setNotificationTimestamp(DateTime timestamp) {
-        contextManager.setNotificationTimestamp(timestamp);
-    }
-
-    public DateTime getNotificationTimestamp() {
-        return contextManager.getNotificationTimestamp();
-    }
-
     public void finish(Database.BatchableContext info) {
         MonitoringUtil.checkStartActionsBatch(false);
     }

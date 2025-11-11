@@ -51,13 +51,13 @@ public class MonitoringService {
     }
     
     // Static utility methods
-    private static List<Log__c> queryAndProcessLogs(MonitoringUtil.MonitoringRule rule, Datetime lastProcessedDatetime, List<MonitoringUtil.MonitoringRule> rules) {
+    private static List<Log__c> queryAndProcessLogs(RuleUtil.Rule rule, Datetime lastProcessedDatetime, List<RuleUtil.Rule> rules) {
         QBuilder qbCount = buildMonitoringLogsQuery(rule, new Set<String>{'COUNT()'});
         String qbCountQuery = qbCount.build();
         Integer countLogs = Database.countQuery(qbCountQuery);
         Integer limitRows = (countLogs > MAX_RECORDS_TO_PROCESS) ? MAX_RECORDS_TO_PROCESS : null;
         
-        List<String> logFields = MonitoringUtil.getLogFieldNames(rules);
+        List<String> logFields = RuleUtil.getLogFieldNames(rules);
         QBuilder qb = buildMonitoringLogsQuery(rule, new Set<String>(logFields));
         if (limitRows != null) {
             qb.addLimit(limitRows);
@@ -66,16 +66,17 @@ public class MonitoringService {
         return Database.query(qbQuery);
     }
     
-    public static QBuilder buildMonitoringLogsQuery(MonitoringUtil.MonitoringRule rule, Set<String> logFields) {
+    public static QBuilder buildMonitoringLogsQuery(RuleUtil.Rule rule, Set<String> logFields) {
         ConfigUtil.BooleanExpressionParser parser = new ConfigUtil.BooleanExpressionParser(rule.filterLogic);
         
         QBuilder qb = new QBuilder(Log__c.SObjectType)
             .selectFields(new Set<String>(logFields));
         
-        for(MonitoringUtil.RuleFilter rf : rule.filters) {
-            if(rf.comparisonType == MonitoringUtil.ComparisonType.VALUE && rf.isFilterable) {
+        for(RuleUtil.RuleFilter rf : rule.ruleFilters) {
+            if(RuleUtil.MAP_COMPARISON_TYPES_BY_STRINGS.get(rf.comparisonType) == RuleUtil.ComparisonType.VALUE && rf.isFilterable) {
                 qb.add(rf.toQCondition());
-            } else {
+            }
+            else if (RuleUtil.MAP_COMPARISON_TYPES_BY_STRINGS.get(rf.comparisonType) != RuleUtil.ComparisonType.FIELD) {
                 parser.removeOperand(String.valueOf(rf.index));
                 qb.add(rf.toQCondition(null));
             }
@@ -99,23 +100,23 @@ public class MonitoringService {
         Boolean needRunBatch = false;
 
         List<Id> ruleIds = new List<Id>();
-        List<MonitoringUtil.MonitoringRule> rules = (ruleType == MonitoringUtil.RULE_TYPE_MONITORING) 
-            ? MonitoringUtil.getMonitoringRules(null) 
-            : MonitoringUtil.getLimitsRules(null);
-        Map<Id, MonitoringUtil.Event> eventsMap = MonitoringUtil.getLastCreatedEventsMap();
+        List<RuleUtil.Rule> rules = (ruleType.equals(Constants.RULE_SOBJECT.TYPE_MONITORING)) 
+            ? RuleUtil.getMonitoringRules(null) 
+            : RuleUtil.getLimitsRules(null);
+        Map<Id, RuleUtil.Event> eventsMap = MonitoringUtil.getLastCreatedEventsMap();
 
         Datetime lastProcessedDatetime = null;
         
-        for (MonitoringUtil.MonitoringRule rule : rules) {
-            MonitoringUtil.Event event = eventsMap.get(rule.ruleId);
+        for (RuleUtil.Rule rule : rules) {
+            RuleUtil.Event event = eventsMap.get(rule.id);
             if (event == null) {
-                ruleIds.add(rule.ruleId);
+                ruleIds.add(rule.id);
             }
             else if (event.createdDate != null
                     && (rule.nextRunTime(event.createdDate) <= currentTime)
                     || rule.nextRunTime(event.createdDate) == null) {
 
-                ruleIds.add(rule.ruleId);
+                ruleIds.add(rule.id);
                 lastProcessedDatetime = (event.createdDate < lastProcessedDatetime && lastProcessedDatetime != null)
                         ? event.createdDate
                         : (lastProcessedDatetime == null ? event.createdDate : lastProcessedDatetime);
@@ -136,7 +137,7 @@ public class MonitoringService {
                     qb.add(QBuilder.condition(Constants.LOG_SOBJECT.AREA).notEqualsTo(Constants.LOG_SOBJECT.PHAROS_AREA));
                 }
 
-                if (ruleType == MonitoringUtil.RULE_TYPE_LIMITS) {
+                if (ruleType.equals(Constants.RULE_SOBJECT.TYPE_LIMITS)) {
                     qb.add(QBuilder.condition(Constants.LOG_SOBJECT.LIMITS).isNotNull());
                 }
                 
@@ -152,12 +153,12 @@ public class MonitoringService {
     }
     
     public static Boolean needRunMonitoringRules(Datetime currentTime) {
-        Boolean result = needRunRules(MonitoringUtil.RULE_TYPE_MONITORING, true, currentTime);
+        Boolean result = needRunRules(Constants.RULE_SOBJECT.TYPE_MONITORING, true, currentTime);
         return result;
     }
     
     public static Boolean needRunLimitsRules(Datetime currentTime) {
-        return needRunRules(MonitoringUtil.RULE_TYPE_LIMITS, false, currentTime);
+        return needRunRules(Constants.RULE_SOBJECT.TYPE_LIMITS, false, currentTime);
     }
     
     // Utility methods moved from MonitoringBatch
@@ -183,7 +184,7 @@ public class MonitoringService {
     
     // Inner interface
     public interface IMonitoringStrategy {
-        void processStrategy(List<Rule__c> rules, Map<Id, MonitoringUtil.Event> eventsMap, Datetime currentTime, DateTime startTime);
+        void processStrategy(List<Rule__c> rules, Map<Id, RuleUtil.Event> eventsMap, Datetime currentTime, DateTime startTime);
         Integer getStrategyIterationsCount();
         Datetime getLastProcessedDatetime();
         void updateLastProcessedFlag(Datetime processedDatetime);
@@ -207,12 +208,12 @@ public class MonitoringService {
         public abstract String getRuleType();
         public abstract Boolean hasNewData();
         public abstract Boolean needRunRules(Datetime currentTime);
-        public abstract List<MonitoringUtil.MonitoringRule> getRules(List<Id> ruleIds);
-        public abstract void evaluateRulesForStrategy(List<Id> ruleIds, List<MonitoringUtil.MonitoringRule> rules, Datetime lastProcessedDatetime, Datetime startTime, Map<Id, MonitoringUtil.Event> eventsMap);
+        public abstract List<RuleUtil.Rule> getRules(List<Id> ruleIds);
+        public abstract void evaluateRulesForStrategy(List<Id> ruleIds, List<RuleUtil.Rule> rules, Datetime lastProcessedDatetime, Datetime startTime, Map<Id, RuleUtil.Event> eventsMap);
         
         // Common implementation for processStrategySpecific
-        public void processStrategySpecific(List<Rule__c> rules, Map<Id, MonitoringUtil.Event> eventsMap, Datetime currentTime, DateTime startTime) {
-            List<MonitoringUtil.MonitoringRule> strategyRules = getRules(new List<Id>{rules[0].Id});
+        public void processStrategySpecific(List<Rule__c> rules, Map<Id, RuleUtil.Event> eventsMap, Datetime currentTime, DateTime startTime) {
+            List<RuleUtil.Rule> strategyRules = getRules(new List<Id>{rules[0].Id});
             
             Datetime lastProcessedDatetime = calculateLastProcessedDatetime(strategyRules, eventsMap);
             
@@ -222,7 +223,7 @@ public class MonitoringService {
         }
         
         // Common implementation for processStrategy
-        public void processStrategy(List<Rule__c> rules, Map<Id, MonitoringUtil.Event> eventsMap, Datetime currentTime, DateTime startTime) {
+        public void processStrategy(List<Rule__c> rules, Map<Id, RuleUtil.Event> eventsMap, Datetime currentTime, DateTime startTime) {
             processStrategySpecific(rules, eventsMap, currentTime, startTime);
         }
         
@@ -252,9 +253,9 @@ public class MonitoringService {
             }
             
             // Clear cached rules for Test context
-            MonitoringUtil.cachedRules = new Map<String, Map<Id, MonitoringUtil.MonitoringRule>>();
+            RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
             
-            Map<Id, MonitoringUtil.Event> eventsMap = MonitoringUtil.getLastCreatedEventsMap();
+            Map<Id, RuleUtil.Event> eventsMap = MonitoringUtil.getLastCreatedEventsMap();
             processStrategy(scope, eventsMap, currentTime, startTime);
         }
         
@@ -269,15 +270,15 @@ public class MonitoringService {
         }
         
         // Common helper method for calculating last processed datetime
-        protected Datetime calculateLastProcessedDatetime(List<MonitoringUtil.MonitoringRule> rules, 
-                                                        Map<Id, MonitoringUtil.Event> eventsMap) {
+        protected Datetime calculateLastProcessedDatetime(List<RuleUtil.Rule> rules, 
+                                                        Map<Id, RuleUtil.Event> eventsMap) {
             Datetime lastProcessedDatetime = null;
             Datetime currentTime = Datetime.now();
             
-            for (MonitoringUtil.MonitoringRule rule : rules) {
-                MonitoringUtil.Event event = eventsMap.get(rule.ruleId);
+            for (RuleUtil.Rule rule : rules) {
+                RuleUtil.Event event = eventsMap.get(rule.id);
                 if (event == null) {
-                    lastProcessedDatetime = currentTime.addMinutes(-Integer.valueOf(rule.eventTypeInterval));
+                    lastProcessedDatetime = currentTime.addMinutes(-Integer.valueOf(rule.eventTimeInterval));
                 } else if(event.createdDate != null && (rule.nextRunTime(event.createdDate) <= currentTime)) {
                     lastProcessedDatetime = event.createdDate;
                 }
@@ -295,7 +296,7 @@ public class MonitoringService {
         }
         
         public override String getRuleType() {
-            return MonitoringUtil.RULE_TYPE_MONITORING;
+            return Constants.RULE_SOBJECT.TYPE_MONITORING;
         }
         
         public override Boolean hasNewData() {
@@ -306,11 +307,11 @@ public class MonitoringService {
             return MonitoringService.needRunMonitoringRules(currentTime);
         }
         
-        public override List<MonitoringUtil.MonitoringRule> getRules(List<Id> ruleIds) {
-            return MonitoringUtil.getMonitoringRules(ruleIds);
+        public override List<RuleUtil.Rule> getRules(List<Id> ruleIds) {
+            return RuleUtil.getMonitoringRules(ruleIds);
         }
         
-        public override void evaluateRulesForStrategy(List<Id> ruleIds, List<MonitoringUtil.MonitoringRule> rules, Datetime lastProcessedDatetime, Datetime startTime, Map<Id, MonitoringUtil.Event> eventsMap) {
+        public override void evaluateRulesForStrategy(List<Id> ruleIds, List<RuleUtil.Rule> rules, Datetime lastProcessedDatetime, Datetime startTime, Map<Id, RuleUtil.Event> eventsMap) {
             List<Log__c> logs = MonitoringService.queryAndProcessLogs(rules.get(0), lastProcessedDatetime, rules);
             MonitoringUtil.evaluateRules(logs, ruleIds, startTime, eventsMap, logger);
         }
@@ -351,7 +352,7 @@ public class MonitoringService {
         }
         
         public override String getRuleType() {
-            return MonitoringUtil.RULE_TYPE_LIMITS;
+            return Constants.RULE_SOBJECT.TYPE_LIMITS;
         }
         
         public override Boolean hasNewData() {
@@ -362,11 +363,11 @@ public class MonitoringService {
             return MonitoringService.needRunLimitsRules(currentTime);
         }
         
-        public override List<MonitoringUtil.MonitoringRule> getRules(List<Id> ruleIds) {
-            return MonitoringUtil.getLimitsRules(ruleIds);
+        public override List<RuleUtil.Rule> getRules(List<Id> ruleIds) {
+            return RuleUtil.getLimitsRules(ruleIds);
         }
         
-        public override void evaluateRulesForStrategy(List<Id> ruleIds, List<MonitoringUtil.MonitoringRule> rules, Datetime lastProcessedDatetime, Datetime startTime, Map<Id, MonitoringUtil.Event> eventsMap) {
+        public override void evaluateRulesForStrategy(List<Id> ruleIds, List<RuleUtil.Rule> rules, Datetime lastProcessedDatetime, Datetime startTime, Map<Id, RuleUtil.Event> eventsMap) {
             List<Log__c> logs = MonitoringService.queryAndProcessLogs(rules.get(0), lastProcessedDatetime, rules);
             MonitoringUtil.evaluateLimitsRules(logs, ruleIds, startTime, eventsMap, logger);
         }

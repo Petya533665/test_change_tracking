@@ -85,7 +85,6 @@ public without sharing class JiraService {
         String getProjectIssueFieldsEndpoint(String projectOrKeyId, String issueType, Integer startAt, Integer maxResults);
         String getPrioritiesEndpoint();
         String getPrioritySchemesEndpoint();
-        String getPutJiraTaskPropertiesEndpoint(String issueKey);
         String getIssueEndpoint(String issueKey);
         String getExpandedIssueEndpoint(String issueKey);
         String getLinkIssuesEndpoint();
@@ -106,15 +105,22 @@ public without sharing class JiraService {
         List<Object> getBulkResolutionTasks(List<String> taskKeys, Logger logger);
         Map<String, DateTime> getResolutionDatetimeByTaskKey(List<String> taskKeys, Logger logger);
         void putJiraTaskPriority(String taskKey, String taskPriorityName);
-        void putJiraTaskProperties(String issueKey, Id recordId);
         void createNewTicketComment(String comment, String issueKey);
         String addAttachment(Blob fileBlob, String fileName, String issueKey);
+        AttachmentResult addAttachmentWithMediaId(Blob fileBlob, String fileName, String issueKey);
         String addCommentToIssueWithAttachments(String message, String issueKey, ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient);
         Object transformCustomFieldValue(String rawValue, JiraProjectIssueField field, Logger logger);
         Boolean isJiraCustomFieldHasAllowedType(JiraProjectIssueField field);
     }
 
     public static final String URL_PATH_SLASH = '/';
+
+    // Inner class to hold attachment result data
+    public class AttachmentResult {
+        public String fileName;
+        public String attachmentId;
+        public String mediaServicesId;
+    }
 
     public static JIRA_SERVICE_AUTH_TYPE getJIRAServiceAuthType() {
         if(ConfigUtil.JIRA_SETTINGS.Jira_Username__c == JIRA_CLOUD_OAUTH_USERNAME) {
@@ -398,7 +404,11 @@ public without sharing class JiraService {
         set;
     }
 
-    public static final String API_VERSION = '2';
+    // Jira Cloud API v2 endpoints are deprecated
+    // 2025-08-01 to 2025-10-31: Full shutdown phase. Atlassian will progressively disable v2 endpoints for all customers.
+    // By October 31, 2025, v2 endpoints will be fully retired and stop responding.
+    public static final String API_VERSION = '3';
+    public static final String API_VERSION_V2 = '2';
     public static final String API_REST = '/rest/api/';
     public static final String API_PROJECT = '/project/';
     public static final String API_PROJECT_COMPONENTS = '/components';
@@ -416,7 +426,11 @@ public without sharing class JiraService {
     public static final String API_PRIORITIES = '/priority';
     public static final String API_PRIORITY_SCHEMES = '/priorityschemes?expand=schemes.projectKeys';
     public static final String API_JQL_SEARCH = '/search';
-    public static String API_REST_BASE =  JIRA_API_URL + API_REST + API_VERSION;
+    public static final String API_JQL_ENHANCED_SEARCH = '/search/jql';
+    
+    // Jira Cloud API v2 endpoints are deprecated, now using version 3
+    // Hosted API still uses version 2
+    public static String API_REST_BASE =  JIRA_API_URL + API_REST +  (isCloudJiraInstance() ? API_VERSION : API_VERSION_V2);
 
     public static final String JIRA_CLOUD_API_RESOURCES_ENDPOINT = 'https://api.atlassian.com/oauth/token/accessible-resources';
     public static final String LINK_ISSUE_TYPE_RELATES = 'Relates';
@@ -429,6 +443,7 @@ public without sharing class JiraService {
     public static final String JIRA_API_JQL_ISSUES = 'issues';
     public static final String JIRA_API_JQL_ISSUE_KEY = 'key';
     public static final String JIRA_API_JQL_ISSUE_FIELDS = 'fields';
+    public static final String JIRA_API_JQL_ISSUE_FIELDS_ALL = '*all';
     public static final String JIRA_API_JQL_ISSUE_RESOLUTION_DATE = 'resolutiondate';
     public static final String API_PAGINATION_MAX_RESULTS = 'maxResults';
     public static final String API_PAGINATION_START_AT = 'startAt';
@@ -490,10 +505,6 @@ public without sharing class JiraService {
             return API_REST_BASE + API_PRIORITY_SCHEMES;
         }
 
-        public virtual String getPutJiraTaskPropertiesEndpoint(String issueKey) {
-            return API_REST_BASE + API_ISSUE + issueKey + API_ISSUE_PROPERTIES;
-        }
-
         public virtual String getIssueEndpoint(String issueKey) {
             return API_REST_BASE + API_ISSUE + issueKey;
         }
@@ -521,7 +532,8 @@ public without sharing class JiraService {
         public virtual String getJQLEndpoint(String jql) {
             HttpUtils.HttpURLParameters queryParams = new HttpUtils.HttpURLParameters();
             queryParams.addEncodedParameter(JIRA_API_JQL, jql);
-            return API_REST_BASE + API_JQL_SEARCH + queryParams.toStringParameters('?');
+            queryParams.addParameter(JIRA_API_JQL_ISSUE_FIELDS, JIRA_API_JQL_ISSUE_FIELDS_ALL);
+            return API_REST_BASE + API_JQL_ENHANCED_SEARCH + queryParams.toStringParameters('?');
         }
 
         public virtual String getEpicsEndpoint(String projectOrKeyId, String query) {
@@ -549,7 +561,7 @@ public without sharing class JiraService {
             return getJQLEndpoint(jql);
         }
 
-        // /rest/api/2/search?jql=KEY%20IN%20(key1,key2,...,keyN)&fields=status&maxResults=100)
+        // /rest/api/[2||3]/search/jql?jql=KEY%20IN%20(key1,key2,...,keyN)&fields=status&maxResults=100)
         public virtual String getBulkResolutionTasksEndpoint(List<String> taskKeys) {
             String jql = 'KEY IN (' + String.join(taskKeys, ',') + ')';
             HttpUtils.HttpURLParameters queryParams = new HttpUtils.HttpURLParameters();
@@ -557,7 +569,7 @@ public without sharing class JiraService {
             queryParams.addParameter(JIRA_API_JQL_ISSUE_FIELDS, JIRA_API_JQL_ISSUE_RESOLUTION_DATE);
             queryParams.addParameter(JIRA_API_JQL_MAX_RESULTS, JIRA_API_JQL_MAX_RESULTS_DEFAULT_VALUE);
             queryParams.addParameter(JIRA_API_JQL_VALIDATE_QUERY, JIRA_API_JQL_VALIDATE_QUERY_DEFAULT_VALUE);
-            return API_REST_BASE + API_JQL_SEARCH + queryParams.toStringParameters('?');
+            return API_REST_BASE + API_JQL_ENHANCED_SEARCH + queryParams.toStringParameters('?');
         }
 
         public virtual String getCreateIssueEndpoint() {
@@ -823,7 +835,6 @@ public without sharing class JiraService {
         }
 
         public virtual void createNewTicketComment(String comment, String issueKey) {
-
             String b = HttpUtils.post(
                 JiraService.getService().getCreateIssueCommentEndpoint(issueKey),
                 comment,
@@ -834,22 +845,81 @@ public without sharing class JiraService {
 
         public virtual String addCommentToIssueWithAttachments(String message, String issueKey, ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient) {
             if (chartGeneratorImageLambdaClient != null && chartGeneratorImageLambdaClient.hasCharts()) {
-                for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
-                    if (chart != null && String.isNotBlank(chart)) {
-                        ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
+                if (JiraService.isCloudJiraInstance()) {
+                    // For Jira Cloud, collect Media Services IDs for ADF format
+                    List<AttachmentResult> attachmentResults = new List<AttachmentResult>();
+                    
+                    for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
+                        if (chart != null && String.isNotBlank(chart)) {
+                            ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
 
-                        if (chartEnum != null) {
-                            Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
-                            String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
-                            addAttachment(chartBlob, fileName, issueKey);
-                            message += '\n!' + fileName + '!';
-                        } else {
-                            // Chart type not found in enum
+                            if (chartEnum != null) {
+                                Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
+                                String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                AttachmentResult result = addAttachmentWithMediaId(chartBlob, fileName, issueKey);
+                                attachmentResults.add(result);
+                            }
+                        }
+                    }
+                    
+                    // Return ADF format with media nodes
+                    return createADFCommentWithAttachments(message, attachmentResults);
+                } else {
+                    // For Jira Server, use the old format
+                    for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
+                        if (chart != null && String.isNotBlank(chart)) {
+                            ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
+
+                            if (chartEnum != null) {
+                                Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
+                                String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                addAttachment(chartBlob, fileName, issueKey);
+                                message += '\n!' + fileName + '!';
+                            } else {
+                                // Chart type not found in enum
+                            }
                         }
                     }
                 }
             }
             return message;
+        }
+
+        // Helper method to create ADF format comment with attachments
+        private String createADFCommentWithAttachments(String message, List<AttachmentResult> attachmentResults) {
+            // Convert message text to ADF format using existing method
+            Map<String, Object> adfContent = (Map<String, Object>) TicketingService.textToAtlassianDocumentFormatContent(message, true);
+            
+            // Get the content array from the ADF document
+            List<Object> content = (List<Object>) adfContent.get('content');
+            
+            // Add media groups for each attachment
+            if (attachmentResults != null && !attachmentResults.isEmpty()) {
+                for (AttachmentResult attachment : attachmentResults) {
+                    if (String.isNotBlank(attachment.mediaServicesId)) {
+                        // Add a media group with the attachment
+                        Map<String, Object> mediaGroup = new Map<String, Object>{
+                            'type' => 'mediaGroup',
+                            'content' => new List<Object>{
+                                new Map<String, Object>{
+                                    'type' => 'media',
+                                    'attrs' => new Map<String, Object>{
+                                        'type' => 'file',
+                                        'id' => attachment.mediaServicesId
+                                    }
+                                }
+                            }
+                        };
+                        content.add(mediaGroup);
+                    }
+                }
+            }
+            
+            // Return the complete body structure for Jira API
+            Map<String, Object> bodyStructure = new Map<String, Object>{
+                'body' => adfContent
+            };
+            return JSON.serialize(bodyStructure);
         }
 
 
@@ -877,6 +947,48 @@ public without sharing class JiraService {
             return fileName;
         }
 
+        // New method to add attachment and return Media Services ID for ADF
+        public virtual AttachmentResult addAttachmentWithMediaId(Blob fileBlob, String fileName, String issueKey) {
+            String boundary = '----WebKitFormBoundary' + System.currentTimeMillis();
+
+            Map<String, String> headers = new Map<String, String>(JiraService.JIRA_HEADERS);
+            headers.put('Content-Type', 'application/octet-stream');
+            headers.put('X-Atlassian-Token', 'no-check');
+            headers.put('Content-Type', 'multipart/form-data; boundary=' + boundary);
+
+            String endpoint = JiraService.getService().getCreateIssueAttachmentEndpoint(issueKey);
+
+            Blob bodyBlob = HttpUtils.getMultipartFormData(boundary, fileBlob, fileName);
+
+            String response = HttpUtils.postputBlobBody(
+                endpoint,
+                bodyBlob,
+                headers,
+                200
+            );
+
+            // Parse the response to extract Media Services ID
+            AttachmentResult result = new AttachmentResult();
+            result.fileName = fileName;
+            
+            try {
+                List<Object> attachments = (List<Object>) JSON.deserializeUntyped(response);
+                if (attachments != null && !attachments.isEmpty()) {
+                    Map<String, Object> attachment = (Map<String, Object>) attachments[0];
+                    Map<String, Object> mediaServices = (Map<String, Object>) attachment.get('mediaServices');
+                    if (mediaServices != null) {
+                        result.mediaServicesId = (String) mediaServices.get('id');
+                    }
+                    result.attachmentId = (String) attachment.get('id');
+                }
+            } catch (Exception e) {
+                // If parsing fails, we'll still have the filename
+            }
+
+            return result;
+        }
+
+
         private virtual JiraIssue searchIssueByLabel(String label, String projectOrKeyId) {
             String b = getApiData(getSearchIssueByLabelEndpoint(label, projectOrKeyId));
             JQLResponse resp = (JQLResponse)JSON.deserialize(b, JQLResponse.class);
@@ -884,17 +996,6 @@ public without sharing class JiraService {
                 return resp.issues[0];
             }
             return null;
-        }
-
-        public virtual void putJiraTaskProperties(String issueKey, Id recordId) {
-            Map<String, Object> bodyObject = new Map<String, Object>{
-                'id' => recordId,
-                'instance' => Constants.GLOBAL_VARIABLE.BASE_URL,
-                'org_id' => UserInfo.getOrganizationId(),
-                'is_sandbox' => ConfigUtil.currentOrgIsSandbox,
-                'is_enabled' => true
-            };
-            putApiData(getPutJiraTaskPropertiesEndpoint(issueKey), bodyObject);
         }
 
         public virtual void putJiraTaskPriority(String taskKey, String taskPriorityName) {
@@ -1071,15 +1172,36 @@ public without sharing class JiraService {
     public class JiraService_Hosted_9_4_14_Impl extends JiraServiceDefaultImpl {
         
         public override String getProjectsEndpoint() {
-            return JIRA_API_URL + API_REST + API_VERSION + API_PROJECT;
+            return JIRA_API_URL + API_REST + API_VERSION_V2 + API_PROJECT;
         }
 
         public override String getPrioritiesEndpoint() {
-            return JIRA_API_URL + API_REST + API_VERSION + API_PRIORITIES;
+            return JIRA_API_URL + API_REST + API_VERSION_V2 + API_PRIORITIES;
         }
 
         public override String getPrioritySchemesEndpoint() {
-            return JIRA_API_URL + API_REST + API_VERSION + API_PRIORITY_SCHEMES;
+            return JIRA_API_URL + API_REST + API_VERSION_V2 + API_PRIORITY_SCHEMES;
+        }
+
+        public override String getProjectIssueTypesEndpoint(String projectOrKeyId) {
+            String projectIssueTypes = String.format(API_ISSUE_CREATE_META_ISSUE_TYPES, new List<String>{projectOrKeyId});
+            return JIRA_API_URL + API_REST + API_VERSION_V2 + projectIssueTypes;
+        }
+
+        public override String getJQLEndpoint(String jql) {
+            HttpUtils.HttpURLParameters queryParams = new HttpUtils.HttpURLParameters();
+            queryParams.addEncodedParameter(JIRA_API_JQL, jql);
+            return JIRA_API_URL + API_REST + API_VERSION_V2 + API_JQL_SEARCH + queryParams.toStringParameters('?');
+        }
+
+        public override String getBulkResolutionTasksEndpoint(List<String> taskKeys) {
+            String jql = 'KEY IN (' + String.join(taskKeys, ',') + ')';
+            HttpUtils.HttpURLParameters queryParams = new HttpUtils.HttpURLParameters();
+            queryParams.addEncodedParameter(JIRA_API_JQL, jql);
+            queryParams.addParameter(JIRA_API_JQL_ISSUE_FIELDS, JIRA_API_JQL_ISSUE_RESOLUTION_DATE);
+            queryParams.addParameter(JIRA_API_JQL_MAX_RESULTS, JIRA_API_JQL_MAX_RESULTS_DEFAULT_VALUE);
+            queryParams.addParameter(JIRA_API_JQL_VALIDATE_QUERY, JIRA_API_JQL_VALIDATE_QUERY_DEFAULT_VALUE);
+            return JIRA_API_URL + API_REST + API_VERSION_V2 + API_JQL_SEARCH + queryParams.toStringParameters('?');
         }
 
         public override List<JiraPriorityScheme> getPrioritySchemes() {
@@ -1614,9 +1736,9 @@ public without sharing class JiraService {
     }
 
     public static Boolean isCloudJiraInstance() {
-        Boolean result = String.isNotBlank(ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c)
-            && ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c.startsWith('https://')
-            && ConfigUtil.JIRA_SETTINGS.Jira_Base_Url__c.endsWith('.atlassian.net');
+        Boolean result = String.isNotBlank(ConfigUtil.JIRA_SETTINGS?.Jira_Base_Url__c)
+            && ConfigUtil.JIRA_SETTINGS?.Jira_Base_Url__c?.startsWith('https://')
+            && ConfigUtil.JIRA_SETTINGS?.Jira_Base_Url__c?.endsWith('.atlassian.net');
         return result;
     }
 
@@ -1964,6 +2086,10 @@ public without sharing class JiraService {
     // Text area transformer
     public class TextAreaTransformer extends BaseJiraFieldTransformer {
         public override Object transform(String rawValue) {
+            if (JiraService.isCloudJiraInstance()) {
+                // Use enhanced ADF conversion with link support for Jira Cloud
+                return TicketingService.textToAtlassianDocumentFormatContent(rawValue, true);
+            }
             return rawValue;
         }
 

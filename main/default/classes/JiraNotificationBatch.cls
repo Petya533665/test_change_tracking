@@ -106,15 +106,6 @@ public with sharing class JiraNotificationBatch extends DatabaseUtils.PharosBatc
         contextManager.clearChartImages(recordId);
     }
 
-    // Missing methods for timestamp tracking
-    public void setNotificationTimestamp(DateTime timestamp) {
-        contextManager.setNotificationTimestamp(timestamp);
-    }
-
-    public DateTime getNotificationTimestamp() {
-        return contextManager.getNotificationTimestamp();
-    }
-
     public void finish(Database.BatchableContext info) {
         NotificationService.putNotificationTimeStamp(null);
         this.notificationServiceImpl.finish(info, this.contextManager);

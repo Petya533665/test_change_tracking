@@ -1,9 +1,10 @@
 public with sharing class EmailServicesSelector {
 
-    public List<ApexEmailNotification> getApexEmailNotifications() {
+    public List<ApexEmailNotification> getApexEmailNotificationsWithNotBlankEmail() {
         return [
             SELECT Id, Email
             FROM ApexEmailNotification
+            WHERE Email != NULL
         ];
     }
      

@@ -23,7 +23,7 @@ public with sharing class EmailServicesSelectorMock implements System.StubProvid
         this.apexEmailNotificationsEmail = apexEmailNotificationsEmail;
     }
 
-    public String getApexEmailNotificationsEmail() {
+    public String getApexEmailNotificationsWithNotBlankEmailEmail() {
         return this.apexEmailNotificationsEmail ?? TEST_TEMPLATE_APEX_EMAIL_NOTIFICATIONS_EMAIL;
     }
 
@@ -50,8 +50,8 @@ public with sharing class EmailServicesSelectorMock implements System.StubProvid
                                     List<String> listOfParamNames,
                                     List<Object> listOfArgs) {
 
-        if (stubbedMethodName.equals('getApexEmailNotifications')) {
-            return this.getApexEmailNotifications();
+        if (stubbedMethodName.equals('getApexEmailNotificationsWithNotBlankEmail')) {
+            return this.getApexEmailNotificationsWithNotBlankEmail();
         } else if (stubbedMethodName.equals('getPackageAllAddresses')) {
             return this.getPackageAllAddresses();
         } else if (stubbedMethodName.equals('getPackageEmailServicesFunctions')) {
@@ -63,7 +63,7 @@ public with sharing class EmailServicesSelectorMock implements System.StubProvid
         }
     }
 
-    private List<ApexEmailNotification> getApexEmailNotifications() {
+    private List<ApexEmailNotification> getApexEmailNotificationsWithNotBlankEmail() {
         List<ApexEmailNotification> apexEmailNotifications = new List<ApexEmailNotification>();
 
         Boolean isSkipCreationNeeded = 
@@ -77,7 +77,7 @@ public with sharing class EmailServicesSelectorMock implements System.StubProvid
         for (Integer i = 0; i < this.apexEmailNotificationIds.size(); i++) {
             apexEmailNotifications.add(new ApexEmailNotification(
                 Id = this.apexEmailNotificationIds.get(i),
-                Email = this.getApexEmailNotificationsEmail() + i
+                Email = this.getApexEmailNotificationsWithNotBlankEmailEmail() + i
             ));
         }
         return apexEmailNotifications;

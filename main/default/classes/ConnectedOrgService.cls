@@ -8,7 +8,6 @@ public with sharing class ConnectedOrgService {
     public static final String BROADCAST_SEND_TO = 'sendTo';
     public static final String BROADCAST_RECEIVE_FROM = 'receiveFrom';
     public static final String SOURCE_QUICK_START = 'QuickStart';
-    public static final String DEFAULT_DEVOPS_ORG_NAME = 'DevOps Center';
 
     public static List<Connected_Org__c> getConnectedOrgsList() {
 
@@ -40,15 +39,6 @@ public with sharing class ConnectedOrgService {
             }
         }
         return result;
-    }
-
-    public static Connected_Org__c getDevOpsCenterConnectedOrg() {
-        for (Connected_Org__c corg : getConnectedOrgsList()) {
-            if (corg.Title__c == DEFAULT_DEVOPS_ORG_NAME) {
-                return corg;
-            }
-        }
-        return null;
     }
 
     public static List<AdminService.ConnectedOrgDTO> getQSAnotherConnectedOrg() {
@@ -90,7 +80,7 @@ public with sharing class ConnectedOrgService {
 
     public static Connected_Org__c createSelfConnectedOrg(String name, String description) {
         Connected_Org__c newCorg = new Connected_Org__c(
-            Name = DEFAULT_DEVOPS_ORG_NAME.equals(name) ? UserInfo.getOrganizationId() : UserInfo.getOrganizationId().left(15),
+            Name = UserInfo.getOrganizationId().left(15),
             Title__c = name,
             Description__c = description,
             Type__c = ConfigUtil.currentOrgIsSandbox ? 'sandbox' : 'production',

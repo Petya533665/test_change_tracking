@@ -5,18 +5,18 @@ public with sharing class TicketingService {
     private TicketingServiceInterface strategy;
     public static final String AZURE_DEV_OPS_ERROR_CREATE_TAGS = 'TF401289:';
 
-    private static final Map<TICKETING_SERVICE_TYPE, TicketingServiceInterface> TYPE_TO_SERVICE = new                       Map<TICKETING_SERVICE_TYPE, TicketingServiceInterface>{
+    private static final Map<TICKETING_SERVICE_TYPE, TicketingServiceInterface> TYPE_TO_SERVICE = new Map<TICKETING_SERVICE_TYPE, TicketingServiceInterface>{
         TICKETING_SERVICE_TYPE.JIRA => new TicketingServiceJiraImpl(),
         TICKETING_SERVICE_TYPE.AZURE_DEV_OPS => new TicketingServiceAzureDevOpsImpl()
     };
-    private static final Map<MonitoringUtil.ActionType, TicketingServiceInterface> ACTION_TYPE_TO_SERVICE = new                       Map<MonitoringUtil.ActionType, TicketingServiceInterface>{
-        MonitoringUtil.ActionType.JIRA => new TicketingServiceJiraImpl(),
-        MonitoringUtil.ActionType.JIRA_TICKET_COMMENT => new TicketingServiceJiraImpl(),
-        MonitoringUtil.ActionType.AZURE_DEV_OPS => new TicketingServiceAzureDevOpsImpl(),
-        MonitoringUtil.ActionType.AZURE_DEV_OPS_WORK_ITEM_COMMENT => new TicketingServiceAzureDevOpsImpl()
+    private static final Map<RuleUtil.ActionType, TicketingServiceInterface> ACTION_TYPE_TO_SERVICE = new Map<RuleUtil.ActionType, TicketingServiceInterface>{
+        RuleUtil.ActionType.JIRA => new TicketingServiceJiraImpl(),
+        RuleUtil.ActionType.JIRA_TICKET_COMMENT => new TicketingServiceJiraImpl(),
+        RuleUtil.ActionType.AZURE_DEV_OPS => new TicketingServiceAzureDevOpsImpl(),
+        RuleUtil.ActionType.AZURE_DEV_OPS_WORK_ITEM_COMMENT => new TicketingServiceAzureDevOpsImpl()
     };
 
-    public TicketingService(MonitoringUtil.ActionType actionType, Logger logger) {
+    public TicketingService(RuleUtil.ActionType actionType, Logger logger) {
         this.logger = logger;
         this.strategy = ACTION_TYPE_TO_SERVICE.get(actionType);
     }
@@ -432,7 +432,7 @@ public with sharing class TicketingService {
                         'id' => this.taskInfo.issueTypeId
                     },
                     'summary' => this.taskInfo.summary,
-                    'description' => this.taskInfo.details
+                    'description' => JiraService.isCloudJiraInstance() ? textToAtlassianDocumentFormatContent(this.taskInfo.details, true) : this.taskInfo.details
                 }
             };
         }
@@ -612,18 +612,30 @@ public with sharing class TicketingService {
 
                         String comment = jiraServiceInterface.addCommentToIssueWithAttachments(comments, issueKey, chartGeneratorImageLambdaClient);
 
-                        this.bodyRequest = new Map<String, Object>{
-                            'body' => comment
-                        };
-
-                        jiraServiceInterface.createNewTicketComment(JSON.serialize(this.bodyRequest), issueKey);
+                        if (JiraService.isCloudJiraInstance()) {
+                            // For Jira Cloud, comment is already in ADF format (JSON string)
+                            jiraServiceInterface.createNewTicketComment(comment, issueKey);
+                        } else {
+                            // For Jira Server, wrap in body object
+                            this.bodyRequest = new Map<String, Object>{
+                                'body' => comment
+                            };
+                            jiraServiceInterface.createNewTicketComment(JSON.serialize(this.bodyRequest), issueKey);
+                        }
                     }
                 } else {
-                    this.bodyRequest = new Map<String, Object>{
-                        'body' => comments
-                    };
-
-                    jiraServiceInterface.createNewTicketComment(JSON.serialize(this.bodyRequest), issueKey);
+                    if (JiraService.isCloudJiraInstance()) {
+                        // For Jira Cloud, convert to ADF format
+                        Map<String, Object> adfContent = (Map<String, Object>) TicketingService.textToAtlassianDocumentFormatContent(comments, true);
+                        String adfJson = JSON.serialize(new Map<String, Object>{ 'body' => adfContent });
+                        jiraServiceInterface.createNewTicketComment(adfJson, issueKey);
+                    } else {
+                        // For Jira Server, use simple body format
+                        this.bodyRequest = new Map<String, Object>{
+                            'body' => comments
+                        };
+                        jiraServiceInterface.createNewTicketComment(JSON.serialize(this.bodyRequest), issueKey);
+                    }
                 }
             }
         }
@@ -649,12 +661,6 @@ public with sharing class TicketingService {
                 201
             );
             JiraService.NewTaskCreatedResponse newTaskCreatedResponse = (JiraService.NewTaskCreatedResponse)JSON.deserialize(b, JiraService.NewTaskCreatedResponse.class);
-
-            // Add information for Pharos Jira Plugin
-            if(String.isNotBlank(this.taskInfo.recordId) && this.taskInfo.recordId.getSobjectType() == Log__c.SObjectType) {
-                JiraService.getService().putJiraTaskProperties(newTaskCreatedResponse.key, this.taskInfo.recordId);
-            }
-
             return new TicketCreateResult(newTaskCreatedResponse.key, ConfigUtil.JIRA_TASK_URL + newTaskCreatedResponse.key);
         }
 
@@ -920,7 +926,11 @@ public with sharing class TicketingService {
             populateIteration();
             populateRelatedWorkItems(relatedWorkItems);
 
-            String endpoint = String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM, new List<String>{ConfigUtil.AZURE_DEV_OPS_API_SETTINGS.Organization_Id__c, this.taskInfo.projectId, this.taskInfo.issueTypeId});
+            // For custom types: full referenceName (e.g., "Test23.Test2WorkItem")
+            // For inherited/system types: simple name (e.g., "Issue")
+            // We just need to URL encode it here
+            String workItemTypeName = EncodingUtil.urlEncode(this.taskInfo.issueTypeId, 'UTF-8').replace('+', '%20');
+            String endpoint = String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM, new List<String>{ConfigUtil.AZURE_DEV_OPS_API_SETTINGS.Organization_Id__c, this.taskInfo.projectId, workItemTypeName});
             Map<String, String> headers = HttpUtils.getHeadersAuthorizationAcceptJson(AzureService.AZURE_DEVOPS_REST_API_TOKEN_TYPE_BEARER + AzureService.OAUTH_API_TOKEN);
             headers.putAll(HttpUtils.getHeadersContentTypeJSONPatch());
             String b;
@@ -1120,10 +1130,13 @@ public with sharing class TicketingService {
         public TicketingTaskInfo() {}
 
         public TicketingTaskInfo(EventAction__c eventAction) {
+            // Use ADF-aware merge field settings for JIRA actions
+            Boolean isJiraAction = eventAction.Action__r.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION || 
+                                   eventAction.Action__r.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT;
             List<String> renderMessages = NotificationService.renderMergeFields(
                 eventAction.Event__c,
                 new List<String>{eventAction.Action__r.Subject__c, eventAction.Action__r.Body__c},
-                new NotificationService.MergeFieldSettings(eventAction.Action__r.Action_Type__c));
+                new NotificationService.MergeFieldSettings(eventAction.Action__r.Action_Type__c, isJiraAction));
 
             AutoChart.AutoChartFieldsResult autoChartFieldsResult = new NotificationService.MergeFields().getChartFieldsAndClear(renderMessages);
             renderMessages = autoChartFieldsResult.cleanedMessages;
@@ -1141,16 +1154,19 @@ public with sharing class TicketingService {
             this.issueTypeId = eventAction.Action__r.JIRAIssueType__c;
             this.componentIds = String.isNotBlank(eventAction.Action__r.JIRAComponents__c) ? eventAction.Action__r.JIRAComponents__c.split(',') : new List<String>();
             if (String.isNotBlank(eventAction.Action__r.Additional_Metadata__c)) {
-                NotificationService.MergeFieldSettings settings = new NotificationService.MergeFieldSettings(eventAction.Action__r.Action_Type__c);
+                NotificationService.MergeFieldSettings settings = new NotificationService.MergeFieldSettings(eventAction.Action__r.Action_Type__c, isJiraAction);
                 this.additionalMetadata = getAdditionalMetadata(eventAction.Action__c, eventAction.Event__c, eventAction.Action__r.Additional_Metadata__c, settings);
             }
         }
 
         public TicketingTaskInfo(Action__c jiraAction, TicketingSObjectWrapper sObjectWrapper) {
+            // Use ADF-aware merge field settings for JIRA actions
+            Boolean isJiraAction = jiraAction.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION || 
+                                   jiraAction.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT;
             List<String> renderMessages = NotificationService.renderMergeFields(
                 sObjectWrapper.id,
                 new List<String>{jiraAction.Subject__c, jiraAction.Body__c},
-                new NotificationService.MergeFieldSettings(jiraAction.Action_Type__c));
+                new NotificationService.MergeFieldSettings(jiraAction.Action_Type__c, isJiraAction));
 
             AutoChart.AutoChartFieldsResult autoChartFieldsResult = new NotificationService.MergeFields().getChartFieldsAndClear(renderMessages);
             renderMessages = autoChartFieldsResult.cleanedMessages;
@@ -1159,13 +1175,13 @@ public with sharing class TicketingService {
             this.summary = (String.isBlank(jiraAction.Subject__c))
                 ? sObjectWrapper.summary
                 : renderMessages.get(0);
-            if(jiraAction.Action_Type__c == RuleUtil.ACTION_TYPE_JIRA_TICKET_COMMENT || jiraAction.Action_Type__c == RuleUtil.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT) {
+            if(jiraAction.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT || jiraAction.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT) {
                 this.summary = '';
             }
             this.details = (String.isBlank(jiraAction.Body__c)
                 ? Url.getOrgDomainUrl().toExternalForm() + '/' + sObjectWrapper.id + '\n\n' + sObjectWrapper.details
                 : renderMessages.get(1));
-            if(jiraAction.Action_Type__c == RuleUtil.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION) {
+            if(jiraAction.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION) {
                 this.details = this.details.replaceAll('\n', '</br>');
             }
             this.summary = this.summary.abbreviate(255);
@@ -1179,7 +1195,7 @@ public with sharing class TicketingService {
             this.issueTypeId = jiraAction.JIRAIssueType__c;
             this.componentIds = String.isNotBlank(jiraAction.JIRAComponents__c) ? jiraAction.JIRAComponents__c.split(',') : new List<String>();
             if (String.isNotBlank(jiraAction.Additional_Metadata__c)) {
-                NotificationService.MergeFieldSettings settings = new NotificationService.MergeFieldSettings(jiraAction.Action_Type__c);
+                NotificationService.MergeFieldSettings settings = new NotificationService.MergeFieldSettings(jiraAction.Action_Type__c, isJiraAction);
                 this.additionalMetadata = getAdditionalMetadata(UserInfo.getUserId(), sObjectWrapper.id, jiraAction.Additional_Metadata__c, settings);
             }
         }
@@ -1305,5 +1321,151 @@ public with sharing class TicketingService {
             LIMIT 1
         ];
         return someOpenLogsByHash1;
+    }
+
+    // Convert text to Atlassian document format content
+    public static Object textToAtlassianDocumentFormatContent(String content) {
+        return textToAtlassianDocumentFormatContent(content, false);
+    }
+    
+    // Enhanced version with link support
+    public static Object textToAtlassianDocumentFormatContent(String content, Boolean supportLinks) {
+        if (String.isBlank(content)) {
+            return new Map<String, Object>{
+                'type' => 'doc',
+                'version' => 1,
+                'content' => new List<Object>()
+            };
+        }
+        
+        List<Object> paragraphContent;
+        if (supportLinks) {
+            paragraphContent = parseContentWithLinks(content);
+        } else {
+            paragraphContent = new List<Object>{
+                new Map<String, Object>{
+                    'type' => 'text',
+                    'text' => content
+                }
+            };
+        }
+        
+        return new Map<String, Object>{
+            'type' => 'doc',
+            'version' => 1,
+            'content' => new List<Object>{
+                new Map<String, Object>{
+                    'type' => 'paragraph',
+                    'content' => paragraphContent
+                }
+            }
+        };
+    }
+
+    public static final Pattern URL_PATTERN = Pattern.compile('(https?://[^\\s]+)');
+    // Parse content and create ADF nodes with proper link support
+    private static List<Object> parseContentWithLinks(String content) {
+        List<Object> nodes = new List<Object>();
+        
+        // URL regex pattern to match http/https URLs
+        Matcher urlMatcher = URL_PATTERN.matcher(content);
+        
+        Integer lastEnd = 0;
+        
+        while (urlMatcher.find()) {
+            Integer start = urlMatcher.start();
+            Integer endPos = urlMatcher.end();
+            String url = urlMatcher.group(1);
+            
+            // Add text before the URL
+            if (start > lastEnd) {
+                String textBefore = content.substring(lastEnd, start);
+                if (String.isNotBlank(textBefore)) {
+                    nodes.add(createTextNode(textBefore));
+                }
+            }
+            
+            // Add the URL as a link node
+            nodes.add(createLinkNode(url, url));
+            lastEnd = endPos;
+        }
+        
+        // Add remaining text after the last URL
+        if (lastEnd < content.length()) {
+            String remainingText = content.substring(lastEnd);
+            if (String.isNotBlank(remainingText)) {
+                nodes.add(createTextNode(remainingText));
+            }
+        }
+        
+        // If no URLs were found, return the original content as text
+        if (nodes.isEmpty()) {
+            nodes.add(createTextNode(content));
+        }
+        
+        return nodes;
+    }
+    
+    // Create ADF text node
+    private static Map<String, Object> createTextNode(String text) {
+        return new Map<String, Object>{
+            'type' => 'text',
+            'text' => text
+        };
+    }
+    
+    // Create ADF link node
+    private static Map<String, Object> createLinkNode(String url, String displayText) {
+        return new Map<String, Object>{
+            'type' => 'text',
+            'text' => displayText,
+            'marks' => new List<Object>{
+                new Map<String, Object>{
+                    'type' => 'link',
+                    'attrs' => new Map<String, Object>{
+                        'href' => url
+                    }
+                }
+            }
+        };
+    }
+    
+    // Enhanced method to create ADF content with mixed text and links
+    public static Object createADFContentWithLinks(List<Map<String, String>> contentParts) {
+        List<Object> paragraphContent = new List<Object>();
+        
+        for (Map<String, String> part : contentParts) {
+            String type = part.get('type');
+            String text = part.get('text');
+            String url = part.get('url');
+            
+            if (type == 'link' && String.isNotBlank(url)) {
+                paragraphContent.add(createLinkNode(url, String.isNotBlank(text) ? text : url));
+            } else if (type == 'text' && String.isNotBlank(text)) {
+                paragraphContent.add(createTextNode(text));
+            }
+        }
+        
+        return new Map<String, Object>{
+            'type' => 'doc',
+            'version' => 1,
+            'content' => new List<Object>{
+                new Map<String, Object>{
+                    'type' => 'paragraph',
+                    'content' => paragraphContent
+                }
+            }
+        };
+    }
+
+    public static final Pattern LINK_MERGE_FIELD_PATTERN = Pattern.compile('\\{![^}]*\\.Link\\}');
+    // Utility method to detect if content contains merge field links
+    public static Boolean containsMergeFieldLinks(String content) {
+        if (String.isBlank(content)) {
+            return false;
+        }
+        
+        // Pattern to match merge fields ending with .Link
+        return LINK_MERGE_FIELD_PATTERN.matcher(content).find();
     }
 }

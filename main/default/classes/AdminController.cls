@@ -164,6 +164,8 @@ public with sharing class AdminController {
                 response.data = AdminService.createConnectionOrg(data);
             } else if (method == 'updateConnectedOrg') {
                 response.data = AdminService.updateConnectedOrg(data);
+            } else if (method == 'resetConnectedOrgOauth') {
+                response.data = AdminService.resetConnectedOrgOauth(data);
             } else if (method == 'refreshConnectedOrgToken') {
                 response.data = AdminService.refreshConnectedOrgToken(data);
             } else if (method == 'testConnectedOrg') {
@@ -358,8 +360,6 @@ public with sharing class AdminController {
                 response.data = LoggerSettingsController.getJiraSites();
             } else if (method == 'getAzureDevOpsAccounts') {
                 response.data = LoggerSettingsController.getAzureDevOpsAccounts();
-            } else if (method == 'validateDevOpsCenter') {
-                response.data = DevOpsCenterController.validateDevOpsCenter();
             } else if (method == 'getDebugLogServiceSettings') {
                 response.data = AdminService.getDebugLogServiceSettings();
             } else if (method == 'saveDebugLogServiceSettings') {

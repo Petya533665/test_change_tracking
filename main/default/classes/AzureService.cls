@@ -172,15 +172,16 @@ public with sharing class AzureService {
 
 	public static void refreshOAuthToken(Logger logger, Boolean withDML) {
 		OAuthSettings__mdt mdtSettings = OAuthSettings__mdt.getInstance(AzureService.AZURE_DEVOPS_API_SETTINGS_NAME);
-		String endpoint = AzureService.AZURE_DEVOPS_API_GET_TOKEN_ENDPOINT;
-		String extendedClientSecret = [SELECT Extended_Client_Secret__c FROM OAuthSettings__mdt WHERE DeveloperName =:AzureService.AZURE_DEVOPS_API_SETTINGS_NAME LIMIT 1].Extended_Client_Secret__c;
+		String endpoint = GraphAPIService.GRAPH_API_GET_TOKEN_ENDPOINT;
 
 		HttpUtils.HttpURLParameters bodyParams = new HttpUtils.HttpURLParameters();
-		bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_ASSERTATION_TYPE, HttpUtils.HTTP_URL_PARAM_CLIENT_ASSERTATION_TYPE_VALUE_JWT);
-		bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_GRANT_TYPE, AZURE_DEVOPS_API_TOKEN_GRANT_TYPE_REFRESH);
-		bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_ASSERTATION, extendedClientSecret);
-		bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_ASSERTATION, OAUTH_API_REFRESH_TOKEN);
+		bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_REFRESH_TOKEN, OAUTH_API_REFRESH_TOKEN);
+		bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_ID, mdtSettings.Client_Id__c);
+		bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_SECRET, mdtSettings.Client_Secret__c);
+		bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_GRANT_TYPE, GraphAPIService.GRAPH_API_TOKEN_GRANT_TYPE_REFRESH);
+		bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_RESPONSE_TYPE, GraphAPIService.GRAPH_API_TOKEN_RESPONSE_TYPE_CODE);
 		bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_REDIRECT_URI, LoggerSettingsController.PHAROS_OUATH_CALLBACK_PROXY);
+		bodyParams.addEncodedParameterWithFixedWhitespace(HttpUtils.HTTP_URL_PARAM_SCOPE, GraphAPIService.AZURE_DEVOPS_API_SCOPE);
 
 		String b = HttpUtils.post(
 			endpoint,
@@ -1688,4 +1689,5 @@ public with sharing class AzureService {
 	public class AzureDevOpsBoardWrapper {
 		public List<AzureDevOpsBoardReference> value;
 	}
+
 }
