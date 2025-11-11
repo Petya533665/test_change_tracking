@@ -10,7 +10,6 @@ private class AIChatIndexBatchTest {
 
     private static void createTestLogs(Integer count, String hashPrefix) {
         List<Log__c> testLogs = new List<Log__c>();
-        List<Log_Index__c> logIndexes = new List<Log_Index__c>();
         String orgId = UserInfo.getOrganizationId().left(15);
         
         for (Integer i = 0; i < count; i++) {
@@ -20,16 +19,8 @@ private class AIChatIndexBatchTest {
                 Organization_Id__c = orgId
             );
             testLogs.add(log);
-            Log_Index__c logIndex = new Log_Index__c(
-                Key__c = 'A' + log.Hash_1__c + orgId,
-                Hash__c = log.Hash_1__c,
-                Organization_Id__c = orgId,
-                Type__c = ConfigUtil.LOG_INDEX_TYPE_HASH1
-            );
-            logIndexes.add(logIndex);
         }
         insert testLogs;
-        insert logIndexes;
     }
 
     private static Map<String, HttpCalloutMock> getBaseHttpMocks() {
@@ -79,7 +70,7 @@ private class AIChatIndexBatchTest {
     private static void test_existing_settings() {
         createTestLogs(5, 'test');
         AI_Chat_Index_Settings__c settings = new AI_Chat_Index_Settings__c();
-        DateTime timestamp = DateTime.now().addHours(-10);
+        DateTime timestamp = DateTime.now().addHours(-1);
         settings.LastLogUpdateTimestamp__c = timestamp;
         insert settings;
         
@@ -94,29 +85,29 @@ private class AIChatIndexBatchTest {
         System.assertNotEquals(timestamp, updatedSettings.LastLogUpdateTimestamp__c, 'LastLogUpdateTimestamp should be updated');
     }
 
-    // @IsTest
-    // private static void test_deleted_logs_only() {
-    //     createTestLogs(5, 'test');
-    //     AI_Chat_Index_Settings__c settings = new AI_Chat_Index_Settings__c();
-    //     DateTime timestamp = DateTime.now().addHours(-10);
-    //     settings.LastLogUpdateTimestamp__c = timestamp;
-    //     insert settings;
+    @IsTest
+    private static void test_deleted_logs_only() {
+        createTestLogs(5, 'test');
+        AI_Chat_Index_Settings__c settings = new AI_Chat_Index_Settings__c();
+        DateTime timestamp = DateTime.now().addHours(-1);
+        settings.LastLogUpdateTimestamp__c = timestamp;
+        insert settings;
         
-    //     List<Log_Index__c> logIndexesToDelete = [SELECT Id, Hash__c FROM Log_Index__c LIMIT 5];
-    //     Set<String> hashesToDelete = new Set<String>();
-    //     for (Log_Index__c logIndex : logIndexesToDelete) {
-    //         hashesToDelete.add(logIndex.Hash__c);
-    //     }
-    //     List<Log__c> logsToDelete = [SELECT Id FROM Log__c WHERE Hash_1__c IN :hashesToDelete];
-    //     delete logsToDelete;
-    //     delete logIndexesToDelete;
+        List<Log_Index__c> logIndexesToDelete = [SELECT Id, Hash__c FROM Log_Index__c LIMIT 5];
+        Set<String> hashesToDelete = new Set<String>();
+        for (Log_Index__c logIndex : logIndexesToDelete) {
+            hashesToDelete.add(logIndex.Hash__c);
+        }
+        List<Log__c> logsToDelete = [SELECT Id FROM Log__c WHERE Hash_1__c IN :hashesToDelete];
+        delete logsToDelete;
+        delete logIndexesToDelete;
         
-    //     Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(getBaseHttpMocks()));
-    //     Test.startTest();
-    //     Database.executeBatch(AIChatIndexBatch.getInstance());
-    //     Test.stopTest();
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(getBaseHttpMocks()));
+        Test.startTest();
+        Database.executeBatch(AIChatIndexBatch.getInstance());
+        Test.stopTest();
         
-    //     AI_Chat_Index_Settings__c updatedSettings = AI_Chat_Index_Settings__c.getOrgDefaults();
-    //     System.assertNotEquals(timestamp, updatedSettings.LastLogUpdateTimestamp__c, 'LastLogUpdateTimestamp should be updated');
-    // }
+        AI_Chat_Index_Settings__c updatedSettings = AI_Chat_Index_Settings__c.getOrgDefaults();
+        System.assertNotEquals(timestamp, updatedSettings.LastLogUpdateTimestamp__c, 'LastLogUpdateTimestamp should be updated');
+    }
 }
