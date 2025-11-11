@@ -125,17 +125,58 @@ public without sharing class AdminService {
         return Templates.ISSUE_SOBJECT.DEFAULT_TICKET_COMMENT_ACTION;
     }
 
+    // Webhook template methods
+    public static Map<String, String> getDefaultWebhookActionTemplate() {
+        return Templates.LOG_SOBJECT.DEFAULT_WEBHOOK_ACTION;
+    }
+
+    public static Map<String, String> getIssueDefaultWebhookActionTemplate() {
+        return Templates.ISSUE_SOBJECT.DEFAULT_WEBHOOK_ACTION;
+    }
+
+    public static Map<String, String> getIssueDefaultWebhookUpdateActionTemplate() {
+        return Templates.ISSUE_SOBJECT.DEFAULT_WEBHOOK_UPDATE_ACTION;
+    }
+
+    public static Map<String, String> getDefaultMonitoringWebhookActionTemplate() {
+        return Templates.EVENT_SOBJECT.DEFAULT_WEBHOOK_ACTION;
+    }
+
+    public static Map<String, String> getTraceResultDefaultWebhookActionTemplate() {
+        return Templates.TRACE_RESULT_SOBJECT.DEFAULT_WEBHOOK_ACTION;
+    }
+
     public static List<MergeField> getSobjectFields(Schema.DescribeSObjectResult d, String dType, Schema.DescribeFieldResult parent, Schema.DescribeSObjectResult parentObject, Integer depth) {
         depth = depth + 1;
         List<MergeField> result = new List<MergeField>();
         Map<String, Schema.SObjectField> fieldsMap = d.fields.getMap();
+        
+        // Get exclusion list for this SObject (only applies to Log and Issue at root level, not related objects)
+        List<Schema.SObjectField> excludedFields = new List<Schema.SObjectField>();
+        List<Schema.SObjectField> updateOnlyFields = new List<Schema.SObjectField>();
+        
+        if (parent == null) { // Only apply exclusions and update-only markings at root level
+            Schema.SObjectType sobjType = d.getSObjectType();
+            if (MAP_EXCLUDE_FIELDS_FROM_MERGE_FIELDS.containsKey(sobjType)) {
+                excludedFields = MAP_EXCLUDE_FIELDS_FROM_MERGE_FIELDS.get(sobjType);
+            }
+            if (MAP_UPDATE_ONLY_MERGE_FIELDS.containsKey(sobjType)) {
+                updateOnlyFields = MAP_UPDATE_ONLY_MERGE_FIELDS.get(sobjType);
+            }
+        }
+        
         for(String sobjectFieldName : fieldsMap.keySet()) {
-            if(ConfigUtil.MERGE_FIELDS_SKIP_FIELD_NAMES.contains(sobjectFieldName)) continue;
-
             Schema.SObjectField sfd = fieldsMap.get(sobjectFieldName);
+            
+            // Check if field is in exclusion list (only at root level)
+            if (parent == null && excludedFields.contains(sfd)) continue;
+            
             Schema.DescribeFieldResult dfr = sfd.getDescribe();
+            // skip if field is not accessible
             if(!dfr.isAccessible()) continue;
+            // skip if field is a standard preference field
             if(isStandardPreferencesField(dfr)) continue;
+
             String label = ((parent != null) ? (parent.getLabel() + ' -> ') : '') + dfr.getLabel();
             String localName = (parent != null) ? (parent.getRelationshipName() + '.' + dfr.getName()) : dfr.getName();
             String objectName = (parentObject != null) ? parentObject.getName() : d.getName();
@@ -146,7 +187,15 @@ public without sharing class AdminService {
             if (MAP_SOBJECT_TYPE_TO_NOT_AVAILABLE_FOR_JIRA_MAPPING.get(dType).contains(sobjectFieldAPIName)) {
                 availableForJiraMapping = false;
             }
-            result.add(new MergeField(label, apiName, dType, sobjectFieldAPIName, availableForJiraMapping));
+            
+            MergeField field = new MergeField(label, apiName, dType, sobjectFieldAPIName, availableForJiraMapping);
+            
+            // Mark field as update-only if it's in the updateOnlyFields list (only at root level)
+            if (parent == null && updateOnlyFields.contains(sfd)) {
+                field.setIsUpdateOnly(true);
+            }
+            
+            result.add(field);
 
             List<Schema.sObjectType> relSObjectTypes = dfr.getReferenceTo();
             if(!relSObjectTypes.isEmpty() && depth < 2 && dfr.getRelationshipName() != null) {
@@ -250,6 +299,7 @@ public without sharing class AdminService {
         public String sobjectype;
         public String apiName;
         public Boolean availableForJiraMapping;
+        public Boolean isUpdateOnly;
 
         public MergeField(String label, String value, String sobjectype, String apiName) {
             this(label, value, sobjectype, apiName, true);
@@ -261,10 +311,15 @@ public without sharing class AdminService {
             this.sobjectype = sobjectype;
             this.apiName = apiName;
             this.availableForJiraMapping = availableForJiraMapping;
+            this.isUpdateOnly = false;
         }
 
         public void setAvailableForJiraMapping(Boolean availableForJiraMapping) {
             this.availableForJiraMapping = availableForJiraMapping;
+        }
+
+        public void setIsUpdateOnly(Boolean isUpdateOnly) {
+            this.isUpdateOnly = isUpdateOnly;
         }
 
         public Integer compareTo(Object compareTo) {
@@ -298,7 +353,6 @@ public without sharing class AdminService {
             'ChangeTrackingEnabled' => PermissionsUtil.ChangeTrackingEnabled,
             'IssueNotificationsEnabled' => PermissionsUtil.IssueNotificationsEnabled,
             'AzureDevOpsIntegrationEnabled' => PermissionsUtil.AzureDevOpsIntegrationEnabled,
-            'DevOpsCenterIntegrationEnabled' => PermissionsUtil.DevOpsCenterIntegrationEnabled,
             'DebugLogServiceEnabled' => PermissionsUtil.DebugLogServiceEnabled,
             'IssueAnalysisEnabled' => PermissionsUtil.IssueAnalysisEnabled,
             'MandatoryErrorReportingEnabled' => PermissionsUtil.MandatoryErrorReportingEnabled,
@@ -306,7 +360,8 @@ public without sharing class AdminService {
             'IssueTrackingEnabled' => PermissionsUtil.IssueTrackingEnabled,
             'MetadataChatEnabled' => PermissionsUtil.MetadataChatEnabled,
             'AutoChartEnabled' => PermissionsUtil.AutoChartEnabled,
-            'ForecastEnabled' => PermissionsUtil.ForecastEnabled
+            'ForecastEnabled' => PermissionsUtil.ForecastEnabled,
+            'WebhookIntegrationEnabled' => PermissionsUtil.WebhookIntegrationEnabled
         };
         return result;
     }
@@ -603,6 +658,174 @@ public without sharing class AdminService {
         );
     }
 
+    /**
+     * Extract base URL (protocol + domain) from a webhook URL
+     * @param webhookUrl The full webhook URL
+     * @return Base URL (e.g., https://example.com)
+     */
+    public static String extractWebhookBaseUrl(String webhookUrl) {
+        if (String.isBlank(webhookUrl)) {
+            return null;
+        }
+        
+        try {
+            // Find the third slash to get protocol + domain
+            Integer firstSlash = webhookUrl.indexOf('://');
+            if (firstSlash == -1) {
+                return null;
+            }
+            Integer thirdSlash = webhookUrl.indexOf('/', firstSlash + 3);
+            if (thirdSlash == -1) {
+                return webhookUrl; // URL is just protocol + domain
+            }
+            return webhookUrl.substring(0, thirdSlash);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Generate Remote Site Setting name for a webhook URL
+     * @param webhookUrl The webhook URL
+     * @return Remote Site Setting name
+     */
+    public static String generateWebhookRemoteSiteName(String webhookUrl) {
+        String baseUrl = extractWebhookBaseUrl(webhookUrl);
+        if (String.isBlank(baseUrl)) {
+            return null;
+        }
+        
+        // Extract domain from URL and create a safe name
+        String domain = baseUrl.replace('https://', '').replace('http://', '').replace('.', '_').replace(':', '_').replace('/', '_').replace('-', '_');
+        return 'Webhook_' + domain.left(30); // Limit to 30 chars + prefix = ~39 chars (max is 40)
+    }
+
+    /**
+     * Create Remote Site Settings for webhook URLs (synchronous batch operation - called BEFORE DML)
+     * @param webhookUrls Set of webhook URLs to process
+     */
+    public static void upsertWebhookRemoteSiteSettings(Set<String> webhookUrls) {
+        if (webhookUrls == null || webhookUrls.isEmpty()) {
+            return;
+        }
+        
+        // Batch process all unique base URLs (no callout in loop)
+        Set<String> processedBaseUrls = new Set<String>();
+        
+        for (String webhookUrl : webhookUrls) {
+            if (String.isBlank(webhookUrl)) {
+                continue;
+            }
+            
+            String baseUrl = extractWebhookBaseUrl(webhookUrl);
+            String remoteSiteName = generateWebhookRemoteSiteName(webhookUrl);
+            
+            // Only process each unique base URL once
+            if (String.isNotBlank(baseUrl) && String.isNotBlank(remoteSiteName) && !processedBaseUrls.contains(baseUrl)) {
+                try {
+                    upsertRemoteSiteSetting(
+                        remoteSiteName,
+                        baseUrl,
+                        'Auto-generated for webhook action'
+                    );
+                    processedBaseUrls.add(baseUrl);
+                } catch (Exception e) {
+                    Logger.getInstance()?.addInternalError(
+                        e, 
+                        AdminService.class.getName(), 
+                        'upsertWebhookRemoteSiteSettings - URL: ' + webhookUrl
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Delete Remote Site Settings for webhook URLs if not used by other actions (synchronous batch operation - called BEFORE DML)
+     * This method queries existing actions to determine which Remote Site Settings will be unused AFTER the pending delete.
+     * @param webhookUrlsToCheck Set of webhook URLs to check
+     * @param actionIdsToExclude Set of action IDs that will be deleted (exclude from usage check)
+     */
+    public static void deleteWebhookRemoteSiteSettings(Set<String> webhookUrlsToCheck, Set<Id> actionIdsToExclude) {
+        if (webhookUrlsToCheck == null || webhookUrlsToCheck.isEmpty()) {
+            return;
+        }
+        
+        // Get all currently active webhook URLs, EXCLUDING the ones that will be deleted
+        Set<String> activeBaseUrls = new Set<String>();
+        String actionType = Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION;
+        
+        List<Action__c> activeActions;
+        if (actionIdsToExclude != null && !actionIdsToExclude.isEmpty()) {
+            activeActions = [
+                SELECT Webhook_URL__c 
+                FROM Action__c 
+                WHERE Action_Type__c = :actionType 
+                AND Webhook_URL__c != null 
+                AND Id NOT IN :actionIdsToExclude
+            ];
+        } else {
+            activeActions = [
+                SELECT Webhook_URL__c 
+                FROM Action__c 
+                WHERE Action_Type__c = :actionType 
+                AND Webhook_URL__c != null
+            ];
+        }
+        
+        for (Action__c action : activeActions) {
+            String baseUrl = extractWebhookBaseUrl(action.Webhook_URL__c);
+            if (String.isNotBlank(baseUrl)) {
+                activeBaseUrls.add(baseUrl);
+            }
+        }
+        
+        // Process each URL to potentially delete
+        Set<String> processedBaseUrls = new Set<String>();
+        Map<String, MetadataServiceUtil.RemoteSiteSettingsWrapper> createdRemoteSiteSettings = getRemoteSiteSettingsMap();
+        
+        for (String webhookUrl : webhookUrlsToCheck) {
+            if (String.isBlank(webhookUrl)) {
+                continue;
+            }
+            
+            String baseUrl = extractWebhookBaseUrl(webhookUrl);
+            if (String.isBlank(baseUrl) || processedBaseUrls.contains(baseUrl)) {
+                continue; // Already processed this base URL
+            }
+            
+            // Check if this base URL will still be in use AFTER the delete
+            if (activeBaseUrls.contains(baseUrl)) {
+                continue; // Still in use, don't delete
+            }
+            
+            // Get the Remote Site Setting name
+            String remoteSiteName = generateWebhookRemoteSiteName(webhookUrl);
+            if (String.isBlank(remoteSiteName)) {
+                continue;
+            }
+            
+            // Find and delete the Remote Site Setting
+            try {
+                for (MetadataServiceUtil.RemoteSiteSettingsWrapper rss : createdRemoteSiteSettings.values()) {
+                    if (rss.SiteName == remoteSiteName || rss.SiteName == ConfigUtil.prefixCurrentOrgNamespace(remoteSiteName)) {
+                        MetadataServiceUtil.deleteRemoteSiteSettingsMetadata(
+                            new List<String>{ConfigUtil.prefixCurrentOrgNamespace(rss.SiteName)}
+                        );
+                        processedBaseUrls.add(baseUrl);
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                Logger.getInstance()?.addInternalError(
+                    e, 
+                    AdminService.class.getName(), 
+                    'deleteWebhookRemoteSiteSettings - URL: ' + webhookUrl
+                );
+            }
+        }
+    }
+
     public static Boolean checkRemoteSiteSettings() {
         Boolean result = true;
         try {
@@ -645,17 +868,17 @@ public without sharing class AdminService {
     }
 
     private static Boolean isEmailServicesAvailable() {
-        List<ApexEmailNotification> apexEmailNotifications = emailServicesSelector.getApexEmailNotifications();
+        Map<String, ApexEmailNotification> apexEmailNotificationByEmail = emailServicesSelector.apexEmailNotificationByEmail;
         List<EmailServicesFunction> availableEmailServices = emailServicesSelector.getPackageEmailServicesFunctions();
         List<EmailServicesAddress> availableEmailServicesAddresses = emailServicesSelector.getPackageAllAddresses();
 
-        if (apexEmailNotifications.isEmpty() || availableEmailServices.isEmpty() || availableEmailServicesAddresses.isEmpty() || !availableEmailServices.get(0).IsActive) {
+        if (apexEmailNotificationByEmail.isEmpty() || availableEmailServices.isEmpty() || availableEmailServicesAddresses.isEmpty() || !availableEmailServices.get(0).IsActive) {
             return false;
         }
 
         EmailServicesAddress availableAddress;
         for (EmailServicesAddress currentAddress : availableEmailServicesAddresses) {
-            if (EmailServicesService.emailServicesAddressService.getEmailFromEmailServiceAddress(currentAddress).equals(apexEmailNotifications.get(0).Email) && currentAddress.isActive) {
+            if (apexEmailNotificationByEmail.containsKey(EmailServicesService.emailServicesAddressService.getEmailFromEmailServiceAddress(currentAddress)) && currentAddress.isActive) {
                 availableAddress = currentAddress;
                 break;
             }
@@ -733,7 +956,7 @@ public without sharing class AdminService {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         Boolean incomingValue = Boolean.valueOf(input.get(ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE));
 
-        List<ApexEmailNotification> apexEmailNotifications = emailServicesSelector.getApexEmailNotifications();
+        Map<String, ApexEmailNotification> apexEmailNotificationByEmail = emailServicesSelector.apexEmailNotificationByEmail;
         List<EmailServicesFunction> availableEmailServices = emailServicesSelector.getPackageEmailServicesFunctions();
 
         Id functionId;
@@ -771,13 +994,13 @@ public without sharing class AdminService {
                 List<EmailServicesAddress> addressesToDelete = new List<EmailServicesAddress>();
                 EmailServicesAddress addressToUpdate;
 
-                if (apexEmailNotifications.isEmpty()) {
+                if (apexEmailNotificationByEmail.isEmpty()) {
                     addressToUpdate = emailServicesAddresses.get(0);
                     emailServicesAddresses.remove(0);
                     addressesToDelete.addAll(emailServicesAddresses);
                 } else {
                     for (EmailServicesAddress currentEmailServicesAddress : emailServicesAddresses) {
-                        if (apexEmailNotifications.get(0).Email.equals(EmailServicesService.emailServicesAddressService.getEmailFromEmailServiceAddress(currentEmailServicesAddress))) {
+                        if (apexEmailNotificationByEmail.containsKey(EmailServicesService.emailServicesAddressService.getEmailFromEmailServiceAddress(currentEmailServicesAddress))) {
                             if (!currentEmailServicesAddress.IsActive) {
                                 addressToUpdate = currentEmailServicesAddress;
                             }
@@ -795,9 +1018,8 @@ public without sharing class AdminService {
             }
 
             try {
-                ApexEmailNotification apexEmailNotification = !apexEmailNotifications.isEmpty() ? apexEmailNotifications.get(0) : null;
                 String errorEmailServiceAddress = getPackageEmailServiceFunctionEmailAddress();
-                upsertApexEmailNotification(errorEmailServiceAddress, apexEmailNotification);
+                upsertApexEmailNotification(errorEmailServiceAddress, apexEmailNotificationByEmail.get(errorEmailServiceAddress));
             }
             catch(Exception e) {
                 throw new AdminServiceException(e);
@@ -1525,8 +1747,6 @@ public without sharing class AdminService {
 
             Map<String, Object> output = new Map<String, Object>{
                 ConfigUtil.CREATE_META_REQUEST_DATA_KEY_META => customFields,
-                ConfigUtil.CREATE_META_REQUEST_DATA_KEY_LOG_FIELDS => getLogFieldsForJiraMapping(),
-                ConfigUtil.CREATE_META_REQUEST_DATA_KEY_ISSUE_FIELDS => getIssueFieldsForJiraMapping(),
                 ConfigUtil.CREATE_META_REQUEST_DATA_KEY_COMPONENTS => components,
                 ConfigUtil.CREATE_META_REQUEST_DATA_KEY_EPICS => epics,
                 ConfigUtil.CREATE_META_REQUEST_DATA_KEY_PRIORITIES => priorities
@@ -1539,139 +1759,224 @@ public without sharing class AdminService {
         return null;
     }
 
-    public static Object getLogFieldsForJiraMapping() {
-        List<Map<String, String>> result = new List<Map<String, String>>();
-
-        SObjectType logType = ConfigUtil.MAP_GD.get(Log__c.getSObjectType().getDescribe().getName());
-        Map<String,Schema.SObjectField> mfields = logType.getDescribe().fields.getMap();
-        List<String> fieldKeys = (new List<String>(mfields.keySet()));
-        for (String k : fieldKeys) {
-            Schema.DescribeFieldResult dsr = mfields.get(k).getDescribe();
-            if(dsr.isAccessible() && !FILTERS_EXCLUDE_LOG_FIELDS.contains(k.toLowerCase())) {
-                result.add(new Map<String, String>{
-                    ConfigUtil.PICKLIST_KEY_VALUE => dsr.getName(),
-                    ConfigUtil.PICKLIST_KEY_LABEL => dsr.getLabel()
-                });
-            }
-        }
-
-        return result;
-    }
-
-    public static Object getIssueFieldsForJiraMapping() {
-        List<Map<String, String>> result = new List<Map<String, String>>();
-
-        SObjectType issueType = ConfigUtil.MAP_GD.get(Issue__c.getSObjectType().getDescribe().getName());
-        Map<String,Schema.SObjectField> mfields = issueType.getDescribe().fields.getMap();
-        List<String> fieldKeys = (new List<String>(mfields.keySet()));
-        for (String k : fieldKeys) {
-            Schema.DescribeFieldResult dsr = mfields.get(k).getDescribe();
-            if(dsr.isAccessible()) {
-                result.add(new Map<String, String> {
-                    ConfigUtil.PICKLIST_KEY_VALUE => dsr.getName(),
-                    ConfigUtil.PICKLIST_KEY_LABEL => dsr.getLabel()
-                });
-            }
-        }
-
-        return result;
-    }
-
-    public static final Set<String> FILTERS_EXCLUDE_LOG_FIELDS = new Set<String>{
-        Schema.sObjectType.Log__c.fields.Async_Job_Id__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Icon__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.IsDeleted.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Deploy_Results__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Deploy_results_available__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Setup_Audit_Trail__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Audit_Trail_available__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Pending_Jobs__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Total_Pending_Jobs__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Total_Active_Sessions__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Installed_Packages__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Post_Processing_Status__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Post_Processing_Complete__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Broadcast_Status__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Email_Integration_Status__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Jira_Integration_Status__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Slack_Integration_Status__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.PagerDuty_Integration_Status__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Notification_Integration_Status__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Stacktrace_Parse_Result__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Stack_trace_parse_result_available__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Teams_Integration_Status__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Organization_Url__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Id.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Name.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Sent_To_Splunk__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Splunk_Link__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.Executable_Rules__c.getName().toLowerCase(),
-        Schema.sObjectType.Log__c.fields.User__c.getName().toLowerCase()
-    };
-
-    public static Map<Schema.sObjectType, List<Schema.SObjectField>> MAP_EXCLUDE_STANDARD_FIELDS_FOR_FILTERS = new Map<Schema.sObjectType, List<Schema.SObjectField>>{
-        Log__c.sObjectType => new List<Schema.SObjectField>{
-            Schema.sObjectType.Log__c.fields.Async_Job_Name__c.getSObjectField(),
-            Schema.sObjectType.Log__c.fields.Flow_Version__c.getSObjectField(),
-            Schema.sObjectType.Log__c.fields.Flow_Version_Id__c.getSObjectField(),
-            Schema.sObjectType.Log__c.fields.Related_Id__c.getSObjectField(),
-            Schema.sObjectType.Log__c.fields.Related_Object_Type__c.getSObjectField(),
-            Schema.sObjectType.Log__c.fields.Related_Objects__c.getSObjectField()
-        },
-        Issue__c.sObjectType => new List<Schema.SObjectField>()
-    };
-
-    public static Map<Schema.sObjectType, List<Schema.SObjectField>> MAP_EXCLUDE_STANDARD_FIELDS_FOR_UPDATE_FILTERS = new Map<Schema.sObjectType, List<Schema.SObjectField>>{
+    // Fields to exclude from update rule filters (fields that should NOT appear in update filters)
+    public static Map<Schema.sObjectType, List<Schema.SObjectField>> MAP_EXCLUDE_FILTER_FIELDS_ON_UPDATE = new Map<Schema.sObjectType, List<Schema.SObjectField>>{
         Log__c.sObjectType => new List<Schema.SObjectField>(),
         Issue__c.sObjectType => new List<Schema.SObjectField>{
-            Schema.sObjectType.Issue__c.fields.Impacted_Objects__c.getSObjectField(),
-            Schema.sObjectType.Issue__c.fields.Impacted_Objects_by_Type__c.getSObjectField(),
-            Schema.sObjectType.Issue__c.fields.Impacted_Objects_Count__c.getSObjectField(),
-            Schema.sObjectType.Issue__c.fields.Impacted_Users__c.getSObjectField(),
-            Schema.sObjectType.Issue__c.fields.Impacted_Users_Count__c.getSObjectField()
+            // System fields excluded from Issue update rules
+            Schema.sObjectType.Issue__c.fields.IsDeleted.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.CreatedById.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.LastModifiedById.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.LastModifiedDate.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.SystemModstamp.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.LastActivityDate.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.LastViewedDate.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.LastReferencedDate.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.OwnerId.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.RecordTypeId.getSObjectField(),
+            // Insert field ONLY
+            Schema.sObjectType.Issue__c.fields.Log__c.getSObjectField(),
+            // Internal/Integration fields
+            Schema.sObjectType.Issue__c.fields.Email_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Jira_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Slack_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.PagerDuty_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Notification_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Teams_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Executable_Rules__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Key__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Category_Icon__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Analysis_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Analysis_Statuses_Details__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Issue_Analysis__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Source_Control_Metadata__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.DevOps_Center_Metadata_Available__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Override_Priority__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Users_Impacted__c.getSObjectField()
         }
     };
 
-    public static Map<Schema.sObjectType, List<Schema.SObjectField>> MAP_STANDARD_FIELDS_FOR_FILTERS = new Map<Schema.sObjectType, List<Schema.SObjectField>>{
+    // Fields to exclude from merge fields (for Insert Field dialogs)
+    // These are system fields and internal fields that should NOT appear in merge field lists
+    public static Map<Schema.sObjectType, List<Schema.SObjectField>> MAP_EXCLUDE_FIELDS_FROM_MERGE_FIELDS = new Map<Schema.sObjectType, List<Schema.SObjectField>>{
         Log__c.sObjectType => new List<Schema.SObjectField>{
-            Schema.sObjectType.Log__c.fields.Area__c.getSObjectField(),
+            // System fields that are not useful in merge fields
+            Schema.sObjectType.Log__c.fields.CreatedById.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.IsDeleted.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.LastModifiedById.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.LastModifiedDate.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.SystemModstamp.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.LastActivityDate.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.LastViewedDate.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.LastReferencedDate.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.OwnerId.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.RecordTypeId.getSObjectField(),
+            // Internal/system fields
+            Schema.sObjectType.Log__c.fields.Email_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Jira_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Slack_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.PagerDuty_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Notification_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Teams_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Executable_Rules__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Issue_Tracker_Status__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Bug_Tracker__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Post_Processing_Status__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Post_Processing_Complete__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Post_Processing_Settings__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Broadcast_Status__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Stacktrace_Parse_Result__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Stack_trace_parse_result_available__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Audit_Trail_available__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Deploy_results_available__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Deploy_Results__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Icon__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Sent_To_Splunk__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Splunk_Link__c.getSObjectField()
+        },
+        Issue__c.sObjectType => new List<Schema.SObjectField>{
+            // System fields that are not useful in merge fields
+            Schema.sObjectType.Issue__c.fields.IsDeleted.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.LastModifiedById.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.LastModifiedDate.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.SystemModstamp.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.LastActivityDate.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.LastViewedDate.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.LastReferencedDate.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.OwnerId.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.RecordTypeId.getSObjectField(),
+            // Internal/Integration fields
+            Schema.sObjectType.Issue__c.fields.Email_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Jira_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Slack_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.PagerDuty_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Notification_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Teams_Integration_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Executable_Rules__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Key__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Category_Icon__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Analysis_Status__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Analysis_Statuses_Details__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Issue_Analysis__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Source_Control_Metadata__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.DevOps_Center_Metadata_Available__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Override_Priority__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Users_Impacted__c.getSObjectField()
+        },
+        Event__c.sObjectType => new List<Schema.SObjectField>{
+            Schema.sObjectType.Event__c.fields.CreatedById.getSObjectField(),
+            Schema.sObjectType.Event__c.fields.IsDeleted.getSObjectField(),
+            Schema.sObjectType.Event__c.fields.LastModifiedById.getSObjectField(),
+            Schema.sObjectType.Event__c.fields.LastModifiedDate.getSObjectField(),
+            Schema.sObjectType.Event__c.fields.SystemModstamp.getSObjectField(),
+            Schema.sObjectType.Event__c.fields.LastViewedDate.getSObjectField(),
+            Schema.sObjectType.Event__c.fields.LastReferencedDate.getSObjectField(),
+            Schema.sObjectType.Event__c.fields.OwnerId.getSObjectField(),
+            Schema.sObjectType.Event__c.fields.RecordTypeId.getSObjectField()
+        },
+        Trace_Result__c.sObjectType => new List<Schema.SObjectField>{
+            Schema.sObjectType.Trace_Result__c.fields.CreatedById.getSObjectField(),
+            Schema.sObjectType.Trace_Result__c.fields.IsDeleted.getSObjectField(),
+            Schema.sObjectType.Trace_Result__c.fields.LastModifiedById.getSObjectField(),
+            Schema.sObjectType.Trace_Result__c.fields.LastModifiedDate.getSObjectField(),
+            Schema.sObjectType.Trace_Result__c.fields.SystemModstamp.getSObjectField(),
+            Schema.sObjectType.Trace_Result__c.fields.LastActivityDate.getSObjectField(),
+            Schema.sObjectType.Trace_Result__c.fields.LastViewedDate.getSObjectField(),
+            Schema.sObjectType.Trace_Result__c.fields.LastReferencedDate.getSObjectField()
+        }
+    };
+
+    // Fields that are ONLY available for Update rules (not for Create rules) - these should be marked as isUpdateOnly in merge fields
+    public static Map<Schema.sObjectType, List<Schema.SObjectField>> MAP_UPDATE_ONLY_MERGE_FIELDS = new Map<Schema.sObjectType, List<Schema.SObjectField>>{
+        Log__c.sObjectType => new List<Schema.SObjectField>(),
+        Issue__c.sObjectType => new List<Schema.SObjectField>{
+            // These fields are available in Update but NOT in Create
+            Schema.sObjectType.Issue__c.fields.Assigned__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Assigned_To__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Average_Daily_Volume__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Average_Frequency__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Bug_Tracker__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Exception_Codes__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.First_Occurred_On__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Impacted_Objects__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Impacted_Objects_Count__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Impacted_Objects_by_Type__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Impacted_Users__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Impacted_Users_Count__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Name.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Last_Occurred_On__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Log_Count__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Priority__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Regressed_On__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Regression__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Related_Issue__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Resolved_On__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Score__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Status__c.getSObjectField()
+        }
+    };
+
+    // Standard fields to include in rule filters (excludes "Insert field ONLY" fields like Flow_Link__c, Organization_Url__c, Related_Object__c, User__c, Log__c)
+    public static Map<Schema.sObjectType, List<Schema.SObjectField>> MAP_INCLUDE_FIELDS_FOR_FILTERS_ON_CREATE = new Map<Schema.sObjectType, List<Schema.SObjectField>>{
+        Log__c.sObjectType => new List<Schema.SObjectField>{
+            Schema.sObjectType.Log__c.fields.Async_Job_Id__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Async_Job_Name__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Area__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Category__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Created_At__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.CreatedById.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Details__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Exception_Codes__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.First_Occurred_On__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Flow_API_Name__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Flow_Version__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Flow_Version_Id__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Hash_1__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Hash_2__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Hash_3__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Installed_Packages__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Interview_GUID_External__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Is_New__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Is_Parent__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Is_Sandbox__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Name.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Namespace__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Apex_Name__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Organization_Id__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Organization_Name__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Originated_From__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Parent__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Pending_Jobs__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Profile_Id__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Profile_Name__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.RecordTypeId.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Related_Id__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Related_Object_Type__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Related_Objects__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Request_Id_External__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Role_Id__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Role_Name__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Salesforce_Error_Id__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Salesforce_License_Type_Name__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Setup_Audit_Trail__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Stacktrace__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Summary__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Total_Active_Sessions__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Total_Pending_Jobs__c.getSObjectField(),
+            Schema.sObjectType.Log__c.fields.Transaction_Id_External__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Type__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.User_Id__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.User_Name__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Visualforce_Page__c.getSObjectField()
         },
         Issue__c.sObjectType => new List<Schema.SObjectField>{
+            // Fields for Issue Create rules only (limited set)
             Schema.sObjectType.Issue__c.fields.Category__c.getSObjectField(),
-            Schema.sObjectType.Issue__c.fields.Functional_Area__c.getSObjectField(),
-            Schema.sObjectType.Issue__c.fields.Summary__c.getSObjectField(),
-            Schema.sObjectType.Issue__c.fields.Description__c.getSObjectField(),
             Schema.sObjectType.Issue__c.fields.CreatedDate.getSObjectField(),
-            Schema.sObjectType.Issue__c.fields.CreatedById.getSObjectField(),
-            Schema.sObjectType.Issue__c.fields.Organization_Name__c.getSObjectField()
+            Schema.sObjectType.Issue__c.fields.Description__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Functional_Area__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Organization_Name__c.getSObjectField(),
+            Schema.sObjectType.Issue__c.fields.Summary__c.getSObjectField()
         }
     };
 
@@ -1717,12 +2022,8 @@ public without sharing class AdminService {
         List<FilterField> result = new List<FilterField>();
         String pahrosPrefix = ConfigUtil.getNameSpacePrefix();
         // standard first
-        List<Schema.SObjectField> excluded = MAP_EXCLUDE_STANDARD_FIELDS_FOR_FILTERS.get(sobjectType);
         if(!isUpdateRule) {
-            for (Schema.SObjectField field : MAP_STANDARD_FIELDS_FOR_FILTERS.get(sobjectType)) {
-                if(ruleType == Constants.RULE_SOBJECT.TYPE_MONITORING && excluded.contains(field)) {
-                    continue;
-                }
+            for (Schema.SObjectField field : MAP_INCLUDE_FIELDS_FOR_FILTERS_ON_CREATE.get(sobjectType)) {
                 Schema.DescribeFieldResult dsr = field.getDescribe();
                 result.add(new FilterField(dsr.getName(), dsr.getLabel(), String.valueOf(dsr.getType())));
             }
@@ -1732,7 +2033,7 @@ public without sharing class AdminService {
         for(Schema.SObjectField field : mfields.values()) {
             Schema.DescribeFieldResult dsr = field.getDescribe();
             if((!isUpdateRule && dsr.isCustom() && !dsr.getName().startsWith(pahrosPrefix)) 
-                || (isUpdateRule && !MAP_EXCLUDE_STANDARD_FIELDS_FOR_UPDATE_FILTERS.get(sobjectType).contains(field))) {
+                || (isUpdateRule && !MAP_EXCLUDE_FILTER_FIELDS_ON_UPDATE.get(sobjectType).contains(field))) {
                 result.add(new FilterField(dsr.getName(), dsr.getLabel(), String.valueOf(dsr.getType())));
             }
         }
@@ -1879,7 +2180,8 @@ public without sharing class AdminService {
             //'Jira' => ConfigUtil.SETTINGS.Auto_Jira_Task__c,
             ConfigUtil.SLACK_SERVICE_NAME => ConfigUtil.SLACK_SETTINGS.Slack_Enabled__c,
             ConfigUtil.PAGER_DUTY_SERVICE_NAME => ConfigUtil.PAGER_DUTY_SETTINGS.PagerDuty_Enabled__c,
-            ConfigUtil.TEAMS_SERVICE_NAME => ConfigUtil.GRAPH_API_SETTINGS.Enabled__c
+            ConfigUtil.TEAMS_SERVICE_NAME => ConfigUtil.GRAPH_API_SETTINGS.Enabled__c,
+            ConfigUtil.WEBHOOK_SERVICE_NAME => PermissionsUtil.WebhookIntegrationEnabled
         };
     }
     //log-categories
@@ -2384,6 +2686,27 @@ public without sharing class AdminService {
             && !input.containsKey(RuleUtil.KEY_ACTIONS)
             && !input.containsKey(RuleUtil.KEY_RULE_FILTERS);
         RuleUtil.Rule deserializedRuleWrapper = (RuleUtil.Rule)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE)), RuleUtil.Rule.class);
+        
+        // FIRST: Create Remote Site Settings for webhook actions (BEFORE any DML)
+        // Collect all webhook URLs and make synchronous callout(s)
+        if (!isOnlyRuleData && PermissionsUtil.WebhookIntegrationEnabled 
+            && input.get(RuleUtil.KEY_ACTIONS) != null) {
+            Set<String> webhookUrls = new Set<String>();
+            List<RuleUtil.Action> actions = (List<RuleUtil.Action>)JSON.deserialize(
+                JSON.serialize(input.get(RuleUtil.KEY_ACTIONS)), 
+                List<RuleUtil.Action>.class
+            );
+            for (RuleUtil.Action actionWrapper : actions) {
+                if (actionWrapper.type == Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION 
+                    && String.isNotBlank(actionWrapper.webhookUrl)) {
+                    webhookUrls.add(actionWrapper.webhookUrl);
+                }
+            }
+            if (!webhookUrls.isEmpty()) {
+                // Make synchronous callout(s) BEFORE any DML operations
+                upsertWebhookRemoteSiteSettings(webhookUrls);
+            }
+        }
         if(!isOnlyRuleData) {
             RuleUtil.Rule ruleWrapper = getMonitoringRuleWrapper(deserializedRuleWrapper, input);
             if(ruleWrapper != null) {
@@ -3081,15 +3404,15 @@ public without sharing class AdminService {
             return true;
         }
 
-        List<ApexEmailNotification> apexEmailNotifications = emailServicesSelector.getApexEmailNotifications();
+        Map<String, ApexEmailNotification> apexEmailNotificationByEmail = emailServicesSelector.apexEmailNotificationByEmail;
 
         List<EmailServicesAddress> addressesToDelete = new List<EmailServicesAddress>();
         EmailServicesAddress addressToUpdate;
 
         for (EmailServicesAddress currentEmailServicesAddress : addresses) {
             Boolean isEmailNotificationEqualsEmailFromEmailServiceAddress =
-                !apexEmailNotifications.isEmpty()
-                && apexEmailNotifications.get(0).Email.equals(EmailServicesService.emailServicesAddressService.getEmailFromEmailServiceAddress(currentEmailServicesAddress));
+                !apexEmailNotificationByEmail.isEmpty()
+                && apexEmailNotificationByEmail.containsKey(EmailServicesService.emailServicesAddressService.getEmailFromEmailServiceAddress(currentEmailServicesAddress));
 
             if (isEmailNotificationEqualsEmailFromEmailServiceAddress) {
                 if (isEmailServicesAddressResetNeeded(currentEmailServicesAddress)) {
@@ -3145,11 +3468,11 @@ public without sharing class AdminService {
             List<PharosRunningUserEmailServiceInfoWrapper> emailServiceInfoWrappers =
                 new List<PharosRunningUserEmailServiceInfoWrapper>();
 
-            List<ApexEmailNotification> apexEmailNotifications = emailServicesSelector.getApexEmailNotifications();
+            Map<String, ApexEmailNotification> apexEmailNotificationByEmail = emailServicesSelector.apexEmailNotificationByEmail;
             List<EmailServicesAddress> addresses = emailServicesSelector.getPackageAllActiveAddresses();
             Map<Id, User> userNameByUserIdMap = new Map<Id, User>(getUsersByUserIds(getEmailServicesAddressRunAsUserIds(addresses)));
             for (EmailServicesAddress currentEmailServicesAddress : addresses) {
-                if (!apexEmailNotifications.isEmpty() && apexEmailNotifications.get(0).Email.equals(EmailServicesService.emailServicesAddressService.getEmailFromEmailServiceAddress(currentEmailServicesAddress))) {
+                if (!apexEmailNotificationByEmail.isEmpty() && apexEmailNotificationByEmail.containsKey(EmailServicesService.emailServicesAddressService.getEmailFromEmailServiceAddress(currentEmailServicesAddress))) {
                     emailServiceInfoWrappers.add(new PharosRunningUserEmailServiceInfoWrapper(
                         currentEmailServicesAddress,
                         userNameByUserIdMap.get(currentEmailServicesAddress.RunAsUserId)
