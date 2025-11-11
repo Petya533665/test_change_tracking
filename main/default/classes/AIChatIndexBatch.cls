@@ -141,13 +141,19 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
         try {
             uploadCurrentPart(true);
             completeMultipartUpload();
-            
+        }
+        catch (Exception e) {
+            loggerInstance?.addInternalError(e, AIChatIndexBatch.class.getName(), 'finish');
+            this.loggerInstance?.flush();
+        }
+        
+        try {
             AsyncApexJob job = [SELECT CreatedDate FROM AsyncApexJob WHERE Id = :BC.getJobId() LIMIT 1];
             SETTINGS.LastLogUpdateTimestamp__c = job.CreatedDate;
             update SETTINGS;
         }
         catch (Exception e) {
-            loggerInstance?.addInternalError(e, AIChatIndexBatch.class.getName(), 'finish');
+            loggerInstance?.addInternalError(e, AIChatIndexBatch.class.getName(), 'finish:updateSettings');
         }
 
         this.loggerInstance?.flush();
