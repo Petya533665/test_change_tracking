@@ -3,8 +3,6 @@
     <fullName>All</fullName>
     <columns>NAME</columns>
     <columns>Category_Icon__c</columns>
-    <columns>CREATED_DATE</columns>
-    <columns>First_Occurred_On__c</columns>
     <columns>Organization_Name__c</columns>
     <columns>Summary__c</columns>
     <columns>Log_Count__c</columns>
@@ -14,6 +12,7 @@
     <columns>Average_Frequency__c</columns>
     <columns>Priority__c</columns>
     <columns>Status__c</columns>
+    <columns>First_Occurred_On__c</columns>
     <columns>Last_Occurred_On__c</columns>
     <filterScope>Everything</filterScope>
     <label>All</label>
