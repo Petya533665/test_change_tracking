@@ -1,5 +1,8 @@
 public with sharing class TraceRetentionBatch extends DatabaseUtils.PharosBatchImpl implements Database.Batchable<TraceRetentionRunWrapper>,Database.Stateful, Database.AllowsCallouts, Schedulable, Database.RaisesPlatformEvents {
 
+	@TestVisible
+	private static final Integer BATCH_SCOPE = 200;
+
 	public void execute(SchedulableContext sc) {
 		LogServiceScheduler.rescheduleCronTriggers();
 	}
@@ -20,7 +23,7 @@ public with sharing class TraceRetentionBatch extends DatabaseUtils.PharosBatchI
 	    super(logger);
         this.traceServiceInst = TraceService.getInstance();
         this.storageHelper = helper;
-	    BATCH_SCOPE = 200;
+	    this.BATCH_SCOPE = BATCH_SCOPE;
     }
 
 	public override void startBatch() {
@@ -109,7 +112,7 @@ public with sharing class TraceRetentionBatch extends DatabaseUtils.PharosBatchI
             try {
                 Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(runInstance.sourceId);
                 this.traceServiceInst.setConnectedOrgById(runInstance.sourceId);
-                List<ApexLog> logs = TraceService.getDebugApexLogsForDelete(corg, BATCH_SCOPE);
+                List<ApexLog> logs = TraceService.getDebugApexLogsForDelete(corg, this.BATCH_SCOPE);
                 if(!logs.isEmpty()) {
                     Set<Id> logIds = (new Map<Id, ApexLog>(logs)).keySet();
                     List<Database.DeleteResult> deleteResults = this.traceServiceInst.deleteDebugLogs(logIds);

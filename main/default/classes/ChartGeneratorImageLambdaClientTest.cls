@@ -428,22 +428,7 @@ public class ChartGeneratorImageLambdaClientTest {
         System.assert(differentChartMap.containsKey('OCCURRENCE_LOGS_LAST_30_DAYS'), 'Different chart response should contain OCCURRENCE_LOGS_LAST_30_DAYS');
         System.assertEquals(1, differentChartMap.size(), 'Different chart response should have 1 chart type');
     }
-    
-    @IsTest
-    static void testErrorResponseParsing() {
-        // Test error response parsing logic
-        ChartGeneratorImageLambdaClient client = new ChartGeneratorImageLambdaClient();
-        
-        // Test new error response format (Examples 5 & 6)
-        String unauthorizedErrorResponse = '{"message":"Unauthorized: Invalid or missing API key","error":"Unauthorized: Invalid or missing API key"}';
-        String chartBuildingErrorResponse = '{"message":"Error building occurrence logs chart for Last 7 Days","error":"Unexpected token i in JSON at position 0"}';
-        
-        // Test successful response format
-        String successResponse = '{"OCCURRENCE_LAST_7_DAYS":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==","OCCURRENCE_LOGS_LAST_7_DAYS":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}';
-    }
-    
 
-    
     @IsTest
     static void testUtilityMethods() {
         // Test utility methods
@@ -624,12 +609,6 @@ public class ChartGeneratorImageLambdaClientTest {
         } catch (ChartGeneratorImageLambdaClient.ChartGeneratorException e) {
             System.assertEquals('Chart image not found for type: INVALID_CHART_TYPE', e.getMessage());
         }
-    }
-    
-    @IsTest
-    static void testResponseFormatValidation() {
-        // Test response format validation
-        ChartGeneratorImageLambdaClient client = new ChartGeneratorImageLambdaClient();
     }
     
     @IsTest

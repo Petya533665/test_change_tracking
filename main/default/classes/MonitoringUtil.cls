@@ -35,7 +35,7 @@ public with sharing class MonitoringUtil {
         Map<Id, RuleUtil.Event> eventsMap,
         Logger logger) {
 
-        List<RuleUtil.Rule> rules = RuleUtil.getMonitoringRules(ruleIds);
+        List<RuleUtil.Rule> rules = RuleUtil.getMonitoringRules(ruleIds, true);
         List<RuleUtil.Rule> toCreateEvents = new List<RuleUtil.Rule>();
         List<Event__c> newEvents = new List<Event__c>();
         List<EventAction__c> newEventActions = new List<EventAction__c>();
@@ -55,7 +55,7 @@ public with sharing class MonitoringUtil {
         Map<Id, RuleUtil.Event> eventsMap,
         Logger logger) {
 
-        List<RuleUtil.Rule> rules = RuleUtil.getLimitsRules(ruleIds);
+        List<RuleUtil.Rule> rules = RuleUtil.getLimitsRules(ruleIds, true);
         List<RuleUtil.Rule> toCreateEvents = new List<RuleUtil.Rule>();
         List<Event__c> newEvents = new List<Event__c>();
         List<EventAction__c> newEventActions = new List<EventAction__c>();
@@ -147,10 +147,39 @@ public with sharing class MonitoringUtil {
     }
 
     // Helper methods for limits processing
+    
+    /**
+     * Normalize DateTime to the nearest minute by zeroing out seconds and milliseconds
+     * This handles production timing variance where HourlyLimitsBatch runs with ±15 second delays
+     * Example: 14:15:13 → 14:15:00
+     */
+    private static DateTime normalizeToMinute(DateTime dt) {
+        if (dt == null) return null;
+        return DateTime.newInstance(
+            dt.year(), 
+            dt.month(), 
+            dt.day(),
+            dt.hour(), 
+            dt.minute(), 
+            0  // Zero out seconds and milliseconds
+        );
+    }
+    
+    /**
+     * Filter logs by time interval with second-level tolerance
+     * Production reality: HourlyLimitsBatch runs every ~60 min ±15 seconds variance
+     * Without buffer, logs at exactly -60min 13sec fall outside the -60min window
+     * Solution: Add buffer to start time to accommodate production variance
+     */
     private static List<Log__c> filterLogsByTimeInterval(List<Log__c> logs, DateTime start, DateTime endTime) {
+        // FIX: Add buffer to start time to handle production timing variance
+        // Production data shows gaps of 60.22 min (60 min 13 sec) which would be excluded
+        // by strict 60-minute window. The buffer ensures we capture these logs.
+        DateTime normalizedStart = start.addMinutes(-Constants.MONITORING.SPIKE_DETECTION_BUFFER_MINUTES);
+        
         List<Log__c> filtered = new List<Log__c>();
         for(Log__c log : logs) {
-            if(log?.Created_At__c >= start && log?.Created_At__c <= endTime) {
+            if(log?.Created_At__c >= normalizedStart && log?.Created_At__c <= endTime) {
                 filtered.add(log);
             }
         }

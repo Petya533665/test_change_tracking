@@ -5,14 +5,19 @@ global with sharing class LogsChartsWrapperController {
 	public Log__c currentLog { get; set; }
 	public String packageNamespace { get {return ConfigUtil.getNameSpacePrefix();} set; }
 
+	@TestVisible
 	private static final Integer LAST_7_DAYS_DATE_RANGE = 7;
 	private static final Integer LAST_30_DAYS_DATE_RANGE = 30;
 	private static final Integer LAST_60_DAYS_DATE_RANGE = 60;
 	private static final Integer LAST_6_MONTH_DATE_RANGE = 180;
 
+	@TestVisible
 	private static final String LABEL_SAME = 'Same';
+	@TestVisible
 	private static final String LABEL_SIMILAR = 'Similar';
+	@TestVisible
 	private static final String LABEL_POSSIBLY_RELATED = 'Possibly Related';
+	@TestVisible
 	private static final String LABEL_TIMING = 'Timing';
 	private static final String REPORT_NAME_SUMMARY_BY_DATE_HASH1 = 'Summary by Date Filtered 1';
 	private static final String REPORT_NAME_SUMMARY_BY_DATE_HASH2 = 'Summary by Date Filtered 2';

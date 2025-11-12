@@ -92,6 +92,14 @@ public class MonitoringService {
             parser.addOperand();
         }
         
+        // FIX: Filter out logs without Limits__c for limits rules
+        // This ensures only HourlyLimitsBatch snapshot logs are processed,
+        // preventing regular logs from interfering with spike detection
+        if (rule.type != null && rule.type.equals(Constants.RULE_SOBJECT.TYPE_LIMITS)) {
+            qb.add(QBuilder.condition(Constants.LOG_SOBJECT.LIMITS).isNotNull());
+            parser.addOperand();
+        }
+        
         qb.setConditionOrder(parser.toConditionString());
         return qb;
     }
@@ -101,8 +109,8 @@ public class MonitoringService {
 
         List<Id> ruleIds = new List<Id>();
         List<RuleUtil.Rule> rules = (ruleType.equals(Constants.RULE_SOBJECT.TYPE_MONITORING)) 
-            ? RuleUtil.getMonitoringRules(null) 
-            : RuleUtil.getLimitsRules(null);
+            ? RuleUtil.getMonitoringRules(null, true)
+            : RuleUtil.getLimitsRules(null, true);
         Map<Id, RuleUtil.Event> eventsMap = MonitoringUtil.getLastCreatedEventsMap();
 
         Datetime lastProcessedDatetime = null;
@@ -215,7 +223,7 @@ public class MonitoringService {
         public void processStrategySpecific(List<Rule__c> rules, Map<Id, RuleUtil.Event> eventsMap, Datetime currentTime, DateTime startTime) {
             List<RuleUtil.Rule> strategyRules = getRules(new List<Id>{rules[0].Id});
             
-            Datetime lastProcessedDatetime = calculateLastProcessedDatetime(strategyRules, eventsMap);
+            Datetime lastProcessedDatetime = calculateLastProcessedDatetime(strategyRules, eventsMap, currentTime);
             
             if (lastProcessedDatetime != null && !strategyRules.isEmpty()) {
                 evaluateRulesForStrategy(new List<Id>{rules[0].Id}, strategyRules, lastProcessedDatetime, startTime, eventsMap);
@@ -271,14 +279,21 @@ public class MonitoringService {
         
         // Common helper method for calculating last processed datetime
         protected Datetime calculateLastProcessedDatetime(List<RuleUtil.Rule> rules, 
-                                                        Map<Id, RuleUtil.Event> eventsMap) {
+                                                        Map<Id, RuleUtil.Event> eventsMap,
+                                                        Datetime currentTime) {
             Datetime lastProcessedDatetime = null;
-            Datetime currentTime = Datetime.now();
             
             for (RuleUtil.Rule rule : rules) {
                 RuleUtil.Event event = eventsMap.get(rule.id);
                 if (event == null) {
-                    lastProcessedDatetime = currentTime.addMinutes(-Integer.valueOf(rule.eventTimeInterval));
+                    // FIX: Add buffer to query window to ensure we capture previous snapshots
+                    // Production data shows HourlyLimitsBatch runs with ~60 min gap ±15 seconds variance
+                    // Without buffer, snapshots at exactly -60 min or slightly delayed fall outside window
+                    // Buffer ensures reliable capture even with typical production timing delays
+                    lastProcessedDatetime = currentTime.addMinutes(
+                        -Integer.valueOf(rule.eventTimeInterval) 
+                        - Constants.MONITORING.QUERY_WINDOW_BUFFER_MINUTES
+                    );
                 } else if(event.createdDate != null && (rule.nextRunTime(event.createdDate) <= currentTime)) {
                     lastProcessedDatetime = event.createdDate;
                 }
@@ -308,7 +323,7 @@ public class MonitoringService {
         }
         
         public override List<RuleUtil.Rule> getRules(List<Id> ruleIds) {
-            return RuleUtil.getMonitoringRules(ruleIds);
+            return RuleUtil.getMonitoringRules(ruleIds, true);
         }
         
         public override void evaluateRulesForStrategy(List<Id> ruleIds, List<RuleUtil.Rule> rules, Datetime lastProcessedDatetime, Datetime startTime, Map<Id, RuleUtil.Event> eventsMap) {
@@ -364,7 +379,7 @@ public class MonitoringService {
         }
         
         public override List<RuleUtil.Rule> getRules(List<Id> ruleIds) {
-            return RuleUtil.getLimitsRules(ruleIds);
+            return RuleUtil.getLimitsRules(ruleIds, true);
         }
         
         public override void evaluateRulesForStrategy(List<Id> ruleIds, List<RuleUtil.Rule> rules, Datetime lastProcessedDatetime, Datetime startTime, Map<Id, RuleUtil.Event> eventsMap) {

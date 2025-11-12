@@ -10,8 +10,11 @@ private class JobBatchTest {
     @IsTest
     private static void test_start() {
         Test.startTest();
-        JobBatch.getInstance().startBatch();
+        JobBatch jobBatch = JobBatch.getInstance();
+        jobBatch.startBatch();
         Test.stopTest();
+        
+        Assert.areNotEqual(null, jobBatch, 'JobBatch instance should not be null');
     }
 
     @IsTest

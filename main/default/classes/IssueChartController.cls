@@ -1,5 +1,6 @@
 public with sharing class IssueChartController {
 
+	@TestVisible
 	private static final String RECORD_ID_EXCEPTION = 'Record Id is null';
 
 	private static final String TODAYS_USER_IMPACT_CHART = 'Todays User Impact';

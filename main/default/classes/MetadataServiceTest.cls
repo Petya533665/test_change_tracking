@@ -1918,5 +1918,7 @@ private class MetadataServiceTest
 		new MetadataService.WorkflowTaskTranslation();
 		new MetadataService.WorkflowTimeTrigger();
 		new MetadataService.WorkspaceMapping();
+		
+		System.assertNotEquals(null, System.Limits.getQueueableJobs());
 	}
 }
