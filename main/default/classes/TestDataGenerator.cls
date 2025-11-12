@@ -145,18 +145,6 @@ public with sharing class TestDataGenerator {
 	@TestVisible
 	private static String CURRENT_USER_ID_15 = UserInfo.getUserId().left(15);
 
-	@TestVisible
-	public static String CURRENT_CONNECTED_ORG_TITLE {
-		get {
-			if(CURRENT_CONNECTED_ORG_TITLE == null) {
-				Connected_Org__c corg = Connected_Org__c.getInstance(CURRENT_CONNECTED_ORG_ID_15);
-				CURRENT_CONNECTED_ORG_TITLE = corg.Title__c;
-			}
-			return CURRENT_CONNECTED_ORG_TITLE;
-		}
-		private set;
-	}
-
 	public static void deleteTestEmailExceptionLogs() {
 		List<Log__c> logs = getTestEmailExceptionLogs();
 		if(!logs.isEmpty() && !ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c) {
@@ -169,9 +157,7 @@ public with sharing class TestDataGenerator {
 		if(ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c) {
 			Connected_Org__c connectedPharosOrg = ConnectedOrgService.getPassthroughConnectedOrg();
 			if(connectedPharosOrg != null) {
-				String logServiceEndpoint = connectedPharosOrg.Instance_Url__c + ConfigUtil.PHAROS_REST_SERVICE_ENDPOINT + '?'
-					+ LogRestService.HASH1_PARAMS + '=' + EncodingUtil.urlEncode(TEST_EMAIL_HASH1, 'UTF-8')
-					+ '&' + LogRestService.LIMIT_PARAMS + '=1';
+				String logServiceEndpoint = getTestEmailExceptionLogEndpoint(connectedPharosOrg.Instance_Url__c);
 
 				String b = HttpUtils.get(
 					logServiceEndpoint,
@@ -187,6 +173,13 @@ public with sharing class TestDataGenerator {
 			logs = [SELECT Id, Name FROM Log__c WHERE Hash_1__c =:TEST_EMAIL_HASH1 ORDER BY CreatedDate DESC LIMIT 1];
 		}
 		return logs;
+	}
+
+	@TestVisible
+	private static String getTestEmailExceptionLogEndpoint(String instanceUrl) {
+		return instanceUrl + ConfigUtil.PHAROS_REST_SERVICE_ENDPOINT + '?'
+			+ LogRestService.HASH1_PARAMS + '=' + EncodingUtil.urlEncode(TEST_EMAIL_HASH1, 'UTF-8')
+			+ '&' + LogRestService.LIMIT_PARAMS + '=1';
 	}
 
 	public static TestResultLogs getTestEmailExceptionLog() {

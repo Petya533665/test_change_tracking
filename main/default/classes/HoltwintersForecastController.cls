@@ -203,20 +203,25 @@ public with sharing class HoltwintersForecastController {
             if (response != null && response.forecast != null && !response.forecast.isEmpty()) {
                 List<TraceScheduleController.TraceRequest> traceRequestsToCreate = new List<TraceScheduleController.TraceRequest>();
                 
-                // Iterate through each date in the forecast
+                // Collect all time ranges from all dates into a single list
+                List<HoltwintersForecastLambdaClient.ActivityTimeRange> allTimeRanges = new List<HoltwintersForecastLambdaClient.ActivityTimeRange>();
                 for (String dateKey : response.forecast.keySet()) {
                     List<HoltwintersForecastLambdaClient.ActivityTimeRange> timeRanges = response.forecast.get(dateKey);
+                    if (timeRanges != null && !timeRanges.isEmpty()) {
+                        allTimeRanges.addAll(timeRanges);
+                    }
+                }
+                
+                // Merge all overlapping time ranges (regardless of date)
+                List<HoltwintersForecastLambdaClient.ActivityTimeRange> mergedTimeRanges = mergeOverlappingTimeRanges(allTimeRanges);
+
+                // Create trace requests for each merged time range
+                for (HoltwintersForecastLambdaClient.ActivityTimeRange timeRange : mergedTimeRanges) {
+                    TraceScheduleController.TraceRequest traceRequest = createTraceRequest(timeRange, params.traceScheduleId);
                     
-                    if (timeRanges != null) {
-                        // Create trace requests for each predicted activity time range
-                        for (HoltwintersForecastLambdaClient.ActivityTimeRange timeRange : timeRanges) {
-                            TraceScheduleController.TraceRequest traceRequest = createTraceRequest(timeRange, params.traceScheduleId);
-                            
-                            // Add to list if creation was successful
-                            if (traceRequest != null) {
-                                traceRequestsToCreate.add(traceRequest);
-                            }
-                        }
+                    // Add to list if creation was successful
+                    if (traceRequest != null) {
+                        traceRequestsToCreate.add(traceRequest);
                     }
                 }
                 // Save trace requests to database
@@ -247,6 +252,105 @@ public with sharing class HoltwintersForecastController {
                 'message' => 'Error: ' + e.getMessage()
             };
         }
+    }
+
+    /**
+     * Merge overlapping time ranges (regardless of date)
+     * Two ranges overlap if: start1 < end2 AND start2 < end1
+     * Overlapping ranges are merged into a single range with the earliest start and latest end
+     */
+    private static List<HoltwintersForecastLambdaClient.ActivityTimeRange> mergeOverlappingTimeRanges(
+        List<HoltwintersForecastLambdaClient.ActivityTimeRange> timeRanges
+    ) {
+        if (timeRanges == null || timeRanges.isEmpty()) {
+            return new List<HoltwintersForecastLambdaClient.ActivityTimeRange>();
+        }
+
+        // Create a list with parsed datetimes for sorting
+        List<TimeRangeWrapper> wrappers = new List<TimeRangeWrapper>();
+        for (HoltwintersForecastLambdaClient.ActivityTimeRange timeRange : timeRanges) {
+            Datetime startDt = parseDateTime(timeRange.startDateTime);
+            Datetime endDt = parseDateTime(timeRange.endDateTime);
+            
+            // Skip ranges with invalid dates
+            if (startDt != null && endDt != null && startDt <= endDt) {
+                wrappers.add(new TimeRangeWrapper(timeRange, startDt, endDt));
+            }
+        }
+
+        if (wrappers.isEmpty()) {
+            return new List<HoltwintersForecastLambdaClient.ActivityTimeRange>();
+        }
+
+        // Sort by startDateTime (bubble sort for simplicity)
+        for (Integer i = 0; i < wrappers.size() - 1; i++) {
+            for (Integer j = 0; j < wrappers.size() - i - 1; j++) {
+                if (wrappers[j].startDateTime > wrappers[j + 1].startDateTime) {
+                    TimeRangeWrapper temp = wrappers[j];
+                    wrappers[j] = wrappers[j + 1];
+                    wrappers[j + 1] = temp;
+                }
+            }
+        }
+
+        // Merge overlapping ranges
+        List<HoltwintersForecastLambdaClient.ActivityTimeRange> merged = new List<HoltwintersForecastLambdaClient.ActivityTimeRange>();
+        TimeRangeWrapper current = wrappers[0];
+
+        for (Integer i = 1; i < wrappers.size(); i++) {
+            TimeRangeWrapper next = wrappers[i];
+            
+            // Check if ranges overlap: current.end >= next.start
+            if (current.endDateTime >= next.startDateTime) {
+                // Merge: extend current range to include next
+                if (next.endDateTime > current.endDateTime) {
+                    current.endDateTime = next.endDateTime;
+                    // Update the original timeRange object with merged endDateTime from next range
+                    current.timeRange.endDateTime = next.timeRange.endDateTime;
+                    // Update time_range field to reflect merged range (format: "HH:mm-HH:mm")
+                    current.timeRange.time_range = formatTimeRange(current.startDateTime, next.endDateTime);
+                }
+            } else {
+                // No overlap, add current to merged list and move to next
+                merged.add(current.timeRange);
+                current = next;
+            }
+        }
+
+        // Add the last range
+        merged.add(current.timeRange);
+
+        return merged;
+    }
+
+    /**
+     * Wrapper class to hold time range with parsed datetimes for sorting
+     */
+    private class TimeRangeWrapper {
+        HoltwintersForecastLambdaClient.ActivityTimeRange timeRange;
+        Datetime startDateTime;
+        Datetime endDateTime;
+
+        TimeRangeWrapper(HoltwintersForecastLambdaClient.ActivityTimeRange timeRange, Datetime startDateTime, Datetime endDateTime) {
+            this.timeRange = timeRange;
+            this.startDateTime = startDateTime;
+            this.endDateTime = endDateTime;
+        }
+    }
+
+
+    /**
+     * Format time range string from start and end datetimes (format: "HH:mm-HH:mm")
+     */
+    private static String formatTimeRange(Datetime startDt, Datetime endDt) {
+        if (startDt == null || endDt == null) {
+            return null;
+        }
+        // Format: "HH:mm-HH:mm" (e.g., "19:00-22:00")
+        // Extract time from datetime strings using formatGmt
+        String startTime = startDt.formatGmt('HH:mm');
+        String endTime = endDt.formatGmt('HH:mm');
+        return startTime + '-' + endTime;
     }
 
     /**

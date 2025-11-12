@@ -144,7 +144,7 @@ global with sharing class EventsChartsWrapperController {
 	}
 
 	private static ChartData getMonitoringChartData(Id ruleId, Id eventId, DateTime startTime, DateTime endTime) {
-		List<RuleUtil.Rule> rules = RuleUtil.getMonitoringRules(new List<Id>{ruleId});
+		List<RuleUtil.Rule> rules = RuleUtil.getMonitoringRules(new List<Id>{ruleId}, false);
 		if(rules.get(0).subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_SPIKE)) {
 			ChartData result = new ChartData();
 			List<String> logFields = RuleUtil.getLogFieldNames(rules);
@@ -172,7 +172,7 @@ global with sharing class EventsChartsWrapperController {
 
 	private static ChartData getLimitsChartData(Id ruleId, Id eventId, DateTime startTime, DateTime endTime) {
 		ChartData result = new ChartData();
-		List<RuleUtil.Rule> rules = RuleUtil.getLimitsRules(new List<Id>{ruleId});
+		List<RuleUtil.Rule> rules = RuleUtil.getLimitsRules(new List<Id>{ruleId}, false);
 		if (rules.isEmpty()) {
 			return result;
 		}
@@ -209,7 +209,7 @@ global with sharing class EventsChartsWrapperController {
 	public static ChartData getImpactChartData(Id ruleId, Id eventId, DateTime startTime, DateTime endTime) {
 		ChartData result = new ChartData();
 
-		List<RuleUtil.Rule> rules = RuleUtil.getMonitoringRules(new List<Id>{ruleId});
+		List<RuleUtil.Rule> rules = RuleUtil.getMonitoringRules(new List<Id>{ruleId}, false);
 		Rule__c rule = [SELECT Id, EventTimeInterval__c FROM Rule__c WHERE Id = :ruleId];
 		Event__c event = [SELECT Id, CreatedDate, Records__c FROM Event__c WHERE Id = :eventId];
 		Set<String> eventRecordIds = new Set<String>(parseIds(event.Records__c));

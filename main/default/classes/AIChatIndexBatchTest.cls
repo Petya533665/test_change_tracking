@@ -10,10 +10,13 @@ private class AIChatIndexBatchTest {
 
     private static void createTestLogs(Integer count, String hashPrefix) {
         List<Log__c> testLogs = new List<Log__c>();
+        String orgId = UserInfo.getOrganizationId().left(15);
+        
         for (Integer i = 0; i < count; i++) {
             Log__c log = new Log__c(
                 Hash_1__c = hashPrefix + i,
-                Created_At__c = DateTime.now()
+                Created_At__c = DateTime.now(),
+                Organization_Id__c = orgId
             );
             testLogs.add(log);
         }
@@ -90,7 +93,7 @@ private class AIChatIndexBatchTest {
         settings.LastLogUpdateTimestamp__c = timestamp;
         insert settings;
         
-        List<Log_Index__c> logIndexesToDelete = [SELECT Id, Hash__c FROM Log_Index__c LIMIT 2];
+        List<Log_Index__c> logIndexesToDelete = [SELECT Id, Hash__c FROM Log_Index__c LIMIT 5];
         Set<String> hashesToDelete = new Set<String>();
         for (Log_Index__c logIndex : logIndexesToDelete) {
             hashesToDelete.add(logIndex.Hash__c);

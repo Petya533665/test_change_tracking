@@ -840,6 +840,24 @@ public with sharing class Constants {
         }
     }
     
+    // Monitoring Configuration Constants
+    public static final Monitoring MONITORING {
+        get { return MONITORING == null ? (MONITORING = new Monitoring()) : MONITORING; }
+        private set;
+    }
+    
+    public inherited sharing class Monitoring {
+        // Query window buffer (minutes) for capturing limits snapshots
+        // Production data shows HourlyLimitsBatch runs with ~60 min gap ±15 seconds variance
+        // This buffer ensures we capture all snapshots even with timing delays
+        public Integer QUERY_WINDOW_BUFFER_MINUTES = 2;
+        
+        // Spike detection window buffer (minutes) for filtering logs
+        // Handles second-level variance in production (e.g., 60.22 min gaps)
+        // Ensures logs at -60min 13sec are included in -60min spike detection window
+        public Integer SPIKE_DETECTION_BUFFER_MINUTES = 1;
+    }
+    
     public inherited sharing virtual class SObjectTypeConstants {
         private SObjectType objectType;
 

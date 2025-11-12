@@ -3006,6 +3006,57 @@ public class Test_AdminController {
     }
 
     @IsTest
+    static void test_RemoteAction_createEmailService_enableParam_WithNonMatchingEmailAddresses() {
+        // Setup: 1 ApexEmailNotification with different email than package email service address
+        List<Id> apexEmailNotificationFakeIds = TestDataFactory.getFakeIds(ApexEmailNotification.SObjectType, 1);
+        List<Id> emailServicesFunctionFakeIds = TestDataFactory.getFakeIds(EmailServicesFunction.SObjectType, 1);
+        List<Id> emailServicesAddressFakeIds = TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 1);
+
+        EmailServicesSelectorMock emailServicesSelectorMock = new EmailServicesSelectorMock(
+            apexEmailNotificationFakeIds,
+            emailServicesFunctionFakeIds,
+            emailServicesAddressFakeIds
+        );
+
+        // Set different email for ApexEmailNotification (not matching package email)
+        emailServicesSelectorMock.setApexEmailNotificationsEmail('different.email@example.com');
+        emailServicesSelectorMock.setEmailServicesAddressIsActive(true);
+
+        AdminService.emailServicesSelector = (EmailServicesSelector) Test.createStub(
+            EmailServicesSelector.class,
+            emailServicesSelectorMock
+        );
+
+        List<Id> newEmailServicesAddressFakeIds = TestDataFactory.getFakeIds(EmailServicesAddress.SObjectType, 1);
+
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        endpoint2TestResp.putAll(getUpdateEmailServicesFunctionMock(emailServicesFunctionFakeIds.get(0)));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesAddressServiceMock.getDeleteEmailServicesAddressMocks(new List<Id>{ emailServicesAddressFakeIds.get(0) }));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.emailServicesAddressServiceMock.getCreateEmailServicesAddressMock(newEmailServicesAddressFakeIds.get(0)));
+        endpoint2TestResp.putAll(EmailServicesServiceMock.apexEmailNotificationServiceMock.getUpdateApexEmailNotificationMock(apexEmailNotificationFakeIds.get(0)));
+
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        Map<String, Object> response;
+
+        Test.startTest();
+            AdminController ctrl = new AdminController();
+
+            Map<String, Object> payload = new Map<String, Object>{
+                'method' => 'createEmailService',
+                'data' => new Map<String, Object>{
+                    ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE => true
+                }
+            };
+
+            response = (Map<String, Object>)JSON.deserializeUntyped(AdminController.remoteActionHandler(JSON.serialize(payload)));
+        Test.stopTest();
+
+        Assert.areNotEqual(null, response, 'Response should not be null');
+    }
+
+    @IsTest
     static void test_RemoteAction_getCreateMeta() {
         Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
         mocks.putAll(JiraNotificationBatchTest.createJiraMocks());

@@ -824,15 +824,15 @@ public with sharing class RuleUtil {
 	public static List<Rule> getArchivalRules(List<Id> ruleIds) {
 		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null);
 		if(rules == null) {
-			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null);
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_ARCHIVAL, null, true);
 		}
 		return rules;
 	}
 
-	public static List<Rule> getMonitoringRules(List<Id> ruleIds) {
+	public static List<Rule> getMonitoringRules(List<Id> ruleIds, Boolean activeOnly) {
 		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_MONITORING, null);
 		if(rules == null) {
-			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_MONITORING, null);
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_MONITORING, null, activeOnly);
 		}
 		return rules;
 	}
@@ -840,7 +840,7 @@ public with sharing class RuleUtil {
 	public static List<Rule> getJiraRules(List<Id> ruleIds) {
 		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, null);
 		if(rules == null) {
-			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, null);
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, null, true);
 		}
 		return rules;
 	}
@@ -848,7 +848,7 @@ public with sharing class RuleUtil {
 	public static List<Rule> getAzureDevOpsRules(List<Id> ruleIds) {
 		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS, null);
 		if(rules == null) {
-			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS, null);
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS, null, true);
 		}
 		return rules;
 	}
@@ -856,7 +856,7 @@ public with sharing class RuleUtil {
 	public static List<Rule> getAzureDevOpsRules(List<Id> ruleIds, String sobjectType) {
 		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS, sobjectType);
 		if(rules == null) {
-			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS, sobjectType);
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS, sobjectType, true);
 		}
 		return rules;
 	}
@@ -864,7 +864,7 @@ public with sharing class RuleUtil {
 	public static List<Rule> getJiraRules(List<Id> ruleIds, String sobjectType) {
 		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, sobjectType);
 		if(rules == null) {
-			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, sobjectType);
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE, sobjectType, true);
 		}
 		return rules;
 	}
@@ -872,7 +872,7 @@ public with sharing class RuleUtil {
 	public static List<Rule> getNotificationRules(List<Id> ruleIds, String sobjectType) {
 		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_NOTIFICATION, sobjectType);
 		if(rules == null) {
-			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_NOTIFICATION, sobjectType);
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_NOTIFICATION, sobjectType, true);
 		}
 		return rules;
 	}
@@ -880,7 +880,7 @@ public with sharing class RuleUtil {
 	public static List<Rule> getNotificationRules(List<Id> ruleIds) {
 		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_NOTIFICATION, null);
 		if(rules == null) {
-			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_NOTIFICATION, null);
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_NOTIFICATION, null, true);
 		}
 		return rules;
 	}
@@ -888,19 +888,19 @@ public with sharing class RuleUtil {
 	public static List<Rule> getBroadcastRules(List<Id> ruleIds) {
 		List<Rule> rules = getRulesFromCache(ruleIds, Constants.RULE_SOBJECT.TYPE_BROADCAST, null);
 		if(rules == null) {
-			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_BROADCAST, null);
+			rules = getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_BROADCAST, null, true);
 		}
 		return rules;
 	}
 
-	public static List<Rule> getLimitsRules(List<Id> ruleIds) {
+	public static List<Rule> getLimitsRules(List<Id> ruleIds, Boolean activeOnly) {
 		// When specific ruleIds are provided, bypass cache to avoid stale/empty cache issues
 		if (ruleIds != null) {
-			return getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_LIMITS, null);
+			return getRules(ruleIds, Constants.RULE_SOBJECT.TYPE_LIMITS, null, activeOnly);
 		}
 		List<Rule> rules = getRulesFromCache(null, Constants.RULE_SOBJECT.TYPE_LIMITS, null);
 		if (rules == null) {
-			rules = getRules(null, Constants.RULE_SOBJECT.TYPE_LIMITS, null);
+			rules = getRules(null, Constants.RULE_SOBJECT.TYPE_LIMITS, null, activeOnly);
 		}
 		return rules;
 	}
@@ -966,11 +966,11 @@ public with sharing class RuleUtil {
 		cachedRules.put(ruleType, existingRules);
 	}
 
-	private static List<Rule> getRules(List<Id> ruleIds, String ruleType, String sobjectType) {
+	private static List<Rule> getRules(List<Id> ruleIds, String ruleType, String sobjectType, Boolean activeOnly) {
 		List<Rule> result = new List<Rule>();
 
 		// Only query database if not already cached
-		List<Rule__c> rules = getRuleRecords(ruleIds, ruleType);
+		List<Rule__c> rules = getRuleRecords(ruleIds, ruleType, activeOnly);
 		for(Rule__c rule : rules) {
 			Rule ruleWrapper = new Rule(rule)
 				.addFilters(rule.RuleFilters__r)
@@ -987,7 +987,7 @@ public with sharing class RuleUtil {
 		return result;
 	}
 
-	private static List<Rule__c> getRuleRecords(List<Id> ruleIds, String ruleType) {
+	private static List<Rule__c> getRuleRecords(List<Id> ruleIds, String ruleType, Boolean activeOnly) {
 		List<Rule__c> rules;
 		Integer limitRules = 0;
 		if(ruleType.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL)) {
@@ -1062,8 +1062,8 @@ public with sharing class RuleUtil {
 				FROM RuleActions__r
 				)
 				FROM Rule__c
-				WHERE Active__c = true
-					AND Is_Not_Valid__c = false
+				WHERE 
+					Is_Not_Valid__c = false
 					AND Id IN :ruleIds
 					AND Type__c = :ruleType
 				ORDER BY Index__c ASC nulls last
@@ -1124,12 +1124,21 @@ public with sharing class RuleUtil {
 				)
 				FROM Rule__c
 				WHERE
-					Active__c = true
-					AND Is_Not_Valid__c = false
+					Is_Not_Valid__c = false
 					AND Type__c = :ruleType
 				ORDER BY Index__c ASC nulls last
 				LIMIT :limitRules
 			];
+			
+			if (activeOnly) {
+				List<Rule__c> activeRules = new List<Rule__c>();
+				for (Rule__c rule : rules) {
+					if (rule.Active__c == true) {
+						activeRules.add(rule);
+					}
+				}
+				rules = activeRules;
+			}
 		}
 		return rules;
 	}

@@ -24,9 +24,24 @@ public with sharing class IntegrationSettingsTest {
     private static final String SLACK_CHANNEL_ID = 'C1AD0CDA4';
     private static final String SLACK_CHANNEL_NEXT_CURSOR = 'dGVhbTpDUlBKVzFRVEM=';
     private static final String SLACK_CHANNEL_EMPTY_CURSOR = null;
+
+    private static final String TEST_GIT_API_EXT_USERNAME = 'someusername2';
+    private static final String TEST_GIT_API_TOKEN = 'token';
+    private static final String TEST_GIT_API_OAUTH_TOKEN = 'oauthtoken';
+    private static final String TEST_GIT_API_EXT_REPONAME = 'reponame2';
+    private static final String TEST_GIT_API_EXT_BRANCH_NAME = 'master2';
+    private static final String TEST_GIT_API_EXT_REPOSITORY_URL = 'https://github.com/someusername2/reponame2.git';
     
     @TestSetup
     private static void testSetup() {
+        Git_API_Settings__c gitApiSettings = Git_API_Settings__c.getOrgDefaults();
+        gitApiSettings.Enabled__c = true;
+        gitApiSettings.Username__c = TEST_GIT_API_EXT_USERNAME;
+        gitApiSettings.Token__c = TEST_GIT_API_TOKEN;
+        gitApiSettings.oAuth_Token__c = TEST_GIT_API_OAUTH_TOKEN;
+        gitApiSettings.Last_Processed_Date_Time__c = Datetime.now().formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+        upsert gitApiSettings;
+
         Jira_Settings__c jiraSettings = Jira_Settings__c.getOrgDefaults();
         jiraSettings.Jira_Base_Url__c = JIRA_MOCK_REST_ENDPOINT;
         jiraSettings.Jira_API_Url__c = JIRA_MOCK_REST_ENDPOINT;
@@ -178,12 +193,8 @@ public with sharing class IntegrationSettingsTest {
     @IsTest
     static void resetGitHubSettings() {
         Git_API_Settings__c gitApiSettings = Git_API_Settings__c.getOrgDefaults();
-        gitApiSettings.Token__c = 'Test_Token';
-        gitApiSettings.oAuth_Token__c = 'Test_oAuthToken';
-        gitApiSettings.Username__c = 'Test_Username';
-        gitApiSettings.Reponame__c = 'Test_Reponame';
-        gitApiSettings.Branch_Name__c = 'Test_BranchName';
-        gitApiSettings.Last_Processed_Date_Time__c = Datetime.now().formatGmt(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+        gitApiSettings.Reponame__c = TEST_GIT_API_EXT_REPOSITORY_URL;
+        gitApiSettings.Branch_Name__c = TEST_GIT_API_EXT_BRANCH_NAME;
         upsert gitApiSettings;
 
         Test.startTest();
@@ -222,23 +233,17 @@ public with sharing class IntegrationSettingsTest {
 
     @IsTest
     static void setGitHubSettings_WithResetByRepoOrBranchName() {
-        ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
-        ConfigUtil.GIT_API_SETTINGS.Username__c = GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME;
-        ConfigUtil.GIT_API_SETTINGS.Token__c = GitHubCommitBatchTest.TEST_GIT_API_TOKEN;
-        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = UserInfo.getUserId();
-        upsert ConfigUtil.GIT_API_SETTINGS;
-
         Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-        endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserReposByNameEndpoint(GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME,GitHubCommitBatchTest.TEST_GIT_API_EXT_REPONAME), GitHubCommitBatchTest.getGitAPIUserReposByNameMock());
-        endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserExtRepoBranchesByNameEndpoint(), GitHubCommitBatchTest.getGitAPIUserExtRepoBranchesByNameMock());
+        endpoint2TestResp.put(getGitAPIUserReposByNameEndpoint(TEST_GIT_API_EXT_USERNAME, TEST_GIT_API_EXT_REPONAME), getGitAPIUserReposByNameMock());
+        endpoint2TestResp.put(getGitAPIUserExtRepoBranchesByNameEndpoint(), getGitAPIUserExtRepoBranchesByNameMock());
 
         HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
         Test.setMock(HttpCalloutMock.class, multiCalloutMock);
 
         Test.startTest();
             Map<String, Object> inputSettings = new Map<String, Object>{
-                'repositoryUrl' => GitHubCommitBatchTest.TEST_GIT_API_EXT_REPOSITORY_URL,
-                'branchName' => GitHubCommitBatchTest.TEST_GIT_API_EXT_BRANCH_NAME
+                'repositoryUrl' => TEST_GIT_API_EXT_REPOSITORY_URL,
+                'branchName' => TEST_GIT_API_EXT_BRANCH_NAME
             };
             IntegrationSettings.GIT_HUB.setGitHubSettings(inputSettings);
         Test.stopTest();
@@ -247,23 +252,17 @@ public with sharing class IntegrationSettingsTest {
 
     @IsTest
     static void setGitHubSettings_ValidateRepositoryName() {
-        ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
-        ConfigUtil.GIT_API_SETTINGS.Username__c = GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME;
-        ConfigUtil.GIT_API_SETTINGS.Token__c = GitHubCommitBatchTest.TEST_GIT_API_TOKEN;
-        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = UserInfo.getUserId();
-        upsert ConfigUtil.GIT_API_SETTINGS;
-
         Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-        endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserReposByNameEndpoint(GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME, GitHubCommitBatchTest.TEST_GIT_API_EXT_REPONAME), getGitAPIUserReposByNameNotFoundMock());
-        endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserExtRepoBranchesByNameEndpoint(), getGitAPIUserExtRepoBranchesByNameNotFoundMock());
+        endpoint2TestResp.put(getGitAPIUserReposByNameEndpoint(TEST_GIT_API_EXT_USERNAME, TEST_GIT_API_EXT_REPONAME), getGitAPIUserReposByNameNotFoundMock());
+        endpoint2TestResp.put(getGitAPIUserExtRepoBranchesByNameEndpoint(), getGitAPIUserExtRepoBranchesByNameNotFoundMock());
 
         HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
         Test.setMock(HttpCalloutMock.class, multiCalloutMock);
 
         Test.startTest();
             Map<String, Object> inputSettings = new Map<String, Object>{
-                'repositoryUrl' => GitHubCommitBatchTest.TEST_GIT_API_EXT_REPOSITORY_URL,
-                'branchName' => GitHubCommitBatchTest.TEST_GIT_API_EXT_BRANCH_NAME
+                'repositoryUrl' => TEST_GIT_API_EXT_REPOSITORY_URL,
+                'branchName' => TEST_GIT_API_EXT_BRANCH_NAME
             };
             IntegrationSettings.GitHubSettings settings = IntegrationSettings.GIT_HUB.setGitHubSettings(inputSettings);
         Test.stopTest();
@@ -275,23 +274,17 @@ public with sharing class IntegrationSettingsTest {
 
     @IsTest
     static void setGitHubSettings_ValidateBranchName() {
-        ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
-        ConfigUtil.GIT_API_SETTINGS.Username__c = GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME;
-        ConfigUtil.GIT_API_SETTINGS.Token__c = GitHubCommitBatchTest.TEST_GIT_API_TOKEN;
-        ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = UserInfo.getUserId();
-        upsert ConfigUtil.GIT_API_SETTINGS;
-
         Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-        endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserReposByNameEndpoint(GitHubCommitBatchTest.TEST_GIT_API_EXT_USERNAME, GitHubCommitBatchTest.TEST_GIT_API_EXT_REPONAME), GitHubCommitBatchTest.getGitAPIUserReposByNameMock());
-        endpoint2TestResp.put(GitHubCommitBatchTest.getGitAPIUserExtRepoBranchesByNameEndpoint(), getGitAPIUserExtRepoBranchesByNameNotFoundMock());
+        endpoint2TestResp.put(getGitAPIUserReposByNameEndpoint(TEST_GIT_API_EXT_USERNAME, TEST_GIT_API_EXT_REPONAME), getGitAPIUserReposByNameMock());
+        endpoint2TestResp.put(getGitAPIUserExtRepoBranchesByNameEndpoint(), getGitAPIUserExtRepoBranchesByNameNotFoundMock());
 
         HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
         Test.setMock(HttpCalloutMock.class, multiCalloutMock);
 
         Test.startTest();
             Map<String, Object> inputSettings = new Map<String, Object>{
-                'repositoryUrl' => GitHubCommitBatchTest.TEST_GIT_API_EXT_REPOSITORY_URL,
-                'branchName' => GitHubCommitBatchTest.TEST_GIT_API_EXT_BRANCH_NAME
+                'repositoryUrl' => TEST_GIT_API_EXT_REPOSITORY_URL,
+                'branchName' => TEST_GIT_API_EXT_BRANCH_NAME
             };
 
             IntegrationSettings.GitHubSettings settings = IntegrationSettings.GIT_HUB.setGitHubSettings(inputSettings);
@@ -1175,6 +1168,49 @@ public with sharing class IntegrationSettingsTest {
 
         Assert.areNotEqual(null, testChannels);
         Assert.areEqual(1, testChannels.size());
+    }
+
+    private static String getGitAPIUserReposByNameEndpoint(String reponame) {
+        return getGitAPIUserReposByNameEndpoint(GitHubUtils.GIT_USERNAME, reponame);
+    }
+
+    private static String getGitAPIUserReposByNameEndpoint(String owner, String reponame) {
+        return String.format(GitHubUtils.GIT_API_GET_REPOS_INFO, new List<String>{owner, reponame});
+    }
+
+    private static String getGitAPIUserExtRepoBranchesByNameEndpoint() {
+        return String.format(GitHubUtils.GIT_API_GET_REPO_BRANCHES_INFO, new List<String>{TEST_GIT_API_EXT_USERNAME, TEST_GIT_API_EXT_REPONAME, TEST_GIT_API_EXT_BRANCH_NAME});
+    }
+
+    private static TestDataFactory.SingleRequestMock getGitAPIUserReposByNameMock() {
+        Map<String, Object> objectRepos = new Map<String, Object> {
+            'name' => TEST_GIT_API_EXT_REPONAME,
+            'archived' => false,
+            'disabled' => false,
+            'owner' => new Map<String, Object> {
+                'login' => TEST_GIT_API_EXT_USERNAME
+            }
+        };
+
+        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(objectRepos)
+        );
+        return singleRequestMock;
+    }
+
+    private static TestDataFactory.SingleRequestMock getGitAPIUserExtRepoBranchesByNameMock() {
+        Map<String, Object> objectRepos = new Map<String, Object> {
+            'name' => TEST_GIT_API_EXT_BRANCH_NAME
+        };
+
+        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(objectRepos)
+        );
+        return singleRequestMock;
     }
 
     // Global Mocks

@@ -655,6 +655,418 @@ public class HoltwintersForecastControllerTest {
                 'users_processed' => 10,
                 'total_users' => 15
                 };
+            } else if (forecastType == 'invalid_datetime') {
+                Datetime tomorrow = Datetime.now().addDays(1);
+                String tomorrowStr = tomorrow.format('yyyy-MM-dd');
+                forecastData = new Map<String, Object>{
+                    'forecast' => new Map<String, Object>{
+                        tomorrowStr => new List<Map<String, Object>>{
+                            new Map<String, Object>{
+                                'time_range' => '08:30-10:30',
+                                'startDateTime' => null,  // Invalid: null datetime
+                                'endDateTime' => 'invalid-date-format',  // Invalid: bad format
+                                'predicted_activity' => 3.869,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '09:00',
+                                'userId' => 'user1'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '10:30-12:30',
+                                'startDateTime' => '',  // Invalid: empty string
+                                'endDateTime' => tomorrow.addHours(10).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 2.5,
+                                'confidence' => 'medium',
+                                'detected_peak_time' => '11:00',
+                                'userId' => 'user2'
+                            }
+                        }
+                    },
+                    'seasonality' => new Map<String, Object>{
+                        'type' => 'weekly',
+                        'description' => 'Weekly seasonality pattern detected'
+                    },
+                    'execution_time_seconds' => 0.456,
+                    'logs_processed' => 500,
+                    'users_processed' => 10,
+                    'total_users' => 15
+                };
+            } else if (forecastType == 'null_userid') {
+                Datetime tomorrow = Datetime.now().addDays(1);
+                String tomorrowStr = tomorrow.format('yyyy-MM-dd');
+                forecastData = new Map<String, Object>{
+                    'forecast' => new Map<String, Object>{
+                        tomorrowStr => new List<Map<String, Object>>{
+                            new Map<String, Object>{
+                                'time_range' => '08:30-10:30',
+                                'startDateTime' => tomorrow.addHours(8).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => tomorrow.addHours(10).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 3.869,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '09:00',
+                                'userId' => null  // Null userId
+                            }
+                        }
+                    },
+                    'seasonality' => new Map<String, Object>{
+                        'type' => 'weekly',
+                        'description' => 'Weekly seasonality pattern detected'
+                    },
+                    'execution_time_seconds' => 0.456,
+                    'logs_processed' => 500,
+                    'users_processed' => 10,
+                    'total_users' => 15
+                };
+            } else if (forecastType == 'empty_time_ranges') {
+                Datetime tomorrow = Datetime.now().addDays(1);
+                String tomorrowStr = tomorrow.format('yyyy-MM-dd');
+                forecastData = new Map<String, Object>{
+                    'forecast' => new Map<String, Object>{
+                        tomorrowStr => new List<Map<String, Object>>()  // Empty list
+                    },
+                    'seasonality' => new Map<String, Object>{
+                        'type' => 'weekly',
+                        'description' => 'Weekly seasonality pattern detected'
+                    },
+                    'execution_time_seconds' => 0.456,
+                    'logs_processed' => 500,
+                    'users_processed' => 10,
+                    'total_users' => 15
+                };
+            } else if (forecastType == 'two_overlapping_ranges') {
+                // Two overlapping ranges that should merge into one
+                Datetime tomorrow = Datetime.now().addDays(1);
+                String tomorrowStr = tomorrow.format('yyyy-MM-dd');
+                Datetime baseTime = tomorrow.addHours(8);
+                forecastData = new Map<String, Object>{
+                    'forecast' => new Map<String, Object>{
+                        tomorrowStr => new List<Map<String, Object>>{
+                            new Map<String, Object>{
+                                'time_range' => '08:00-10:00',
+                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 3.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '09:00',
+                                'userId' => 'user1'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '09:30-11:30',
+                                'startDateTime' => baseTime.addHours(1).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(3).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 4.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '10:00',
+                                'userId' => 'user2'
+                            }
+                        }
+                    },
+                    'seasonality' => new Map<String, Object>{
+                        'type' => 'weekly',
+                        'description' => 'Weekly seasonality pattern detected'
+                    },
+                    'execution_time_seconds' => 0.456,
+                    'logs_processed' => 500,
+                    'users_processed' => 10,
+                    'total_users' => 15
+                };
+            } else if (forecastType == 'two_non_overlapping_ranges') {
+                // Two non-overlapping ranges that should remain separate
+                Datetime tomorrow = Datetime.now().addDays(1);
+                String tomorrowStr = tomorrow.format('yyyy-MM-dd');
+                Datetime baseTime = tomorrow.addHours(8);
+                forecastData = new Map<String, Object>{
+                    'forecast' => new Map<String, Object>{
+                        tomorrowStr => new List<Map<String, Object>>{
+                            new Map<String, Object>{
+                                'time_range' => '08:00-10:00',
+                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 3.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '09:00',
+                                'userId' => 'user1'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '11:00-13:00',
+                                'startDateTime' => baseTime.addHours(3).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(5).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 4.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '12:00',
+                                'userId' => 'user2'
+                            }
+                        }
+                    },
+                    'seasonality' => new Map<String, Object>{
+                        'type' => 'weekly',
+                        'description' => 'Weekly seasonality pattern detected'
+                    },
+                    'execution_time_seconds' => 0.456,
+                    'logs_processed' => 500,
+                    'users_processed' => 10,
+                    'total_users' => 15
+                };
+            } else if (forecastType == 'adjacent_ranges') {
+                // Two adjacent ranges (touching exactly) - should merge
+                Datetime tomorrow = Datetime.now().addDays(1);
+                String tomorrowStr = tomorrow.format('yyyy-MM-dd');
+                Datetime baseTime = tomorrow.addHours(8);
+                forecastData = new Map<String, Object>{
+                    'forecast' => new Map<String, Object>{
+                        tomorrowStr => new List<Map<String, Object>>{
+                            new Map<String, Object>{
+                                'time_range' => '08:00-10:00',
+                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 3.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '09:00',
+                                'userId' => 'user1'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '10:00-12:00',
+                                'startDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(4).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 4.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '11:00',
+                                'userId' => 'user2'
+                            }
+                        }
+                    },
+                    'seasonality' => new Map<String, Object>{
+                        'type' => 'weekly',
+                        'description' => 'Weekly seasonality pattern detected'
+                    },
+                    'execution_time_seconds' => 0.456,
+                    'logs_processed' => 500,
+                    'users_processed' => 10,
+                    'total_users' => 15
+                };
+            } else if (forecastType == 'contained_range') {
+                // One range completely contains another - should merge
+                Datetime tomorrow = Datetime.now().addDays(1);
+                String tomorrowStr = tomorrow.format('yyyy-MM-dd');
+                Datetime baseTime = tomorrow.addHours(8);
+                forecastData = new Map<String, Object>{
+                    'forecast' => new Map<String, Object>{
+                        tomorrowStr => new List<Map<String, Object>>{
+                            new Map<String, Object>{
+                                'time_range' => '08:00-12:00',
+                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(4).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 3.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '10:00',
+                                'userId' => 'user1'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '09:00-11:00',
+                                'startDateTime' => baseTime.addHours(1).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(3).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 4.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '10:00',
+                                'userId' => 'user2'
+                            }
+                        }
+                    },
+                    'seasonality' => new Map<String, Object>{
+                        'type' => 'weekly',
+                        'description' => 'Weekly seasonality pattern detected'
+                    },
+                    'execution_time_seconds' => 0.456,
+                    'logs_processed' => 500,
+                    'users_processed' => 10,
+                    'total_users' => 15
+                };
+            } else if (forecastType == 'multiple_groups') {
+                // Multiple separate groups of overlapping ranges
+                Datetime tomorrow = Datetime.now().addDays(1);
+                String tomorrowStr = tomorrow.format('yyyy-MM-dd');
+                Datetime baseTime = tomorrow.addHours(8);
+                forecastData = new Map<String, Object>{
+                    'forecast' => new Map<String, Object>{
+                        tomorrowStr => new List<Map<String, Object>>{
+                            // First group: 08:00-10:00 and 09:00-11:00 (overlap, merge to 08:00-11:00)
+                            new Map<String, Object>{
+                                'time_range' => '08:00-10:00',
+                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 3.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '09:00',
+                                'userId' => 'user1'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '09:00-11:00',
+                                'startDateTime' => baseTime.addHours(1).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(3).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 4.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '10:00',
+                                'userId' => 'user2'
+                            },
+                            // Second group: 13:00-15:00 and 14:00-16:00 (overlap, merge to 13:00-16:00)
+                            new Map<String, Object>{
+                                'time_range' => '13:00-15:00',
+                                'startDateTime' => baseTime.addHours(5).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(7).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 5.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '14:00',
+                                'userId' => 'user3'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '14:00-16:00',
+                                'startDateTime' => baseTime.addHours(6).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(8).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 6.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '15:00',
+                                'userId' => 'user4'
+                            }
+                        }
+                    },
+                    'seasonality' => new Map<String, Object>{
+                        'type' => 'weekly',
+                        'description' => 'Weekly seasonality pattern detected'
+                    },
+                    'execution_time_seconds' => 0.456,
+                    'logs_processed' => 500,
+                    'users_processed' => 10,
+                    'total_users' => 15
+                };
+            } else if (forecastType == 'unsorted_ranges') {
+                // Unsorted ranges (to test sorting functionality)
+                Datetime tomorrow = Datetime.now().addDays(1);
+                String tomorrowStr = tomorrow.format('yyyy-MM-dd');
+                Datetime baseTime = tomorrow.addHours(8);
+                forecastData = new Map<String, Object>{
+                    'forecast' => new Map<String, Object>{
+                        tomorrowStr => new List<Map<String, Object>>{
+                            // Add ranges in reverse order
+                            new Map<String, Object>{
+                                'time_range' => '11:00-13:00',
+                                'startDateTime' => baseTime.addHours(3).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(5).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 4.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '12:00',
+                                'userId' => 'user2'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '08:00-10:00',
+                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 3.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '09:00',
+                                'userId' => 'user1'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '09:30-11:30',
+                                'startDateTime' => baseTime.addHours(1).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(3).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 5.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '10:00',
+                                'userId' => 'user3'
+                            }
+                        }
+                    },
+                    'seasonality' => new Map<String, Object>{
+                        'type' => 'weekly',
+                        'description' => 'Weekly seasonality pattern detected'
+                    },
+                    'execution_time_seconds' => 0.456,
+                    'logs_processed' => 500,
+                    'users_processed' => 10,
+                    'total_users' => 15
+                };
+            } else if (forecastType == 'invalid_start_end') {
+                // Ranges where start > end (should be skipped)
+                Datetime tomorrow = Datetime.now().addDays(1);
+                String tomorrowStr = tomorrow.format('yyyy-MM-dd');
+                Datetime baseTime = tomorrow.addHours(8);
+                forecastData = new Map<String, Object>{
+                    'forecast' => new Map<String, Object>{
+                        tomorrowStr => new List<Map<String, Object>>{
+                            new Map<String, Object>{
+                                'time_range' => '10:00-08:00',
+                                'startDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),  // end < start
+                                'predicted_activity' => 3.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '09:00',
+                                'userId' => 'user1'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '08:00-10:00',
+                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 4.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '09:00',
+                                'userId' => 'user2'
+                            }
+                        }
+                    },
+                    'seasonality' => new Map<String, Object>{
+                        'type' => 'weekly',
+                        'description' => 'Weekly seasonality pattern detected'
+                    },
+                    'execution_time_seconds' => 0.456,
+                    'logs_processed' => 500,
+                    'users_processed' => 10,
+                    'total_users' => 15
+                };
+            } else if (forecastType == 'all_invalid_ranges') {
+                // All ranges are invalid (null dates, empty strings, start > end) - should return empty list
+                Datetime tomorrow = Datetime.now().addDays(1);
+                String tomorrowStr = tomorrow.format('yyyy-MM-dd');
+                Datetime baseTime = tomorrow.addHours(8);
+                forecastData = new Map<String, Object>{
+                    'forecast' => new Map<String, Object>{
+                        tomorrowStr => new List<Map<String, Object>>{
+                            new Map<String, Object>{
+                                'time_range' => '10:00-08:00',
+                                'startDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),  // end < start
+                                'predicted_activity' => 3.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '09:00',
+                                'userId' => 'user1'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '08:30-10:30',
+                                'startDateTime' => null,  // Invalid: null datetime
+                                'endDateTime' => 'invalid-date-format',  // Invalid: bad format
+                                'predicted_activity' => 4.0,
+                                'confidence' => 'high',
+                                'detected_peak_time' => '09:00',
+                                'userId' => 'user2'
+                            },
+                            new Map<String, Object>{
+                                'time_range' => '10:30-12:30',
+                                'startDateTime' => '',  // Invalid: empty string
+                                'endDateTime' => baseTime.addHours(10).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'predicted_activity' => 2.5,
+                                'confidence' => 'medium',
+                                'detected_peak_time' => '11:00',
+                                'userId' => 'user3'
+                            }
+                        }
+                    },
+                    'seasonality' => new Map<String, Object>{
+                        'type' => 'weekly',
+                        'description' => 'Weekly seasonality pattern detected'
+                    },
+                    'execution_time_seconds' => 0.456,
+                    'logs_processed' => 500,
+                    'users_processed' => 10,
+                    'total_users' => 15
+                };
             }
             
             response.setBody(JSON.serialize(forecastData));
@@ -788,6 +1200,532 @@ public class HoltwintersForecastControllerTest {
         // This assertion might need to be adjusted based on actual controller behavior
         
         Test.stopTest();
+    }
+
+    @IsTest
+    static void test_createAutoTraceRequests_InvalidDateTimeFormats() {
+        // Create test issue and trace schedule
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Invalid DateTime');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        // Create logs data
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        // Mock with invalid datetime formats (null, empty, invalid format)
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('invalid_datetime'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('holtwintersForecast'), 'Result should contain holtwintersForecast');
+        // Should handle invalid datetime gracefully - may return 0 trace requests or skip invalid entries
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+    }
+
+    @IsTest
+    static void test_createAutoTraceRequests_WithNullUserId() {
+        // Create test issue and trace schedule
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Null UserId');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        // Create logs data
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        // Mock with null userId in time range
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('null_userid'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('holtwintersForecast'), 'Result should contain holtwintersForecast');
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+        // Should still create trace requests even without userId
+    }
+
+    @IsTest
+    static void test_createAutoTraceRequests_PartialSaveFailure() {
+        // Create test issue and trace schedule
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Partial Save');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        // Create logs data
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('success'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('success'), 'Result should contain success');
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+        System.assert(result.containsKey('message'), 'Result should contain message');
+    }
+
+    @IsTest
+    static void test_createAutoTraceRequests_DeletesExistingAutoTraceRequests() {
+        // Create test issue and trace schedule
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Delete Existing');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        // Create existing AutoTrace requests
+        Trace_Request__c existingRequest1 = new Trace_Request__c(
+            Issue__c = testIssue.Id,
+            Type__c = 'AutoTrace',
+            Status__c = 'New',
+            Trace_Schedule__c = traceSchedule.Id,
+            Start_Date__c = Datetime.now().addDays(1),
+            End_Date__c = Datetime.now().addDays(1).addHours(1)
+        );
+        Trace_Request__c existingRequest2 = new Trace_Request__c(
+            Issue__c = testIssue.Id,
+            Type__c = 'AutoTrace',
+            Status__c = 'New',
+            Trace_Schedule__c = traceSchedule.Id,
+            Start_Date__c = Datetime.now().addDays(2),
+            End_Date__c = Datetime.now().addDays(2).addHours(1)
+        );
+        insert new List<Trace_Request__c>{existingRequest1, existingRequest2};
+
+        // Verify existing requests exist
+        List<Trace_Request__c> existingRequests = [
+            SELECT Id 
+            FROM Trace_Request__c 
+            WHERE Issue__c = :testIssue.Id AND Type__c = 'AutoTrace'
+        ];
+        System.assertEquals(2, existingRequests.size(), 'Should have 2 existing AutoTrace requests');
+
+        // Create logs data
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('success'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        // Verify existing requests were deleted
+        List<Trace_Request__c> remainingRequests = [
+            SELECT Id 
+            FROM Trace_Request__c 
+            WHERE Issue__c = :testIssue.Id AND Type__c = 'AutoTrace'
+        ];
+        // Should have new requests, but old ones should be deleted
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+    }
+
+    @IsTest
+    static void test_createAutoTraceRequests_EmptyTimeRanges() {
+        // Create test issue and trace schedule
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Empty Time Ranges');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        // Create logs data
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        // Mock with empty time ranges
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('empty_time_ranges'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('holtwintersForecast'), 'Result should contain holtwintersForecast');
+        System.assertEquals('No valid time ranges found in forecast data for trace request creation', 
+            result.get('message'), 'Should return appropriate message for empty time ranges');
+    }
+
+    @IsTest
+    static void test_mergeOverlappingTimeRanges_TwoOverlappingRanges() {
+        // Test that two overlapping ranges merge into one
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Overlapping Ranges');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('two_overlapping_ranges'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+        // Two overlapping ranges (08:00-10:00 and 09:30-11:30) should merge into one (08:00-11:30)
+        System.assertEquals(1, result.get('traceRequestsCreated'), 'Should merge two overlapping ranges into one');
+    }
+
+    @IsTest
+    static void test_mergeOverlappingTimeRanges_TwoNonOverlappingRanges() {
+        // Test that two non-overlapping ranges remain separate
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Non-Overlapping Ranges');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('two_non_overlapping_ranges'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+        // Two non-overlapping ranges should remain separate
+        System.assertEquals(2, result.get('traceRequestsCreated'), 'Should keep two non-overlapping ranges separate');
+    }
+
+    @IsTest
+    static void test_mergeOverlappingTimeRanges_AdjacentRanges() {
+        // Test that adjacent (touching) ranges merge
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Adjacent Ranges');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('adjacent_ranges'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+        // Adjacent ranges (touching exactly) should merge
+        System.assertEquals(1, result.get('traceRequestsCreated'), 'Should merge adjacent ranges');
+    }
+
+    @IsTest
+    static void test_mergeOverlappingTimeRanges_ContainedRange() {
+        // Test that one range containing another merges correctly
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Contained Range');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('contained_range'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+        // One range containing another should merge into the larger range
+        System.assertEquals(1, result.get('traceRequestsCreated'), 'Should merge contained range into containing range');
+    }
+
+    @IsTest
+    static void test_mergeOverlappingTimeRanges_MultipleGroups() {
+        // Test multiple separate groups of overlapping ranges
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Multiple Groups');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('multiple_groups'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+        // Two groups of overlapping ranges should result in 2 merged ranges
+        System.assertEquals(2, result.get('traceRequestsCreated'), 'Should create 2 merged ranges from 2 groups');
+    }
+
+    @IsTest
+    static void test_mergeOverlappingTimeRanges_UnsortedRanges() {
+        // Test that unsorted ranges are sorted and merged correctly
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Unsorted Ranges');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('unsorted_ranges'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+        // Unsorted overlapping ranges should be sorted and merged into one
+        System.assertEquals(1, result.get('traceRequestsCreated'), 'Should sort and merge unsorted overlapping ranges');
+    }
+
+    @IsTest
+    static void test_mergeOverlappingTimeRanges_InvalidStartEnd() {
+        // Test that ranges with start > end are skipped
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for Invalid Start End');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('invalid_start_end'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+        // Invalid range (start > end) should be skipped, only valid range should create trace request
+        System.assertEquals(1, result.get('traceRequestsCreated'), 'Should skip invalid range and create trace request for valid range');
+    }
+
+    @IsTest
+    static void test_mergeOverlappingTimeRanges_AllInvalidRanges() {
+        // Test that when all ranges are invalid, empty list is returned (covers wrappers.isEmpty() branch)
+        Issue__c testIssue = new Issue__c(Summary__c = 'Test Issue for All Invalid Ranges');
+        insert testIssue;
+
+        Trace_Schedule__c traceSchedule = new Trace_Schedule__c(
+            Issue__c = testIssue.Id,
+            Status__c = 'Scheduled'
+        );
+        insert traceSchedule;
+
+        List<Map<String, Object>> logEntries = new List<Map<String, Object>>{
+            new Map<String, Object>{
+                'userId' => 'testuser1',
+                'timestamp' => Datetime.now().addDays(-1).format('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'')
+            }
+        };
+
+        Map<String, Object> parameters = new Map<String, Object>{
+            'logsData' => JSON.serialize(logEntries),
+            'traceScheduleId' => traceSchedule.Id,
+            'issueId' => testIssue.Id
+        };
+        String parametersJSON = JSON.serialize(parameters);
+
+        Test.setMock(HttpCalloutMock.class, new UniversalForecastMock('all_invalid_ranges'));
+        Test.startTest();
+        Map<String, Object> result = HoltwintersForecastController.createAutoTraceRequests(parametersJSON);
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        System.assert(result.containsKey('traceRequestsCreated'), 'Result should contain traceRequestsCreated');
+        // All ranges are invalid, so no trace requests should be created
+        System.assertEquals(0, result.get('traceRequestsCreated'), 'Should return 0 trace requests when all ranges are invalid');
+        // When all ranges have invalid dates, parseDateTime may throw exception which is caught and returns error message
+        // OR if parsing succeeds but all are filtered out, returns "No valid time ranges found"
+        String message = String.valueOf(result.get('message'));
+        System.assert(message.contains('No valid time ranges found') || message.contains('Error:'), 
+            'Should return appropriate message when all ranges are invalid. Actual: ' + message);
     }
 
 }

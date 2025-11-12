@@ -51,6 +51,11 @@ private class BroadcastServiceTest {
         Test.setMock(HttpCalloutMock.class, multiCalloutMock);
         BroadcastBatch.getInstance().startBatch();
         Test.stopTest();
+        
+        // Verify that the log was processed
+        Log__c processedLog = [SELECT Id, Broadcast_Status__c FROM Log__c WHERE Id = :log.Id];
+        Assert.areNotEqual(null, processedLog, 'Log should not be null');
+        Assert.areNotEqual(BroadcastService.BROADCAST_STATUS_NEEDED, processedLog.Broadcast_Status__c, 'Broadcast status should have changed');
     }
 
     @IsTest

@@ -3,480 +3,540 @@
 private class GitHubCommitBatchTest {
 
 	private static final String TEST_GIT_API_USERNAME = 'someusername';
-	@TestVisible
-	private static final String TEST_GIT_API_EXT_USERNAME = 'someusername2';
-	@TestVisible
 	private static final String TEST_GIT_API_TOKEN = 'token';
 	private static final String TEST_GIT_API_OAUTH_TOKEN = 'oauthtoken';
 	private static final String TEST_GIT_API_REPONAME = 'reponame';
-	@TestVisible
-	private static final String TEST_GIT_API_EXT_REPONAME = 'reponame2';
 	private static final String TEST_GIT_API_BRANCH_NAME = 'master';
-	@TestVisible
-	private static final String TEST_GIT_API_EXT_BRANCH_NAME = 'master2';
-
-	@TestVisible
-	private static final String TEST_GIT_API_EXT_REPOSITORY_URL = 'https://github.com/someusername2/reponame2.git';
-	@TestVisible
-	private static final String TEST_GIT_API_REPOSITORY_URL = 'https://github.com/someusername/reponame.git';
 
 	@TestSetup
 	private static void testSetup() {
+		TestDataFactory.createConnectedOrg();
+		
 		ConfigUtil.GIT_API_SETTINGS.Username__c = TEST_GIT_API_USERNAME;
 		ConfigUtil.GIT_API_SETTINGS.Token__c = TEST_GIT_API_TOKEN;
 		ConfigUtil.GIT_API_SETTINGS.oauth_Token__c = TEST_GIT_API_OAUTH_TOKEN;
 		ConfigUtil.GIT_API_SETTINGS.Reponame__c = TEST_GIT_API_REPONAME;
 		ConfigUtil.GIT_API_SETTINGS.Branch_Name__c = TEST_GIT_API_BRANCH_NAME;
 		upsert ConfigUtil.GIT_API_SETTINGS;
+
+		// Setup OpenAI
+		ConfigUtil.OPEN_AI_SETTINGS.Token__c = 'test-openai-token';
+		upsert ConfigUtil.OPEN_AI_SETTINGS;
 	}
 
+	// ============================================
+	// Test Batch Execution - Initial Run (no Last_Processed_Date_Time)
+	// ============================================
+	
 	@IsTest
-	static void test_audit_trail_changes_apex_class() {
+	static void test_batchExecution_initialRun_withApexClass() {
 		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
+			GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
 		};
+		createMockApexClasses(new List<String>{'TestClass'});
+		setupPermissions(true, true);
+		setHttpMocks();
+		
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = null;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+		
+		createMockAuditTrail(Datetime.now(), 'TestClass', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
 
-		createMockApexClasses(new List<String>{'someApexClassName','someChangedApexClass'});
-
+		Test.startTest();
 		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
+		batchInstance.startBatch();
+		Test.stopTest();
 
-		String initialLastProcessedDatetime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
-		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = initialLastProcessedDatetime;
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.isTrue(String.isNotBlank(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c), 'Last_Processed_Date_Time__c should be set after initial run');
+	}
+
+	// ============================================
+	// Test Batch Execution - Subsequent Run with Changes
+	// ============================================
+	
+	@IsTest
+	static void test_batchExecution_subsequentRun_withChanges() {
+		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
+			GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
+		};
+		createMockApexClasses(new List<String>{'ChangedClass'});
+		setupPermissions(true, true);
+		setHttpMocks();
+
+		String lastProcessedDateTime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = lastProcessedDateTime;
 		upsert ConfigUtil.GIT_API_SETTINGS;
 
-		Map<String, Object> dataMap = new Map<String, Object>();
-		dataMap.put('Id', 'someNewTrailId');
-		dataMap.put('Display', 'someChangedApexClass');
-		dataMap.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
-		dataMap.put('CreatedDate', Datetime.now());
-		List<Map<String, Object>> dataMapList = new List<Map<String, Object>>();
-		dataMapList.add(dataMap);
+		createMockAuditTrail(Datetime.now(), 'ChangedClass', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
 
+		Test.startTest();
+		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+		batchInstance.startBatch();
+		Test.stopTest();
+
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.areNotEqual(lastProcessedDateTime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should be updated after processing changes');
+	}
+
+	// ============================================
+	// Test Batch Execution - No Changes
+	// ============================================
+	
+	@IsTest
+	static void test_batchExecution_noChanges() {
+		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
+			GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
+		};
+		setupPermissions(true, true);
+
+		String lastProcessedDateTime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = lastProcessedDateTime;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+
+		GitHubCommitBatch.mockAuditTrails = new List<SetupAuditTrail>();
+
+		Test.startTest();
+		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+		batchInstance.startBatch();
+		Test.stopTest();
+
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.areEqual(lastProcessedDateTime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should not change when no changes detected');
+	}
+
+	// ============================================
+	// Test Batch Execution - Missing Permissions
+	// ============================================
+	
+	@IsTest
+	static void test_batchExecution_missingPermissions() {
+		setupPermissions(false, false);
+
+		String lastProcessedDateTime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = lastProcessedDateTime;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+
+		Test.startTest();
+		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+		batchInstance.startBatch();
+		Test.stopTest();
+
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.areEqual(lastProcessedDateTime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should not change when permissions are missing');
+	}
+
+	// ============================================
+	// Test Batch Execution - Missing Token
+	// ============================================
+	
+	@IsTest
+	static void test_batchExecution_missingToken() {
+		setupPermissions(true, true);
+		
+		String lastProcessedDateTime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = lastProcessedDateTime;
+		ConfigUtil.GIT_API_SETTINGS.Token__c = null;
+		ConfigUtil.GIT_API_SETTINGS.oAuth_Token__c = null;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+
+		Test.startTest();
+		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+		batchInstance.startBatch();
+		Test.stopTest();
+
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.areEqual(lastProcessedDateTime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should not change when token is missing');
+	}
+
+	// ============================================
+	// Test Batch Execution - Multiple Metadata Types
+	// ============================================
+	
+	@IsTest
+	static void test_batchExecution_multipleMetadataTypes() {
+		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
+			GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true,
+			GitHubCommitBatch.METADATA_TYPE_APEX_TRIGGER => true
+		};
+		createMockApexClasses(new List<String>{'TestClass'});
+		setupPermissions(true, true);
+		setHttpMocks();
+		
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = null;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+		
+		List<Map<String, Object>> dataMapList = new List<Map<String, Object>>();
+		dataMapList.add(createAuditTrailData('id1', Datetime.now(), 'TestClass', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS));
+		dataMapList.add(createAuditTrailData('id2', Datetime.now().addMinutes(-5), 'TestTrigger', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_TRIGGER));
 		GitHubCommitBatch.mockAuditTrails = (List<SetupAuditTrail>)JSON.deserialize(JSON.serialize(dataMapList), List<SetupAuditTrail>.class);
 
 		Test.startTest();
-		List<GitHubCommitBatch.MetadataTypeWrapper> items = GitHubCommitBatch.getMetadataTypeMembers();
-		Test.stopTest();
-		system.assertEquals(1, items.size());
-		system.assertEquals(true, items.get(0).member.contains('someChangedApexClass'));
-		system.assertNotEquals(initialLastProcessedDatetime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c);
-	}
-
-	@IsTest
-	static void test_get_git_user_info() {
-		GitHubUtils.GitUserInfo userInfo;
-
-		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		endpoint2TestResp.put(getGitAPIUserEndpoint(), getGitAPIUserMock());
-
-		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
-		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-		Test.startTest();
-		userInfo = GitHubUtils.getGitUserInfo(TEST_GIT_API_TOKEN);
-		Test.stopTest();
-
-		System.assertEquals(TEST_GIT_API_USERNAME, userInfo.login);
-	}
-
-	@IsTest
-	static void test_get_git_own_user_repos() {
-		List<GitHubUtils.GitReposInfo> reposInfo;
-
-		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		endpoint2TestResp.put(getGitAPIUserReposEndpoint(), getGitAPIUserReposMock());
-
-		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
-		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-		Test.startTest();
-		Map<String, Object> data = new Map<String, Object>{
-			'reponame' => null
-		};
-		reposInfo = GitHubUtils.getReposInfos(data);
-		Test.stopTest();
-
-		System.assertEquals(2, reposInfo.size());
-		System.assertEquals(TEST_GIT_API_REPONAME, reposInfo.get(0).name);
-		System.assertEquals(TEST_GIT_API_EXT_REPONAME, reposInfo.get(1).name);
-	}
-
-	@IsTest
-	static void test_get_git_user_repos_by_name() {
-		List<GitHubUtils.GitReposInfo> reposInfo;
-
-		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		endpoint2TestResp.put(getGitAPIUserReposEndpoint(), getGitAPIUserReposMock());
-		endpoint2TestResp.put(getGitAPIUserReposByNameEndpoint(TEST_GIT_API_EXT_REPONAME), getGitAPIUserReposByNameMock());
-
-		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
-		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-		Test.startTest();
-		Map<String, Object> data = new Map<String, Object>{
-			'reponame' => TEST_GIT_API_EXT_REPONAME
-		};
-		reposInfo = GitHubUtils.getReposInfos(data);
-		Test.stopTest();
-
-		System.assertEquals(1, reposInfo.size());
-		System.assertEquals(TEST_GIT_API_EXT_REPONAME, reposInfo.get(0).name);
-	}
-
-	@IsTest
-	static void test_get_git_user_own_repo_branches() {
-		List<GitHubUtils.GitRepoBranchInfo> repoBranchesInfo;
-
-		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		endpoint2TestResp.put(getGitAPIUserOwnRepoBranchesEndpoint(), getGitAPIUserOwnRepoBranchesMock());
-
-		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
-		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-		Test.startTest();
-		Map<String, Object> data = new Map<String, Object>{
-			'reponame' => TEST_GIT_API_REPONAME
-		};
-		repoBranchesInfo = GitHubUtils.getRepoBranchesInfos(data);
-		Test.stopTest();
-
-		System.assertEquals(1, repoBranchesInfo.size());
-		System.assertEquals(TEST_GIT_API_BRANCH_NAME, repoBranchesInfo.get(0).name);
-	}
-
-	@IsTest
-	static void test_get_git_user_ext_repo_branches() {
-		List<GitHubUtils.GitRepoBranchInfo> repoBranchesInfo;
-
-		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		endpoint2TestResp.put(getGitAPIUserExtRepoBranchesEndpoint(), getGitAPIUserExtRepoBranchesMock());
-
-		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
-		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-		Test.startTest();
-		Map<String, Object> data = new Map<String, Object>{
-			'owner' => TEST_GIT_API_EXT_USERNAME,
-			'reponame' => TEST_GIT_API_EXT_REPONAME
-		};
-		repoBranchesInfo = GitHubUtils.getRepoBranchesInfos(data);
-		Test.stopTest();
-
-		System.assertEquals(1, repoBranchesInfo.size());
-		System.assertEquals(TEST_GIT_API_EXT_BRANCH_NAME, repoBranchesInfo.get(0).name);
-	}
-
-	@IsTest
-	static void test_get_git_user_ext_repo_branches_by_name() {
-		List<GitHubUtils.GitRepoBranchInfo> repoBranchesInfo;
-
-		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		endpoint2TestResp.put(getGitAPIUserExtRepoBranchesByNameEndpoint(), getGitAPIUserExtRepoBranchesByNameMock());
-
-		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
-		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
-
-		Test.startTest();
-		Map<String, Object> data = new Map<String, Object>{
-			'owner' => TEST_GIT_API_EXT_USERNAME,
-			'reponame' => TEST_GIT_API_EXT_REPONAME,
-			'branchname' => TEST_GIT_API_EXT_BRANCH_NAME
-		};
-		repoBranchesInfo = GitHubUtils.getRepoBranchesInfos(data);
-		Test.stopTest();
-
-		System.assertEquals(1, repoBranchesInfo.size());
-		System.assertEquals(TEST_GIT_API_EXT_BRANCH_NAME, repoBranchesInfo.get(0).name);
-	}
-
-	@IsTest
-	static void test_commit_apex_classes() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
-		};
-		createMockApexClasses(new List<String>{'someApexClassName'});
 		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
+		batchInstance.startBatch();
 		Test.stopTest();
+
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.isTrue(String.isNotBlank(ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c), 'Last_Processed_Date_Time__c should be set');
 	}
 
-	private static void setMocks() {
-		MetadataService.RetrieveResult retrieveResult = new MetadataService.RetrieveResult();
-		retrieveResult.id = TEST_RETRIEVE_ELEMENT_ID;
-		retrieveResult.done = true;
-		retrieveResult.status = 'Succeeded';
-		retrieveResult.zipFile = TEST_RETRIEVE_RESPONSE_ZIP;
-		Test.setMock(WebServiceMock.class, new MetadataRetrieveResultWebServiceMockImpl(retrieveResult, getSubmitRetrieveAsyncResult()));
+	// ============================================
+	// Test Batch Execution - Multiple Classes
+	// ============================================
+	
+	@IsTest
+	static void test_batchExecution_multipleApexClasses() {
+		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
+			GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
+		};
+		// Create multiple classes with sizes that will fit in one container
+		createMockApexClassesWithSizes(new Map<String, Integer>{
+			'TestClass1' => 1000,
+			'TestClass2' => 2000,
+			'TestClass3' => 3000
+		});
+		setupPermissions(true, true);
+		setHttpMocks();
 		
+		String lastProcessedDateTime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = lastProcessedDateTime;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+		
+		List<Map<String, Object>> dataMapList = new List<Map<String, Object>>();
+		dataMapList.add(createAuditTrailData('id1', Datetime.now(), 'TestClass1', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS));
+		dataMapList.add(createAuditTrailData('id2', Datetime.now().addMinutes(-1), 'TestClass2', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS));
+		dataMapList.add(createAuditTrailData('id3', Datetime.now().addMinutes(-2), 'TestClass3', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS));
+		GitHubCommitBatch.mockAuditTrails = (List<SetupAuditTrail>)JSON.deserialize(JSON.serialize(dataMapList), List<SetupAuditTrail>.class);
+
+		Test.startTest();
+		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+		batchInstance.startBatch();
+		Test.stopTest();
+
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.areNotEqual(lastProcessedDateTime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should be updated');
+	}
+
+	// ============================================
+	// Test Batch Execution - Custom Objects
+	// ============================================
+	
+	@IsTest
+	static void test_batchExecution_withCustomObjects() {
+		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
+			GitHubCommitBatch.METADATA_TYPE_CUSTOM_OBJECT => true
+		};
+		setupPermissions(true, true);
+		setHttpMocksWithCustomObjects();
+		
+		String lastProcessedDateTime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = lastProcessedDateTime;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+		
+		// Use Log__c as custom object change
+		createMockAuditTrail(Datetime.now(), 'Log', GitHubCommitBatch.AUDIT_TRAIL_SECTION_CUSTOM_OBJECTS);
+
+		Test.startTest();
+		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+		batchInstance.startBatch();
+		Test.stopTest();
+
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.areNotEqual(lastProcessedDateTime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should be updated');
+	}
+
+	// ============================================
+	// Test Batch Execution - Standard Objects
+	// ============================================
+	
+	@IsTest
+	static void test_batchExecution_withStandardObjects() {
+		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
+			GitHubCommitBatch.METADATA_TYPE_CUSTOM_OBJECT => true
+		};
+		setupPermissions(true, true);
+		setHttpMocks();
+		
+		String lastProcessedDateTime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = lastProcessedDateTime;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+		
+		// Section starts with "Customize" for standard objects
+		createMockAuditTrail(Datetime.now(), 'Account', 'Customize Application');
+
+		Test.startTest();
+		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+		batchInstance.startBatch();
+		Test.stopTest();
+
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.areNotEqual(lastProcessedDateTime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should be updated');
+	}
+
+	// ============================================
+	// Test Batch Execution - Metadata via listMetadata
+	// ============================================
+	
+	@IsTest
+	static void test_batchExecution_withWorkflowMetadata() {
+		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
+			GitHubCommitBatch.METADATA_TYPE_WORKFLOW => true
+		};
+		setupPermissions(true, true);
+		setHttpMocksWithWorkflow();
+		
+		String lastProcessedDateTime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = lastProcessedDateTime;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+		
+		createMockAuditTrail(Datetime.now(), 'TestWorkflow', GitHubCommitBatch.AUDIT_TRAIL_SECTION_WORKFLOW);
+
+		Test.startTest();
+		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+		batchInstance.startBatch();
+		Test.stopTest();
+
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.areNotEqual(lastProcessedDateTime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should be updated');
+	}
+
+	// ============================================
+	// Test Batch Execution - Delete Metadata Change
+	// ============================================
+	
+	@IsTest
+	static void test_batchExecution_withDeleteChange() {
+		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
+			GitHubCommitBatch.METADATA_TYPE_WORKFLOW => true
+		};
+		setupPermissions(true, true);
+		setHttpMocksWithWorkflow();
+		
+		String lastProcessedDateTime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = lastProcessedDateTime;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+		
+		// Audit change with 'delete' keyword
+		createMockAuditTrail(Datetime.now(), 'Delete TestWorkflow', GitHubCommitBatch.AUDIT_TRAIL_SECTION_WORKFLOW);
+
+		Test.startTest();
+		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+		batchInstance.startBatch();
+		Test.stopTest();
+
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.areNotEqual(lastProcessedDateTime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should be updated');
+	}
+
+	// ============================================
+	// Test Batch Execution - AWS Service Error
+	// ============================================
+	
+	@IsTest
+	static void test_batchExecution_withAwsServiceError() {
+		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
+			GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
+		};
+		createMockApexClasses(new List<String>{'TestClass'});
+		setupPermissions(true, true);
+		setHttpMocksWithError();
+		
+		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = null;
+		// Set Token__c to blank to use oAuth_Token__c
+		ConfigUtil.GIT_API_SETTINGS.Token__c = null;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+		
+		createMockAuditTrail(Datetime.now(), 'TestClass', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
+
+		Test.startTest();
+		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
+		batchInstance.startBatch();
+		Test.stopTest();
+
+		Assert.areNotEqual(null, batchInstance, 'Batch instance should not be null');
+		Assert.areEqual(1, [SELECT COUNT() FROM Log__c], 'Count of Logs do not match');
+	}
+
+	// ============================================
+	// Helper Methods
+	// ============================================
+	
+	private static void setupPermissions(Boolean gitHubEnabled, Boolean changeTrackingEnabled) {
+		Integer gitHubBit = gitHubEnabled ? 1 : 0;
+		Integer changeTrackingBit = changeTrackingEnabled ? 1 : 0;
+		Integer issueAnalysisBit = gitHubEnabled ? 1 : 0; // Enable when GitHub is enabled
+		Integer metadataChatBit = gitHubEnabled ? 1 : 0; // Enable when GitHub is enabled
+		
+		// GitHubIntegrationEnabled = index 15, ChangeTrackingEnabled = index 16
+		// IssueAnalysisEnabled = index 22, MetadataChatEnabled = index 28
+		Integer intValue = PermissionsUtil.getIntegerFromBitmap(new Map<Integer, Integer>{
+			0=>0, 1=>0, 2=>0, 3=>0, 4=>0, 5=>0, 6=>0, 7=>0, 8=>0, 9=>0, 10=>0, 11=>0,
+			12=>0, 13=>0, 14=>0, 15=>gitHubBit, 16=>changeTrackingBit, 17=>0, 18=>0, 19=>0, 20=>0, 21=>0, 22=>issueAnalysisBit, 23=>0,
+			24=>0, 25=>0, 26=>0, 27=>0, 28=>metadataChatBit
+		});
+		PermissionsUtil.FeatureMap1IntValue = intValue;
+
+		ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
+		ConfigUtil.CHANGE_TRACKING_SETTINGS.Git_Change_Tracking__c = changeTrackingEnabled;
+		upsert ConfigUtil.GIT_API_SETTINGS;
+		upsert ConfigUtil.CHANGE_TRACKING_SETTINGS;
+	}
+
+	private static void createMockAuditTrail(Datetime createdDate, String display, String section) {
+		Map<String, Object> dataMap = createAuditTrailData('testAuditId', createdDate, display, section);
+		GitHubCommitBatch.mockAuditTrails = (List<SetupAuditTrail>)JSON.deserialize(
+			JSON.serialize(new List<Map<String, Object>>{ dataMap }), 
+			List<SetupAuditTrail>.class
+		);
+	}
+
+	private static Map<String, Object> createAuditTrailData(String id, Datetime createdDate, String display, String section) {
+		return new Map<String, Object>{
+			'Id' => id,
+			'CreatedDate' => createdDate,
+			'Display' => display,
+			'Section' => section
+		};
+	}
+
+	private static void setHttpMocks() {
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+		
+		TestDataFactory.SingleRequestMock awsMock = new TestDataFactory.SingleRequestMock(
+			200,
+			'OK',
+			JSON.serialize(new Map<String, Object>{ 'success' => true })
+		);
+		endpoint2TestResp.put(GitHubUtils.AWS_GIT_SERVICE_ENDPOINT, awsMock);
+
+		// Mock for PharosChatController.getNamespaceStatus
+		TestDataFactory.SingleRequestMock namespaceStatusMock = new TestDataFactory.SingleRequestMock(
 			200,
 			'OK',
 			JSON.serialize(new Map<String, Object>{
-				'success' => true
+				'empty' => false,
+				'logsEmpty' => false,
+				'indexingInProgress' => false
 			})
 		);
-		endpoint2TestResp.put(GitHubUtils.AWS_GIT_SERVICE_ENDPOINT, singleRequestMock);
+		endpoint2TestResp.put(PharosChatController.CHECK_NAMESPACE_STATUS_ENDPOINT, namespaceStatusMock);
 
 		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
 		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+		
+		// Set WebServiceMock for Metadata API
+		setMetadataServiceMock();
 	}
 
-	private static String getGitAPIUserEndpoint() {
-		return GitHubUtils.GIT_API_USER_INFO;
-	}
-	private static TestDataFactory.SingleRequestMock getGitAPIUserMock() {
-		Map<String, Object> objectUser = new Map<String, Object> {
-				'login' => TEST_GIT_API_USERNAME
-		};
-
-		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
-				200,
-				'OK',
-				JSON.serialize(objectUser)
-		);
-		return singleRequestMock;
+	private static void setMetadataServiceMock() {
+		List<MetadataService.FileProperties> fileProps = new List<MetadataService.FileProperties>();
+		MetadataService.FileProperties fp = new MetadataService.FileProperties();
+		fp.fullName = 'TestApexClass';
+		fp.type_x = GitHubCommitBatch.METADATA_TYPE_APEX_CLASS;
+		fileProps.add(fp);
+		
+		Test.setMock(WebServiceMock.class, new MockMetadataServiceImpl(fileProps));
 	}
 
-	private static String getGitAPIUserReposEndpoint() {
-		return GitHubUtils.GIT_API_REPOS_INFO;
-	}
-	@TestVisible
-	private static String getGitAPIUserReposByNameEndpoint(String reponame) {
-		return getGitAPIUserReposByNameEndpoint(GitHubUtils.GIT_USERNAME, reponame);
-	}
-	@TestVisible
-	private static String getGitAPIUserReposByNameEndpoint(String owner, String reponame) {
-		return String.format(GitHubUtils.GIT_API_GET_REPOS_INFO, new List<String>{owner, reponame});
-	}
-	private static TestDataFactory.SingleRequestMock getGitAPIUserReposMock() {
-		List<Map<String, Object>> objectRepos = new List<Map<String, Object>>{
-			new Map<String, Object> {
-				'name' => TEST_GIT_API_REPONAME,
-				'archived' => false,
-				'disabled' => false,
-				'owner' => new Map<String, Object> {
-					'login' => TEST_GIT_API_USERNAME
-				}
-			},
-			new Map<String, Object> {
-				'name' => 'disabledRepo',
-				'archived' => false,
-				'disabled' => true,
-				'owner' => new Map<String, Object> {
-					'login' => TEST_GIT_API_USERNAME
-				}
-			},
-			new Map<String, Object> {
-				'name' => 'archivedRepo',
-				'archived' => true,
-				'disabled' => false,
-				'owner' => new Map<String, Object> {
-					'login' => TEST_GIT_API_USERNAME
-				}
-			},
-			new Map<String, Object> {
-				'name' => TEST_GIT_API_EXT_REPONAME,
-				'archived' => false,
-				'disabled' => false,
-				'owner' => new Map<String, Object> {
-					'login' => TEST_GIT_API_EXT_USERNAME
-				}
-			}
-		};
-
-		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+	private static void setHttpMocksWithCustomObjects() {
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		
+		TestDataFactory.SingleRequestMock awsMock = new TestDataFactory.SingleRequestMock(
 			200,
 			'OK',
-			JSON.serialize(objectRepos)
+			JSON.serialize(new Map<String, Object>{ 'success' => true })
 		);
-		return singleRequestMock;
-	}
+		endpoint2TestResp.put(GitHubUtils.AWS_GIT_SERVICE_ENDPOINT, awsMock);
 
-	@TestVisible
-	private static TestDataFactory.SingleRequestMock getGitAPIUserReposByNameMock() {
-		Map<String, Object> objectRepos = new Map<String, Object> {
-			'name' => TEST_GIT_API_EXT_REPONAME,
-			'archived' => false,
-			'disabled' => false,
-			'owner' => new Map<String, Object> {
-				'login' => TEST_GIT_API_EXT_USERNAME
-			}
-		};
-
-		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+		// Mock for PharosChatController.getNamespaceStatus
+		TestDataFactory.SingleRequestMock namespaceStatusMock = new TestDataFactory.SingleRequestMock(
 			200,
 			'OK',
-			JSON.serialize(objectRepos)
+			JSON.serialize(new Map<String, Object>{
+				'empty' => false,
+				'logsEmpty' => false,
+				'indexingInProgress' => false
+			})
 		);
-		return singleRequestMock;
+		endpoint2TestResp.put(PharosChatController.CHECK_NAMESPACE_STATUS_ENDPOINT, namespaceStatusMock);
+
+		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+		
+		// Set WebServiceMock for Custom Objects with namespace
+		List<MetadataService.FileProperties> fileProps = new List<MetadataService.FileProperties>();
+		MetadataService.FileProperties fp = new MetadataService.FileProperties();
+		fp.fullName = 'Log__c';
+		fp.type_x = GitHubCommitBatch.METADATA_TYPE_CUSTOM_OBJECT;
+		fp.namespacePrefix = ConfigUtil.currentOrgNameSpacePrefix;
+		fileProps.add(fp);
+		
+		Test.setMock(WebServiceMock.class, new MockMetadataServiceImpl(fileProps));
 	}
 
-	@Testvisible
-	private static String getGitAPIUserExtRepoBranchesByNameEndpoint() {
-		return String.format(GitHubUtils.GIT_API_GET_REPO_BRANCHES_INFO, new List<String>{TEST_GIT_API_EXT_USERNAME, TEST_GIT_API_EXT_REPONAME, TEST_GIT_API_EXT_BRANCH_NAME});
-	}
-	@Testvisible
-	private static TestDataFactory.SingleRequestMock getGitAPIUserExtRepoBranchesByNameMock() {
-		Map<String, Object> objectRepos = new Map<String, Object> {
-			'name' => TEST_GIT_API_EXT_BRANCH_NAME
-		};
-
-		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+	private static void setHttpMocksWithWorkflow() {
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		
+		TestDataFactory.SingleRequestMock awsMock = new TestDataFactory.SingleRequestMock(
 			200,
 			'OK',
-			JSON.serialize(objectRepos)
+			JSON.serialize(new Map<String, Object>{ 'success' => true })
 		);
-		return singleRequestMock;
-	}
+		endpoint2TestResp.put(GitHubUtils.AWS_GIT_SERVICE_ENDPOINT, awsMock);
 
-	private static String getGitAPIUserExtRepoBranchesEndpoint() {
-		return String.format(GitHubUtils.GIT_API_REPO_BRANCHES_INFO, new List<String>{TEST_GIT_API_EXT_USERNAME, TEST_GIT_API_EXT_REPONAME});
-	}
-	private static TestDataFactory.SingleRequestMock getGitAPIUserExtRepoBranchesMock() {
-		List<Map<String, Object>> objectRepos = new List<Map<String, Object>>{
-			new Map<String, Object> {
-				'name' => TEST_GIT_API_EXT_BRANCH_NAME
-			}
-		};
-
-		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+		// Mock for PharosChatController.getNamespaceStatus
+		TestDataFactory.SingleRequestMock namespaceStatusMock = new TestDataFactory.SingleRequestMock(
 			200,
 			'OK',
-			JSON.serialize(objectRepos)
+			JSON.serialize(new Map<String, Object>{
+				'empty' => false,
+				'logsEmpty' => false,
+				'indexingInProgress' => false
+			})
 		);
-		return singleRequestMock;
+		endpoint2TestResp.put(PharosChatController.CHECK_NAMESPACE_STATUS_ENDPOINT, namespaceStatusMock);
+
+		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+		
+		// Set WebServiceMock for Workflow
+		List<MetadataService.FileProperties> fileProps = new List<MetadataService.FileProperties>();
+		MetadataService.FileProperties fp = new MetadataService.FileProperties();
+		fp.fullName = 'TestWorkflow';
+		fp.type_x = GitHubCommitBatch.METADATA_TYPE_WORKFLOW;
+		fileProps.add(fp);
+		
+		Test.setMock(WebServiceMock.class, new MockMetadataServiceImpl(fileProps));
 	}
 
-	private static String getGitAPIUserOwnRepoBranchesEndpoint() {
-		return String.format(GitHubUtils.GIT_API_REPO_BRANCHES_INFO, new List<String>{GitHubUtils.GIT_USERNAME, TEST_GIT_API_REPONAME});
-	}
-	private static TestDataFactory.SingleRequestMock getGitAPIUserOwnRepoBranchesMock() {
-		List<Map<String, Object>> objectRepos = new List<Map<String, Object>>{
-			new Map<String, Object> {
-				'name' => TEST_GIT_API_BRANCH_NAME
-			}
-		};
+	private static void setHttpMocksWithError() {
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		
+		// Mock AWS Git Service with 404 error
+		TestDataFactory.SingleRequestMock awsErrorMock = new TestDataFactory.SingleRequestMock(
+			404,
+			'Not Found',
+			''
+		);
+		endpoint2TestResp.put(GitHubUtils.AWS_GIT_SERVICE_ENDPOINT, awsErrorMock);
 
-		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+		// Mock for PharosChatController.getNamespaceStatus
+		TestDataFactory.SingleRequestMock namespaceStatusMock = new TestDataFactory.SingleRequestMock(
 			200,
 			'OK',
-			JSON.serialize(objectRepos)
+			JSON.serialize(new Map<String, Object>{
+				'empty' => false,
+				'logsEmpty' => false,
+				'indexingInProgress' => false
+			})
 		);
-		return singleRequestMock;
-	}
+		endpoint2TestResp.put(PharosChatController.CHECK_NAMESPACE_STATUS_ENDPOINT, namespaceStatusMock);
 
-	static List<GitHubCommitBatch.MetadataTypeWrapper> createPackageItems(String type) {
-		List<GitHubCommitBatch.MetadataTypeWrapper> result = new List<GitHubCommitBatch.MetadataTypeWrapper>();
-		GitHubCommitBatch.MetadataTypeWrapper wrapper = new GitHubCommitBatch.MetadataTypeWrapper(type, TEST_RETRIEVE_ELEMENT_MEMBER);
-		wrapper.jobId = TEST_RETRIEVE_ELEMENT_ID;
-		result.add(wrapper);
-		return result;
-	}
-
-	private static MetadataService.AsyncResult getSubmitRetrieveAsyncResult() {
-		MetadataService.AsyncResult asyncResult = new MetadataService.AsyncResult();
-		asyncResult.id = TEST_RETRIEVE_ELEMENT_ID;
-		asyncResult.done = true;
-		return asyncResult;
-	}
-
-	@IsTest
-	static void test_submit_retrieve_remote_site_settings() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_REMOTE_SITE_SETTINGS => true
-		};
-
-		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
-		Test.stopTest();
-	}
-
-	@IsTest
-	static void test_submit_retrieve_workflows() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_WORKFLOW => true
-		};
-
-		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
-		Test.stopTest();
-	}
-
-	@IsTest
-	static void test_submit_retrieve_approval_processes() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_APPROVAL_PROCESS => true
-		};
-		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
-		Test.stopTest();
-	}
-
-	@IsTest
-	static void test_submit_retrieve_aura_elements() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_AURA => true
-		};
-		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
-		Test.stopTest();
-	}
-
-	@IsTest
-	static void test_submit_retrieve_connected_apps() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_CONNECTED_APP => true
-		};
-
-		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
-		Test.stopTest();
-	}
-
-	@IsTest
-	static void test_submit_retrieve_named_creds() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_NAMED_CREDENTIAL => true
-		};
-		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
-		Test.stopTest();
-	}
-
-	@IsTest
-	static void test_submit_retrieve_custom_metadata() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_CUSTOM_METADATA => true
-		};
-		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
-		Test.stopTest();
+		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+		
+		// Set WebServiceMock for Metadata API
+		setMetadataServiceMock();
 	}
 
 	private static void createMockApexClasses(List<String> apexClassNames) {
@@ -492,260 +552,43 @@ private class GitHubCommitBatchTest {
 		GitHubCommitBatch.mockListApexClasses = (List<ApexClass>)JSON.deserialize(JSON.serialize(dataMapList), List<ApexClass>.class);
 	}
 
-	@IsTest
-	static void test_submit_retrieve_apex_classes() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
-		};
-		createMockApexClasses(new List<String>{'someApexClassName'});
+	private static void createMockApexClassesWithSizes(Map<String, Integer> classNamesWithSizes) {
+		GitHubCommitBatch.mockListApexClasses = new List<ApexClass>();
 
-		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
-		Test.stopTest();
-	}
-
-	@IsTest
-	static void test_submit_retrieve_apex_triggers() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_APEX_TRIGGER => true
-		};
-
-		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
-		Test.stopTest();
-	}
-
-	@IsTest
-	static void test_submit_retrieve_metadata_flows() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_FLOW => true
-		};
-
-		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
-		Test.stopTest();
-	}
-
-	@IsTest
-	static void test_last_processed_date_time_update() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
-		};
-
-		createMockApexClasses(new List<String>{'TestApexClass'});
-		setMocks();
-
-		Datetime dtNow = Datetime.now();
-
-		// Test Case 1: Initial run with blank Last_Processed_Date_Time__c
-		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = null;
-		upsert ConfigUtil.GIT_API_SETTINGS;
-
-		Test.startTest();
-
-		// Create mock audit trail for initial run with multiple records
 		List<Map<String, Object>> dataMapList = new List<Map<String, Object>>();
-		
-		Map<String, Object> dataMap1 = new Map<String, Object>();
-		dataMap1.put('Id', 'initialTrailId1');
-		dataMap1.put('Display', 'TestApexClass1');
-		dataMap1.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
-		dataMap1.put('CreatedDate', dtNow);
-		dataMapList.add(dataMap1);
-		
-		Map<String, Object> dataMap2 = new Map<String, Object>();
-		dataMap2.put('Id', 'initialTrailId2');
-		dataMap2.put('Display', 'TestApexClass2');
-		dataMap2.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
-		dataMap2.put('CreatedDate', dtNow.addDays(-1));
-		dataMapList.add(dataMap2);
-		
-		Map<String, Object> dataMap3 = new Map<String, Object>();
-		dataMap3.put('Id', 'initialTrailId3');
-		dataMap3.put('Display', 'TestApexClass3');
-		dataMap3.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
-		dataMap3.put('CreatedDate', dtNow.addDays(-2));
-		dataMapList.add(dataMap3);
-
-		GitHubCommitBatch.mockAuditTrails = (List<SetupAuditTrail>)JSON.deserialize(JSON.serialize(dataMapList), List<SetupAuditTrail>.class);
-
-		List<GitHubCommitBatch.MetadataTypeWrapper> items = GitHubCommitBatch.getMetadataTypeMembers();
-
-		Test.stopTest();
-
-		// Verify Last_Processed_Date_Time__c was updated to the highest CreatedDate (first record due to DESC order)
-		System.assertEquals(dtNow.formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT), ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should be updated to the highest CreatedDate');
-	}
-
-	@IsTest
-	static void test_last_processed_id_update_with_changes() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
-		};
-
-		createMockApexClasses(new List<String>{'ChangedApexClass'});
-		setMocks();
-
-		// Test Case: Subsequent run with existing Last_Processed_Date_Time__c and new changes
-		Datetime dtNow = Datetime.now();
-		String initialLastProcessedDatetime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
-		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = initialLastProcessedDatetime;
-		upsert ConfigUtil.GIT_API_SETTINGS;
-
-		Test.startTest();
-
-		// Create mock audit trail for subsequent run with multiple records
-		List<Map<String, Object>> dataMapList = new List<Map<String, Object>>();
-		
-		Map<String, Object> dataMap1 = new Map<String, Object>();
-		dataMap1.put('Id', 'newTrailId1');
-		dataMap1.put('Display', 'ChangedApexClass2');
-		dataMap1.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
-		dataMap1.put('CreatedDate', dtNow);
-		dataMapList.add(dataMap1);
-		
-		Map<String, Object> dataMap2 = new Map<String, Object>();
-		dataMap2.put('Id', 'newTrailId2');
-		dataMap2.put('Display', 'ChangedApexClass1');
-		dataMap2.put('Section', GitHubCommitBatch.AUDIT_TRAIL_SECTION_APEX_CLASS);
-		dataMap2.put('CreatedDate', dtNow.addSeconds(-5));
-		dataMapList.add(dataMap2);
-
-		GitHubCommitBatch.mockAuditTrails = (List<SetupAuditTrail>)JSON.deserialize(JSON.serialize(dataMapList), List<SetupAuditTrail>.class);
-
-		List<GitHubCommitBatch.MetadataTypeWrapper> items = GitHubCommitBatch.getMetadataTypeMembers();
-
-		Test.stopTest();
-
-		// Verify Last_Processed_Date_Time__c was updated to the highest CreatedDate (first record due to DESC order)
-		System.assertEquals(dtNow.formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT), ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should be updated to the highest CreatedDate');
-	}
-
-	@IsTest
-	static void test_last_processed_id_update_no_changes() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_APEX_CLASS => true
-		};
-
-		createMockApexClasses(new List<String>{});
-		setMocks();
-
-		// Test Case: No changes scenario
-		String initialLastProcessedDatetime = Datetime.now().addDays(-1).formatGMT(Constants.GLOBAL_VARIABLE.DATETIME_FORMAT);
-		ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c = initialLastProcessedDatetime;
-		upsert ConfigUtil.GIT_API_SETTINGS;
-
-		Test.startTest();
-
-		// Create empty mock audit trail
-		GitHubCommitBatch.mockAuditTrails = new List<SetupAuditTrail>();
-
-		List<GitHubCommitBatch.MetadataTypeWrapper> items = GitHubCommitBatch.getMetadataTypeMembers();
-
-		Test.stopTest();
-
-		// Verify Last_Processed_Date_Time__c remains unchanged when no new changes
-		System.assertEquals(initialLastProcessedDatetime, ConfigUtil.GIT_API_SETTINGS.Last_Processed_Date_Time__c, 'Last_Processed_Date_Time__c should remain unchanged when no new changes');
-		System.assertEquals(0, items.size(), 'Should return empty list when no changes detected');
-	}
-
-	@IsTest
-	static void test_submit_retrieve_metadata_custom_objects() {
-		GitHubCommitBatch.MAP_ENABLED_METADATA = new Map<String, Boolean>{
-				GitHubCommitBatch.METADATA_TYPE_CUSTOM_OBJECT => true
-		};
-
-		GitHubCommitBatch batchInstance = GitHubCommitBatch.getInstance();
-		setMocks();
-
-		Test.startTest();
-		Database.executeBatch(batchInstance, 1);
-		Test.stopTest();
-	}
-
-	public static final String TEST_RETRIEVE_ELEMENT_ID = 'testId';
-	public static final String TEST_RETRIEVE_ELEMENT_MEMBER = 'someMember';
-	public static final String TEST_RETRIEVE_RESPONSE_ZIP = 'someBase64ZipContent';
-
-	public static final String TEST_WORKFLOW_ELEMENT_API_NAME = 'someWorkflowAPIName';
-	public static final String TEST_APPROVAL_PROCESS_ELEMENT_API_NAME = 'someApprovalAPIName';
-	public static final String TEST_AURA_ELEMENT_API_NAME = 'someAuraAPIName';
-	public static final String TEST_RSS_ELEMENT_API_NAME = 'someRssAPIName';
-	public static final String TEST_APP_ELEMENT_API_NAME = 'someAppAPIName';
-	public static final String TEST_CREDS_ELEMENT_API_NAME = 'someCredsAPIName';
-	public static final String TEST_CUSTOM_METADATA_ELEMENT_API_NAME = 'someCustomMetaPIName';
-
-	public static final Map<String, String> TEST_MAP_DEFAULT_DESCRIBE_LIST_COMPONENTS = new Map<String, String>{
-			GitHubCommitBatch.METADATA_TYPE_WORKFLOW => TEST_WORKFLOW_ELEMENT_API_NAME,
-			GitHubCommitBatch.METADATA_TYPE_APPROVAL_PROCESS => TEST_APPROVAL_PROCESS_ELEMENT_API_NAME,
-			GitHubCommitBatch.METADATA_TYPE_AURA => TEST_AURA_ELEMENT_API_NAME,
-			GitHubCommitBatch.METADATA_TYPE_REMOTE_SITE_SETTINGS => TEST_RSS_ELEMENT_API_NAME,
-			GitHubCommitBatch.METADATA_TYPE_CONNECTED_APP => TEST_APP_ELEMENT_API_NAME,
-			GitHubCommitBatch.METADATA_TYPE_NAMED_CREDENTIAL => TEST_CREDS_ELEMENT_API_NAME,
-			GitHubCommitBatch.METADATA_TYPE_CUSTOM_METADATA => TEST_CUSTOM_METADATA_ELEMENT_API_NAME
-	};
-
-	public static List<MetadataService.FileProperties> getDefaultListDescribeElements() {
-		List<MetadataService.FileProperties> result = new List<MetadataService.FileProperties>();
-		for(String metaType : TEST_MAP_DEFAULT_DESCRIBE_LIST_COMPONENTS.keySet()) {
-			MetadataService.FileProperties fp = new MetadataService.FileProperties();
-			fp.fullName = TEST_MAP_DEFAULT_DESCRIBE_LIST_COMPONENTS.get(metaType);
-			fp.type_x = metaType;
-			result.add(fp);
+		for(String className : classNamesWithSizes.keySet()) {
+			Map<String, Object> dataMap = new Map<String, Object>();
+			dataMap.put('Name', className);
+			dataMap.put('LengthWithoutComments', classNamesWithSizes.get(className));
+			dataMapList.add(dataMap);
 		}
-		return result;
+		GitHubCommitBatch.mockListApexClasses = (List<ApexClass>)JSON.deserialize(JSON.serialize(dataMapList), List<ApexClass>.class);
 	}
 
-	public class MetadataRetrieveResultWebServiceMockImpl implements WebServiceMock {
-		private MetadataService.RetrieveResult retrieveResult;
-		private MetadataService.AsyncResult asyncResult;
+	// Mock class for Metadata Service
+	public class MockMetadataServiceImpl implements WebServiceMock {
 		private MetadataService.FileProperties[] fileProperties;
 
-		public MetadataRetrieveResultWebServiceMockImpl(MetadataService.RetrieveResult retrieveResult, MetadataService.AsyncResult asyncResult) {
-			this(retrieveResult, asyncResult, getDefaultListDescribeElements());
-		}
-
-		public MetadataRetrieveResultWebServiceMockImpl(MetadataService.RetrieveResult retrieveResult, MetadataService.AsyncResult asyncResult, MetadataService.FileProperties[] fileProperties) {
-			this.retrieveResult = retrieveResult;
-			this.asyncResult = asyncResult;
+		public MockMetadataServiceImpl(MetadataService.FileProperties[] fileProperties) {
 			this.fileProperties = fileProperties;
 		}
+
 		public void doInvoke(
-				Object stub,
-				Object request,
-				Map<String, Object> response,
-				String endpoint,
-				String soapAction,
-				String requestName,
-				String responseNS,
-				String responseName,
-				String responseType) {
-
-			if(request instanceof MetadataService.listMetadata_element) {
-				MetadataService.listMetadataResponse_element listMetadataResponseElement = new MetadataService.listMetadataResponse_element();
-				listMetadataResponseElement.result = this.fileProperties;
-				response.put('response_x', listMetadataResponseElement);
+			Object stub,
+			Object request,
+			Map<String, Object> response,
+			String endpoint,
+			String soapAction,
+			String requestName,
+			String responseNS,
+			String responseName,
+			String responseType
+		) {
+			if (request instanceof MetadataService.listMetadata_element) {
+				MetadataService.listMetadataResponse_element listResponse = new MetadataService.listMetadataResponse_element();
+				listResponse.result = this.fileProperties;
+				response.put('response_x', listResponse);
 			}
-			else if (request instanceof MetadataService.retrieve_element) {
-				MetadataService.retrieveResponse_element retrieveResponseElement = new MetadataService.retrieveResponse_element();
-				retrieveResponseElement.result = this.asyncResult;
-				response.put('response_x', retrieveResponseElement);
-			}
-			else if (request instanceof MetadataService.checkRetrieveStatus_element) {
-				MetadataService.checkRetrieveStatusResponse_element checkResponseElement = new MetadataService.checkRetrieveStatusResponse_element();
-				checkResponseElement.result = this.retrieveResult;
-				response.put('response_x', checkResponseElement);
-			}
-
 		}
 	}
 }

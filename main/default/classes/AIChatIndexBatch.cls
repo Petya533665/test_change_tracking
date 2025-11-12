@@ -11,10 +11,9 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
     private List<Map<String, Object>> uploadedParts = new List<Map<String, Object>>();
     private List<Map<String, Object>> logBuffer = new List<Map<String, Object>>();
     private Integer currentPartIndex = 0;
-    private Integer totalBatches = 0;
-    private Integer currentBatchNumber = 0;
     private Integer deletedLogCount = 0;
     private Boolean onlyDeletedLogsPresent = false;
+    private Set<String> processedHashes = new Set<String>();
     
     private AI_Chat_Index_Settings__c settingsInstance = null;
     private AI_Chat_Index_Settings__c SETTINGS {
@@ -43,7 +42,7 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
 
     private AIChatIndexBatch(Logger logger) {
         super(logger);
-        BATCH_SCOPE = MAX_LOGS_PER_BATCH;
+        BATCH_SCOPE = 5000;
     }
 
     public override void startBatch() {
@@ -51,16 +50,28 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
     }
 
     public override Integer getIterationsCount() {
+        List<Log_Index__c> newLogIndexes = [
+            SELECT Hash__c
+            FROM Log_Index__c
+            WHERE CreatedDate >= :SETTINGS.LastLogUpdateTimestamp__c
+        ];
+        List<String> newHashes = new List<String>();
+        for (Log_Index__c logIndex : newLogIndexes) {
+            newHashes.add(logIndex.Hash__c);
+        }
+        Integer count = [
+            SELECT COUNT()
+            FROM Log__c
+            WHERE Hash_1__c IN :newHashes
+        ];
+
         this.deletedLogCount = [
             SELECT COUNT()
             FROM Log_Index__c
             WHERE IsDeleted = true AND LastModifiedDate > :SETTINGS.LastLogUpdateTimestamp__c
             ALL ROWS
         ];
-        Integer count = [
-            SELECT COUNT() FROM Log_Index__c
-            WHERE CreatedDate >= :SETTINGS.LastLogUpdateTimestamp__c
-        ];
+
         if (count == 0 && this.deletedLogCount > 0) {
             count = 1;
             this.onlyDeletedLogsPresent = true;
@@ -72,45 +83,53 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
         return PermissionsUtil.MetadataChatEnabled && ConfigUtil.OPEN_AI_SETTINGS.OpenAI_Enabled__c;
     }
 
-    public Iterable<SObject> start(Database.BatchableContext batchableContext) {
-        Integer itemsCount = getIterationsCount();
-        this.totalBatches = Integer.valueOf(Math.ceil(itemsCount / Decimal.valueOf(BATCH_SCOPE)));
-        initiateMultipartUpload(this.totalBatches);
-        
+    public Database.QueryLocator start(Database.BatchableContext batchableContext) {
         if (this.onlyDeletedLogsPresent) {
-            return new List<SObject>();
+            initiateMultipartUpload(1);
+            return Database.getQueryLocator([SELECT Id FROM Log__c WHERE Id = null]);
         }
 
         List<Log_Index__c> newLogIndexes = [
             SELECT Hash__c
             FROM Log_Index__c
             WHERE CreatedDate >= :SETTINGS.LastLogUpdateTimestamp__c
-            LIMIT :itemsCount
         ];
         List<String> newHashes = new List<String>();
         for (Log_Index__c logIndex : newLogIndexes) {
             newHashes.add(logIndex.Hash__c);
         }
+        Integer totalBatches = Integer.valueOf(Math.ceil(newHashes.size() / Decimal.valueOf(MAX_LOGS_PER_BATCH)));
+        initiateMultipartUpload(totalBatches);
 
-        List<AggregateResult> uniqueIds = [
-            SELECT MIN(Id) uniqueId
+        return Database.getQueryLocator([
+            SELECT Id, Hash_1__c
             FROM Log__c
             WHERE Hash_1__c IN :newHashes
-            GROUP BY Hash_1__c
-            ORDER BY MIN(Id) DESC
-        ];
-        return uniqueIds;
+            ORDER BY Hash_1__c, CreatedDate ASC
+        ]);
     }
 
     public void execute(Database.BatchableContext info, List<SObject> scope) {
         try {
-            this.currentBatchNumber++;
-            List<Map<String, Object>> transformedLogs = getTransformedLogs(scope);
-            logBuffer.addAll(transformedLogs);
-            
-            Boolean isLastBatch = this.currentBatchNumber == this.totalBatches;
-            if (Limits.getHeapSize() > HEAP_SIZE_THRESHOLD || (isLastBatch && !logBuffer.isEmpty())) {
-                uploadCurrentPart(isLastBatch);
+            List<Log__c> logs = (List<Log__c>) scope;
+            List<Id> uniqueLogIds = new List<Id>();
+            for (Log__c log : logs) {
+                if (log.Hash_1__c != null && !processedHashes.contains(log.Hash_1__c)) {
+                    processedHashes.add(log.Hash_1__c);
+                    uniqueLogIds.add(log.Id);
+                }
+            }
+
+            for (Integer i = 0; i < uniqueLogIds.size(); i += MAX_LOGS_PER_BATCH) {
+                Integer endIndex = Math.min(i + MAX_LOGS_PER_BATCH, uniqueLogIds.size());
+                List<Id> batchLogIds = new List<Id>();
+                for (Integer j = i; j < endIndex; j++) {
+                    batchLogIds.add(uniqueLogIds[j]);
+                }
+                logBuffer.addAll(getTransformedLogs(batchLogIds));
+                if (Limits.getHeapSize() > HEAP_SIZE_THRESHOLD) {
+                    uploadCurrentPart(false);
+                }
             }
         }
         catch (Exception e) {
@@ -120,17 +139,21 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
 
     public void finish(Database.BatchableContext BC) {
         try {
-            if (this.onlyDeletedLogsPresent) {
-                uploadCurrentPart(true);
-            }
+            uploadCurrentPart(true);
             completeMultipartUpload();
-            
+        }
+        catch (Exception e) {
+            loggerInstance?.addInternalError(e, AIChatIndexBatch.class.getName(), 'finish');
+            this.loggerInstance?.flush();
+        }
+        
+        try {
             AsyncApexJob job = [SELECT CreatedDate FROM AsyncApexJob WHERE Id = :BC.getJobId() LIMIT 1];
             SETTINGS.LastLogUpdateTimestamp__c = job.CreatedDate;
             update SETTINGS;
         }
         catch (Exception e) {
-            loggerInstance?.addInternalError(e, AIChatIndexBatch.class.getName(), 'finish');
+            loggerInstance?.addInternalError(e, AIChatIndexBatch.class.getName(), 'finish:updateSettings');
         }
 
         this.loggerInstance?.flush();
@@ -201,7 +224,7 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
 
     private String createArrayPart(List<Map<String, Object>> batchLogs, Integer partIndex, Boolean lastPart) {
         if (batchLogs.isEmpty()) {
-            return '';
+            return lastPart ? ']}' : '';
         }
         String arrayJSON = JSON.serialize(batchLogs);
         
@@ -214,22 +237,17 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
         }
     }
 
-    private List<Map<String, Object>> getTransformedLogs(List<SObject> scope) {
-        Set<Id> logIds = new Set<Id>();
-        for (SObject record : scope) {
-            logIds.add((Id)record.get('uniqueId'));
-        }
-        
+    private List<Map<String, Object>> getTransformedLogs(List<Id> logIds) {
         Set<String> fields = new Set<String>{
             'Id', 'Name', 'Hash_1__c', 'Created_At__c', 'Category__c', 'Type__c', 'Area__c', 'Summary__c', 'Details__c', 'Issue__r.Id', 'Issue__r.Name'
         };
         QBuilder qb = new QBuilder(Log__c.SObjectType)
             .selectFields(fields)
-            .add(QBuilder.condition('Id').isIn(new List<Id>(logIds)));
-        List<Log__c> logs = Database.query(qb.build());
+            .add(QBuilder.condition('Id').isIn(logIds));
+        List<Log__c> fullLogs = Database.query(qb.build());
 
         List<Map<String, Object>> transformedLogs = new List<Map<String, Object>>();
-        for (Log__c log : logs) {
+        for (Log__c log : fullLogs) {
             Map<String, Object> transformedLog = new Map<String, Object>();
             transformedLog.put('id', log.Id);
             transformedLog.put('name', log.Name);
