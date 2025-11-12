@@ -66,13 +66,12 @@ global with sharing class EventsChartsWrapperController {
     public static String getLogRecords(String eventId, Integer range) {
 		// default 1h range from now
 		Event__c event = [
-			SELECT Id, Records__c, Rule__c, CreatedDate,
-            Rule__r.Name, Rule__r.Threshold__c, Rule__r.EventTimeInterval__c, Rule__r.AggregateInterval__c, Rule__r.Subtype__c, Rule__r.Type__c
+			SELECT Id, CreatedDate, Rule__r.Type__c
 			FROM Event__c
 			WHERE Id= :eventId
 		];
 		String ruleId = event.Rule__c;
-		Rule__c currentRule = event.Rule__r;
+		String ruleType = event.Rule__r.Type__c;
 
         DateTime eventTime = event.CreatedDate;
         DateTime startTime = eventTime.addMinutes(-60);
@@ -82,7 +81,7 @@ global with sharing class EventsChartsWrapperController {
         startTime = eventTime.addMinutes(-shiftMinutes);
 		endTime = eventTime.addMinutes(shiftMinutes);
 		
-		return JSON.serialize(getChartData(ruleId, event.Id, startTime, endTime));
+		return JSON.serialize(getChartData(ruleId, ruleType, event.Id, startTime, endTime));
 	}
 	
 	// ===== #3 chart (Logs Timing)
@@ -136,7 +135,16 @@ global with sharing class EventsChartsWrapperController {
         return JSON.serialize(eventLogs);
     }
 
-	private static ChartData getChartData(Id ruleId, Id eventId, DateTime startTime, DateTime endTime) {
+	private static ChartData getChartData(Id ruleId, String ruleType, Id eventId, DateTime startTime, DateTime endTime) {
+		if (ruleType == Constants.RULE_SOBJECT.TYPE_LIMITS) {
+			return getLimitsChartData(ruleId, eventId, startTime, endTime);
+		}
+		else {
+			return getMonitoringChartData(ruleId, eventId, startTime, endTime);
+		}
+	}
+
+	private static ChartData getMonitoringChartData(Id ruleId, Id eventId, DateTime startTime, DateTime endTime) {
 		List<RuleUtil.Rule> rules = RuleUtil.getMonitoringRules(new List<Id>{ruleId});
 		if(rules.get(0).subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_SPIKE)) {
 			ChartData result = new ChartData();
@@ -162,6 +170,161 @@ global with sharing class EventsChartsWrapperController {
 		else {
 			return getImpactChartData(ruleId, eventId, startTime, endTime);
 		}
+	}
+
+	private static ChartData getLimitsChartData(Id ruleId, Id eventId, DateTime startTime, DateTime endTime) {
+		ChartData result = new ChartData();
+		List<RuleUtil.Rule> rules = RuleUtil.getLimitsRules(new List<Id>{ruleId});
+		if(rules.isEmpty()) {
+			return result;
+		}
+		
+		RuleUtil.Rule rule = rules.get(0);
+		
+		// Get limit fields to query
+		List<String> logFields = RuleUtil.getLogFieldNames(rules);
+		logFields.add('Created_At__c');
+		logFields.add('Limits__c');
+		
+		// Query logs with Limits__r relationship
+		String eventLogsQuery = new QBuilder(Log__c.SObjectType)
+			.selectFields(new Set<String>(logFields))
+			.add(QBuilder.condition('Created_At__c').isGreaterOrEquals(':startTime'))
+			.add(QBuilder.condition('Created_At__c').isLessOrEquals(':endTime'))
+			.add(QBuilder.condition('Limits__c').isNotNull())
+			.add(QBuilder.orderBy('Created_At__c').ascending())
+			.addLimit(EVENT_CHART_MAX_RECORDS)
+			.build();
+		
+		List<Log__c> logs = Database.query(eventLogsQuery);
+		
+		// Get org limits to calculate percentages
+		Map<String, System.OrgLimit> orgLimits = OrgLimits.getMap();
+		
+		// Determine which limit field(s) are being monitored
+		Set<String> monitoredFields = new Set<String>();
+		if(rule.groupFieldNames != null && !rule.groupFieldNames.isEmpty()) {
+			// Use groupFieldNames if available (set during rule processing)
+			for(String groupFieldName : rule.groupFieldNames) {
+				monitoredFields.add(groupFieldName);
+			}
+		} else {
+			// Fallback: check rule filters for Limits__r fields
+			for(RuleUtil.RuleFilter filter : rule.ruleFilters) {
+				if(filter.fieldName != null && filter.fieldName.startsWith('Limits__r.')) {
+					String fieldName = filter.fieldName.substringAfter('Limits__r.');
+					monitoredFields.add(fieldName);
+				}
+			}
+		}
+		
+		// If no specific fields found, monitor all limit fields
+		if(monitoredFields.isEmpty()) {
+			for(String limitKey : LimitsService.FIELD_MAP.keySet()) {
+				Schema.DescribeFieldResult fieldDescribe = LimitsService.FIELD_MAP.get(limitKey);
+				monitoredFields.add(fieldDescribe.getName());
+			}
+		}
+		
+		// Group logs by time intervals (similar to splitLogsBySeconds)
+		Map<Long, List<Log__c>> logsByInterval = new Map<Long, List<Log__c>>();
+		for(Log__c log : logs) {
+			if(log.Created_At__c == null || log.Limits__r == null) continue;
+			
+			Long roundedMills = log.Created_At__c.getTime();
+			List<Log__c> logsByMills = logsByInterval.get(roundedMills) != null
+				? logsByInterval.get(roundedMills)
+				: new List<Log__c>();
+			
+			logsByMills.add(log);
+			logsByInterval.put(roundedMills, logsByMills);
+		}
+		
+		// Process each interval and calculate limit values
+		for(Long datetimeLong : logsByInterval.keySet()) {
+			List<Log__c> intervalLogs = logsByInterval.get(datetimeLong);
+			if(intervalLogs.isEmpty()) continue;
+			
+			// Get the most recent log in the interval (or average if multiple)
+			Log__c representativeLog = intervalLogs[intervalLogs.size() - 1];
+			if(representativeLog.Limits__r == null) continue;
+			
+			ChartDataInterval interval = new ChartDataInterval();
+			interval.logValues = new Map<Integer, Map<String, Decimal>>();
+			interval.logValues.put(1, new Map<String, Decimal>());
+			
+			Map<String, Object> populated = representativeLog.Limits__r.getPopulatedFieldsAsMap();
+			if(populated == null) continue;
+			
+			Decimal totalValue = 0;
+			Integer fieldCount = 0;
+			
+			// Process each monitored limit field
+			for(String fieldName : monitoredFields) {
+				if(!populated.containsKey(fieldName)) continue;
+				
+				Object fieldValue = populated.get(fieldName);
+				if(fieldValue == null) continue;
+				
+				try {
+					Decimal usedValue = Decimal.valueOf(String.valueOf(fieldValue));
+					
+					// Find the corresponding limit key in LimitsService.FIELD_MAP
+					String limitKey = null;
+					for(String key : LimitsService.FIELD_MAP.keySet()) {
+						Schema.DescribeFieldResult fieldDescribe = LimitsService.FIELD_MAP.get(key);
+						if(fieldDescribe.getName() == fieldName) {
+							limitKey = key;
+							break;
+						}
+					}
+					
+					if(limitKey != null) {
+						System.OrgLimit orgLimit = orgLimits.get(limitKey);
+						if(orgLimit != null && orgLimit.getLimit() != null && orgLimit.getLimit() > 0) {
+							// Calculate percentage
+							Decimal percentage = (usedValue / orgLimit.getLimit()) * 100;
+							
+							// Store both absolute value and percentage
+							// Use fieldName as key, store percentage as the value for chart display
+							interval.logValues.get(1).put(fieldName, percentage);
+							
+							// Also store absolute value in a separate key for hover tooltip
+							interval.logValues.get(1).put(fieldName + '_absolute', usedValue);
+							interval.logValues.get(1).put(fieldName + '_max', Decimal.valueOf(orgLimit.getLimit()));
+							
+							totalValue += percentage;
+							fieldCount++;
+						} else {
+							// If no org limit available, just store the absolute value
+							interval.logValues.get(1).put(fieldName, usedValue);
+							totalValue += usedValue;
+							fieldCount++;
+						}
+					}
+				} catch(Exception e) {
+					// Skip invalid values
+					continue;
+				}
+			}
+			
+			// Set interval value - use the first/primary field's percentage for single field,
+			// or average if multiple fields are monitored
+			if(fieldCount > 0) {
+				if(fieldCount == 1) {
+					// Single field: use its percentage directly
+					interval.value = totalValue;
+				} else {
+					// Multiple fields: use average percentage
+					interval.value = totalValue / fieldCount;
+				}
+			}
+			
+			result.mapIntervals.put(datetimeLong, interval);
+		}
+		
+		result.countLogs = logs.size();
+		return result;
 	}
 
 	public static ChartData getImpactChartData(Id ruleId, Id eventId, DateTime startTime, DateTime endTime) {
