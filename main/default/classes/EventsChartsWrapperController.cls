@@ -178,13 +178,30 @@ global with sharing class EventsChartsWrapperController {
 		}
 
 		RuleUtil.Rule rule = rules.get(0);
-		RuleFilter__c ruleFilter = [SELECT FieldName__c FROM RuleFilter__c WHERE Rule__c = :ruleId LIMIT 1];
-		String limitName = ruleFilter.FieldName__c;
-		List<Limits__c> limits = [SELECT Id, CreatedDate FROM Limits__c WHERE Name = :limitName];
-
-		for (Limits__c limitRecord : limits) {
-			result.logs.add(new Map<String, Object> {'CreatedDate' => limitRecord.CreatedDate});
+		List<RuleFilter__c> ruleFilters = [SELECT FieldName__c FROM RuleFilter__c WHERE Rule__c = :ruleId LIMIT 1];
+		if (ruleFilters.isEmpty()) {
+			return result;
 		}
+		String limitName = ruleFilters[0].FieldName__c;
+		String limitFieldName = LimitsService.FIELD_MAP.get(limitName).getName();
+		String limitsQuery = new QBuilder(Limits__c.SObjectType)
+			.selectFields(new Set<String>{limitFieldName, 'CreatedDate'})
+			.add(QBuilder.condition('CreatedDate').isGreaterOrEquals(':startTime'))
+			.add(QBuilder.condition('CreatedDate').isLessOrEquals(':endTime'))
+			.addLimit(EVENT_CHART_MAX_RECORDS)
+			.build();
+		List<Limits__c> limits = Database.query(limitsQuery);
+
+		Integer orgLimit = OrgLimits.getMap()?.get(limitName)?.getLimit();
+		for (Limits__c l : limits) {
+			Decimal limitValue = Decimal.valueOf(String.valueOf(l.get(limitFieldName)));
+			Decimal limitPercentage = null;
+			if (orgLimit != null && orgLimit > 0) {
+				limitPercentage = (limitValue / orgLimit) * 100;
+			}
+			result.logs.add(new Map<String, Object> {'CreatedDate' => l.CreatedDate, 'limitValue' => limitValue, 'limitPercentage' => limitPercentage});
+		}
+
 		result.countLogs = result.logs.size();
 		return result;
 	}
