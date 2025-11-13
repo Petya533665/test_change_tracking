@@ -1129,16 +1129,16 @@ public with sharing class RuleUtil {
 				ORDER BY Index__c ASC nulls last
 				LIMIT :limitRules
 			];
-			
-			if (activeOnly) {
-				List<Rule__c> activeRules = new List<Rule__c>();
-				for (Rule__c rule : rules) {
-					if (rule.Active__c == true) {
-						activeRules.add(rule);
-					}
+		}
+
+		if (activeOnly) {
+			List<Rule__c> activeRules = new List<Rule__c>();
+			for (Rule__c rule : rules) {
+				if (rule.Active__c == true) {
+					activeRules.add(rule);
 				}
-				rules = activeRules;
 			}
+			rules = activeRules;
 		}
 		return rules;
 	}
