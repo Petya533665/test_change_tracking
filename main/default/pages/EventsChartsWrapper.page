@@ -9,15 +9,15 @@
     </style>
     <script>
         let currentEvent = {
-            Id: '{!currentEvent.Id}',
+            Id: '{!JSENCODE(currentEvent.Id)}',
             CreatedDate: '{!currentEvent.CreatedDate}',
-            RuleId: '{!currentEvent.Rule__c}',
+            RuleId: '{!JSENCODE(currentEvent.Rule__c)}',
         };
         let currentRule = {
-            Id: '{!currentRule.Id}',
+            Id: '{!JSENCODE(currentRule.Id)}',
             Name: '{!JSENCODE(currentRule.Name)}',
-            Threshold__c: '{!currentRule.Threshold__c}',
-            EventTimeInterval__c: '{!currentRule.EventTimeInterval__c}',
+            Threshold__c: {!currentRule.Threshold__c},
+            EventTimeInterval__c: {!currentRule.EventTimeInterval__c},
             Subtype__c: '{!JSENCODE(currentRule.Subtype__c)}',
             Type__c: '{!JSENCODE(currentRule.Type__c)}'
         };
