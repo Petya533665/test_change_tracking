@@ -994,7 +994,7 @@ public without sharing class PermissionsUtil {
 			if (MaxNotifications24hr == null) {
 				MaxNotifications24hr = FeatureMap10.get(MAP_FEATURE10_INDEX_BY_NAME.get(FP_MAX_NOTIFICATIONS_24_HR));
 			}
-			return 100000;
+			return MaxNotifications24hr;
 		}
 		private set;
 	}
