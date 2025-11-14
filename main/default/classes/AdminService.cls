@@ -339,7 +339,12 @@ public without sharing class AdminService {
             'IssueTrackingEnabled' => PermissionsUtil.IssueTrackingEnabled,
             'MetadataChatEnabled' => PermissionsUtil.MetadataChatEnabled,
             'AutoChartEnabled' => PermissionsUtil.AutoChartEnabled,
-            'ForecastEnabled' => PermissionsUtil.ForecastEnabled
+            'ForecastEnabled' => PermissionsUtil.ForecastEnabled,
+            'SystemOverviewDashboardEnabled' => PermissionsUtil.SystemOverviewDashboardEnabled,
+            'RuleTemplateCustomization' => PermissionsUtil.RuleTemplateCustomization,
+            'RuleImportExport' => PermissionsUtil.RuleImportExport,
+            'UpdateRules' => PermissionsUtil.UpdateRules,
+            'AsyncProcessErrorTracking' => PermissionsUtil.AsyncProcessErrorTracking
         };
         return result;
     }

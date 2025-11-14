@@ -127,6 +127,12 @@ public without sharing class PermissionsUtil {
 	public static final String FP_FLOW_LOGGING_ENABLED = 'FlowLoggingEnabled';
 	public static final String FP_METADATA_CHAT_ENABLED = 'MetadataChatEnabled';
 
+	public static final String FP_SYSTEM_OVERVIEW_DASHBOARD_ENABLED = 'SystemOverviewDashboardEnabled';
+	public static final String FP_RULE_TEMPLATE_CUSTOMIZATION = 'RuleTemplateCustomization';
+	public static final String FP_RULE_IMPORT_EXPORT = 'RuleImportExport';
+	public static final String FP_UPDATE_RULES = 'UpdateRules';
+	public static final String FP_ASYNC_PROCESS_ERROR_TRACKING = 'AsyncProcessErrorTracking';
+
 	public static final String FP_CHARGIFY_PRODUCT_EDITION = 'Edition';
 	public static final String CHARGIFY_PRODUCT_EDITION_ENTERPRISE = 'Enterprise';
 	public static final String CHARGIFY_PRODUCT_EDITION_PROFESSIONAL = 'Professional';
@@ -173,11 +179,16 @@ public without sharing class PermissionsUtil {
 		FP_METADATA_CHAT_ENABLED => 28
 	};
 
-	// 3bit of 29bit
+	// 8bit of 29bit
 	public static final Map<String, Integer> MAP_FEATURE12_INDEX_BY_NAME = new Map<String, Integer> {
 		FP_LIMITS_MONITORING_ENABLED => 0,
 		FP_AUTO_CHART_ENABLED => 1,
-		FP_FORECAST_ENABLED => 2
+		FP_FORECAST_ENABLED => 2,
+		FP_SYSTEM_OVERVIEW_DASHBOARD_ENABLED => 3,
+		FP_RULE_TEMPLATE_CUSTOMIZATION => 4,
+		FP_RULE_IMPORT_EXPORT => 5,
+		FP_UPDATE_RULES => 6,
+		FP_ASYNC_PROCESS_ERROR_TRACKING => 7
 	};
 
 	public static Map<Integer, Boolean> FeatureMap1 {
@@ -755,6 +766,58 @@ public without sharing class PermissionsUtil {
 	}
 
 	@TestVisible
+	public static Boolean SystemOverviewDashboardEnabled {
+		get {
+			if(SystemOverviewDashboardEnabled == null) {
+				SystemOverviewDashboardEnabled = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_SYSTEM_OVERVIEW_DASHBOARD_ENABLED));
+			}
+			return SystemOverviewDashboardEnabled;
+		}
+		private set;
+	}
+	@TestVisible
+	public static Boolean RuleTemplateCustomization {
+		get {
+			if(RuleTemplateCustomization == null) {
+				RuleTemplateCustomization = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_RULE_TEMPLATE_CUSTOMIZATION));
+			}
+			return RuleTemplateCustomization;
+		}
+		private set;
+	}
+	@TestVisible
+	public static Boolean RuleImportExport {
+		get {
+			if(RuleImportExport == null) {
+				RuleImportExport = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_RULE_IMPORT_EXPORT));
+			}
+			return RuleImportExport;
+		}
+		private set;
+	}
+
+	@TestVisible
+	public static Boolean UpdateRules {
+		get {
+			if(UpdateRules == null) {
+				UpdateRules = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_UPDATE_RULES));
+			}
+			return UpdateRules;
+		}
+		private set;
+	}
+
+	@TestVisible
+	public static Boolean AsyncProcessErrorTracking {
+		get {
+			if(AsyncProcessErrorTracking == null) {
+				AsyncProcessErrorTracking = FeatureMap12.get(MAP_FEATURE12_INDEX_BY_NAME.get(FP_ASYNC_PROCESS_ERROR_TRACKING));
+			}
+			return AsyncProcessErrorTracking;
+		}
+		private set;
+	}
+	
 	public static Integer MaxMonitoringRules {
 		get {
 			if(MaxMonitoringRules == null) {
