@@ -203,6 +203,7 @@ global with sharing class EventsChartsWrapperController {
 		}
 
 		result.countLogs = result.logs.size();
+		result.limitName = limitName;
 		return result;
 	}
 
@@ -297,6 +298,8 @@ global with sharing class EventsChartsWrapperController {
 		public Map<Long, ChartDataInterval> mapIntervals;
 		public List<Map<String, Object>> logs;
 		public Integer countLogs;
+		public String limitName;
+
 		public ChartData() {
 			this.mapIntervals = new Map<Long, ChartDataInterval>();
 			this.logs = new List<Map<String, Object>>();
