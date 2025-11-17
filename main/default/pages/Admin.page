@@ -43,7 +43,6 @@
             sldsIconsPath: "/apexpages/slds/latest/assets/icons",
             remoteActionHandlerName: '{!$RemoteAction.AdminController.remoteActionHandler}',
             assetsPath: "{!URLFOR($Resource.adminapp, 'assets')}",
-            monacoEditorPath: "{!URLFOR($Resource.monaco_editor)}",
             packageNamespace: JSON.stringify('{!packageNamespace}'),
             orgId: "{!orgId}",
             baseUrl: "{!baseUrl}",

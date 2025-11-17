@@ -28,7 +28,7 @@
         const logName = '{!JSENCODE(log.Name)}';
         const logCategory = '{!JSENCODE(log.Category__c)}';
         const stackTraceParseResult = '{!JSENCODE(log.Stacktrace_Parse_Result__c)}';
-        const stackTraceParseResultAvailable = '{!log.Stack_trace_parse_result_available__c}';
+        const stackTraceParseResultAvailable = {!log.Stack_trace_parse_result_available__c};
         const Summary__c = '{!JSENCODE(log.Summary__c)}';
         const Organization_Url__c = '{!JSENCODE(log.Organization_Url__c)}';
         const Stacktrace__c = '{!JSENCODE(log.Stacktrace__c)}';

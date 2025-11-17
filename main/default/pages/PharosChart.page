@@ -17,14 +17,14 @@
         const SENSITIVE_PERMISSIONS_CHART_NAME = 'Sensitive Permissions';
         const UNUSED_FIELDS_CHART_NAME = 'Unused Fields';
 
-        const chartName = '{!chart}';
+        const chartName = '{!JSENCODE(chart)}';
 
         window.onload = function() {
             sendMessageToLWC('isLoaded', true);
         }
         document.addEventListener('DOMContentLoaded', function() {
             if (chartName === LOG_LIMITS_CHART_NAME) {
-                _chartData = JSON.parse('{!chartDataJSON}');
+                _chartData = JSON.parse('{!JSENCODE(chartDataJSON)}');
                 initializeChart();
             }
         });
@@ -189,7 +189,7 @@
                 window.parent.postMessage(
                     {
                         type: 'height',
-                        chart: '{!chart}',
+                        chart: '{!JSENCODE(chart)}',
                         value: height
                     },
                     '*'
@@ -226,7 +226,7 @@
                         labelFormat: '{value}%',
                         minimum: 0,
                     }
-                    chart.title = {!modal} ? '' : 'Transactional Limits';
+                    chart.title = '{!JSENCODE(modal)}' === 'true' ? '' : 'Transactional Limits';
                     chart.zoomSettings = {
                         mode: 'X',
                         showToolbar: true,

@@ -17,7 +17,7 @@ public with sharing class IssueJiraTaskController {
 				WHERE Id = :stdController.getId()
 		];
 		
-		String isDevParam = ApexPages.currentPage().getParameters().get('dev');
+		String isDevParam = ApexPages.currentPage().getParameters().get('dev').escapeHtml4();
 		isBlurMode = !PermissionsUtil.JiraIntegrationEnabled && !PermissionsUtil.AzureDevOpsIntegrationEnabled;
 		if (isBlurMode) {
 			blurModeUrlParameter = BlurModeService.getEncryptedUrlParameter();
