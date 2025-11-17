@@ -35,6 +35,11 @@
                 <default>false</default>
                 <label>Broadcast</label>
             </value>
+            <value>
+                <fullName>Limits</fullName>
+                <default>false</default>
+                <label>Limits</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>
