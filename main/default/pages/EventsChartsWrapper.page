@@ -10,7 +10,7 @@
     <script>
         let currentEvent = {
             Id: '{!JSENCODE(currentEvent.Id)}',
-            CreatedDate: '{!currentEvent.CreatedDate}',
+            CreatedDate: {!currentEvent.CreatedDate},
             RuleId: '{!JSENCODE(currentEvent.Rule__c)}',
         };
         let currentRule = {

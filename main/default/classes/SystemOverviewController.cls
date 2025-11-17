@@ -652,11 +652,6 @@ public with sharing class SystemOverviewController {
 		return count;
 	}
 
-	@AuraEnabled
-	public static Boolean isSystemOverviewDashboardEnabled(){
-		return PermissionsUtil.SystemOverviewDashboardEnabled;
-	}
-
 	public class SObjectOption {
 		@AuraEnabled
 		public String label { get; set; }

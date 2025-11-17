@@ -106,7 +106,7 @@ public with sharing class TraceScheduleController {
             this.traceScheduleStatus = traceSchedules[0].Status__c;
         }
         this.lexOrigin = Url.getOrgDomainUrl().toExternalForm().split('.my.')[0]+'.lightning.force.com';
-        String isDevParam = ApexPages.currentPage().getParameters().get('dev');
+        String isDevParam = ApexPages.currentPage().getParameters().get('dev').escapeHtml4();
         if (String.isNotBlank(isDevParam)) {
             Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
             ApexPages.currentPage().setCookies(new Cookie[]{ devCookie });
