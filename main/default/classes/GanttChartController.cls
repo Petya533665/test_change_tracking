@@ -19,7 +19,7 @@ public with sharing class GanttChartController {
 
     public GanttChartController(ApexPages.StandardController stdController) {
         recordId = ApexPages.currentPage().getParameters().get('recordId');
-        String isDevParam = ApexPages.currentPage().getParameters().get('dev').escapeHtml4();
+        String isDevParam = ApexPages.currentPage().getParameters().get('dev')?.escapeHtml4();
         if (String.isNotBlank(isDevParam)) {
             Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
             ApexPages.currentPage().setCookies(new Cookie[]{ devCookie });
