@@ -9,8 +9,8 @@
     </style>
     <script>
         let currentLog = {
-            Created_At__c: '{!currentLog.Created_At__c}',
-            Id: '{!currentLog.Id}',
+            Created_At__c: '{!JSENCODE(TEXT(currentLog.Created_At__c))}'
+            Id: '{!JSENCODE(currentLog.Id)}',
         };
         const blurModeUrlParameter = '{!blurModeUrlParameter}';
         window.APP_CONFIG = {

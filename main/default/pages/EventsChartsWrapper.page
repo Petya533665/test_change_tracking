@@ -10,14 +10,14 @@
     <script>
         let currentEvent = {
             Id: '{!JSENCODE(currentEvent.Id)}',
-            CreatedDate: {!currentEvent.CreatedDate},
+            CreatedDate: '{!JSENCODE(TEXT(currentEvent.CreatedDate))}',
             RuleId: '{!JSENCODE(currentEvent.Rule__c)}',
         };
         let currentRule = {
             Id: '{!JSENCODE(currentRule.Id)}',
             Name: '{!JSENCODE(currentRule.Name)}',
-            Threshold__c: {!currentRule.Threshold__c},
-            EventTimeInterval__c: {!currentRule.EventTimeInterval__c},
+            Threshold__c: {!IF(ISBLANK(currentRule.Threshold__c), 'null', JSENCODE(TEXT(currentRule.Threshold__c)))},
+            EventTimeInterval__c: {!IF(ISBLANK(currentRule.EventTimeInterval__c), 'null', JSENCODE(TEXT(currentRule.EventTimeInterval__c)))},
             Subtype__c: '{!JSENCODE(currentRule.Subtype__c)}',
             Type__c: '{!JSENCODE(currentRule.Type__c)}'
         };
