@@ -830,7 +830,7 @@ public without sharing class PermissionsUtil {
 		}
 		private set;
 	}
-	
+
 	public static Integer MaxMonitoringRules {
 		get {
 			if(MaxMonitoringRules == null) {
