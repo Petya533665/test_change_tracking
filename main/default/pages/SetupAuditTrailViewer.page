@@ -122,7 +122,7 @@
         const itemTemplate = Handlebars.compile(document.getElementById('setup-audit-trail-template').innerHTML);
         const setupAuditTrailJson = '{!JSENCODE(data)}';
         const hours = 12;
-        const logCreated = moment('{!log.Created_At__c}');
+        const logCreated = moment('{!JSENCODE(TEXT(log.Created_At__c))}');
         const userTimezoneOffset = '{!userTimezoneOffset}';
 
         function timeChanged() {
