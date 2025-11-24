@@ -466,6 +466,7 @@ public with sharing class NotificationService {
         public Map<Id, List<System.Exception>> slackExceptions = new Map<Id, List<System.Exception>>();
         public Map<Id, List<System.Exception>> pagerDutyExceptions = new Map<Id, List<System.Exception>>();
         public Map<Id, List<System.Exception>> teamsExceptions = new Map<Id, List<System.Exception>>();
+        public Map<Id, List<System.Exception>> webhookExceptions = new Map<Id, List<System.Exception>>();
         public Map<Id, System.Exception> ticketingExceptions = new Map<Id, System.Exception>();
         public Schema.DescribeSObjectResult sObjectType;
         public Schema.DescribeFieldResult dfrId;
@@ -476,6 +477,7 @@ public with sharing class NotificationService {
         public Schema.DescribeFieldResult dfrPagerDutyIntegrationStatus;
         public Schema.DescribeFieldResult dfrSlackIntegrationStatus;
         public Schema.DescribeFieldResult dfrTeamsIntegrationStatus;
+        public Schema.DescribeFieldResult dfrWebhookIntegrationStatus;
         public Schema.DescribeFieldResult dfrExecutableRules;
 
         public ErrorsHelper(SObject sobjectRecord) {
@@ -489,6 +491,7 @@ public with sharing class NotificationService {
                 dfrPagerDutyIntegrationStatus = Schema.sObjectType.Log__c.fields.PagerDuty_Integration_Status__c;
                 dfrSlackIntegrationStatus = Schema.sObjectType.Log__c.fields.Slack_Integration_Status__c;
                 dfrTeamsIntegrationStatus = Schema.sObjectType.Log__c.fields.Teams_Integration_Status__c;
+                dfrWebhookIntegrationStatus = Schema.sObjectType.Log__c.fields.Webhook_Integration_Status__c;
                 dfrExecutableRules = Schema.sObjectType.Log__c.fields.Executable_Rules__c;
             }
             else if(sobjectRecord.getSObjectType() == Schema.sObjectType.Issue__c.SObjectType) {
@@ -501,6 +504,7 @@ public with sharing class NotificationService {
                 dfrPagerDutyIntegrationStatus = Schema.sObjectType.Issue__c.fields.PagerDuty_Integration_Status__c;
                 dfrSlackIntegrationStatus = Schema.sObjectType.Issue__c.fields.Slack_Integration_Status__c;
                 dfrTeamsIntegrationStatus = Schema.sObjectType.Issue__c.fields.Teams_Integration_Status__c;
+                dfrWebhookIntegrationStatus = Schema.sObjectType.Issue__c.fields.Webhook_Integration_Status__c;
                 dfrExecutableRules = Schema.sObjectType.Issue__c.fields.Executable_Rules__c;
             }
             else if(sobjectRecord.getSObjectType() == Schema.sObjectType.Trace_Result__c.SObjectType) {
@@ -513,6 +517,7 @@ public with sharing class NotificationService {
                 dfrPagerDutyIntegrationStatus = null;
                 dfrSlackIntegrationStatus = null;
                 dfrTeamsIntegrationStatus = null;
+                dfrWebhookIntegrationStatus = null;
                 dfrExecutableRules = Schema.sObjectType.Trace_Result__c.fields.Executable_Rules__c;
             }
         }
@@ -541,6 +546,7 @@ public with sharing class NotificationService {
             List<System.Exception> slackExceptionsList = slackExceptions.get(recordId);
             List<System.Exception> pagerDutyExceptionsList = pagerDutyExceptions.get(recordId);
             List<System.Exception> teamsExceptionsList = teamsExceptions.get(recordId);
+            List<System.Exception> webhookExceptionsList = webhookExceptions.get(recordId);
 
             if(emailExceptionsList != null && !emailExceptions.isEmpty()) {
                 for(System.Exception e : emailExceptionsList) {
@@ -573,6 +579,11 @@ public with sharing class NotificationService {
                     logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'teamsExceptions'));
                 }
             }
+            if(webhookExceptionsList != null && !webhookExceptionsList.isEmpty()) {
+                for(System.Exception e : webhookExceptionsList) {
+                    logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'webhookExceptions'));
+                }
+            }
 
             // Check if we only have Slack rate limit errors
             Boolean hasOnlySlackRateLimitErrors = false;
@@ -588,13 +599,15 @@ public with sharing class NotificationService {
                 hasOnlySlackRateLimitErrors = hasOnlySlackRateLimitErrors
                     && (emailExceptionsList == null || emailExceptionsList.isEmpty())
                     && (teamsExceptionsList == null || teamsExceptionsList.isEmpty())
-                    && (pagerDutyExceptionsList == null || pagerDutyExceptionsList.isEmpty());
+                    && (pagerDutyExceptionsList == null || pagerDutyExceptionsList.isEmpty())
+                    && (webhookExceptionsList == null || webhookExceptionsList.isEmpty());
             }
 
             if((emailExceptionsList == null || emailExceptionsList.isEmpty())
                 && (teamsExceptionsList == null || teamsExceptionsList.isEmpty())
                 && (slackExceptionsList == null || slackExceptionsList.isEmpty())
-                && (pagerDutyExceptionsList == null || pagerDutyExceptionsList.isEmpty())) {
+                && (pagerDutyExceptionsList == null || pagerDutyExceptionsList.isEmpty())
+                && (webhookExceptionsList == null || webhookExceptionsList.isEmpty())) {
 
                 PermissionsUtil.putSObjectField(failedRecord, dfrNotificationIntegrationStatus, Constants.GLOBAL_VARIABLE.NOTIFICATION_INTEGRATION_STATUS_COMPLETED);
             }
@@ -622,6 +635,9 @@ public with sharing class NotificationService {
                 String teamsExceptionValue = (teamsExceptionsList != null && !teamsExceptionsList.isEmpty())
                     ? teamsExceptionsList.get(0).getMessage().abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH)
                     : null;
+                String webhookExceptionValue = (webhookExceptionsList != null && !webhookExceptionsList.isEmpty())
+                    ? webhookExceptionsList.get(0).getMessage().abbreviate(Constants.GLOBAL_VARIABLE.TEXT_FIELD_MAX_LENGTH)
+                    : null;
                 if(dfrEmailIntegrationStatus != null) {
                     PermissionsUtil.putSObjectField(failedRecord, dfrEmailIntegrationStatus, emailExceptionValue);
                 }
@@ -631,8 +647,11 @@ public with sharing class NotificationService {
                 if(dfrSlackIntegrationStatus != null) {
                     PermissionsUtil.putSObjectField(failedRecord, dfrSlackIntegrationStatus, slackExceptionValue);
                 }
-                if(dfrSlackIntegrationStatus != null) {
+                if(dfrTeamsIntegrationStatus != null) {
                     PermissionsUtil.putSObjectField(failedRecord, dfrTeamsIntegrationStatus, teamsExceptionValue);
+                }
+                if(dfrWebhookIntegrationStatus != null) {
+                    PermissionsUtil.putSObjectField(failedRecord, dfrWebhookIntegrationStatus, webhookExceptionValue);
                 }
                 PermissionsUtil.putSObjectField(failedRecord, dfrNotificationIntegrationStatus, Constants.GLOBAL_VARIABLE.NOTIFICATION_INTEGRATION_STATUS_FAILED);
             }
@@ -972,7 +991,8 @@ public with sharing class NotificationService {
         JIRA,
         TEAMS,
         AZURE_DEV_OPS,
-        PAGERDUTY
+        PAGERDUTY,
+        WEBHOOK
     }
 
     public static final Map<String, NotificationContext> MAP_NOTIFICATION_CONTEXTS_BY_ACTION_TYPE = new Map<String, NotificationContext> {
@@ -983,7 +1003,8 @@ public with sharing class NotificationService {
             Constants.ACTION_SOBJECT.ACTION_TYPE_TEAMS_NOTIFICATION => NotificationContext.TEAMS,
             Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION => NotificationContext.AZURE_DEV_OPS,
             Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT => NotificationContext.AZURE_DEV_OPS,
-            Constants.ACTION_SOBJECT.ACTION_TYPE_PAGERDUTY_NOTIFICATION => NotificationContext.PAGERDUTY
+            Constants.ACTION_SOBJECT.ACTION_TYPE_PAGERDUTY_NOTIFICATION => NotificationContext.PAGERDUTY,
+            Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION => NotificationContext.WEBHOOK
     };
 
     public class MergeFieldSettings {
@@ -1005,7 +1026,7 @@ public with sharing class NotificationService {
         }
     }
 
-    public class MergeFields {
+    public with sharing class MergeFields {
         private final Map<String, MergeFieldSettings> mergeFieldSettingsMap;
 
         public MergeFields(){
@@ -1692,6 +1713,76 @@ public with sharing class NotificationService {
     }
 
     /**
+     * Webhook notification action handler
+     * Supports custom HTTP webhooks with configurable URL, headers, body, and authentication
+     */
+    public class WebhookActionHandler implements ActionHandler {
+        public Map<Id, WebhookService.WebhookResponse> webhookResponses = new Map<Id, WebhookService.WebhookResponse>();
+
+        public void execute(String recordId, Action__c actionFields) {
+            sendWebhook(recordId, actionFields);
+        }
+
+        public void execute(String recordId, Action__c actionFields, SObject record) {
+            sendWebhook(recordId, actionFields);
+        }
+
+        public void execute(String recordId, Action__c actionFields, SObject record, BatchContextManager batchContext) {
+            sendWebhook(recordId, actionFields);
+        }
+
+        public void handleException(String recordId, Exception e, ErrorsHelper logErrors) {
+            List<System.Exception> exceptions = logErrors.webhookExceptions.get(recordId) != null
+                ? logErrors.webhookExceptions.get(recordId)
+                : new List<System.Exception>();
+            exceptions.add(e);
+            logErrors.webhookExceptions.put(recordId, exceptions);
+        }
+
+        public void handleException(String recordId, Exception e, ErrorsHelper logErrors, BatchContextManager batchContext) {
+            // Use the existing exception handling
+            handleException(recordId, e, logErrors);
+        }
+
+        public String getActionType() {
+            return Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION;
+        }
+
+        private void sendWebhook(String recordId, Action__c actionFields) {
+            if (!PermissionsUtil.WebhookIntegrationEnabled) {
+                return;
+            }
+
+            try {
+                // Build webhook configuration from action fields
+                WebhookService.WebhookConfig config = WebhookService.buildConfigFromAction(actionFields);
+
+                // Send webhook
+                WebhookService.WebhookResponse response = WebhookService.sendWebhook(recordId, config);
+
+                // Store response for potential debugging
+                webhookResponses.put(recordId, response);
+
+                // Throw exception if webhook failed
+                if (!response.success) {
+                    throw new WebhookService.WebhookException(
+                        'Webhook failed: ' + response.errorMessage
+                    );
+                }
+
+            } catch (Exception e) {
+                // Log error
+                Logger.getInstance()?.addInternalError(
+                    e,
+                    NotificationService.class.getName(),
+                    'sendWebhook'
+                );
+                throw e; // Re-throw for error handling
+            }
+        }
+    }
+
+    /**
      * Registry for managing standard notification action handlers
      * 
      * Standard Handlers:
@@ -1715,6 +1806,7 @@ public with sharing class NotificationService {
             registerHandler(new SlackActionHandler());
             registerHandler(new TeamsActionHandler());
             registerHandler(new PagerDutyActionHandler());
+            registerHandler(new WebhookActionHandler());
             
             // NOTE: AutoChart handlers are NOT registered here
             // They are managed internally by AutoChart.AutoChartActionProcessor
@@ -1742,7 +1834,7 @@ public with sharing class NotificationService {
      * Centralized action processor that replaces duplicate switch statement logic
      * Enhanced with rate limiting support
      */
-    public class ActionProcessor {
+    public with sharing class ActionProcessor {
         private String recordId;
         private ErrorsHelper logErrors;
         private ActionHandlerRegistry registry;

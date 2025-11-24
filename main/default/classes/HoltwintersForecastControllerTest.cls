@@ -583,8 +583,8 @@ public class HoltwintersForecastControllerTest {
                     yesterdayStr => new List<Map<String, Object>>{
                         new Map<String, Object>{
                             'time_range' => '08:30-10:30',
-                            'startDateTime' => yesterday.addHours(8).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                            'endDateTime' => yesterday.addHours(10).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                            'startDateTime' => yesterday.addHours(8).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                            'endDateTime' => yesterday.addHours(10).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                             'predicted_activity' => 3.869,
                             'confidence' => 'high',
                             'detected_peak_time' => '09:00',
@@ -611,8 +611,8 @@ public class HoltwintersForecastControllerTest {
                     todayStr => new List<Map<String, Object>>{
                         new Map<String, Object>{
                             'time_range' => '08:30-10:30',
-                            'startDateTime' => startTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                            'endDateTime' => endTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                            'startDateTime' => startTime.format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                            'endDateTime' => endTime.format(TraceService.DATE_TIME_FORMAT_ISO08601),
                             'predicted_activity' => 3.869,
                             'confidence' => 'high',
                             'detected_peak_time' => '09:00',
@@ -637,8 +637,8 @@ public class HoltwintersForecastControllerTest {
                     tomorrowStr => new List<Map<String, Object>>{
                         new Map<String, Object>{
                             'time_range' => '08:30-10:30',
-                            'startDateTime' => tomorrow.addHours(8).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                            'endDateTime' => tomorrow.addHours(10).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                            'startDateTime' => tomorrow.addHours(8).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                            'endDateTime' => tomorrow.addHours(10).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                             'predicted_activity' => 3.869,
                             'confidence' => 'high',
                             'detected_peak_time' => '09:00',
@@ -673,7 +673,7 @@ public class HoltwintersForecastControllerTest {
                             new Map<String, Object>{
                                 'time_range' => '10:30-12:30',
                                 'startDateTime' => '',  // Invalid: empty string
-                                'endDateTime' => tomorrow.addHours(10).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => tomorrow.addHours(10).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 2.5,
                                 'confidence' => 'medium',
                                 'detected_peak_time' => '11:00',
@@ -698,8 +698,8 @@ public class HoltwintersForecastControllerTest {
                         tomorrowStr => new List<Map<String, Object>>{
                             new Map<String, Object>{
                                 'time_range' => '08:30-10:30',
-                                'startDateTime' => tomorrow.addHours(8).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => tomorrow.addHours(10).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => tomorrow.addHours(8).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => tomorrow.addHours(10).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 3.869,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '09:00',
@@ -742,8 +742,8 @@ public class HoltwintersForecastControllerTest {
                         tomorrowStr => new List<Map<String, Object>>{
                             new Map<String, Object>{
                                 'time_range' => '08:00-10:00',
-                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(2).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 3.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '09:00',
@@ -751,8 +751,8 @@ public class HoltwintersForecastControllerTest {
                             },
                             new Map<String, Object>{
                                 'time_range' => '09:30-11:30',
-                                'startDateTime' => baseTime.addHours(1).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(3).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.addHours(1).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(3).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 4.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '10:00',
@@ -779,8 +779,8 @@ public class HoltwintersForecastControllerTest {
                         tomorrowStr => new List<Map<String, Object>>{
                             new Map<String, Object>{
                                 'time_range' => '08:00-10:00',
-                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(2).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 3.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '09:00',
@@ -788,8 +788,8 @@ public class HoltwintersForecastControllerTest {
                             },
                             new Map<String, Object>{
                                 'time_range' => '11:00-13:00',
-                                'startDateTime' => baseTime.addHours(3).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(5).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.addHours(3).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(5).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 4.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '12:00',
@@ -816,8 +816,8 @@ public class HoltwintersForecastControllerTest {
                         tomorrowStr => new List<Map<String, Object>>{
                             new Map<String, Object>{
                                 'time_range' => '08:00-10:00',
-                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(2).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 3.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '09:00',
@@ -825,8 +825,8 @@ public class HoltwintersForecastControllerTest {
                             },
                             new Map<String, Object>{
                                 'time_range' => '10:00-12:00',
-                                'startDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(4).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.addHours(2).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(4).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 4.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '11:00',
@@ -853,8 +853,8 @@ public class HoltwintersForecastControllerTest {
                         tomorrowStr => new List<Map<String, Object>>{
                             new Map<String, Object>{
                                 'time_range' => '08:00-12:00',
-                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(4).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(4).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 3.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '10:00',
@@ -862,8 +862,8 @@ public class HoltwintersForecastControllerTest {
                             },
                             new Map<String, Object>{
                                 'time_range' => '09:00-11:00',
-                                'startDateTime' => baseTime.addHours(1).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(3).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.addHours(1).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(3).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 4.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '10:00',
@@ -891,8 +891,8 @@ public class HoltwintersForecastControllerTest {
                             // First group: 08:00-10:00 and 09:00-11:00 (overlap, merge to 08:00-11:00)
                             new Map<String, Object>{
                                 'time_range' => '08:00-10:00',
-                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(2).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 3.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '09:00',
@@ -900,8 +900,8 @@ public class HoltwintersForecastControllerTest {
                             },
                             new Map<String, Object>{
                                 'time_range' => '09:00-11:00',
-                                'startDateTime' => baseTime.addHours(1).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(3).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.addHours(1).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(3).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 4.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '10:00',
@@ -910,8 +910,8 @@ public class HoltwintersForecastControllerTest {
                             // Second group: 13:00-15:00 and 14:00-16:00 (overlap, merge to 13:00-16:00)
                             new Map<String, Object>{
                                 'time_range' => '13:00-15:00',
-                                'startDateTime' => baseTime.addHours(5).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(7).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.addHours(5).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(7).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 5.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '14:00',
@@ -919,8 +919,8 @@ public class HoltwintersForecastControllerTest {
                             },
                             new Map<String, Object>{
                                 'time_range' => '14:00-16:00',
-                                'startDateTime' => baseTime.addHours(6).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(8).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.addHours(6).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(8).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 6.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '15:00',
@@ -948,8 +948,8 @@ public class HoltwintersForecastControllerTest {
                             // Add ranges in reverse order
                             new Map<String, Object>{
                                 'time_range' => '11:00-13:00',
-                                'startDateTime' => baseTime.addHours(3).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(5).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.addHours(3).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(5).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 4.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '12:00',
@@ -957,8 +957,8 @@ public class HoltwintersForecastControllerTest {
                             },
                             new Map<String, Object>{
                                 'time_range' => '08:00-10:00',
-                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(2).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 3.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '09:00',
@@ -966,8 +966,8 @@ public class HoltwintersForecastControllerTest {
                             },
                             new Map<String, Object>{
                                 'time_range' => '09:30-11:30',
-                                'startDateTime' => baseTime.addHours(1).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(3).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.addHours(1).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(3).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 5.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '10:00',
@@ -994,8 +994,8 @@ public class HoltwintersForecastControllerTest {
                         tomorrowStr => new List<Map<String, Object>>{
                             new Map<String, Object>{
                                 'time_range' => '10:00-08:00',
-                                'startDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),  // end < start
+                                'startDateTime' => baseTime.addHours(2).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.format(TraceService.DATE_TIME_FORMAT_ISO08601),  // end < start
                                 'predicted_activity' => 3.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '09:00',
@@ -1003,8 +1003,8 @@ public class HoltwintersForecastControllerTest {
                             },
                             new Map<String, Object>{
                                 'time_range' => '08:00-10:00',
-                                'startDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'startDateTime' => baseTime.format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.addHours(2).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 4.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '09:00',
@@ -1031,8 +1031,8 @@ public class HoltwintersForecastControllerTest {
                         tomorrowStr => new List<Map<String, Object>>{
                             new Map<String, Object>{
                                 'time_range' => '10:00-08:00',
-                                'startDateTime' => baseTime.addHours(2).format('yyyy-MM-dd\'T\'HH:mm:ss'),
-                                'endDateTime' => baseTime.format('yyyy-MM-dd\'T\'HH:mm:ss'),  // end < start
+                                'startDateTime' => baseTime.addHours(2).format(TraceService.DATE_TIME_FORMAT_ISO08601),
+                                'endDateTime' => baseTime.format(TraceService.DATE_TIME_FORMAT_ISO08601),  // end < start
                                 'predicted_activity' => 3.0,
                                 'confidence' => 'high',
                                 'detected_peak_time' => '09:00',
@@ -1050,7 +1050,7 @@ public class HoltwintersForecastControllerTest {
                             new Map<String, Object>{
                                 'time_range' => '10:30-12:30',
                                 'startDateTime' => '',  // Invalid: empty string
-                                'endDateTime' => baseTime.addHours(10).addMinutes(30).format('yyyy-MM-dd\'T\'HH:mm:ss'),
+                                'endDateTime' => baseTime.addHours(10).addMinutes(30).format(TraceService.DATE_TIME_FORMAT_ISO08601),
                                 'predicted_activity' => 2.5,
                                 'confidence' => 'medium',
                                 'detected_peak_time' => '11:00',

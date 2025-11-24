@@ -17,19 +17,11 @@ public with sharing class JiraTaskController {
 			WHERE Id = :stdController.getId()
 		];
 
-		String isDevParam = ApexPages.currentPage().getParameters().get('dev').escapeHtml4();
 		isBlurMode = !PermissionsUtil.JiraIntegrationEnabled && !PermissionsUtil.AzureDevOpsIntegrationEnabled;
 		if (isBlurMode) {
 			blurModeUrlParameter = BlurModeService.getEncryptedUrlParameter();
 		}
-		if (String.isNotBlank(isDevParam)) {
-			Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
-			ApexPages.currentPage().setCookies(new Cookie[]{ devCookie });
-			isDev = Boolean.valueOf(isDevParam);
-		} else {
-			Cookie devCookie = ApexPages.currentPage().getCookies().get('a2developmentMode');
-			isDev = devCookie != null ? Boolean.valueOf(devCookie.getValue()) : false;
-		}
+		isDev = ConfigUtil.initializeDevelopmentMode(ApexPages.currentPage());
 	}
 
 	public static TicketingService.TicketCreateResult createTask(Object payload) {

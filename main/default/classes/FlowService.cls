@@ -95,7 +95,7 @@ public with sharing class FlowService {
 		}
 	}
 
-	public abstract class FlowStacktraceParserDefImpl  implements FlowStacktraceParserInterface {
+	public with sharing abstract class FlowStacktraceParserDefImpl  implements FlowStacktraceParserInterface {
 		private String data;
 		private FlowDataStructures.FlowStacktraceElement headErrorStacktraceElement;
 

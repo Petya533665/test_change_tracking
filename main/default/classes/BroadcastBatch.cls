@@ -120,7 +120,7 @@ public with sharing class BroadcastBatch extends DatabaseUtils.PharosBatchImpl i
 		return logs;
 	}
 
-	public class CustomIterable implements Iterable<BroadcastData> {
+	public with sharing class CustomIterable implements Iterable<BroadcastData> {
 
 		private Logger loggerInstance;
 

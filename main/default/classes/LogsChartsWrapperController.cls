@@ -29,17 +29,12 @@ global with sharing class LogsChartsWrapperController {
 	private static final String URL_REPORT_HASH3 = '/lightning/r/Report/{0}/view?fv0={1}&fv1={2}&fv2={3}&fv3={4}&fv4={5}';
 
     public LogsChartsWrapperController(ApexPages.StandardController stdController) {
-	    String recordId = ApexPages.currentPage().getParameters().get('recordId');
+	    System.PageReference pageReference = ApexPages.currentPage();
+		String recordId = pageReference.getParameters().get('recordId');
+		isDev = ConfigUtil.initializeDevelopmentMode(pageReference);
 		// save analytics metrics to cache
 		AnalyticsService.getInstance().trackLogPageView(recordId);
 
-        String isDevParam = ApexPages.currentPage().getParameters().get('dev');
-        if (String.isNotBlank(isDevParam)) {
-            isDev = Boolean.valueOf(isDevParam);
-        } else {
-            Cookie devCookie = ApexPages.currentPage().getCookies().get('a2developmentMode');
-            isDev = devCookie != null ? Boolean.valueOf(devCookie.getValue()) : false;
-		}
 		currentLog = [
 			SELECT Id, Name, Hash__c, Hash_1__c, Hash_2__c, Hash_3__c, Created_At__c, Summary__c, Organization_Id__c
 		    FROM Log__c

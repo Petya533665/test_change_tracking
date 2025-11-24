@@ -174,7 +174,8 @@ public with sharing class BulkAPIJobBatchService {
                 }
             }
             if (!lstContentDocumentLinksForInsert.isEmpty()) {
-                insert lstContentDocumentLinksForInsert;
+                DatabaseUtils.getInstance().performInsertDML(lstContentDocumentLinksForInsert, Schema.SObjectType.ContentDocumentLink)
+                    .handleError(BulkAPIJobBatchService.class.getName(), '.createContentDocumentLinks', Logger.getInstance());
             }
         }
     }

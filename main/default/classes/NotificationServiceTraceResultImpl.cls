@@ -1,4 +1,4 @@
-public class NotificationServiceTraceResultImpl extends NotificationServiceBase {
+public with sharing class NotificationServiceTraceResultImpl extends NotificationServiceBase {
 
     public override NotificationService.NOTIFICATION_SERVICE_TYPE getServiceType() {
         return NotificationService.NOTIFICATION_SERVICE_TYPE.TRACE_RESULT;

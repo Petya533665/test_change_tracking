@@ -212,6 +212,11 @@ public with sharing class HoltwintersForecastController {
                     }
                 }
                 
+                // Adjust dates if they are in the past (before merging to avoid duplicate windows)
+                for (HoltwintersForecastLambdaClient.ActivityTimeRange timeRange : allTimeRanges) {
+                    adjustPastDatesForTimeRange(timeRange);
+                }
+                
                 // Merge all overlapping time ranges (regardless of date)
                 List<HoltwintersForecastLambdaClient.ActivityTimeRange> mergedTimeRanges = mergeOverlappingTimeRanges(allTimeRanges);
 
@@ -364,19 +369,37 @@ public with sharing class HoltwintersForecastController {
     }
 
     /**
-     * Adjust dates if they are in the past
+     * Adjust dates if they are in the past for ActivityTimeRange
+     * This should be called before mergeOverlappingTimeRanges to ensure
+     * overlapping windows are properly merged after date adjustments
      */
-    private static void adjustPastDates(TraceScheduleController.TraceRequest traceRequest) {
-        if (traceRequest.startDate != null && traceRequest.endDate != null) {
-            Datetime currentTime = Datetime.now();
-            if (traceRequest.endDate < currentTime) {
-                traceRequest.startDate = traceRequest.startDate.addDays(1);
-                traceRequest.endDate = traceRequest.endDate.addDays(1);
-            } else if (currentTime < traceRequest.endDate && currentTime > traceRequest.startDate) {
-                traceRequest.startDate = currentTime;
-                traceRequest.endDate = traceRequest.endDate.addHours(1);
-            }
+    private static void adjustPastDatesForTimeRange(HoltwintersForecastLambdaClient.ActivityTimeRange timeRange) {
+        if (String.isBlank(timeRange.startDateTime) || String.isBlank(timeRange.endDateTime)) {
+            return;
         }
+        
+        Datetime startDt = parseDateTime(timeRange.startDateTime);
+        Datetime endDt = parseDateTime(timeRange.endDateTime);
+        
+        if (startDt == null || endDt == null) {
+            return;
+        }
+        
+        Datetime currentTime = Datetime.now();
+        if (endDt < currentTime) {
+            // Move entire range forward by one day
+            startDt = startDt.addDays(1);
+            endDt = endDt.addDays(1);
+        } else if (currentTime < endDt && currentTime > startDt) {
+            // Current time is within the range, adjust start to now and extend end by 1 hour
+            startDt = currentTime;
+            endDt = endDt.addHours(1);
+        }
+        
+        // Update the timeRange with adjusted dates (format: yyyy-MM-ddTHH:mm:ss in GMT)
+        timeRange.startDateTime = startDt.formatGmt(TraceService.DATE_TIME_FORMAT_ISO08601);
+        timeRange.endDateTime = endDt.formatGmt(TraceService.DATE_TIME_FORMAT_ISO08601);
+        timeRange.time_range = formatTimeRange(startDt, endDt);
     }
 
     /**
@@ -402,8 +425,8 @@ public with sharing class HoltwintersForecastController {
             return null;
         }
         
-        // Adjust dates if they are in the past
-        adjustPastDates(traceRequest);
+        // Note: Dates are already adjusted in adjustPastDatesForTimeRange before merging
+        // No need to adjust again here
         
         // Set traced entity (user) ID if available
         if (String.isNotBlank(timeRange.userId)) {

@@ -253,6 +253,196 @@ public with sharing class JiraDetailsControllerTest {
         Assert.areNotEqual(null, controller.jiraTask, 'jiraTask should contain error message when exception occurs');
     }
 
+    /**
+     * OWASP XSS Prevention Tests
+     * Test sanitizeUrl method to prevent Stored XSS via javascript: protocol
+     */
+    @IsTest
+    static void test_sanitizeUrl_blocksJavascriptProtocol() {
+        Log__c log = [SELECT Id FROM Log__c LIMIT 1];
+        
+        Test.startTest();
+        ApexPages.StandardController stdController = new ApexPages.StandardController(log);
+        JiraDetailsController controller = new JiraDetailsController(stdController);
+        
+        // Test dangerous javascript: protocol
+        String maliciousUrl = 'javascript:alert(document.cookie)';
+        String sanitized = controller.sanitizeUrl(maliciousUrl);
+        
+        Test.stopTest();
+        
+        Assert.areEqual('', sanitized, 'javascript: protocol should be blocked');
+    }
+
+    @IsTest
+    static void test_sanitizeUrl_blocksDataProtocol() {
+        Log__c log = [SELECT Id FROM Log__c LIMIT 1];
+        
+        Test.startTest();
+        ApexPages.StandardController stdController = new ApexPages.StandardController(log);
+        JiraDetailsController controller = new JiraDetailsController(stdController);
+        
+        // Test dangerous data: protocol
+        String maliciousUrl = 'data:text/html,<script>alert(1)</script>';
+        String sanitized = controller.sanitizeUrl(maliciousUrl);
+        
+        Test.stopTest();
+        
+        Assert.areEqual('', sanitized, 'data: protocol should be blocked');
+    }
+
+    @IsTest
+    static void test_sanitizeUrl_blocksVbscriptProtocol() {
+        Log__c log = [SELECT Id FROM Log__c LIMIT 1];
+        
+        Test.startTest();
+        ApexPages.StandardController stdController = new ApexPages.StandardController(log);
+        JiraDetailsController controller = new JiraDetailsController(stdController);
+        
+        // Test dangerous vbscript: protocol
+        String maliciousUrl = 'vbscript:msgbox(1)';
+        String sanitized = controller.sanitizeUrl(maliciousUrl);
+        
+        Test.stopTest();
+        
+        Assert.areEqual('', sanitized, 'vbscript: protocol should be blocked');
+    }
+
+    @IsTest
+    static void test_sanitizeUrl_blocksFileProtocol() {
+        Log__c log = [SELECT Id FROM Log__c LIMIT 1];
+        
+        Test.startTest();
+        ApexPages.StandardController stdController = new ApexPages.StandardController(log);
+        JiraDetailsController controller = new JiraDetailsController(stdController);
+        
+        // Test dangerous file: protocol
+        String maliciousUrl = 'file:///etc/passwd';
+        String sanitized = controller.sanitizeUrl(maliciousUrl);
+        
+        Test.stopTest();
+        
+        Assert.areEqual('', sanitized, 'file: protocol should be blocked');
+    }
+
+    @IsTest
+    static void test_sanitizeUrl_allowsHttpProtocol() {
+        Log__c log = [SELECT Id FROM Log__c LIMIT 1];
+        
+        Test.startTest();
+        ApexPages.StandardController stdController = new ApexPages.StandardController(log);
+        JiraDetailsController controller = new JiraDetailsController(stdController);
+        
+        // Test safe http: protocol
+        String safeUrl = 'http://jira.example.com/browse/PROJ-123';
+        String sanitized = controller.sanitizeUrl(safeUrl);
+        
+        Test.stopTest();
+        
+        Assert.areEqual(safeUrl, sanitized, 'http: protocol should be allowed');
+    }
+
+    @IsTest
+    static void test_sanitizeUrl_allowsHttpsProtocol() {
+        Log__c log = [SELECT Id FROM Log__c LIMIT 1];
+        
+        Test.startTest();
+        ApexPages.StandardController stdController = new ApexPages.StandardController(log);
+        JiraDetailsController controller = new JiraDetailsController(stdController);
+        
+        // Test safe https: protocol
+        String safeUrl = 'https://dev.azure.com/org/project/_workitems/edit/123';
+        String sanitized = controller.sanitizeUrl(safeUrl);
+        
+        Test.stopTest();
+        
+        Assert.areEqual(safeUrl, sanitized, 'https: protocol should be allowed');
+    }
+
+    @IsTest
+    static void test_sanitizeUrl_allowsRelativeUrls() {
+        Log__c log = [SELECT Id FROM Log__c LIMIT 1];
+        
+        Test.startTest();
+        ApexPages.StandardController stdController = new ApexPages.StandardController(log);
+        JiraDetailsController controller = new JiraDetailsController(stdController);
+        
+        // Test relative URL
+        String relativeUrl = '/apex/JiraDetails?id=a1234';
+        String sanitized = controller.sanitizeUrl(relativeUrl);
+        
+        Test.stopTest();
+        
+        Assert.areEqual(relativeUrl, sanitized, 'Relative URLs should be allowed');
+    }
+
+    @IsTest
+    static void test_sanitizeUrl_handlesNullAndBlank() {
+        Log__c log = [SELECT Id FROM Log__c LIMIT 1];
+        
+        Test.startTest();
+        ApexPages.StandardController stdController = new ApexPages.StandardController(log);
+        JiraDetailsController controller = new JiraDetailsController(stdController);
+        
+        // Test null URL
+        String nullUrl = null;
+        String sanitizedNull = controller.sanitizeUrl(nullUrl);
+        
+        // Test blank URL
+        String blankUrl = '   ';
+        String sanitizedBlank = controller.sanitizeUrl(blankUrl);
+        
+        Test.stopTest();
+        
+        Assert.areEqual('', sanitizedNull, 'Null URL should return empty string');
+        Assert.areEqual('', sanitizedBlank, 'Blank URL should return empty string');
+    }
+
+    @IsTest
+    static void test_sanitizeUrl_caseInsensitiveBlocking() {
+        Log__c log = [SELECT Id FROM Log__c LIMIT 1];
+        
+        Test.startTest();
+        ApexPages.StandardController stdController = new ApexPages.StandardController(log);
+        JiraDetailsController controller = new JiraDetailsController(stdController);
+        
+        // Test case variations of javascript: protocol
+        String upperCase = 'JAVASCRIPT:alert(1)';
+        String mixedCase = 'JaVaScRiPt:alert(1)';
+        
+        String sanitizedUpper = controller.sanitizeUrl(upperCase);
+        String sanitizedMixed = controller.sanitizeUrl(mixedCase);
+        
+        Test.stopTest();
+        
+        Assert.areEqual('', sanitizedUpper, 'Uppercase javascript: should be blocked');
+        Assert.areEqual('', sanitizedMixed, 'Mixed case javascript: should be blocked');
+    }
+
+    @IsTest
+    static void test_sanitizeUrl_withStoredXssVector() {
+        // Create Log__c with malicious Bug_Tracker__c value
+        Log__c maliciousLog = new Log__c();
+        maliciousLog.Type__c = 'ERROR';
+        maliciousLog.Category__c = 'Apex';
+        maliciousLog.Bug_Tracker__c = 'javascript:alert(document.cookie)';
+        maliciousLog.Hash_1__c = 'testmalicious';
+        insert maliciousLog;
+        
+        // Set up page parameters
+        PageReference pageRef = Page.JiraDetails;
+        pageRef.getParameters().put('recordId', maliciousLog.Id);
+        Test.setCurrentPage(pageRef);
+        
+        Test.startTest();
+        ApexPages.StandardController stdController = new ApexPages.StandardController(maliciousLog);
+        JiraDetailsController controller = new JiraDetailsController(stdController);
+        Test.stopTest();
+        
+        // jiraTaskUrl should be empty (blocked by sanitizeUrl)
+        Assert.areEqual('', controller.jiraTaskUrl, 'Malicious URL should be blocked in constructor');
+    }
+
     private static Map<String, HttpCalloutMock> getJiraMock() {
         return new Map<String, HttpCalloutMock>{
             JiraService.getService().getExpandedIssueEndpoint(LOG_BUG_TRACKER_JIRA_TASK_KEY) =>

@@ -209,4 +209,147 @@ private class QBuilderTest {
         System.assertEquals('Name ASC NULLS LAST', segment);
     }
 
+    @IsTest
+    static void test_simpleGroupBy() {
+        // Test simple GROUP BY
+        String query = new QBuilder(Account.SObjectType)
+            .selectFields(new Set<String>{'COUNT(Id) cnt', 'Type'})
+            .add(QBuilder.groupBy('Type'))
+            .build();
+        
+        Assert.areEqual('SELECT COUNT(Id) cnt, Type FROM Account GROUP BY Type', query);
+    }
+
+    @IsTest
+    static void test_multipleGroupBy() {
+        // Test multiple GROUP BY fields
+        String query = new QBuilder(Opportunity.SObjectType)
+            .selectFields(new Set<String>{'COUNT(Id) cnt', 'StageName', 'Type'})
+            .add(QBuilder.groupBy('StageName'))
+            .add(QBuilder.groupBy('Type'))
+            .build();
+        
+        Assert.areEqual('SELECT COUNT(Id) cnt, StageName, Type FROM Opportunity GROUP BY StageName, Type', query);
+    }
+
+    @IsTest
+    static void test_groupByWithDateFunction() {
+        // Test GROUP BY with date function
+        String query = new QBuilder(Account.SObjectType)
+            .selectFields(new Set<String>{'COUNT(Id) cnt', 'CALENDAR_MONTH(CreatedDate) month'})
+            .add(QBuilder.groupBy('CreatedDate').withDateFunction(QGroup.DateFunction.CALENDAR_MONTH))
+            .build();
+        
+        Assert.areEqual('SELECT COUNT(Id) cnt, CALENDAR_MONTH(CreatedDate) month FROM Account GROUP BY CALENDAR_MONTH(CreatedDate)', query);
+    }
+
+    @IsTest
+    static void test_groupByWithRollup() {
+        // Test GROUP BY with ROLLUP
+        String query = new QBuilder(Account.SObjectType)
+            .selectFields(new Set<String>{'COUNT(Id) cnt', 'Type'})
+            .add(QBuilder.groupBy('Type').rollup())
+            .build();
+        
+        Assert.areEqual('SELECT COUNT(Id) cnt, Type FROM Account GROUP BY ROLLUP(Type)', query);
+    }
+
+    @IsTest
+    static void test_groupByWithCube() {
+        // Test GROUP BY with CUBE
+        String query = new QBuilder(Account.SObjectType)
+            .selectFields(new Set<String>{'COUNT(Id) cnt', 'Type', 'Industry'})
+            .add(QBuilder.groupBy('Type').cube())
+            .add(QBuilder.groupBy('Industry').cube())
+            .build();
+        
+        Assert.areEqual('SELECT COUNT(Id) cnt, Type, Industry FROM Account GROUP BY CUBE(Type), CUBE(Industry)', query);
+    }
+
+    @IsTest
+    static void test_groupByWithConditionAndOrderBy() {
+        // Test GROUP BY with WHERE and ORDER BY
+        String query = new QBuilder(Account.SObjectType)
+            .selectFields(new Set<String>{'COUNT(Id) cnt', 'Type'})
+            .add(QBuilder.condition('Type').isNotNull())
+            .add(QBuilder.groupBy('Type'))
+            .add(QBuilder.orderBy('Type').ascending())
+            .build();
+        
+        Assert.areEqual('SELECT COUNT(Id) cnt, Type FROM Account WHERE Type != null GROUP BY Type ORDER BY Type ASC', query);
+    }
+
+    @IsTest
+    static void test_groupByWithLimit() {
+        // Test GROUP BY with LIMIT
+        String query = new QBuilder(Account.SObjectType)
+            .selectFields(new Set<String>{'COUNT(Id) cnt', 'Type'})
+            .add(QBuilder.groupBy('Type'))
+            .addLimit(10)
+            .build();
+        
+        Assert.areEqual('SELECT COUNT(Id) cnt, Type FROM Account GROUP BY Type LIMIT 10', query);
+    }
+
+    @IsTest
+    static void test_allDateFunctions() {
+        // Test all date functions
+        Map<QGroup.DateFunction, String> expectedFunctions = new Map<QGroup.DateFunction, String>{
+            QGroup.DateFunction.CALENDAR_MONTH => 'CALENDAR_MONTH',
+            QGroup.DateFunction.CALENDAR_QUARTER => 'CALENDAR_QUARTER',
+            QGroup.DateFunction.CALENDAR_YEAR => 'CALENDAR_YEAR',
+            QGroup.DateFunction.DAY_IN_MONTH => 'DAY_IN_MONTH',
+            QGroup.DateFunction.DAY_IN_WEEK => 'DAY_IN_WEEK',
+            QGroup.DateFunction.DAY_IN_YEAR => 'DAY_IN_YEAR',
+            QGroup.DateFunction.DAY_ONLY => 'DAY_ONLY',
+            QGroup.DateFunction.FISCAL_MONTH => 'FISCAL_MONTH',
+            QGroup.DateFunction.FISCAL_QUARTER => 'FISCAL_QUARTER',
+            QGroup.DateFunction.FISCAL_YEAR => 'FISCAL_YEAR',
+            QGroup.DateFunction.HOUR_IN_DAY => 'HOUR_IN_DAY',
+            QGroup.DateFunction.WEEK_IN_MONTH => 'WEEK_IN_MONTH',
+            QGroup.DateFunction.WEEK_IN_YEAR => 'WEEK_IN_YEAR'
+        };
+
+        for (QGroup.DateFunction func : expectedFunctions.keySet()) {
+            String query = new QBuilder(Account.SObjectType)
+                .selectFields(new Set<String>{'COUNT(Id) cnt'})
+                .add(QBuilder.groupBy('CreatedDate').withDateFunction(func))
+                .build();
+            
+            String expectedFunction = expectedFunctions.get(func);
+            Assert.areEqual(
+                'SELECT COUNT(Id) cnt FROM Account GROUP BY ' + expectedFunction + '(CreatedDate)',
+                query
+            );
+        }
+    }
+
+    @IsTest
+    static void test_noGroupBy() {
+        // Test query without GROUP BY
+        String query = new QBuilder(Account.SObjectType)
+            .selectFields(new Set<String>{'Id', 'Name'})
+            .build();
+        
+        Assert.areEqual('SELECT Id, Name FROM Account', query);
+    }
+
+    @IsTest
+    static void test_realWorldExample_salesByMonth() {
+        // Real-world example: Sales grouped by month
+        String query = new QBuilder(Opportunity.SObjectType)
+            .selectFields(new Set<String>{
+                'SUM(Amount) totalAmount',
+                'CALENDAR_MONTH(CloseDate) month',
+                'CALENDAR_YEAR(CloseDate) year'
+            })
+            .add(QBuilder.condition('StageName').equalsTo('Closed Won'))
+            .add(QBuilder.groupBy('CloseDate').withDateFunction(QGroup.DateFunction.CALENDAR_MONTH))
+            .add(QBuilder.groupBy('CloseDate').withDateFunction(QGroup.DateFunction.CALENDAR_YEAR))
+            .add(QBuilder.orderBy('CloseDate').descending())
+            .addLimit(12)
+            .build();
+        
+        Assert.areEqual('SELECT SUM(Amount) totalAmount, CALENDAR_MONTH(CloseDate) month, CALENDAR_YEAR(CloseDate) year FROM Opportunity WHERE StageName = \'Closed Won\' GROUP BY CALENDAR_MONTH(CloseDate), CALENDAR_YEAR(CloseDate) ORDER BY CloseDate DESC LIMIT 12', query);
+    }
 }

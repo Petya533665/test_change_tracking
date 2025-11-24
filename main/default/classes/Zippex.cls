@@ -79,7 +79,8 @@ public with sharing class Zippex {
 			//    Atts.clear();
 			//}
 		}
-		insert Atts;
+		DatabaseUtils.getInstance().performInsertDML(Atts, Schema.SObjectType.Attachment)
+			.handleError(Zippex.class.getName(), '.unzipAttachment', Logger.getInstance());
 	}
 	@future
 	private static void unzipAttachmentAsync(Id srcAttId, Id destObjId, String[] fileNames){

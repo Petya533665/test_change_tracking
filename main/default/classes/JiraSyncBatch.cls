@@ -281,7 +281,7 @@ public with sharing class JiraSyncBatch extends DatabaseUtils.PharosBatchImpl im
 		}
 	}
 
-	public abstract class SynchronizeTicketProcessDefaultImpl implements SynchronizeTicketProcess {
+	public with sharing abstract class SynchronizeTicketProcessDefaultImpl implements SynchronizeTicketProcess {
 		private SynchronizeSettings settings;
 		private Issue__c issue;
 		private Logger logger;

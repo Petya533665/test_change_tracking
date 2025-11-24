@@ -341,8 +341,17 @@ public class MonitoringUtilTest {
         Test.stopTest();
 
         // Assert at least one event created for the spike rule
-        List<Event__c> events = [SELECT Id, Rule__c FROM Event__c WHERE Rule__c = :limitsRule.Id];
+        List<Event__c> events = [SELECT Id, Rule__c, Criteria__c FROM Event__c WHERE Rule__c = :limitsRule.Id];
         System.assert(events.size() >= 1, 'Batch should create spike event(s)');
+        
+        // Verify that Limits rule criteria does NOT contain GROUP BY
+        // Limits rules evaluate values directly from Limits__c records, not via SOQL queries
+        for (Event__c event : events) {
+            System.assert(
+                event.Criteria__c == null || !event.Criteria__c.contains('GROUP BY'), 
+                'Limits rule event criteria should NOT contain GROUP BY. Criteria: ' + event.Criteria__c
+            );
+        }
     }
 
     @IsTest
@@ -392,8 +401,17 @@ public class MonitoringUtilTest {
         Test.stopTest();
 
         // Assert batch executed without errors; event may or may not be created depending on org limits
-        List<Event__c> events = [SELECT Id, Rule__c FROM Event__c WHERE Rule__c = :limitsRule.Id];
+        List<Event__c> events = [SELECT Id, Rule__c, Criteria__c FROM Event__c WHERE Rule__c = :limitsRule.Id];
         System.assert(events.size() >= 0, 'Batch threshold processing should complete');
+        
+        // Verify that Limits rule criteria does NOT contain GROUP BY
+        // Limits rules evaluate values directly from Limits__c records, not via SOQL queries
+        for (Event__c event : events) {
+            System.assert(
+                event.Criteria__c == null || !event.Criteria__c.contains('GROUP BY'), 
+                'Limits rule event criteria should NOT contain GROUP BY. Criteria: ' + event.Criteria__c
+            );
+        }
     }
     private static final String MONITORING_RULE_TYPE = 'Monitoring';
     private static final Integer DEFAULT_EVENT_TIME_INTERVAL_MINS = 60;
@@ -4464,17 +4482,20 @@ public class MonitoringUtilTest {
         );
         insert limitsRule;
 
-        // Create a dummy filter to satisfy the filter logic requirement
-        RuleFilter__c dummyFilter = new RuleFilter__c(
+        // Create filter to monitor DailyApiRequests field for spike detection
+        // Use actual field API name from schema to handle namespace correctly
+        String apiFieldName = Schema.SObjectType.Limits__c.fields.DailyApiRequests__c.getName();
+        
+        RuleFilter__c apiRequestsFilter = new RuleFilter__c(
             Rule__c = limitsRule.Id,
             Index__c = 1,
-            FieldName__c = 'Id', // Dummy field that always exists
-            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_NOT_EQUAL,
-            Value__c = 'dummy', // Will always be true since Id is never 'dummy'
+            FieldName__c = apiFieldName,
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            Value__c = '1',
             Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
-            Field_Type__c = RuleUtil.FIELD_TYPE_STRING
+            Field_Type__c = RuleUtil.FIELD_TYPE_NUMBER
         );
-        insert dummyFilter;
+        insert apiRequestsFilter;
 
         // Create action for the rule
         Action__c action = new Action__c(
@@ -4586,7 +4607,7 @@ public class MonitoringUtilTest {
         RuleFilter__c ruleFilter = new RuleFilter__c(
             Rule__c = limitsRule.Id,
             Index__c = 1,
-            FieldName__c = 'DataStorageMB__c',
+            FieldName__c = Schema.SObjectType.Limits__c.fields.DataStorageMB__c.getName(),
             ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
             Value__c = '80%', // Alert when data storage >= 80% of org limit
             Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
@@ -4683,7 +4704,7 @@ public class MonitoringUtilTest {
         RuleFilter__c ruleFilter = new RuleFilter__c(
             Rule__c = limitsRule.Id,
             Index__c = 1,
-            FieldName__c = 'DailyApiRequests__c',
+            FieldName__c = Schema.SObjectType.Limits__c.fields.DailyApiRequests__c.getName(),
             ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_THEN,
             Value__c = '10000', // Much higher than our test value of 100
             Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
@@ -4771,17 +4792,38 @@ public class MonitoringUtilTest {
         );
         insert limitsRule;
 
-        // Create a dummy filter to satisfy filter logic (spike rules don't use traditional filters)
-        RuleFilter__c dummyFilter = new RuleFilter__c(
-            Rule__c = limitsRule.Id,
-            Index__c = 1,
-            FieldName__c = 'Id',
-            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_NOT_EQUAL,
-            Value__c = 'dummy',
-            Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
-            Field_Type__c = RuleUtil.FIELD_TYPE_STRING
-        );
-        insert dummyFilter;
+        // Create filters to monitor specific fields for spike detection
+        // Use actual field API names from schema to handle namespace correctly
+        List<RuleFilter__c> filters = new List<RuleFilter__c>{
+            new RuleFilter__c(
+                Rule__c = limitsRule.Id,
+                Index__c = 1,
+                FieldName__c = Schema.SObjectType.Limits__c.fields.DailyApiRequests__c.getName(),
+                ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+                Value__c = '1',
+                Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+                Field_Type__c = RuleUtil.FIELD_TYPE_NUMBER
+            ),
+            new RuleFilter__c(
+                Rule__c = limitsRule.Id,
+                Index__c = 2,
+                FieldName__c = Schema.SObjectType.Limits__c.fields.DataStorageMB__c.getName(),
+                ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+                Value__c = '1',
+                Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+                Field_Type__c = RuleUtil.FIELD_TYPE_NUMBER
+            ),
+            new RuleFilter__c(
+                Rule__c = limitsRule.Id,
+                Index__c = 3,
+                FieldName__c = Schema.SObjectType.Limits__c.fields.FileStorageMB__c.getName(),
+                ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+                Value__c = '1',
+                Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+                Field_Type__c = RuleUtil.FIELD_TYPE_NUMBER
+            )
+        };
+        insert filters;
 
         Test.startTest();
         
@@ -4797,14 +4839,14 @@ public class MonitoringUtilTest {
         
         Test.stopTest();
 
-        // Verify that an event was created (spike detected on multiple fields)
+        // Verify that one consolidated event was created (spike detected on multiple fields)
         List<Event__c> events = [
             SELECT Id, Rule__c, RecordCount__c, Criteria__c
             FROM Event__c 
             WHERE Rule__c = :limitsRule.Id
         ];
 
-        System.assertEquals(3, events.size(), 'Should create one event per field with spike (3 fields spiked)');
+        System.assertEquals(1, events.size(), 'Should create one consolidated event for all fields with spike (3 fields spiked)');
         System.assertEquals(2, events[0].RecordCount__c, 'Should count limits records contributing to spike (latest snapshot group)');
     }
 

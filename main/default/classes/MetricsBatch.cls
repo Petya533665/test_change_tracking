@@ -143,7 +143,8 @@ public with sharing class MetricsBatch extends DatabaseUtils.PharosBatchImpl imp
         Integer countCommunityLoginsLastMonths = 0;
         for(TenantUsageEntitlement entitlement : [
             SELECT AmountUsed,CurrentAmountAllowed,Frequency, UsageDate, MasterLabel 
-            FROM TenantUsageEntitlement]) {
+            FROM TenantUsageEntitlement
+            LIMIT :Constants.QUERY_LIMITS.SMALL_DATA_QUERY_LIMIT]) {
 
             if(entitlement?.MasterLabel == 'Customer Community Logins') {
                 countCommunityLoginsLastMonths = (entitlement.AmountUsed != null) 
@@ -325,7 +326,7 @@ public with sharing class MetricsBatch extends DatabaseUtils.PharosBatchImpl imp
     }
 
     private static Integer getAllCountLogs() {
-        Integer count = [SELECT COUNT() FROM Log__c];
+        Integer count = Database.countQuery('SELECT COUNT() FROM Log__c');
         return get3bitCount(count);
     }
 

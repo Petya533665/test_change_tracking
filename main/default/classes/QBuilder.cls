@@ -14,11 +14,12 @@ public with sharing class QBuilder {
 	private List<QOrder> orders = new List<QOrder>();
 	private List<QCondition> conditions = new List<QCondition>();
 	private List<QBuilder> subQueries = new List<QBuilder>();
+	private List<QGroup> groupBys = new List<QGroup>();
 
 	private String defaultLogicalOperator = 'AND';
 
 	public QBuilder(SObjectType fromType)	{ this.fromText = String.valueOf(fromType); }
-	public QBuilder(String fromText) 		{ this.fromText = fromText; }
+	public QBuilder(String fromText) 		{ this.fromText = String.escapeSingleQuotes(fromText); }
 
 	/**
 	 * Instantiate an OrderBy object
@@ -37,6 +38,14 @@ public with sharing class QBuilder {
 	}
 
 	/**
+	 * Instantiate a GroupBy object
+	 */
+	public static QGroup groupBy(String fieldName) {
+		QGroup grp = new QGroup(fieldName);
+		return grp;
+	}
+
+	/**
 	 * Add an OrderBy statement
 	 */
 	public QBuilder add(QOrder ob) {
@@ -52,6 +61,16 @@ public with sharing class QBuilder {
 	public QBuilder add(QCondition cnd) {
 		if(cnd != null) {
 			this.conditions.add(cnd);
+		}
+		return this;
+	}
+
+	/**
+	 * Add a GroupBy statement
+	 */
+	public QBuilder add(QGroup grp) {
+		if(grp != null) {
+			this.groupBys.add(grp);
 		}
 		return this;
 	}
@@ -167,6 +186,23 @@ public with sharing class QBuilder {
 	}
 
 	/**
+	 * Build the GROUP BY statement
+	 */
+	public String buildGroupBy() {
+		List<String> groupList = new List<String>();
+
+		for (QGroup groupBy : this.groupBys) {
+			groupList.add(groupBy.build());
+		}
+
+		if (!this.groupBys.isEmpty()) {
+			return 'GROUP BY ' + String.join(groupList, ', ');
+		} else {
+			return '';
+		}
+	}
+
+	/**
 	 * Build the ORDER BY statement
 	 */
 	public String buildOrderBy() {
@@ -195,6 +231,10 @@ public with sharing class QBuilder {
 
 		if (!this.conditions.isEmpty()) {
 			queryParts.add(this.buildConditions());
+		}
+
+		if (!this.groupBys.isEmpty()) {
+			queryParts.add(this.buildGroupBy());
 		}
 
 		if (!this.orders.isEmpty()) {

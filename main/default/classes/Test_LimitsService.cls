@@ -850,6 +850,15 @@ public class Test_LimitsService {
             'Found ' + events.size() + ' events. ' +
             'Log times: [' + testLogs[0].Created_At__c + ', ' + testLogs[1].Created_At__c + '], runDateTime: ' + testTime + '. ' +
             'Spike detection now works correctly after filtering out regular logs.');
+        
+        // Verify that Limits rule criteria does NOT contain GROUP BY
+        // Limits rules evaluate values directly from Limits__c records, not via SOQL queries
+        for (Event__c event : events) {
+            System.assert(
+                event.Criteria__c == null || !event.Criteria__c.contains('GROUP BY'), 
+                'Limits rule event criteria should NOT contain GROUP BY. Criteria: ' + event.Criteria__c
+            );
+        }
     }
 
     @IsTest
@@ -1032,6 +1041,69 @@ public class Test_LimitsService {
             'Previous snapshot should have 1000 API requests');
         System.assertEquals(1600, capturedLogs[1].Limits__r.DailyApiRequests__c,
             'Current snapshot should have 1600 API requests');
+    }
+
+    @IsTest
+    static void test_integerValuesHandled_remoteOrg() {
+        // Test that values are correctly cast to integers when populating limits from REST API
+        
+        // Create a Connected_Org__c record (must be done before Test.startTest for insert)
+        Connected_Org__c testOrg = new Connected_Org__c(
+            Name = '00D000000000001',
+            Instance_Url__c = 'https://test.salesforce.com',
+            Access_Token__c = 'test_token_123'
+        );
+        insert testOrg;
+        
+        // Mock HTTP response with integer values
+        String mockResponseBody = '{' +
+            '"DataStorageMB": {' +
+                '"Max": 1024,' +
+                '"Remaining": 512' +
+            '},' +
+            '"FileStorageMB": {' +
+                '"Max": 2048,' +
+                '"Remaining": 1000' +
+            '},' +
+            '"AnalyticsExternalDataSizeMB": {' +
+                '"Max": 500,' +
+                '"Remaining": 250' +
+            '},' +
+            '"DailyApiRequests": {' +
+                '"Max": 15000,' +
+                '"Remaining": 10000' +
+            '}' +
+        '}';
+        
+        // Set up HTTP mock before Test.startTest
+        Test.setMock(HttpCalloutMock.class, new TestDataFactory.SingleRequestMock(200, 'OK', mockResponseBody));
+        
+        Test.startTest();
+        
+        // Create Limits__c record
+        Limits__c testLimits = new Limits__c();
+        
+        // Call the method
+        LimitsService.populateLimits(testLimits, testOrg, Logger.getInstance());
+        
+        Test.stopTest();
+        
+        // Verify integer values are correctly calculated
+        // DataStorageMB: 1024 - 512 = 512
+        System.assertEquals(512, testLimits.DataStorageMB__c, 
+            'DataStorageMB__c should have integer value 512');
+        
+        // FileStorageMB: 2048 - 1000 = 1048
+        System.assertEquals(1048, testLimits.FileStorageMB__c, 
+            'FileStorageMB__c should have integer value 1048');
+        
+        // AnalyticsExternalDataSizeMB: 500 - 250 = 250
+        System.assertEquals(250, testLimits.AnalyticsExternalDataSizeMB__c, 
+            'AnalyticsExternalDataSizeMB__c should have integer value 250');
+        
+        // DailyApiRequests: 15000 - 10000 = 5000
+        System.assertEquals(5000, testLimits.DailyApiRequests__c, 
+            'DailyApiRequests__c should have integer value 5000');
     }
 
     @IsTest

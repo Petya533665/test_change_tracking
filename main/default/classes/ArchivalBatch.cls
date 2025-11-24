@@ -77,7 +77,7 @@ public with sharing class ArchivalBatch extends DatabaseUtils.PharosBatchImpl im
 		}
 	}
 
-	public class ArchivalLogsQueryHelper {
+	public with sharing class ArchivalLogsQueryHelper {
 		public Datetime ruleStartTime;
 		public Datetime lastProcessedDatetime;
 		public List<RuleUtil.Rule> rules;

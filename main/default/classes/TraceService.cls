@@ -849,7 +849,7 @@ public without sharing class TraceService extends DatabaseUtils.PharosBatchImpl 
         }
     }
 
-    public class DebugLogServiceChunkRequest {
+    public with sharing class DebugLogServiceChunkRequest {
         public String oid;
         public String instance;
         public String session;

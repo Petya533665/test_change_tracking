@@ -1,4 +1,4 @@
-global class Web2LeadParser extends ApexExceptionParser {
+global with sharing class Web2LeadParser extends ApexExceptionParser {
 
     private static final String WEB_TO_LEAD_MARKER = 'Salesforce Could Not Create This Lead';
     private static final String LOG_SUMMARY = 'Web to Lead Failure:';

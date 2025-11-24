@@ -47,6 +47,26 @@ public with sharing class Templates {
                     Schema.SObjectType.Event__c.fields.Event_Details__c.getName()
                 })
         };
+
+        /*
+        [Webhook Body Template]
+        {
+          "event": "critical_event",
+          "rule": "{!pharos__Event__c.pharos__Rule_Description__c}",
+          "record_count": "{!pharos__Event__c.pharos__RecordCount__c}",
+          "details": "{!pharos__Event__c.Event_Details__c}",
+          "link": "{!pharos__Event__c.Link}"
+        }
+        */
+        public final Map<String, String> DEFAULT_WEBHOOK_ACTION = new Map<String, String>{
+            'body' => '{\n' +
+                '  "event": "critical_event",\n' +
+                '  "rule": "{!' + Schema.SObjectType.Event__c.getName() + '.' + Schema.SObjectType.Event__c.fields.Rule_Description__c.getName() + '}",\n' +
+                '  "record_count": "{!' + Schema.SObjectType.Event__c.getName() + '.' + Schema.SObjectType.Event__c.fields.RecordCount__c.getName() + '}",\n' +
+                '  "details": "{!' + Schema.SObjectType.Event__c.getName() + '.' + Schema.SObjectType.Event__c.fields.Event_Details__c.getName() + '}",\n' +
+                '  "link": "{!' + Schema.SObjectType.Event__c.getName() + '.Link}"\n' +
+                '}'
+        };
     }
 
     public inherited sharing class IssueSObject {
@@ -124,6 +144,52 @@ public with sharing class Templates {
                     Schema.SObjectType.Issue__c.fields.Description__c.getName()
             })
         };
+
+        /*
+        [Webhook Body Template - Create]
+        {
+          "event": "new_issue",
+          "category": "{!pharos__Issue__c.pharos__Category__c}",
+          "organization": "{!pharos__Issue__c.pharos__Organization_Name__c}",
+          "summary": "{!pharos__Issue__c.pharos__Summary__c}",
+          "functional_area": "{!pharos__Issue__c.pharos__Functional_Area__c}",
+          "description": "{!pharos__Issue__c.pharos__Description__c}",
+          "link": "{!pharos__Issue__c.Link}"
+        }
+        */
+        public final Map<String, String> DEFAULT_WEBHOOK_ACTION = new Map<String, String>{
+            'body' => '{\n' +
+                '  "event": "new_issue",\n' +
+                '  "category": "{!' + Schema.SObjectType.Issue__c.getName() + '.' + Schema.SObjectType.Issue__c.fields.Category__c.getName() + '}",\n' +
+                '  "organization": "{!' + Schema.SObjectType.Issue__c.getName() + '.' + Schema.SObjectType.Issue__c.fields.Organization_Name__c.getName() + '}",\n' +
+                '  "summary": "{!' + Schema.SObjectType.Issue__c.getName() + '.' + Schema.SObjectType.Issue__c.fields.Summary__c.getName() + '}",\n' +
+                '  "functional_area": "{!' + Schema.SObjectType.Issue__c.getName() + '.' + Schema.SObjectType.Issue__c.fields.Functional_Area__c.getName() + '}",\n' +
+                '  "description": "{!' + Schema.SObjectType.Issue__c.getName() + '.' + Schema.SObjectType.Issue__c.fields.Description__c.getName() + '}",\n' +
+                '  "link": "{!' + Schema.SObjectType.Issue__c.getName() + '.Link}"\n' +
+                '}'
+        };
+
+        /*
+        [Webhook Body Template - Update]
+        {
+          "event": "issue_updated",
+          "category": "{!pharos__Issue__c.pharos__Category__c}",
+          "status": "{!pharos__Issue__c.pharos__Status__c}",
+          "summary": "{!pharos__Issue__c.pharos__Summary__c}",
+          "description": "{!pharos__Issue__c.pharos__Description__c}",
+          "link": "{!pharos__Issue__c.Link}"
+        }
+        */
+        public final Map<String, String> DEFAULT_WEBHOOK_UPDATE_ACTION = new Map<String, String>{
+            'body' => '{\n' +
+                '  "event": "issue_updated",\n' +
+                '  "category": "{!' + Schema.SObjectType.Issue__c.getName() + '.' + Schema.SObjectType.Issue__c.fields.Category__c.getName() + '}",\n' +
+                '  "status": "{!' + Schema.SObjectType.Issue__c.getName() + '.' + Schema.SObjectType.Issue__c.fields.Status__c.getName() + '}",\n' +
+                '  "summary": "{!' + Schema.SObjectType.Issue__c.getName() + '.' + Schema.SObjectType.Issue__c.fields.Summary__c.getName() + '}",\n' +
+                '  "description": "{!' + Schema.SObjectType.Issue__c.getName() + '.' + Schema.SObjectType.Issue__c.fields.Description__c.getName() + '}",\n' +
+                '  "link": "{!' + Schema.SObjectType.Issue__c.getName() + '.Link}"\n' +
+                '}'
+        };
     }
 
     public inherited sharing class LogSObject {
@@ -190,6 +256,32 @@ public with sharing class Templates {
                     Schema.SObjectType.Log__c.fields.Details__c.getName()
                 })
         };
+
+        /*
+        [Webhook Body Template]
+        {
+          "event": "new_log",
+          "category": "{!pharos__Log__c.pharos__Category__c}",
+          "type": "{!pharos__Log__c.pharos__Type__c}",
+          "organization": "{!pharos__Log__c.pharos__Organization_Name__c}",
+          "summary": "{!pharos__Log__c.pharos__Summary__c}",
+          "area": "{!pharos__Log__c.pharos__Area__c}",
+          "details": "{!pharos__Log__c.pharos__Details__c}",
+          "link": "{!pharos__Log__c.Link}"
+        }
+        */
+        public final Map<String, String> DEFAULT_WEBHOOK_ACTION = new Map<String, String>{
+            'body' => '{\n' +
+                '  "event": "new_log",\n' +
+                '  "category": "{!' + Schema.SObjectType.Log__c.getName() + '.' + Schema.SObjectType.Log__c.fields.Category__c.getName() + '}",\n' +
+                '  "type": "{!' + Schema.SObjectType.Log__c.getName() + '.' + Schema.SObjectType.Log__c.fields.Type__c.getName() + '}",\n' +
+                '  "organization": "{!' + Schema.SObjectType.Log__c.getName() + '.' + Schema.SObjectType.Log__c.fields.Organization_Name__c.getName() + '}",\n' +
+                '  "summary": "{!' + Schema.SObjectType.Log__c.getName() + '.' + Schema.SObjectType.Log__c.fields.Summary__c.getName() + '}",\n' +
+                '  "area": "{!' + Schema.SObjectType.Log__c.getName() + '.' + Schema.SObjectType.Log__c.fields.Area__c.getName() + '}",\n' +
+                '  "details": "{!' + Schema.SObjectType.Log__c.getName() + '.' + Schema.SObjectType.Log__c.fields.Details__c.getName() + '}",\n' +
+                '  "link": "{!' + Schema.SObjectType.Log__c.getName() + '.Link}"\n' +
+                '}'
+        };
     }
 
     public inherited sharing class TraceResultSObject {
@@ -220,6 +312,28 @@ public with sharing class Templates {
                     Schema.SObjectType.Issue__c.fields.Category__c.getName(),
                     Schema.SObjectType.Issue__c.fields.Functional_Area__c.getName()
                 })
+        };
+
+        /*
+        [Webhook Body Template]
+        {
+          "event": "trace_result_available",
+          "issue_name": "{!pharos__Trace_Result__c.pharos__Issue__r.Name}",
+          "issue_summary": "{!pharos__Trace_Result__c.pharos__Issue__r.pharos__Summary__c}",
+          "category": "{!pharos__Trace_Result__c.pharos__Issue__r.pharos__Category__c}",
+          "functional_area": "{!pharos__Trace_Result__c.pharos__Issue__r.pharos__Functional_Area__c}",
+          "link": "{!pharos__Trace_Result__c.Link}"
+        }
+        */
+        public final Map<String, String> DEFAULT_WEBHOOK_ACTION = new Map<String, String>{
+            'body' => '{\n' +
+                '  "event": "trace_result_available",\n' +
+                '  "issue_name": "{!' + Schema.SObjectType.Trace_Result__c.getName() + '.' + Schema.SObjectType.Trace_Result__c.fields.Issue__c.getRelationshipName() + '.' + Schema.SObjectType.Issue__c.fields.Name.getName() + '}",\n' +
+                '  "issue_summary": "{!' + Schema.SObjectType.Trace_Result__c.getName() + '.' + Schema.SObjectType.Trace_Result__c.fields.Issue__c.getRelationshipName() + '.' + Schema.SObjectType.Issue__c.fields.Summary__c.getName() + '}",\n' +
+                '  "category": "{!' + Schema.SObjectType.Trace_Result__c.getName() + '.' + Schema.SObjectType.Trace_Result__c.fields.Issue__c.getRelationshipName() + '.' + Schema.SObjectType.Issue__c.fields.Category__c.getName() + '}",\n' +
+                '  "functional_area": "{!' + Schema.SObjectType.Trace_Result__c.getName() + '.' + Schema.SObjectType.Trace_Result__c.fields.Issue__c.getRelationshipName() + '.' + Schema.SObjectType.Issue__c.fields.Functional_Area__c.getName() + '}",\n' +
+                '  "link": "{!' + Schema.SObjectType.Trace_Result__c.getName() + '.Link}"\n' +
+                '}'
         };
     }
 }

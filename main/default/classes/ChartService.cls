@@ -256,7 +256,7 @@ public with sharing class ChartService {
 		String getChartDataJSON();
 	}
 
-	public abstract class ChartServiceAbstract implements ChartServiceInterface {
+	public with sharing abstract class ChartServiceAbstract implements ChartServiceInterface {
 
 		private final ChartDataProperties chartDataProperties;
 
@@ -408,7 +408,7 @@ public with sharing class ChartService {
 	}
 
 	// OCCURRENCE
-	public class OccurrenceChartService extends ChartServiceAbstract {
+	public with sharing class OccurrenceChartService extends ChartServiceAbstract {
 		private final String CURRENT_ISSUE_OCCURRENCE_COLOR = 'rgba(244,40,78,1)';
 		public OccurrenceChartService(String chartName) {
 			super(chartName);
@@ -506,7 +506,7 @@ public with sharing class ChartService {
 	}
 
 	// USER_IMPACT_LAST_30_DAYS, USER_IMPACT_LAST_30_DAYS_DETAILS
-	public class UserImpactChartService extends ChartServiceAbstract {
+	public with sharing class UserImpactChartService extends ChartServiceAbstract {
 		public UserImpactChartService(String chartName) {
 			super(chartName);
 		}
@@ -584,7 +584,7 @@ public with sharing class ChartService {
 	}
 
 	// DATA_IMPACT_LAST_30_DAYS, DATA_IMPACT_LAST_30_DAYS_DETAILS
-	public class DataImpactChartService extends ChartServiceAbstract {
+	public with sharing class DataImpactChartService extends ChartServiceAbstract {
 		public DataImpactChartService(String chartName) {
 			super(chartName);
 		}
@@ -710,7 +710,7 @@ public with sharing class ChartService {
 	}
 
 	// OCCURRENCE_LOGS
-	public class OccurrenceLogsChartService extends ChartServiceAbstract {
+	public with sharing class OccurrenceLogsChartService extends ChartServiceAbstract {
 		public OccurrenceLogsChartService(String chartName) {
 			super(chartName);
 		}
@@ -808,7 +808,7 @@ public with sharing class ChartService {
 	}
 
 	// TIMING_LOGS
-	public class TimingLogsChartService extends ChartServiceAbstract {
+	public with sharing class TimingLogsChartService extends ChartServiceAbstract {
 		public TimingLogsChartService(String chartName) {
 			super(chartName);
 		}
@@ -848,7 +848,7 @@ public with sharing class ChartService {
 	}
 
 	// BLUR MODE // TIMING_LOGS
-	public class TimingLogsBlurModeChartService extends BlurModeChartServiceAbstract {
+	public with sharing class TimingLogsBlurModeChartService extends BlurModeChartServiceAbstract {
 		public TimingLogsBlurModeChartService(String chartName) {
 			super(chartName);
 		}
@@ -875,7 +875,7 @@ public with sharing class ChartService {
 	}
 
 	// EVENT_LOG_RECORDS_BY_TYPE, EVENT_LOG_RECORDS_BY_CATEGORY
-	public class EventLogRecordsChartService extends ChartServiceAbstract {
+	public with sharing class EventLogRecordsChartService extends ChartServiceAbstract {
 		private final String EMPTY_LABEL = '-';
 		public EventLogRecordsChartService(String chartName) {
 			super(chartName);

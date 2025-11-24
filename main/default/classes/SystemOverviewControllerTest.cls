@@ -100,6 +100,48 @@ private class SystemOverviewControllerTest {
 		System.assertEquals(1, result.size(), 'Should return details for one object');
 	}
 
+	/**
+	 * SOQL Injection Prevention Test
+	 * Tests that invalid object names are filtered out by Schema validation
+	 * This test calls fillObjectInfoRecordCount directly to avoid HTTP callout mocking complexity
+	 */
+	@IsTest
+	private static void test_fillObjectInfoRecordCount_withInvalidObjectName() {
+		// Create ObjectInfo with invalid/malicious object name
+		List<SystemOverviewController.ObjectInfo> objectInfos = new List<SystemOverviewController.ObjectInfo>();
+		
+		// Valid object
+		SystemOverviewController.ObjectInfo validInfo = new SystemOverviewController.ObjectInfo();
+		validInfo.name = 'Account';
+		objectInfos.add(validInfo);
+		
+		// Invalid object (would be filtered out by ConfigUtil.MAP_GD.containsKey check)
+		SystemOverviewController.ObjectInfo invalidInfo = new SystemOverviewController.ObjectInfo();
+		invalidInfo.name = 'InvalidObject__c\' OR 1=1--';
+		objectInfos.add(invalidInfo);
+		
+		// Another invalid object (non-existent)
+		SystemOverviewController.ObjectInfo fakeInfo = new SystemOverviewController.ObjectInfo();
+		fakeInfo.name = 'FakeObject__c';
+		objectInfos.add(fakeInfo);
+
+		Test.startTest();
+		// Call fillObjectInfoRecordCount directly (no HTTP callouts)
+		SystemOverviewController.fillObjectInfoRecordCount(objectInfos);
+		Test.stopTest();
+
+		// Verify results
+		System.assertEquals(3, objectInfos.size(), 'Should have all 3 objects in list');
+		
+		// Valid object should have recordCount populated
+		System.assertNotEquals(null, objectInfos[0].recordCount, 'Valid object (Account) should have recordCount populated');
+		System.assert(objectInfos[0].recordCount >= 0, 'Valid object recordCount should be >= 0');
+		
+		// Invalid objects should have null recordCount (filtered by ConfigUtil.MAP_GD.containsKey check)
+		System.assertEquals(null, objectInfos[1].recordCount, 'SQL injection attempt should be blocked - recordCount should be null');
+		System.assertEquals(null, objectInfos[2].recordCount, 'Non-existent object should be filtered - recordCount should be null');
+	}
+
 	private static TestDataFactory.SingleRequestMock getWorkflowRulesMock() {
 		TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
 				200,
@@ -153,9 +195,9 @@ private class SystemOverviewControllerTest {
 	private static void test_getCodeInfo() {
 		Test.startTest();
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		String queryLWC = String.format(SystemOverviewController.CODE_INFO_QUERY, new List<String>{'LightningComponentBundle'});
+		String queryLWC = SystemOverviewController.getCodeInfoQuery('LightningComponentBundle');
 		endpoint2TestResp.put('https://test_Instance_Url' + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(queryLWC, 'UTF-8'), getLightningComponentBundle());
-		String queryFlow = String.format(SystemOverviewController.CODE_INFO_QUERY, new List<String>{'FlowDefinition'});
+		String queryFlow = SystemOverviewController.getCodeInfoQuery('FlowDefinition');
 		endpoint2TestResp.put('https://test_Instance_Url' + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(queryFlow, 'UTF-8'), getFlowDefinition());
 		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
 		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
@@ -168,7 +210,7 @@ private class SystemOverviewControllerTest {
 	private static void test_getCodeInfoDetails() {
 		Test.startTest();
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
-		String queryLWC = String.format(SystemOverviewController.CODE_INFO_DETAILS_LIGHTNING_QUERY, new List<String>{'LightningComponentBundle'});
+		String queryLWC = SystemOverviewController.getCodeInfoDetailsQuery('LightningComponentBundle');
 		endpoint2TestResp.put('https://test_Instance_Url' + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(queryLWC, 'UTF-8'), getLightningComponentBundleDetails());
 		String queryFlow = SystemOverviewController.CODE_INFO_DETAILS_FLOW_QUERY;
 		endpoint2TestResp.put('https://test_Instance_Url' + ConfigUtil.TOOLING_QUERY_API_ENDPOINT + EncodingUtil.urlEncode(queryFlow, 'UTF-8'), getFlowDefinitionDetails());

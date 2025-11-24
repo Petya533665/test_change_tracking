@@ -25,7 +25,9 @@ global with sharing class StacktraceViewerController {
 	private static final SObjectType ISSUE_SOBJECT_TYPE = Issue__c.SObjectType;
 
 	public StacktraceViewerController(ApexPages.StandardController stdController) {
-		String recordId = ApexPages.currentPage().getParameters().get('recordId');
+		System.PageReference pageReference = ApexPages.currentPage();
+		String recordId = pageReference.getParameters().get('recordId');
+		isDev = ConfigUtil.initializeDevelopmentMode(pageReference);
 		Schema.SObjectType sObjectType;
 		try {
 			sObjectType = Id.valueOf(recordId).getSobjectType();
@@ -76,15 +78,6 @@ global with sharing class StacktraceViewerController {
 					blurModeUrlParameter = BlurModeService.getEncryptedUrlParameter();
 				}
 			}
-		}
-		String isDevParam = ApexPages.currentPage().getParameters().get('dev');
-		if (String.isNotBlank(isDevParam)) {
-			Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
-			// ApexPages.currentPage().setCookies(new Cookie[]{ devCookie });
-			isDev = Boolean.valueOf(isDevParam);
-		} else {
-			Cookie devCookie = ApexPages.currentPage().getCookies().get('a2developmentMode');
-			isDev = devCookie != null ? Boolean.valueOf(devCookie.getValue()) : false;
 		}
 	}
 

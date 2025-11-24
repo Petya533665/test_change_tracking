@@ -1,4 +1,4 @@
-public class NotificationServiceLogImpl extends NotificationServiceBase {
+public with sharing class NotificationServiceLogImpl extends NotificationServiceBase {
 
     public override NotificationService.NOTIFICATION_SERVICE_TYPE getServiceType() {
         return NotificationService.NOTIFICATION_SERVICE_TYPE.LOG;

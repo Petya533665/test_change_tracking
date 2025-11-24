@@ -29,9 +29,10 @@ public with sharing class RuleExportImportService {
      */
     public static void deleteAllRules() {
         Logger loggerInstance = Logger.getInstance();
-        DatabaseUtils.getInstance().performDeleteDML([SELECT Id FROM Rule__c], Schema.SObjectType.Rule__c)
+        // LIMIT added for governor limit safety - method processes in chunks if needed
+        DatabaseUtils.getInstance().performDeleteDML([SELECT Id FROM Rule__c LIMIT :Constants.QUERY_LIMITS.LARGE_DATA_QUERY_LIMIT], Schema.SObjectType.Rule__c)
                 .handleError(RuleExportImportService.class.getName(), '.deleteAllRules', loggerInstance);
-        DatabaseUtils.getInstance().performDeleteDML([SELECT Id FROM Action__c], Schema.SObjectType.Action__c)
+        DatabaseUtils.getInstance().performDeleteDML([SELECT Id FROM Action__c LIMIT :Constants.QUERY_LIMITS.LARGE_DATA_QUERY_LIMIT], Schema.SObjectType.Action__c)
                 .handleError(RuleExportImportService.class.getName(), '.deleteAllRules', loggerInstance);
     }
 
@@ -88,7 +89,8 @@ public with sharing class RuleExportImportService {
         cv.VersionData = Blob.valueOf(JSON.serialize(rules));
         cv.IsMajorVersion = true;
         
-        insert cv;
+        DatabaseUtils.getInstance().performInsertDML(new List<ContentVersion>{ cv }, Schema.SObjectType.ContentVersion)
+            .handleError(RuleExportImportService.class.getName(), '.exportRulesWithDownloadUrl', Logger.getInstance());
         cv = [SELECT ContentDocumentId FROM ContentVersion WHERE Id = :cv.Id];
         return '/sfc/servlet.shepherd/document/download/' + cv.ContentDocumentId;
     }

@@ -97,7 +97,7 @@ public with sharing class TicketingService {
         }
     }
     
-    public abstract class TicketingServiceDefaultImpl implements TicketingServiceInterface {
+    public with sharing abstract class TicketingServiceDefaultImpl implements TicketingServiceInterface {
         
         private TicketingSObjectWrapper sobjectWrapper;
         private TicketingTaskInfo taskInfo;
@@ -1041,7 +1041,7 @@ public with sharing class TicketingService {
         return result;
     }
 
-    public class TicketingSObjectWrapper {
+    public with sharing class TicketingSObjectWrapper {
         public String id;
         public String hash1;
         public String hash2;

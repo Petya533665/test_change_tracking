@@ -26,12 +26,6 @@ public with sharing class SystemOverviewController {
 	private static final String ORG_AT_A_GLANCE_WORKFLOW_QUERY = 'SELECT Id FROM WorkflowRule';
 
 	@TestVisible
-	private static final String CODE_INFO_QUERY = 'SELECT COUNT(Id) count_id, NamespacePrefix namespacePrefix FROM {0} GROUP BY NamespacePrefix';
-
-	private static final String CODE_INFO_DETAILS_QUERY = 'SELECT Name, ApiVersion, NamespacePrefix FROM {0}';
-	@TestVisible
-	private static final String CODE_INFO_DETAILS_LIGHTNING_QUERY = 'SELECT MasterLabel, ApiVersion, NamespacePrefix FROM {0}';
-	@TestVisible
 	private static final String CODE_INFO_DETAILS_FLOW_QUERY = 'SELECT MasterLabel, MAX(ApiVersion) ApiVersion, Definition.Id, Definition.NamespacePrefix FROM Flow GROUP BY MasterLabel, Definition.Id, Definition.NamespacePrefix';
 	private static final String PROGRESS_COLOR_SUCCESS = '#2e844a';
 	private static final String PROGRESS_COLOR_WARNING = '#fe9339';
@@ -76,7 +70,7 @@ public with sharing class SystemOverviewController {
 
 	@AuraEnabled
 	public static Organization getOrgInfo() {
-		return [SELECT Id, Name, OrganizationType, CreatedDate, IsSandbox, LanguageLocaleKey, TimeZoneSidKey FROM Organization];
+		return [SELECT Id, Name, OrganizationType, CreatedDate, IsSandbox, LanguageLocaleKey, TimeZoneSidKey FROM Organization LIMIT :Constants.QUERY_LIMITS.SINGLETON_QUERY_LIMIT];
 	}
 
 	@AuraEnabled
@@ -84,7 +78,7 @@ public with sharing class SystemOverviewController {
 		UsersInfo usersInfo = new UsersInfo();
 		usersInfo.numberOfActiveUsers = [SELECT COUNT() FROM User WHERE IsActive = TRUE];
 		usersInfo.numberOfNoActivityInLast30Days = [SELECT COUNT() FROM User WHERE IsActive = TRUE AND LastLoginDate < LAST_N_DAYS:30];
-		usersInfo.numberOfUsers = [SELECT COUNT() FROM User];
+		usersInfo.numberOfUsers = Database.countQuery('SELECT COUNT() FROM User');
 		usersInfo.numberOfInactiveUsers = [SELECT COUNT() FROM User WHERE IsActive = FALSE];
 		return usersInfo;
 	}
@@ -118,7 +112,7 @@ public with sharing class SystemOverviewController {
 					codeInfos.add(new CodeInfo(objectName, key, namespacePrefixCount.get(key)));
 				}
 			} else {
-				String query = String.format(CODE_INFO_QUERY, new List<String>{objectName});
+				String query = getCodeInfoQuery(objectName);
 				if (objectName == LIGHTNING_COMPONENT_BUNDLE_OBJECT_NAME) {
 					List<Object> objects = getToolingAPIObjects(query);
 					for (Object obj : objects) {
@@ -136,9 +130,20 @@ public with sharing class SystemOverviewController {
 		return codeInfos;
 	}
 
+	@TestVisible
+	private static String getCodeInfoQuery(String objectName) {
+		return new QBuilder(objectName)
+			.selectFields(new Set<String>{ 'COUNT(Id) count_id', 'NamespacePrefix namespacePrefix' })
+			.add(QBuilder.groupBy('NamespacePrefix'))
+			.build();
+	}
 
 	@AuraEnabled
 	public static List<CodeInfoDetail> getCodeInfoDetails(String objectName) {
+		if (String.isBlank(objectName)) {
+			return new List<CodeInfoDetail>();
+		}
+
 		List<CodeInfoDetail> codeInfoDetails = new List<CodeInfoDetail>();
 		if (objectName == FLOW_DEFINITION_OBJECT_NAME) {
 			List<FlowDefinitionView> flowDefinitionViews = getFlowDefinitionView().get('flow');
@@ -146,12 +151,7 @@ public with sharing class SystemOverviewController {
 				codeInfoDetails.add(new CodeInfoDetail(objectName, flowDefinitionView.NamespacePrefix, flowDefinitionView.Label, String.valueOf(flowDefinitionView.ApiVersion)));
 			}
 		} else {
-			String query;
-			if (objectName == 'LightningComponentBundle' || objectName == 'AuraDefinitionBundle') {
-				query = String.format(CODE_INFO_DETAILS_LIGHTNING_QUERY, new List<String>{objectName});
-			} else {
-				query = String.format(CODE_INFO_DETAILS_QUERY, new List<String>{objectName});
-			}
+			String query = getCodeInfoDetailsQuery(objectName);
 			if (CODE_INFO_OBJECTS_TOOLING.contains(objectName)) {
 				List<Object> objects = getToolingAPIObjects(query);
 				for (Object obj : objects) {
@@ -167,6 +167,22 @@ public with sharing class SystemOverviewController {
 			}
 		}
 		return codeInfoDetails;
+	}
+
+	@TestVisible
+	private static String getCodeInfoDetailsQuery(String objectName) {
+		return new QBuilder(objectName)
+			.selectFields(getCodeInfoDetailsQueryFields(objectName))
+			.build();
+	}
+
+	private static Set<String> getCodeInfoDetailsQueryFields(String objectName) {
+		Boolean isLightningObjectName = objectName.equals(LIGHTNING_COMPONENT_BUNDLE_OBJECT_NAME) || objectName.equals(AURA_DEFINITION_BUNDLE_OBJECT_NAME);
+		return new Set<String>{
+			'ApiVersion',
+			'NamespacePrefix',
+			isLightningObjectName ? 'MasterLabel' : 'Name'
+		};
 	}
 
 	public static List<Object> getToolingAPIObjects(String query) {
@@ -325,15 +341,18 @@ public with sharing class SystemOverviewController {
 		return objectInfos;
 	}
 
+	@TestVisible
 	private static void fillObjectInfoRecordCount(List<ObjectInfo> objectInfos) {
 		for (ObjectInfo objectInfo : objectInfos) {
-			String query = new QBuilder(objectInfo.name)
+			if (ConfigUtil.MAP_GD.containsKey(objectInfo.name)) {
+				String query = new QBuilder(objectInfo.name)
 					.selectFields(new Set<String>{'COUNT()'})
 					.build();
-			try {
-				Integer count = Database.countQuery(query);
-				objectInfo.recordCount = count;
-			} catch (Exception e) {}
+				try {
+					Integer count = Database.countQuery(query);
+					objectInfo.recordCount = count;
+				} catch (Exception e) {}
+			}
 		}
 	}
 
@@ -466,7 +485,7 @@ public with sharing class SystemOverviewController {
 	@AuraEnabled
 	public static OrgAtAGlance getOrgAtAGlance() {
 		OrgAtAGlance orgAtAGlance = new OrgAtAGlance();
-		Organization org = [SELECT CreatedDate FROM Organization];
+		Organization org = [SELECT CreatedDate FROM Organization LIMIT :Constants.QUERY_LIMITS.SINGLETON_QUERY_LIMIT];
 		Integer ageInDays = org.CreatedDate.date().daysBetween(Date.today());
 		Decimal ageInYears = ageInDays / 365.0;
 		orgAtAGlance.orgAge = ageInYears.setScale(2) + ' years';
@@ -508,13 +527,13 @@ public with sharing class SystemOverviewController {
 		orgAtAGlance.triggers = triggerCount;
 
 		orgAtAGlance.linesOfCode = 0;
-		List<ApexClass> classes = [SELECT Body FROM ApexClass];
+		List<ApexClass> classes = [SELECT Body FROM ApexClass LIMIT :Constants.QUERY_LIMITS.LARGE_DATA_QUERY_LIMIT];
 		for (ApexClass cls : classes) {
 			if (cls.Body != null) {
 				orgAtAGlance.linesOfCode += cls.Body.length() / 80;
 			}
 		}
-		List<ApexTrigger> triggers = [SELECT Body FROM ApexTrigger];
+		List<ApexTrigger> triggers = [SELECT Body FROM ApexTrigger LIMIT :Constants.QUERY_LIMITS.LARGE_DATA_QUERY_LIMIT];
 		for (ApexTrigger trg : triggers) {
 			if (trg.Body != null) {
 				orgAtAGlance.linesOfCode += trg.Body.length() / 80;
@@ -559,7 +578,7 @@ public with sharing class SystemOverviewController {
 	@AuraEnabled
 	public static List<ChartDataPercentage> getLicenses() {
 		List<ChartDataPercentage> chartDataPercentages = new List<ChartDataPercentage>();
-		List<UserLicense> licenses = [SELECT Id, Name, TotalLicenses, UsedLicenses, Status FROM UserLicense];
+		List<UserLicense> licenses = [SELECT Id, Name, TotalLicenses, UsedLicenses, Status FROM UserLicense LIMIT :Constants.QUERY_LIMITS.SMALL_DATA_QUERY_LIMIT];
 		for (UserLicense license : licenses) {
 			chartDataPercentages.add(new ChartDataPercentage(license));
 		}

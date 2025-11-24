@@ -2,6 +2,20 @@ public with sharing class HttpUtils {
 
 	public static final String EXCEPTION_INVALID_SESSION_ID = 'INVALID_SESSION_ID';
 
+	// HTTP Header Names
+	public static final String HEADER_CONTENT_TYPE = 'Content-Type';
+	public static final String HEADER_AUTHORIZATION = 'Authorization';
+	public static final String HEADER_ACCEPT = 'Accept';
+	public static final String HEADER_FROM = 'From';
+
+	// HTTP Methods
+	public static final String HTTP_METHOD_GET = 'GET';
+	public static final String HTTP_METHOD_POST = 'POST';
+	public static final String HTTP_METHOD_PUT = 'PUT';
+	public static final String HTTP_METHOD_PATCH = 'PATCH';
+	public static final String HTTP_METHOD_DELETE = 'DELETE';
+
+	// HTTP Content Types
 	public static final String HTTP_CONTENT_TYPE_JSON = 'application/json';
 	public static final String HTTP_CONTENT_TYPE_FORM_URLENCODED = 'application/x-www-form-urlencoded';
 	public static final String HTTP_CONTENT_TYPE_JSON_PATCH = 'application/json-patch+json';
@@ -10,7 +24,7 @@ public with sharing class HttpUtils {
 
 	public static Map<String, String> getHeadersContentType(String typeValue) {
 		return new Map<String, String>{
-			'Content-Type' => typeValue
+			HEADER_CONTENT_TYPE => typeValue
 		};
 	}
 
@@ -28,13 +42,13 @@ public with sharing class HttpUtils {
 
 	public static Map<String, String> getHeadersAuthorization(String authValue) {
 		return new Map<String, String>{
-			'Authorization' => authValue
+			HEADER_AUTHORIZATION => authValue
 		};
 	}
 
 	public static Map<String, String> getHeadersFrom(String fromValue) {
 		return new Map<String, String>{
-			'From' => fromValue
+			HEADER_FROM => fromValue
 		};
 	}
 
@@ -43,7 +57,7 @@ public with sharing class HttpUtils {
 
 	public static Map<String, String> getHeadersAccept(String acceptType) {
 		return new Map<String, String>{
-			'Accept' => acceptType
+			HEADER_ACCEPT => acceptType
 		};
 	}
 
@@ -97,7 +111,7 @@ public with sharing class HttpUtils {
     public static String get(String url, Map<String, String> headers, Integer expectedResponseCode) {
         HTTPRequest req = new HTTPRequest();
         req.setEndpoint(url);
-        req.setMethod('GET');
+        req.setMethod(HTTP_METHOD_GET);
         if (headers != null) {
             for (String key : headers.keySet()) {
                 req.setHeader(key, headers.get(key));
@@ -162,23 +176,23 @@ public with sharing class HttpUtils {
 	}
 
     public static String patch(String url, String body, Map<String, String> headers, Integer expectedResponseCode) {
-        return postput('PATCH', url, body, headers, expectedResponseCode);
+        return postput(HTTP_METHOD_PATCH, url, body, headers, expectedResponseCode);
     }
 
     public static String del(String url, Map<String, String> headers, Integer expectedResponceCode) {
-        return postput('DELETE', url, null, headers, expectedResponceCode);
+        return postput(HTTP_METHOD_DELETE, url, null, headers, expectedResponceCode);
     }
 
     public static String post(String url, String body, Map<String, String> headers, Integer expectedResponceCode) {
-        return postput('POST', url, body, headers, expectedResponceCode);
+        return postput(HTTP_METHOD_POST, url, body, headers, expectedResponceCode);
     }
 
 	public static String postputBlobBody(String url, Blob body, Map<String, String> headers, Integer expectedResponceCode) {
-		return postputBlobBody('POST', url, body, headers, expectedResponceCode);
+		return postputBlobBody(HTTP_METHOD_POST, url, body, headers, expectedResponceCode);
 	}
 
     public static String put(String url, String body, Map<String, String> headers, Integer expectedResponseCode) {
-        return postput('PUT', url, body, headers, expectedResponseCode);
+        return postput(HTTP_METHOD_PUT, url, body, headers, expectedResponseCode);
     }
 
     public static Map<String, String> responseHeaders = new Map<String, String>();
@@ -259,8 +273,8 @@ public with sharing class HttpUtils {
 
 	public static Map<String, String> getHeaders(String accessToken) {
 		return new Map<String, String> {
-			'Authorization' => 'Bearer ' + accessToken,
-			'Content-Type' => 'application/json'
+			HEADER_AUTHORIZATION => AUTH_TYPE_BEARER + accessToken,
+			HEADER_CONTENT_TYPE => HTTP_CONTENT_TYPE_JSON
 		};
 	}
 
