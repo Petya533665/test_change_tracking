@@ -19,7 +19,7 @@ global with sharing class EventsChartsWrapperController {
         String isDevParam = ApexPages.currentPage().getParameters().get('dev');
         if(String.isNotBlank(isDevParam)) {
             Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
-            // ApexPages.currentPage().setCookies(new Cookie[]{ devCookie });
+            ApexPages.currentPage().setCookies(new Cookie[]{ devCookie });
             isDev = Boolean.valueOf(isDevParam);
         }
         else {
