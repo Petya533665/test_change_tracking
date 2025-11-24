@@ -22,7 +22,8 @@ public with sharing class JiraDetailsController {
                 FROM Log__c
                 WHERE Id = :recordId
             ];
-            this.jiraTaskUrl = this.log.Bug_Tracker__c;
+            // OWASP: Validate URL to prevent Stored XSS via javascript: protocol
+            this.jiraTaskUrl = sanitizeUrl(this.log.Bug_Tracker__c);
         }
         else if(sObjectType == Issue__c.SObjectType){
             Issue__c issue  = [
@@ -30,7 +31,8 @@ public with sharing class JiraDetailsController {
                 FROM Issue__c
                 WHERE Id = :recordId
             ];
-            this.jiraTaskUrl = issue.Bug_Tracker__c;
+            // OWASP: Validate URL to prevent Stored XSS via javascript: protocol
+            this.jiraTaskUrl = sanitizeUrl(issue.Bug_Tracker__c);
         }
 
     }
@@ -59,6 +61,43 @@ public with sharing class JiraDetailsController {
         } catch(Exception e) {
             this.jiraTask = e.getMessage();
         }
+    }
+
+    /**
+     * OWASP XSS Prevention: Validates URL to prevent javascript: and data: protocol attacks
+     * Reference: https://www.owasp.org/index.php/Cross_Site_Scripting
+     * Only allows http://, https://, and relative URLs
+     */
+    @TestVisible
+    private String sanitizeUrl(String url) {
+        if (String.isBlank(url)) {
+            return '';
+        }
+
+        String trimmedUrl = url.trim().toLowerCase();
+
+        // Block dangerous protocols that can execute JavaScript
+        List<String> dangerousProtocols = new List<String>{
+            'javascript:', 'data:', 'vbscript:', 'file:', 'about:'
+        };
+
+        for (String protocol : dangerousProtocols) {
+            if (trimmedUrl.startsWith(protocol)) {
+                // Return empty string for dangerous URLs
+                return '';
+            }
+        }
+
+        // Only allow safe HTTP(S) protocols and relative URLs
+        if (trimmedUrl.startsWith('http://') || 
+            trimmedUrl.startsWith('https://') || 
+            trimmedUrl.startsWith('/') ||
+            !trimmedUrl.contains(':')) {
+            return url; // Return original (not lowercased) if safe
+        }
+
+        // Reject any other protocol
+        return '';
     }
 
 }

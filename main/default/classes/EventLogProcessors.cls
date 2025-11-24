@@ -1,4 +1,4 @@
-public class EventLogProcessors {
+public with sharing class EventLogProcessors {
     // Test variables 
     // These are used to test the EventLogProcessors class, to help evaluate metrics
     // EventLogFieldNames and EventLogFieldTypes is readonly fields on EvnetLogFile

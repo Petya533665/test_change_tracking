@@ -38,7 +38,7 @@ public without sharing class PostInstallClass implements InstallHandler {
 		for(Issue__c issue : issues) {
 			issue.Jira_Integration_Status__c = Constants.GLOBAL_VARIABLE.NOTIFICATION_INTEGRATION_STATUS_FAILED;
 		}
-		Database.update(issues, false);
+		DatabaseUtils.getInstance().performUpdateDML(issues, Schema.SObjectType.Issue__c);
 	}
 
 	private void doInstall() {}

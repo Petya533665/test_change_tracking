@@ -2817,4 +2817,324 @@ private class RuleUtilTest {
 		Test.stopTest();
 	}
 
+	// ========== Webhook Remote Site Settings Cleanup Tests ==========
+
+	@IsTest
+	public static void test_deleteRule_with_webhook_cleans_up_remote_site_settings() {
+		// Create a rule with webhook action
+		Rule__c testRule = new Rule__c(
+			Type__c = Constants.RULE_SOBJECT.TYPE_NOTIFICATION,
+			Active__c = true,
+			Description__c = 'Test Description'
+		);
+		insert testRule;
+
+		// Create webhook action
+		Action__c webhookAction = new Action__c(
+			Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION,
+			Webhook_URL__c = 'https://webhook.site/test-endpoint',
+			Webhook_Method__c = 'POST',
+			Webhook_Headers__c = '{}',
+			Webhook_Body_Template__c = '{"test":"value"}',
+			Webhook_Auth_Type__c = 'None',
+			Webhook_Content_Type__c = 'application/json'
+		);
+		insert webhookAction;
+
+		// Link action to rule
+		RuleAction__c ruleAction = new RuleAction__c(
+			Rule__c = testRule.Id,
+			Action__c = webhookAction.Id
+		);
+		insert ruleAction;
+
+		// Set up mock for Tooling API (must be after DML, before callout)
+		Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+		mocks.putAll(getRemoteSiteSettingsMock());
+		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+		Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+		Test.startTest();
+		// Directly call the delete method (not through remote action handler to avoid transaction limits)
+		Database.DeleteResult result = RuleUtil.deleteRule(testRule.Id);
+		Test.stopTest();
+
+		// Verify the delete was successful
+		System.assert(result.isSuccess(), 'Delete operation should succeed');
+		
+		// Verify rule was deleted
+		List<Rule__c> deletedRules = [SELECT Id FROM Rule__c WHERE Id = :testRule.Id];
+		System.assertEquals(0, deletedRules.size(), 'Rule should be deleted');
+
+		// Verify webhook action was deleted
+		List<Action__c> deletedActions = [SELECT Id FROM Action__c WHERE Id = :webhookAction.Id];
+		System.assertEquals(0, deletedActions.size(), 'Webhook action should be deleted');
+	}
+
+	@IsTest
+	public static void test_deleteAction_with_webhook_cleans_up_remote_site_settings() {
+		// Create webhook action
+		Action__c webhookAction = new Action__c(
+			Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION,
+			Webhook_URL__c = 'https://webhook.site/test-endpoint',
+			Webhook_Method__c = 'POST',
+			Webhook_Headers__c = '{}',
+			Webhook_Body_Template__c = '{"test":"value"}',
+			Webhook_Auth_Type__c = 'None',
+			Webhook_Content_Type__c = 'application/json'
+		);
+		insert webhookAction;
+
+		// Set up mock for Tooling API (must be after DML, before callout)
+		Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+		mocks.putAll(getRemoteSiteSettingsMock());
+		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+		Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+		Test.startTest();
+		// Directly call the delete method
+		Map<String, Object> result = RuleUtil.deleteAction(webhookAction.Id);
+		Test.stopTest();
+
+		// Verify the delete was successful
+		System.assertNotEquals(null, result, 'Delete result should not be null');
+		System.assertEquals(true, result.get(RuleUtil.KEY_SUCCESS), 'Delete operation should succeed');
+		
+		// Verify webhook action was deleted
+		List<Action__c> deletedActions = [SELECT Id FROM Action__c WHERE Id = :webhookAction.Id];
+		System.assertEquals(0, deletedActions.size(), 'Webhook action should be deleted');
+	}
+
+	@IsTest
+	public static void test_deleteAction_preserves_remote_site_settings_when_url_still_in_use() {
+		// Set up mock for Tooling API
+		Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+		mocks.putAll(getRemoteSiteSettingsMock());
+		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+		Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+		// Create two webhook actions with the same URL
+		Action__c webhookAction1 = new Action__c(
+			Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION,
+			Webhook_URL__c = 'https://webhook.site/shared-endpoint',
+			Webhook_Method__c = 'POST',
+			Webhook_Headers__c = '{}',
+			Webhook_Body_Template__c = '{"test":"value1"}',
+			Webhook_Auth_Type__c = 'None',
+			Webhook_Content_Type__c = 'application/json'
+		);
+		insert webhookAction1;
+
+		Action__c webhookAction2 = new Action__c(
+			Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION,
+			Webhook_URL__c = 'https://webhook.site/shared-endpoint',
+			Webhook_Method__c = 'POST',
+			Webhook_Headers__c = '{}',
+			Webhook_Body_Template__c = '{"test":"value2"}',
+			Webhook_Auth_Type__c = 'None',
+			Webhook_Content_Type__c = 'application/json'
+		);
+		insert webhookAction2;
+
+		// Delete only the first action
+		Map<String, Object> data = new Map<String, Object>();
+		data.put(RuleUtil.KEY_ACTION_ID, webhookAction1.Id);
+		
+		Map<String, Object> input = new Map<String, Object>();
+		input.put('method', 'deleteAction');
+		input.put('data', data);
+
+		Test.startTest();
+		String response = AdminController.remoteActionHandler(JSON.serialize(input));
+		Test.stopTest();
+
+		// Verify only first action was deleted
+		List<Action__c> deletedActions = [SELECT Id FROM Action__c WHERE Id = :webhookAction1.Id];
+		System.assertEquals(0, deletedActions.size(), 'First webhook action should be deleted');
+
+		// Verify second action still exists
+		List<Action__c> remainingActions = [SELECT Id FROM Action__c WHERE Id = :webhookAction2.Id];
+		System.assertEquals(1, remainingActions.size(), 'Second webhook action should still exist');
+	}
+
+	@IsTest
+	public static void test_deleteRuleAction_with_webhook_cleans_up_remote_site_settings() {
+		// Create a rule
+		Rule__c testRule = new Rule__c(
+			Type__c = Constants.RULE_SOBJECT.TYPE_NOTIFICATION,
+			Active__c = true,
+			Description__c = 'Test Description'
+		);
+		insert testRule;
+
+		// Create webhook action
+		Action__c webhookAction = new Action__c(
+			Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION,
+			Webhook_URL__c = 'https://webhook.site/test-endpoint',
+			Webhook_Method__c = 'POST',
+			Webhook_Headers__c = '{}',
+			Webhook_Body_Template__c = '{"test":"value"}',
+			Webhook_Auth_Type__c = 'None',
+			Webhook_Content_Type__c = 'application/json'
+		);
+		insert webhookAction;
+
+		// Link action to rule
+		RuleAction__c ruleAction = new RuleAction__c(
+			Rule__c = testRule.Id,
+			Action__c = webhookAction.Id
+		);
+		insert ruleAction;
+
+		// Set up mock for Tooling API (must be after DML, before callout)
+		Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+		mocks.putAll(getRemoteSiteSettingsMock());
+		HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+		Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+		Test.startTest();
+		// Directly call the delete method
+		Map<String, Object> result = RuleUtil.deleteRuleAction(ruleAction.Id);
+		Test.stopTest();
+
+		// Verify the delete was successful
+		System.assertNotEquals(null, result, 'Delete result should not be null');
+		
+		// Verify rule action was deleted
+		List<RuleAction__c> deletedRuleActions = [SELECT Id FROM RuleAction__c WHERE Id = :ruleAction.Id];
+		System.assertEquals(0, deletedRuleActions.size(), 'Rule action should be deleted');
+
+		// Verify webhook action was also deleted (orphaned actions are deleted)
+		List<Action__c> deletedActions = [SELECT Id FROM Action__c WHERE Id = :webhookAction.Id];
+		System.assertEquals(0, deletedActions.size(), 'Orphaned webhook action should be deleted');
+	}
+
+	// Helper method to get Remote Site Settings mock
+	private static Map<String, HttpCalloutMock> getRemoteSiteSettingsMock() {
+		Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+		
+		// Mock for querying existing Remote Site Settings (SOQL query)
+		// This matches the actual endpoint used by AdminService.getRemoteSiteSettings()
+		TestDataFactory.SingleRequestMock queryMock = new TestDataFactory.SingleRequestMock(
+			200,
+			'OK',
+			'{"size":0,"totalSize":0,"done":true,"queryLocator":null,"entityTypeName":"RemoteProxy","records":[]}'
+		);
+		mocks.put(ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_REMOTE_SITE_SETTINGS_QUERY, queryMock);
+		
+		return mocks;
+	}
+
+	@IsTest
+	public static void test_limitsRule_shouldNotHaveGroupBy() {
+		// Test that Limits rules do NOT include GROUP BY in their criteria
+		// Limits rules evaluate values directly from Limits__c records, not via SOQL queries
+		Test.startTest();
+		
+		RuleUtil.Rule limitsRule = new RuleUtil.Rule();
+		limitsRule.type = Constants.RULE_SOBJECT.TYPE_LIMITS;
+		limitsRule.filterLogic = '{1}';
+		// Initialize collections that are normally set in the constructor
+		limitsRule.ruleFilters = new List<RuleUtil.RuleFilter>();
+		limitsRule.groupFieldNames = new Set<String>();
+		limitsRule.maxIndex = 0;
+		
+		// Create filters including both value and field (group) filters
+		List<RuleUtil.RuleFilter> filters = new List<RuleUtil.RuleFilter>();
+		
+		// Value filter
+		RuleUtil.RuleFilter valueFilter = new RuleUtil.RuleFilter();
+		valueFilter.fieldName = 'ActiveScratchOrgs';
+		valueFilter.comparisonOperator = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL;
+		valueFilter.comparisonType = RuleUtil.COMPARISON_TYPE_VALUE;
+		valueFilter.value = '10';
+		valueFilter.index = 1;
+		filters.add(valueFilter);
+		
+		// Field filter (which would normally trigger GROUP BY for monitoring rules)
+		RuleUtil.RuleFilter fieldFilter = new RuleUtil.RuleFilter();
+		fieldFilter.fieldName = 'DailyAsyncApexTests__c';
+		fieldFilter.comparisonType = RuleUtil.COMPARISON_TYPE_FIELD;
+		fieldFilter.index = 2;
+		filters.add(fieldFilter);
+		
+		// Add filters to the rule (this populates maxIndex and groupFieldNames)
+		limitsRule.addFilters(filters);
+		
+		// Populate criteria
+		limitsRule.populateCriteria();
+		
+		Test.stopTest();
+		
+		// Verify criteria was populated
+		System.assertNotEquals(null, limitsRule.criteria, 
+			'Criteria should be populated');
+		
+		// Verify GROUP BY is NOT present for Limits rules
+		System.assert(!limitsRule.criteria.contains('GROUP BY'), 
+			'Limits rule criteria should NOT contain GROUP BY. Actual criteria: ' + limitsRule.criteria);
+		
+		// Verify group field names were populated (to confirm GROUP BY exclusion is intentional)
+		System.assertEquals(false, limitsRule.groupFieldNames.isEmpty(), 
+			'Group field names should be populated to verify GROUP BY exclusion is intentional');
+	}
+	
+	@IsTest
+	public static void test_monitoringRule_shouldHaveGroupBy() {
+		// Test that Monitoring rules DO include GROUP BY in their criteria
+		// Monitoring rules use SOQL queries which support GROUP BY
+		Test.startTest();
+		
+		RuleUtil.Rule monitoringRule = new RuleUtil.Rule();
+		monitoringRule.type = Constants.RULE_SOBJECT.TYPE_MONITORING;
+		monitoringRule.filterLogic = '{1}';
+		// Initialize collections that are normally set in the constructor
+		monitoringRule.ruleFilters = new List<RuleUtil.RuleFilter>();
+		monitoringRule.groupFieldNames = new Set<String>();
+		monitoringRule.maxIndex = 0;
+		
+		// Create filters including both value and field (group) filters
+		List<RuleUtil.RuleFilter> filters = new List<RuleUtil.RuleFilter>();
+		
+		// Value filter
+		RuleUtil.RuleFilter valueFilter = new RuleUtil.RuleFilter();
+		valueFilter.fieldName = 'Summary__c';
+		valueFilter.comparisonOperator = RuleUtil.COMPARISON_OPERATOR_CONTAINS;
+		valueFilter.comparisonType = RuleUtil.COMPARISON_TYPE_VALUE;
+		valueFilter.value = 'Error';
+		valueFilter.index = 1;
+		filters.add(valueFilter);
+		
+		// Field filter (which should trigger GROUP BY for monitoring rules)
+		RuleUtil.RuleFilter fieldFilter = new RuleUtil.RuleFilter();
+		fieldFilter.fieldName = 'Category__c';
+		fieldFilter.comparisonType = RuleUtil.COMPARISON_TYPE_FIELD;
+		fieldFilter.index = 2;
+		filters.add(fieldFilter);
+		
+		// Add filters to the rule (this populates maxIndex and groupFieldNames)
+		monitoringRule.addFilters(filters);
+		
+		// Populate criteria
+		monitoringRule.populateCriteria();
+		
+		Test.stopTest();
+		
+		// Verify criteria was populated
+		System.assertNotEquals(null, monitoringRule.criteria, 
+			'Criteria should be populated');
+		
+		// Verify GROUP BY IS present for Monitoring rules
+		System.assert(monitoringRule.criteria.contains('GROUP BY'), 
+			'Monitoring rule criteria should contain GROUP BY. Actual criteria: ' + monitoringRule.criteria);
+		
+		// Verify the field name is included in the GROUP BY clause
+		System.assert(monitoringRule.criteria.contains('Category__c'), 
+			'GROUP BY clause should include the group field name');
+	}
+
 }

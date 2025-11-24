@@ -1,4 +1,4 @@
-public class NotificationServiceEventActionImpl extends NotificationServiceBase {
+public with sharing class NotificationServiceEventActionImpl extends NotificationServiceBase {
 
     public override NotificationService.NOTIFICATION_SERVICE_TYPE getServiceType() {
         return NotificationService.NOTIFICATION_SERVICE_TYPE.EVENT_ACTION;

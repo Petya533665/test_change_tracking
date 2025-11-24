@@ -1,4 +1,4 @@
-public class MonitoringService {
+public with sharing class MonitoringService {
     // Static variables at the top
     private static final String STRATEGY_TYPE_MONITORING = 'Monitoring';
     private static final String STRATEGY_TYPE_LIMITS = 'Limits';
@@ -205,7 +205,7 @@ public class MonitoringService {
     }
     
     // Abstract base class for monitoring strategies
-    public abstract class BaseMonitoringStrategy implements IMonitoringStrategy {
+    public with sharing abstract class BaseMonitoringStrategy implements IMonitoringStrategy {
         protected Logger logger;
         
         public BaseMonitoringStrategy(Logger logger) {

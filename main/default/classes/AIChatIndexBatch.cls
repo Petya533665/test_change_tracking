@@ -23,7 +23,8 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
                 if (settings == null || settings.Id == null) {
                     settings = new AI_Chat_Index_Settings__c();
                     settings.LastLogUpdateTimestamp__c = DateTime.newInstance(1970, 1, 1);
-                    insert settings;
+                    DatabaseUtils.getInstance().performInsertDML(new List<AI_Chat_Index_Settings__c>{ settings }, Schema.SObjectType.AI_Chat_Index_Settings__c)
+                        .handleError(AIChatIndexBatch.class.getName(), '.SETTINGS', Logger.getInstance());
                 }
                 settingsInstance = settings;
             }
@@ -150,7 +151,7 @@ public without sharing class AIChatIndexBatch extends DatabaseUtils.PharosBatchI
         try {
             AsyncApexJob job = [SELECT CreatedDate FROM AsyncApexJob WHERE Id = :BC.getJobId() LIMIT 1];
             SETTINGS.LastLogUpdateTimestamp__c = job.CreatedDate;
-            update SETTINGS;
+            DatabaseUtils.getInstance().performUpdateDML(new List<AI_Chat_Index_Settings__c>{ SETTINGS }, Schema.SObjectType.AI_Chat_Index_Settings__c);
         }
         catch (Exception e) {
             loggerInstance?.addInternalError(e, AIChatIndexBatch.class.getName(), 'finish:updateSettings');

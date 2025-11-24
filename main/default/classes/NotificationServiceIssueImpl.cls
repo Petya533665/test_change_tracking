@@ -1,4 +1,4 @@
-public class NotificationServiceIssueImpl extends NotificationServiceBase {
+public with sharing class NotificationServiceIssueImpl extends NotificationServiceBase {
 
     public override NotificationService.NOTIFICATION_SERVICE_TYPE getServiceType() {
         return NotificationService.NOTIFICATION_SERVICE_TYPE.ISSUE;

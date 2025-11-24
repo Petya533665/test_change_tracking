@@ -218,7 +218,8 @@ public with sharing class RuleUtil {
 		TEAMS,
 		AZURE_DEV_OPS,
 		JIRA_TICKET_COMMENT,
-        AZURE_DEV_OPS_WORK_ITEM_COMMENT
+        AZURE_DEV_OPS_WORK_ITEM_COMMENT,
+		WEBHOOK
 	}
 
 	public static final Map<String, ActionType> MAP_ACTION_TYPES_BY_STRINGS = new Map<String, ActionType> {
@@ -232,7 +233,8 @@ public with sharing class RuleUtil {
 		Constants.ACTION_SOBJECT.ACTION_TYPE_TEAMS_NOTIFICATION => ActionType.TEAMS,
 		Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION => ActionType.AZURE_DEV_OPS,
 		Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT => ActionType.JIRA_TICKET_COMMENT,
-		Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT => ActionType.AZURE_DEV_OPS_WORK_ITEM_COMMENT
+		Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT => ActionType.AZURE_DEV_OPS_WORK_ITEM_COMMENT,
+		Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION => ActionType.WEBHOOK
 	};
 	public static final Map<String, List<String>> MAP_ACTION_TYPES_BY_RULE_TYPE = new Map<String, List<String>> {
 		Constants.RULE_SOBJECT.TYPE_MONITORING => new List<String> {
@@ -243,7 +245,8 @@ public with sharing class RuleUtil {
 			Constants.ACTION_SOBJECT.ACTION_TYPE_TEAMS_NOTIFICATION,
 			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
 			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT,
-			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
+			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION
 		},
 		Constants.RULE_SOBJECT.TYPE_ARCHIVAL => new List<String> {
 			Constants.ACTION_SOBJECT.ACTION_TYPE_REMOVAL,
@@ -264,7 +267,8 @@ public with sharing class RuleUtil {
 			Constants.ACTION_SOBJECT.ACTION_TYPE_PAGERDUTY_NOTIFICATION,
 			Constants.ACTION_SOBJECT.ACTION_TYPE_TEAMS_NOTIFICATION,
 			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT,
-			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
+			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION
 		},
 		Constants.RULE_SOBJECT.TYPE_BROADCAST => new List<String>(),
 		Constants.RULE_SOBJECT.TYPE_EVENT_MONITORING => new List<String>(),
@@ -297,14 +301,16 @@ public with sharing class RuleUtil {
 			'Id', 'Rule__r.Type__c', 'Rule__r.Name__c', 'Rule__r.Description__c', 'Action__r.Id', 'Action__r.Name', 'Action__r.Name__c', 'Action__r.CreatedDate', 'Action__r.Body__c', 'Action__r.Description__c', 'Action__r.EmailBody__c', 'Action__r.EmailCC__c', 'Action__r.EmailTemplateId__c', 'Action__r.EmailTo__c',
 			'Action__r.JIRAAssignee__c','Action__r.JIRAAssignee_Id__c', 'Action__r.JIRAComponents__c', 'Action__r.JIRAEpic__c', 'Action__r.JIRAIssueType__c', 'Action__r.JIRALabels__c', 'Action__r.JIRAPriority__c', 'Action__r.JIRAProject__c',
 			'Action__r.SlackChannels__c', 'Action__r.Subject__c', 'Action__r.Action_Type__c', 'Action__r.Subtype__c', 'Action__r.PagerDuty_Type__c', 'Action__r.Contact__c', 'Action__r.Contact__r.Name', 'Action__r.CreatedBy.Name', 'Action__r.RecordTypeId', 'Action__r.Type__c',
-			'Action__r.Team_Id__c', 'Action__r.Channel_Id__c', 'Action__r.SlackChannels__c', 'Action__r.SObjectType__c', 'Action__r.Additional_Metadata__c', 'Action__r.Iteration__c', 'Action__r.Is_Update__c'
+			'Action__r.Team_Id__c', 'Action__r.Channel_Id__c', 'Action__r.SlackChannels__c', 'Action__r.SObjectType__c', 'Action__r.Additional_Metadata__c', 'Action__r.Iteration__c', 'Action__r.Is_Update__c',
+			'Action__r.Webhook_URL__c', 'Action__r.Webhook_Method__c', 'Action__r.Webhook_Headers__c', 'Action__r.Webhook_Body_Template__c', 'Action__r.Webhook_Auth_Type__c', 'Action__r.Webhook_Content_Type__c'
 	};
 
 	public final static List<String> ACTION_FIELDS = new List<String>{
 			'Id', 'Name', 'Name__c', 'Body__c', 'Description__c', 'EmailBody__c', 'EmailCC__c', 'EmailTemplateId__c', 'EmailTo__c',
 			'JIRAAssignee__c','JIRAAssignee_Id__c', 'JIRAComponents__c', 'JIRAEpic__c', 'JIRAIssueType__c', 'JIRALabels__c', 'JIRAPriority__c', 'JIRAProject__c',
 			'SlackChannels__c', 'Subject__c', 'Action_Type__c', 'Subtype__c', 'PagerDuty_Type__c', 'Contact__c', 'Contact__r.Name', 'CreatedBy.Name', 'RecordTypeId','Type__c',
-			'Team_Id__c', 'Channel_Id__c', 'SlackChannels__c', 'SObjectType__c', 'Additional_Metadata__c', 'Iteration__c', 'CreatedDate', 'Is_Update__c'
+			'Team_Id__c', 'Channel_Id__c', 'SlackChannels__c', 'SObjectType__c', 'Additional_Metadata__c', 'Iteration__c', 'CreatedDate', 'Is_Update__c',
+			'Webhook_URL__c', 'Webhook_Method__c', 'Webhook_Headers__c', 'Webhook_Body_Template__c', 'Webhook_Auth_Type__c', 'Webhook_Content_Type__c'
 	};
 
 	private static final List<String> REQUIRED_RULE_FIELDS = new List<String> {
@@ -572,6 +578,30 @@ public with sharing class RuleUtil {
 		if (!ruleActionsToUpsert.isEmpty()) {
 			DatabaseUtils.getInstance().performUpsertDML(ruleActionsToUpsert, Schema.SObjectType.RuleAction__c, true);
 		}
+		
+		// Save webhook tokens to custom settings after DML
+		Logger logger = Logger.getInstance();
+		ruleActionIndex = 0;
+		for (Action actionWrapper : actionWrappers) {
+			RuleAction ruleActionWrapper = ruleActionWrappers.get(ruleActionIndex++);
+			// Save webhook token to custom settings if this is a webhook action with auth value
+			if (actionWrapper.type == Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION 
+				&& String.isNotBlank(actionWrapper.webhookUrl) 
+				&& String.isNotBlank(actionWrapper.webhookAuthValue)) {
+				try {
+					WebhookService.putWebhookTokenToSettings(
+						actionWrapper.webhookUrl, 
+						actionWrapper.webhookAuthValue, 
+						true, 
+						logger
+					);
+					// Flush token records after saving
+					GraphAPIService.saveListTokenRecordSettings(true, logger);
+				} catch (Exception e) {
+					logger?.addInternalError(e, null, RuleUtil.class.getName(), 'upsertRuleActionsWithActions - saveWebhookToken');
+				}
+			}
+		}
 	}
 
 	public static Map<Id, Event> getLastCreatedEventsMap() {
@@ -580,6 +610,7 @@ public with sharing class RuleUtil {
 				SELECT MAX(CreatedDate) CreatedDate, Rule__c RuleId
 				FROM Event__c
 				GROUP BY Rule__c
+				LIMIT :Constants.QUERY_LIMITS.LARGE_DATA_QUERY_LIMIT
 		];
 		for (AggregateResult event : events) {
 			Datetime createdDate = (Datetime)event.get('CreatedDate');
@@ -755,12 +786,33 @@ public with sharing class RuleUtil {
 		for (Action__c action : [SELECT Id FROM Action__c WHERE Id IN (SELECT Action__c FROM RuleAction__c WHERE Action__c IN :actionIds AND Rule__c != :ruleId)]) {
 			actionIds.remove(action.Id);
 		}
+		
+		// Collect webhook URLs and action IDs BEFORE deleting (NO callouts in loop)
+		Set<String> webhookUrlsToDelete = new Set<String>();
+		if (!actionIds.isEmpty() && PermissionsUtil.WebhookIntegrationEnabled) {
+			List<Action__c> actionsToDelete = [SELECT Id, Action_Type__c, Webhook_URL__c FROM Action__c WHERE Id IN :actionIds];
+			for (Action__c action : actionsToDelete) {
+				if (action.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION 
+					&& String.isNotBlank(action.Webhook_URL__c)) {
+					webhookUrlsToDelete.add(action.Webhook_URL__c);
+				}
+			}
+		}
+		
+		// FIRST: Delete Remote Site Settings if they won't be used after this delete (callout BEFORE DML)
+		if (!webhookUrlsToDelete.isEmpty()) {
+			AdminService.deleteWebhookRemoteSiteSettings(webhookUrlsToDelete, actionIds);
+		}
+		
+		// THEN: DML (delete actions and rule)
 		if (!actionIds.isEmpty()) {
 			DatabaseUtils.getInstance().performDeleteDML(new List<Id>(actionIds), Schema.SObjectType.Action__c)
 					.handleError(RuleUtil.class.getName(), '.deleteRule');
 		}
-		return DatabaseUtils.getInstance().performDeleteDML(new List<Id>{ruleId}, Schema.SObjectType.Rule__c)
+		Database.DeleteResult result = DatabaseUtils.getInstance().performDeleteDML(new List<Id>{ruleId}, Schema.SObjectType.Rule__c)
 				.handleError(RuleUtil.class.getName(), '.deleteRule').deleteResults[0];
+		
+		return result;
 	}
 
 	public static Boolean isJiraRule(String ruleId) {
@@ -792,6 +844,29 @@ public with sharing class RuleUtil {
 			];
 		}
 
+		// Collect webhook URL and action ID BEFORE deleting (NO callouts in loop)
+		Set<String> webhookUrlsToDelete = new Set<String>();
+		Set<Id> actionIdsToDelete = new Set<Id>();
+		if (actionsAttachedToOtherRules.isEmpty()) {
+			// Get action details before deleting for webhook cleanup
+			List<Action__c> actionToDelete = [SELECT Id, Action_Type__c, Webhook_URL__c FROM Action__c WHERE Id = :ruleAction.get(0).Action__c LIMIT 1];
+			
+			// Collect webhook URL and action ID for sync cleanup
+			if (PermissionsUtil.WebhookIntegrationEnabled 
+				&& !actionToDelete.isEmpty()
+				&& actionToDelete.get(0).Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION 
+				&& String.isNotBlank(actionToDelete.get(0).Webhook_URL__c)) {
+				webhookUrlsToDelete.add(actionToDelete.get(0).Webhook_URL__c);
+				actionIdsToDelete.add(actionToDelete.get(0).Id);
+			}
+		}
+		
+		// FIRST: Delete Remote Site Settings if they won't be used after this delete (callout BEFORE DML)
+		if (!webhookUrlsToDelete.isEmpty()) {
+			AdminService.deleteWebhookRemoteSiteSettings(webhookUrlsToDelete, actionIdsToDelete);
+		}
+		
+		// THEN: DML
 		if (actionsAttachedToOtherRules.isEmpty()) {
 			Database.DeleteResult dr = DatabaseUtils.getInstance().performDeleteDML(new List<Id>{ruleAction.get(0).Action__c}, Schema.SObjectType.Action__c)
 					.handleError(RuleUtil.class.getName(), '.deleteRuleAction').deleteResults[0];
@@ -800,6 +875,8 @@ public with sharing class RuleUtil {
 			actionResult.put(KEY_MESSAGE, dr.getErrors());
 			result.put(ConfigUtil.DELETE_MONITORING_RULE_ACTION_KEY_ACTION_RESULT, actionResult);
 		}
+		
+		// More DML
 		Map<String, Object> ruleActionResult = new Map<String, Object>();
 		Database.DeleteResult dr = DatabaseUtils.getInstance().performDeleteDML(new List<Id>{ruleAction.get(0).Id}, Schema.SObjectType.RuleAction__c)
 				.handleError(RuleUtil.class.getName(), '.deleteRuleAction').deleteResults[0];
@@ -811,13 +888,30 @@ public with sharing class RuleUtil {
 	}
 
 	public static Map<String, Object> deleteAction(String actionId) {
-		List<Action__c> action = [SELECT Id FROM Action__c WHERE Id = :actionId LIMIT 1];
+		List<Action__c> action = [SELECT Id, Action_Type__c, Webhook_URL__c FROM Action__c WHERE Id = :actionId LIMIT 1];
 
+		// Collect webhook URL and action ID BEFORE deleting
+		Set<String> webhookUrlsToDelete = new Set<String>();
+		Set<Id> actionIdsToDelete = new Set<Id>();
+		if (PermissionsUtil.WebhookIntegrationEnabled 
+			&& action.get(0).Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION 
+			&& String.isNotBlank(action.get(0).Webhook_URL__c)) {
+			webhookUrlsToDelete.add(action.get(0).Webhook_URL__c);
+			actionIdsToDelete.add(action.get(0).Id);
+		}
+
+		// FIRST: Delete Remote Site Settings if they won't be used after this delete (callout BEFORE DML)
+		if (!webhookUrlsToDelete.isEmpty()) {
+			AdminService.deleteWebhookRemoteSiteSettings(webhookUrlsToDelete, actionIdsToDelete);
+		}
+
+		// THEN: DML
 		Map<String, Object> actionResult = new Map<String, Object>();
 		Database.DeleteResult dr = DatabaseUtils.getInstance().performDeleteDML(new List<Id>{action.get(0).Id}, Schema.SObjectType.Action__c)
 				.handleError(RuleUtil.class.getName(), '.deleteAction').deleteResults[0];
 		actionResult.put(KEY_SUCCESS, dr.isSuccess());
 		actionResult.put(KEY_MESSAGE, dr.getErrors());
+		
 		return actionResult;
 	}
 
@@ -1058,7 +1152,13 @@ public with sharing class RuleUtil {
 					Action__r.CreatedBy.Name,
 					Action__r.Name__c,
 					Action__r.SobjectType__c,
-					Action__r.Name
+					Action__r.Name,
+					Action__r.Webhook_URL__c,
+					Action__r.Webhook_Method__c,
+					Action__r.Webhook_Headers__c,
+					Action__r.Webhook_Body_Template__c,
+					Action__r.Webhook_Auth_Type__c,
+					Action__r.Webhook_Content_Type__c
 				FROM RuleActions__r
 				)
 				FROM Rule__c
@@ -1119,7 +1219,13 @@ public with sharing class RuleUtil {
 					Action__r.CreatedBy.Name,
 					Action__r.Name__c,
 					Action__r.SobjectType__c,
-					Action__r.Name
+					Action__r.Name,
+					Action__r.Webhook_URL__c,
+					Action__r.Webhook_Method__c,
+					Action__r.Webhook_Headers__c,
+					Action__r.Webhook_Body_Template__c,
+					Action__r.Webhook_Auth_Type__c,
+					Action__r.Webhook_Content_Type__c
 				FROM RuleActions__r
 				)
 				FROM Rule__c
@@ -1613,10 +1719,13 @@ public with sharing class RuleUtil {
 				? FilterEvaluator.substituteValues(this.filterLogic, filterValues)
 				: '';
 
-			if (!this.groupFieldNames.isEmpty()) {
+			// GROUP BY is only applicable for SOQL-based rules, not for Limits rules
+			// Limits rules evaluate values directly from Limits__c records, not via SOQL queries
+			if (!this.groupFieldNames.isEmpty() && !this.type.equals(Constants.RULE_SOBJECT.TYPE_LIMITS)) {
 				this.criteria += ' GROUP BY ' + String.join(new List<String>(this.groupFieldNames), ',');
 			}
 		}
+	
 
 		public Set<Id> applyNotificationRules(List<SObject> records) {
 			return applyNotificationRules(records, null, null);
@@ -2198,6 +2307,13 @@ public with sharing class RuleUtil {
 		public String sObjectType;
 		public Datetime createdDate;
 		public Boolean isUpdate;
+		public String webhookUrl;
+		public String webhookMethod;
+		public String webhookHeaders;
+		public String webhookBodyTemplate;
+		public String webhookAuthType;
+		public String webhookAuthValue;
+		public String webhookContentType;
 
 		public String content;
 		public Action__c fields;
@@ -2241,6 +2357,16 @@ public with sharing class RuleUtil {
 			this.actionName = action.Name__c;
 			this.createdDate = action.CreatedDate;
 			this.isUpdate = action.Is_Update__c != null ? action.Is_Update__c : false;
+			this.webhookUrl = action.Webhook_URL__c;
+			this.webhookMethod = action.Webhook_Method__c;
+			this.webhookHeaders = action.Webhook_Headers__c;
+			this.webhookBodyTemplate = action.Webhook_Body_Template__c;
+			this.webhookAuthType = action.Webhook_Auth_Type__c;
+			// webhookAuthValue is retrieved from custom settings, not from Action__c field
+			this.webhookAuthValue = String.isNotBlank(action.Webhook_URL__c) 
+				? WebhookService.getWebhookTokenFromSettings(action.Webhook_URL__c) 
+				: null;
+			this.webhookContentType = action.Webhook_Content_Type__c;
 
 			this.fields = action;
 
@@ -2292,7 +2418,7 @@ public with sharing class RuleUtil {
 			}
 			
 			Schema.RecordTypeInfo recordTypeInfo = Schema.SObjectType.Action__c.getRecordTypeInfosByName().get(recordTypeName);
-			return new Action__c(
+			Action__c action = new Action__c(
 					Id = id,
 					RecordTypeId = recordTypeInfo != null ? recordTypeInfo.getRecordTypeId() : null,
 					Contact__c = contactId,
@@ -2321,8 +2447,22 @@ public with sharing class RuleUtil {
 					Additional_Metadata__c = additionalMetadata,
 					Name__c = actionName,
 					SobjectType__c = sObjectType,
-					Is_Update__c = isUpdate != null ? isUpdate : false
+				Is_Update__c = isUpdate != null ? isUpdate : false,
+				Webhook_URL__c = webhookUrl,
+				Webhook_Method__c = webhookMethod,
+				Webhook_Headers__c = webhookHeaders,
+				Webhook_Body_Template__c = webhookBodyTemplate,
+				Webhook_Auth_Type__c = webhookAuthType,
+				// Webhook_Auth_Value__c is not set here - tokens are saved to custom settings instead
+				Webhook_Content_Type__c = webhookContentType
 			);
+			
+			// Populate Webhook_URL_Domain__c from Webhook_URL__c
+			if (String.isNotBlank(webhookUrl)) {
+				action.Webhook_URL_Domain__c = AdminService.extractWebhookBaseUrl(webhookUrl);
+			}
+			
+			return action;
 		}
 		
 		/**

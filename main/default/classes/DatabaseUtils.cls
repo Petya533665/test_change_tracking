@@ -192,6 +192,8 @@ public with sharing class DatabaseUtils {
 	public DatabaseUtils performDeleteDML(List<SObject> sObjectList, Schema.DescribeSObjectResult dsr, Boolean allOrNone) {
 		if (!sObjectList.isEmpty()) {
 			sObjects = sObjectList;
+			// Security: CRUD permissions check before delete operation
+			// Complies with Salesforce Security Implementation Guide
 			if (PermissionsUtil.isDeletable(dsr)) {
 				deleteResults = Database.delete(sObjectList, allOrNone);
 			}
@@ -201,6 +203,8 @@ public with sharing class DatabaseUtils {
 
 	public DatabaseUtils performDeleteDML(List<Id> listIds, Schema.DescribeSObjectResult dsr) {
 		if (!listIds.isEmpty()) {
+			// Security: CRUD permissions check before delete operation
+			// Complies with Salesforce Security Implementation Guide
 			if (PermissionsUtil.isDeletable(dsr)) {
 				deleteResults = Database.delete(listIds, false);
 			}

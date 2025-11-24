@@ -118,6 +118,7 @@ public without sharing class PermissionsUtil {
 	public static final String FP_ISSUE_NOTIFICATION_ENABLED = 'IssueNotificationEnabled';
 	public static final String FP_DEBUG_LOG_SERVICE_ENABLED = 'DebugLogServiceEnabled';
 	public static final String FP_AZURE_DEV_OPS_INTEGRATION_ENABLED = 'AzureDevOpsIntegrationEnabled';
+	public static final String FP_WEBHOOK_INTEGRATION_ENABLED = 'WebhookIntegrationEnabled';
 	public static final String FP_UNUSED = 'Unused';
 	public static final String FP_ISSUE_ANALYSIS_ENABLED = 'IssueAnalysisEnabled';
 	public static final String FP_DEBUG_JIRA_REFRESH_TOKENS_ENABLED = 'DebugJiraRefreshTokensEnabled';
@@ -170,7 +171,7 @@ public without sharing class PermissionsUtil {
 		FP_ISSUE_NOTIFICATION_ENABLED => 18,
 		FP_DEBUG_LOG_SERVICE_ENABLED => 19,
 		FP_AZURE_DEV_OPS_INTEGRATION_ENABLED => 20,
-		FP_UNUSED => 21,
+		FP_WEBHOOK_INTEGRATION_ENABLED => 21,
 		FP_ISSUE_ANALYSIS_ENABLED => 22,
 		FP_DEBUG_JIRA_REFRESH_TOKENS_ENABLED => 23,
 		FP_MANDATORY_ERROR_REPORT_ENABLED => 24,
@@ -735,6 +736,17 @@ public without sharing class PermissionsUtil {
 		}
 		private set;
 	}
+
+	@TestVisible
+	public static Boolean WebhookIntegrationEnabled {
+		get {
+			if(WebhookIntegrationEnabled == null) {
+				WebhookIntegrationEnabled = FeatureMap1.get(MAP_FEATURE1_INDEX_BY_NAME.get(FP_WEBHOOK_INTEGRATION_ENABLED));
+			}
+			return WebhookIntegrationEnabled;
+		}
+		private set;
+	}
 	@TestVisible
 	public static Boolean SplunkIntegrationEnabled {
 		get {
@@ -831,6 +843,7 @@ public without sharing class PermissionsUtil {
 		private set;
 	}
 
+	@TestVisible
 	public static Integer MaxMonitoringRules {
 		get {
 			if(MaxMonitoringRules == null) {

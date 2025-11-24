@@ -10,6 +10,11 @@ global with sharing class LogService {
     public static final String FIELD_TYPE_BOOLEAN = 'BOOLEAN';
     public static final String FIELD_TYPE_DOUBLE = 'DOUBLE';
     public static final String NAMESPACE_UNKNOWN = 'unknown';
+    
+    // Precompiled regex patterns for stacktrace normalization (performance optimization)
+    private static final Pattern PATTERN_CAUSED_BY = Pattern.compile('(?i)caused by:\\s*');
+    private static final Pattern PATTERN_SYSTEM_EXCEPTION = Pattern.compile('(?i)System\\.[A-Za-z]+Exception:\\s*');
+    private static final Pattern PATTERN_MULTIPLE_NEWLINES = Pattern.compile('(\\r?\\n){2,}');
 
 	@TestVisible
 	private static Boolean CUSTOM_SKIP_TEST_VALUE;
@@ -957,6 +962,36 @@ global with sharing class LogService {
         return result;
     }
 
+    /**
+     * Normalize stacktrace format to ensure consistent hash generation
+     * Removes format variations between email logs and event logs
+     * Uses precompiled Pattern objects for better performance
+     * @param stacktrace The raw stacktrace string
+     * @return Normalized stacktrace string
+     */
+    public static String normalizeStacktraceForHashing(String stacktrace) {
+        if (String.isBlank(stacktrace)) {
+            return stacktrace;
+        }
+        
+        String normalized = stacktrace;
+        
+        // Remove "caused by:" prefix (case insensitive) - common in event logs
+        normalized = PATTERN_CAUSED_BY.matcher(normalized).replaceAll('');
+        
+        // Remove exception type prefixes that appear before the actual message
+        // Pattern: "System.ListException: " or "System.UnexpectedException: " etc
+        normalized = PATTERN_SYSTEM_EXCEPTION.matcher(normalized).replaceAll('');
+        
+        // Normalize multiple consecutive newlines to single newlines
+        normalized = PATTERN_MULTIPLE_NEWLINES.matcher(normalized).replaceAll('\n');
+        
+        // Remove leading/trailing whitespace
+        normalized = normalized.trim();
+        
+        return normalized;
+    }
+
     public static Log__c calculateHashes(Log__c log) {
 
         String valueForHash1;
@@ -968,7 +1003,9 @@ global with sharing class LogService {
         String logSummary = removeExtraErrorDetails(log.Summary__c);
 
         if(String.isNotBlank(log.Stacktrace__c)) {
-            stackTraceUniqueLines = new Set<String>(ApexExceptionParser.getStackTraceLines(log.Stacktrace__c, ApexExceptionParser.PATTERN_CLASS_2));
+            // Normalize stacktrace before parsing to ensure consistent hash generation
+            String normalizedStacktrace = normalizeStacktraceForHashing(log.Stacktrace__c);
+            stackTraceUniqueLines = new Set<String>(ApexExceptionParser.getStackTraceLines(normalizedStacktrace, ApexExceptionParser.PATTERN_CLASS_2));
             firstLineStacktrace = ApexExceptionParser.getFirstStacktraceLine(stackTraceUniqueLines);
             lastLineStacktrace = ApexExceptionParser.getLastStacktraceLine(stackTraceUniqueLines);
         }

@@ -49,6 +49,19 @@ public with sharing class GraphAPIService {
 	public static final String GRAPH_API_PARAM_COUNT = '$count';
 	public static final String GRAPH_API_PARAM_TOP = '$top';
 	public static final String GRAPH_API_PARAM_QUANTITY = '100';
+	
+	// HTTP Headers and Values
+	public static final String HEADER_CONSISTENCY_LEVEL = 'ConsistencyLevel';
+	public static final String HEADER_CONSISTENCY_LEVEL_VALUE_EVENTUAL = 'eventual';
+	
+	// Search and Query Constants
+	public static final String SEARCH_PREFIX_DISPLAY_NAME = '\"displayName:';
+	public static final String SEARCH_SUFFIX = '\"';
+	public static final String QUERY_PARAM_PREFIX = '?';
+	public static final String BOOLEAN_TRUE_STRING = 'true';
+	
+	// Content Type Values
+	public static final String CONTENT_TYPE_HTML = 'html';
 
 
 	public class GraphAPIServiceException extends Exception {}
@@ -57,13 +70,13 @@ public with sharing class GraphAPIService {
 		String endpoint = String.isBlank(search) ? GRAPH_API_GET_ALL_TEAMS_ENDPOINT : GRAPH_API_ENPOINT + GRAPH_API_PARAM_GROUPS;
         HttpUtils.HttpURLParameters queryParams = new HttpUtils.HttpURLParameters();
 		if (!String.isBlank(search)) {
-			queryParams.addEncodedParameter(GRAPH_API_PARAM_SEARCH, '\"displayName:' + search + '\"');
-			queryParams.addParameter(GRAPH_API_PARAM_COUNT, 'true');
+			queryParams.addEncodedParameter(GRAPH_API_PARAM_SEARCH, SEARCH_PREFIX_DISPLAY_NAME + search + SEARCH_SUFFIX);
+			queryParams.addParameter(GRAPH_API_PARAM_COUNT, BOOLEAN_TRUE_STRING);
 			queryParams.addParameter(GRAPH_API_PARAM_TOP, GRAPH_API_PARAM_QUANTITY);
-	        endpoint = endpoint + queryParams.toStringParameters('?');
+	        endpoint = endpoint + queryParams.toStringParameters(QUERY_PARAM_PREFIX);
 		}
 		Map<String, String> headers = HttpUtils.getHeadersAuthorizationAcceptJson(GRAPH_API_TOKEN_TYPE_BEARER + OAUTH_API_TOKEN);
-		headers.put('ConsistencyLevel', 'eventual');
+		headers.put(HEADER_CONSISTENCY_LEVEL, HEADER_CONSISTENCY_LEVEL_VALUE_EVENTUAL);
 		String b = HttpUtils.get(
             endpoint,
             headers,
@@ -74,7 +87,7 @@ public with sharing class GraphAPIService {
     }
 
 	public static Team getTeamById(String id) {
-		String endpoint = GRAPH_API_ENPOINT + GRAPH_API_PARAM_TEAMS + '/' + id;
+		String endpoint = GRAPH_API_ENPOINT + GRAPH_API_PARAM_TEAMS + Constants.GLOBAL_VARIABLE.SYMBOL_SLASH + id;
 
 		Map<String, String> headers = HttpUtils.getHeadersAuthorizationAcceptJson(GRAPH_API_TOKEN_TYPE_BEARER + OAUTH_API_TOKEN);
 		String b = HttpUtils.get(
@@ -162,7 +175,7 @@ public with sharing class GraphAPIService {
 			this.subject = subject;
 			this.body = new ChatMessageBody();
 			this.body.content = START_TAG_PRE + body + END_TAG_PRE;
-			this.body.contentType = 'html';
+			this.body.contentType = CONTENT_TYPE_HTML;
 			this.hostedContents = new List<Map<String, Object>>();
 		}
 
@@ -382,8 +395,20 @@ public with sharing class GraphAPIService {
 		if(!unsortedResult.isEmpty()) {
 			sortedResult = new Graph_API_Token__c[unsortedResult.size()];
 			for(Graph_API_Token__c record : unsortedResult) {
-				Integer index = Integer.valueOf(record.Name.replaceAll('[^0-9]', ''));
-				sortedResult.set(index, record);
+				// Extract index from Name: Name format is "type + index"
+				// Remove the type prefix to get just the trailing index number
+				String nameWithoutType = record.Name.startsWith(record.Type__c) 
+					? record.Name.substring(record.Type__c.length()) 
+					: record.Name;
+			// Extract trailing numeric index (handles cases where type contains numbers)
+			String indexStr = Constants.GLOBAL_VARIABLE.PATTERN_NON_NUMERIC.matcher(nameWithoutType).replaceAll('');
+				if(String.isNotBlank(indexStr)) {
+					Integer index = Integer.valueOf(indexStr);
+					// Validate index is within bounds
+					if(index >= 0 && index < sortedResult.size()) {
+						sortedResult.set(index, record);
+					}
+				}
 			}
 		}
 

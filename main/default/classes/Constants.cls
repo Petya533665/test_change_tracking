@@ -1,3 +1,4 @@
+@SuppressWarnings('PMD.FieldNamingConventions')
 public with sharing class Constants {
     
     public static final GlobalVariable GLOBAL_VARIABLE { 
@@ -96,11 +97,25 @@ public with sharing class Constants {
         public final Integer TEXT_FIELD_MAX_LENGTH = 255;
 
         public final String SYMBOL_AT = '@';
+        public final String SYMBOL_UNDERSCORE = '_';
+        public final String SYMBOL_DOT = '.';
+        public final String SYMBOL_COLON = ':';
+        public final String SYMBOL_SLASH = '/';
+        public final String SYMBOL_DASH = '-';
+        
+        // URL Protocol Constants
+        public final String URL_PROTOCOL_SEPARATOR = '://';
+        public final String URL_PROTOCOL_HTTPS = 'https://';
+        public final String URL_PROTOCOL_HTTP = 'http://';
 
         public final String SALESFORCE_DOMAIN = 'my.salesforce.com';
         public final String CUSTOM_DOMAIN_SYMBOLS = '--';
 
         public final Pattern PATTERN_SOBJECT_ID = Pattern.compile('([a-zA-Z0-9]{15,18})');
+        public final Pattern PATTERN_MERGE_FIELD = Pattern.compile('\\{![^}]+\\}');
+        public final Pattern PATTERN_MERGE_FIELD_QUOTED = Pattern.compile('"\\{![^}]+\\}"');
+        public final Pattern PATTERN_NON_ALPHANUMERIC = Pattern.compile('[^a-zA-Z0-9]');
+        public final Pattern PATTERN_NON_NUMERIC = Pattern.compile('[^0-9]');
 
         public final String DATETIME_FORMAT = 'yyyy-MM-dd HH:mm:ss';
 
@@ -144,6 +159,7 @@ public with sharing class Constants {
         public final String ACTION_TYPE_EXTERNAL_ARCHIVAL = 'External Archival';
         public final String ACTION_TYPE_JIRA_TICKET_COMMENT = 'JIRA Ticket Comment';
         public final String ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT = 'Azure Dev Ops Work Item Comment';
+        public final String ACTION_TYPE_WEBHOOK_NOTIFICATION = 'Webhook Notification';
         
         private ActionSObject() {
             this.objectType = Action__c.SObjectType;
@@ -856,6 +872,23 @@ public with sharing class Constants {
         // Handles second-level variance in production (e.g., 60.22 min gaps)
         // Ensures logs at -60min 13sec are included in -60min spike detection window
         public Integer SPIKE_DETECTION_BUFFER_MINUTES = 1;
+    }
+    
+    // SOQL Query Limits Configuration
+    public static final QueryLimits QUERY_LIMITS {
+        get { return QUERY_LIMITS == null ? (QUERY_LIMITS = new QueryLimits()) : QUERY_LIMITS; }
+        private set;
+    }
+    
+    public inherited sharing class QueryLimits {
+        // Standard limit for singleton queries (Organization, etc.)
+        public final Integer SINGLETON_QUERY_LIMIT = 1;
+        
+        // Standard limit for small reference data (UserLicense, TenantUsageEntitlement, etc.)
+        public final Integer SMALL_DATA_QUERY_LIMIT = 1000;
+        
+        // Standard limit for large queries (ApexClass, ApexTrigger, Events, Rules, Actions)
+        public final Integer LARGE_DATA_QUERY_LIMIT = 10000;
     }
     
     public inherited sharing virtual class SObjectTypeConstants {

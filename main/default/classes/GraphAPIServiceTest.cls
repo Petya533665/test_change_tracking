@@ -155,6 +155,104 @@ private class GraphAPIServiceTest {
 		System.assertEquals(testToken1, result);
 	}
 
+	@IsTest
+	static void test_webhookTokenSaveAndRetrieve() {
+		final String testWebhookUrl = 'https://webhook.example.com/api/endpoint';
+		final String testToken;
+
+		Test.startTest();
+		testToken = generateRandomString(255*2 + 100);
+		Logger logger = Logger.getInstance();
+		WebhookService.putWebhookTokenToSettings(testWebhookUrl, testToken, true, logger);
+		GraphAPIService.saveListTokenRecordSettings(true, logger);
+		Test.stopTest();
+		
+		GraphAPIService.GRAPH_API_LIST_RECORDS = null;
+		String result = WebhookService.getWebhookTokenFromSettings(testWebhookUrl);
+		System.assertEquals(testToken, result, 'Retrieved token should match saved token');
+	}
+
+	@IsTest
+	static void test_webhookTokenUniquePerUrl() {
+		final String testWebhookUrl1 = 'https://webhook.example.com/api/endpoint1';
+		final String testWebhookUrl2 = 'https://webhook.example.com/api/endpoint2';
+		final String testToken1 = 'token1';
+		final String testToken2 = 'token2';
+
+		Test.startTest();
+		Logger logger = Logger.getInstance();
+		WebhookService.putWebhookTokenToSettings(testWebhookUrl1, testToken1, true, logger);
+		WebhookService.putWebhookTokenToSettings(testWebhookUrl2, testToken2, true, logger);
+		GraphAPIService.saveListTokenRecordSettings(true, logger);
+		Test.stopTest();
+		
+		GraphAPIService.GRAPH_API_LIST_RECORDS = null;
+		String result1 = WebhookService.getWebhookTokenFromSettings(testWebhookUrl1);
+		String result2 = WebhookService.getWebhookTokenFromSettings(testWebhookUrl2);
+		
+		System.assertEquals(testToken1, result1, 'First URL should return first token');
+		System.assertEquals(testToken2, result2, 'Second URL should return second token');
+		System.assertNotEquals(result1, result2, 'Different URLs should have different tokens');
+	}
+
+	@IsTest
+	static void test_webhookTokenTypeGeneration() {
+		final String testWebhookUrl1 = 'https://webhook.example.com/api/endpoint1';
+		final String testWebhookUrl2 = 'https://webhook.example.com/api/endpoint2';
+		final String testWebhookUrl3 = 'https://webhook.example.com/api/endpoint1'; // Same as URL1
+
+		Test.startTest();
+		String tokenType1 = WebhookService.generateWebhookTokenType(testWebhookUrl1);
+		String tokenType2 = WebhookService.generateWebhookTokenType(testWebhookUrl2);
+		String tokenType3 = WebhookService.generateWebhookTokenType(testWebhookUrl3);
+		Test.stopTest();
+		
+		System.assertNotEquals(null, tokenType1, 'Token type should be generated');
+		System.assertNotEquals(null, tokenType2, 'Token type should be generated');
+		System.assertNotEquals(null, tokenType3, 'Token type should be generated');
+		System.assert(tokenType1.startsWith('webhook_'), 'Token type should start with webhook_');
+		System.assert(tokenType2.startsWith('webhook_'), 'Token type should start with webhook_');
+		System.assert(tokenType3.startsWith('webhook_'), 'Token type should start with webhook_');
+		System.assertEquals(tokenType1, tokenType3, 'Same URL should generate same token type');
+		System.assertNotEquals(tokenType1, tokenType2, 'Different URLs should generate different token types');
+		System.assert(tokenType1.length() <= 37, 'Token type length should be <= 37 (webhook_ + 29 char hash)');
+	}
+
+	@IsTest
+	static void test_webhookTokenSplitAcrossMultipleRecords() {
+		final String testWebhookUrl = 'https://webhook.example.com/api/long-token-endpoint';
+		final String testToken;
+
+		Test.startTest();
+		// Create a token that spans multiple records (255 chars per record)
+		testToken = generateRandomString(255*3 + 230);
+		Logger logger = Logger.getInstance();
+		WebhookService.putWebhookTokenToSettings(testWebhookUrl, testToken, true, logger);
+		GraphAPIService.saveListTokenRecordSettings(true, logger);
+		Test.stopTest();
+		
+		GraphAPIService.GRAPH_API_LIST_RECORDS = null;
+		String result = WebhookService.getWebhookTokenFromSettings(testWebhookUrl);
+		System.assertEquals(testToken, result, 'Long token should be correctly split and reassembled');
+	}
+
+	@IsTest
+	static void test_webhookTokenWithHashContainingNumbers() {
+		// Test that token types with numbers in hash work correctly with getGraphApiTokenListRecordsByType
+		final String testWebhookUrl = 'https://webhook123.example456.com/api/endpoint789';
+		final String testToken = 'test-token-value';
+
+		Test.startTest();
+		Logger logger = Logger.getInstance();
+		WebhookService.putWebhookTokenToSettings(testWebhookUrl, testToken, true, logger);
+		GraphAPIService.saveListTokenRecordSettings(true, logger);
+		Test.stopTest();
+		
+		GraphAPIService.GRAPH_API_LIST_RECORDS = null;
+		String result = WebhookService.getWebhookTokenFromSettings(testWebhookUrl);
+		System.assertEquals(testToken, result, 'Token with numbers in URL hash should work correctly');
+	}
+
 	private static final String TEST_GRAPH_API_TEAM_ID = 'someTestGraphTeamId';
 	private static final String TEST_GRAPH_API_TEAM_DISPLAY_NAME = 'someTestGraphTeamLabel';
 	private static final String TEST_GRAPH_API_TEAM_CHANNEL_ID = 'someTestGraphChannelTeamId';

@@ -42,10 +42,13 @@ public without sharing class AdminService {
         String linkLabel =  d.getLabel() + ' Link';
         String linkApiName = '{!' + d.getName() + '.Link}';
         result.add(new MergeField(linkLabel, linkApiName, dType, 'link', true));
+
         if (d.getName() == Issue__c.SObjectType.getDescribe().getName()) {
             String analysisLabel =  'Advanced Analysis';
             String analysisApiName = '{!' + d.getName() + '.Analysis}';
-            result.add(new MergeField(analysisLabel, analysisApiName, dType, 'analysis', false));
+            MergeField analysisField = new MergeField(analysisLabel, analysisApiName, dType, 'analysis', false);
+            analysisField.setIsUpdateOnly(true);
+            result.add(analysisField);
         }
         return result;
     }
@@ -123,6 +126,27 @@ public without sharing class AdminService {
 
     public static Map<String, String> getIssueTicketCommentActionTemplate() {
         return Templates.ISSUE_SOBJECT.DEFAULT_TICKET_COMMENT_ACTION;
+    }
+
+    // Webhook template methods
+    public static Map<String, String> getDefaultWebhookActionTemplate() {
+        return Templates.LOG_SOBJECT.DEFAULT_WEBHOOK_ACTION;
+    }
+
+    public static Map<String, String> getIssueDefaultWebhookActionTemplate() {
+        return Templates.ISSUE_SOBJECT.DEFAULT_WEBHOOK_ACTION;
+    }
+
+    public static Map<String, String> getIssueDefaultWebhookUpdateActionTemplate() {
+        return Templates.ISSUE_SOBJECT.DEFAULT_WEBHOOK_UPDATE_ACTION;
+    }
+
+    public static Map<String, String> getDefaultMonitoringWebhookActionTemplate() {
+        return Templates.EVENT_SOBJECT.DEFAULT_WEBHOOK_ACTION;
+    }
+
+    public static Map<String, String> getTraceResultDefaultWebhookActionTemplate() {
+        return Templates.TRACE_RESULT_SOBJECT.DEFAULT_WEBHOOK_ACTION;
     }
 
     public static List<MergeField> getSobjectFields(Schema.DescribeSObjectResult d, String dType, Schema.DescribeFieldResult parent, Schema.DescribeSObjectResult parentObject, Integer depth) {
@@ -339,6 +363,8 @@ public without sharing class AdminService {
             'IssueTrackingEnabled' => PermissionsUtil.IssueTrackingEnabled,
             'MetadataChatEnabled' => PermissionsUtil.MetadataChatEnabled,
             'AutoChartEnabled' => PermissionsUtil.AutoChartEnabled,
+            'ForecastEnabled' => PermissionsUtil.ForecastEnabled,
+            'WebhookIntegrationEnabled' => PermissionsUtil.WebhookIntegrationEnabled,
             'ForecastEnabled' => PermissionsUtil.ForecastEnabled,
             'SystemOverviewDashboardEnabled' => PermissionsUtil.SystemOverviewDashboardEnabled,
             'RuleTemplateCustomization' => PermissionsUtil.RuleTemplateCustomization,
@@ -658,6 +684,196 @@ public without sharing class AdminService {
         MetadataServiceUtil.upsertRemoteSiteSettingsMetadata(
             MetadataServiceUtil.createRemoteSiteSettingInstance(name, url, description)
         );
+    }
+
+    /**
+     * Extract base URL (protocol + domain) from a webhook URL
+     * @param webhookUrl The full webhook URL
+     * @return Base URL (e.g., https://example.com)
+     */
+    public static String extractWebhookBaseUrl(String webhookUrl) {
+        if (String.isBlank(webhookUrl)) {
+            return null;
+        }
+
+        try {
+            // Find the third slash to get protocol + domain
+            Integer firstSlash = webhookUrl.indexOf(Constants.GLOBAL_VARIABLE.URL_PROTOCOL_SEPARATOR);
+            if (firstSlash == -1) {
+                return null;
+            }
+            Integer thirdSlash = webhookUrl.indexOf(Constants.GLOBAL_VARIABLE.SYMBOL_SLASH, firstSlash + 3);
+            if (thirdSlash == -1) {
+                return webhookUrl; // URL is just protocol + domain
+            }
+            return webhookUrl.substring(0, thirdSlash);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Generate Remote Site Setting name for a webhook URL
+     * @param webhookUrl The webhook URL
+     * @return Remote Site Setting name
+     */
+    public static String generateWebhookRemoteSiteName(String webhookUrl) {
+        String baseUrl = extractWebhookBaseUrl(webhookUrl);
+        if (String.isBlank(baseUrl)) {
+            return null;
+        }
+
+        // Extract domain from URL and create a safe name
+        String domain = baseUrl
+            .replace(Constants.GLOBAL_VARIABLE.URL_PROTOCOL_HTTPS, '')
+            .replace(Constants.GLOBAL_VARIABLE.URL_PROTOCOL_HTTP, '')
+            .replace(Constants.GLOBAL_VARIABLE.SYMBOL_DOT, Constants.GLOBAL_VARIABLE.SYMBOL_UNDERSCORE)
+            .replace(Constants.GLOBAL_VARIABLE.SYMBOL_COLON, Constants.GLOBAL_VARIABLE.SYMBOL_UNDERSCORE)
+            .replace(Constants.GLOBAL_VARIABLE.SYMBOL_SLASH, Constants.GLOBAL_VARIABLE.SYMBOL_UNDERSCORE)
+            .replace(Constants.GLOBAL_VARIABLE.SYMBOL_DASH, Constants.GLOBAL_VARIABLE.SYMBOL_UNDERSCORE);
+        return WebhookService.WEBHOOK_REMOTE_SITE_PREFIX + domain.left(WebhookService.WEBHOOK_REMOTE_SITE_NAME_MAX_LENGTH);
+    }
+
+    /**
+     * Create Remote Site Settings for webhook URLs (synchronous batch operation - called BEFORE DML)
+     * @param webhookUrls Set of webhook URLs to process
+     */
+    public static void upsertWebhookRemoteSiteSettings(Set<String> webhookUrls) {
+        if (webhookUrls == null || webhookUrls.isEmpty()) {
+            return;
+        }
+
+        // Batch process all unique base URLs (no callout in loop)
+        Set<String> processedBaseUrls = new Set<String>();
+
+        for (String webhookUrl : webhookUrls) {
+            if (String.isBlank(webhookUrl)) {
+                continue;
+            }
+
+            String baseUrl = extractWebhookBaseUrl(webhookUrl);
+            String remoteSiteName = generateWebhookRemoteSiteName(webhookUrl);
+
+            // Only process each unique base URL once
+            if (String.isNotBlank(baseUrl) && String.isNotBlank(remoteSiteName) && !processedBaseUrls.contains(baseUrl)) {
+                try {
+                    upsertRemoteSiteSetting(
+                        remoteSiteName,
+                        baseUrl,
+                        WebhookService.WEBHOOK_REMOTE_SITE_DESCRIPTION
+                    );
+                    processedBaseUrls.add(baseUrl);
+                } catch (Exception e) {
+                    Logger.getInstance()?.addInternalError(
+                        e,
+                        AdminService.class.getName(),
+                        'upsertWebhookRemoteSiteSettings - URL: ' + webhookUrl
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Delete Remote Site Settings for webhook URLs if not used by other actions (synchronous batch operation - called BEFORE DML)
+     * This method queries existing actions to determine which Remote Site Settings will be unused AFTER the pending delete.
+     * @param webhookUrlsToCheck Set of webhook URLs to check
+     * @param actionIdsToExclude Set of action IDs that will be deleted (exclude from usage check)
+     */
+    public static void deleteWebhookRemoteSiteSettings(Set<String> webhookUrlsToCheck, Set<Id> actionIdsToExclude) {
+        if (webhookUrlsToCheck == null || webhookUrlsToCheck.isEmpty()) {
+            return;
+        }
+
+        // Extract base URLs from webhook URLs to check
+        Set<String> baseUrlsToCheck = new Set<String>();
+        for (String webhookUrl : webhookUrlsToCheck) {
+            if (String.isNotBlank(webhookUrl)) {
+                String baseUrl = extractWebhookBaseUrl(webhookUrl);
+                if (String.isNotBlank(baseUrl)) {
+                    baseUrlsToCheck.add(baseUrl);
+                }
+            }
+        }
+
+        if (baseUrlsToCheck.isEmpty()) {
+            return;
+        }
+
+        // Get all currently active webhook domains, EXCLUDING the ones that will be deleted
+        Set<String> activeBaseUrls = new Set<String>();
+        String actionType = Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION;
+
+        List<Action__c> activeActions;
+        if (actionIdsToExclude != null && !actionIdsToExclude.isEmpty()) {
+            activeActions = [
+                SELECT Webhook_URL_Domain__c
+                FROM Action__c
+                WHERE Action_Type__c = :actionType
+                AND Webhook_URL_Domain__c != null
+                AND Webhook_URL_Domain__c IN :baseUrlsToCheck
+                AND Id NOT IN :actionIdsToExclude
+            ];
+        } else {
+            activeActions = [
+                SELECT Webhook_URL_Domain__c
+                FROM Action__c
+                WHERE Action_Type__c = :actionType
+                AND Webhook_URL_Domain__c != null
+                AND Webhook_URL_Domain__c IN :baseUrlsToCheck
+            ];
+        }
+
+        for (Action__c action : activeActions) {
+            if (String.isNotBlank(action.Webhook_URL_Domain__c)) {
+                activeBaseUrls.add(action.Webhook_URL_Domain__c);
+            }
+        }
+
+        // Process each URL to potentially delete
+        Set<String> processedBaseUrls = new Set<String>();
+        Map<String, MetadataServiceUtil.RemoteSiteSettingsWrapper> createdRemoteSiteSettings = getRemoteSiteSettingsMap();
+
+        for (String webhookUrl : webhookUrlsToCheck) {
+            if (String.isBlank(webhookUrl)) {
+                continue;
+            }
+
+            String baseUrl = extractWebhookBaseUrl(webhookUrl);
+            if (String.isBlank(baseUrl) || processedBaseUrls.contains(baseUrl)) {
+                continue; // Already processed this base URL
+            }
+
+            // Check if this base URL will still be in use AFTER the delete
+            if (activeBaseUrls.contains(baseUrl)) {
+                continue; // Still in use, don't delete
+            }
+
+            // Get the Remote Site Setting name
+            String remoteSiteName = generateWebhookRemoteSiteName(webhookUrl);
+            if (String.isBlank(remoteSiteName)) {
+                continue;
+            }
+
+            // Find and delete the Remote Site Setting
+            try {
+                for (MetadataServiceUtil.RemoteSiteSettingsWrapper rss : createdRemoteSiteSettings.values()) {
+                    if (rss.SiteName == remoteSiteName || rss.SiteName == ConfigUtil.prefixCurrentOrgNamespace(remoteSiteName)) {
+                        MetadataServiceUtil.deleteRemoteSiteSettingsMetadata(
+                            new List<String>{ConfigUtil.prefixCurrentOrgNamespace(rss.SiteName)}
+                        );
+                        processedBaseUrls.add(baseUrl);
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                Logger.getInstance()?.addInternalError(
+                    e,
+                    AdminService.class.getName(),
+                    'deleteWebhookRemoteSiteSettings - URL: ' + webhookUrl
+                );
+            }
+        }
     }
 
     public static Boolean checkRemoteSiteSettings() {
@@ -1666,7 +1882,6 @@ public without sharing class AdminService {
             Schema.sObjectType.Log__c.fields.LastViewedDate.getSObjectField(),
             Schema.sObjectType.Log__c.fields.LastReferencedDate.getSObjectField(),
             Schema.sObjectType.Log__c.fields.OwnerId.getSObjectField(),
-            Schema.sObjectType.Log__c.fields.RecordTypeId.getSObjectField(),
             // Internal/system fields
             Schema.sObjectType.Log__c.fields.Email_Integration_Status__c.getSObjectField(),
             Schema.sObjectType.Log__c.fields.Jira_Integration_Status__c.getSObjectField(),
@@ -2036,7 +2251,8 @@ public without sharing class AdminService {
             //'Jira' => ConfigUtil.SETTINGS.Auto_Jira_Task__c,
             ConfigUtil.SLACK_SERVICE_NAME => ConfigUtil.SLACK_SETTINGS.Slack_Enabled__c,
             ConfigUtil.PAGER_DUTY_SERVICE_NAME => ConfigUtil.PAGER_DUTY_SETTINGS.PagerDuty_Enabled__c,
-            ConfigUtil.TEAMS_SERVICE_NAME => ConfigUtil.GRAPH_API_SETTINGS.Enabled__c
+            ConfigUtil.TEAMS_SERVICE_NAME => ConfigUtil.GRAPH_API_SETTINGS.Enabled__c,
+            ConfigUtil.WEBHOOK_SERVICE_NAME => PermissionsUtil.WebhookIntegrationEnabled
         };
     }
     //log-categories
@@ -2541,6 +2757,27 @@ public without sharing class AdminService {
             && !input.containsKey(RuleUtil.KEY_ACTIONS)
             && !input.containsKey(RuleUtil.KEY_RULE_FILTERS);
         RuleUtil.Rule deserializedRuleWrapper = (RuleUtil.Rule)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE)), RuleUtil.Rule.class);
+
+        // FIRST: Create Remote Site Settings for webhook actions (BEFORE any DML)
+        // Collect all webhook URLs and make synchronous callout(s)
+        if (!isOnlyRuleData && PermissionsUtil.WebhookIntegrationEnabled
+            && input.get(RuleUtil.KEY_ACTIONS) != null) {
+            Set<String> webhookUrls = new Set<String>();
+            List<RuleUtil.Action> actions = (List<RuleUtil.Action>)JSON.deserialize(
+                JSON.serialize(input.get(RuleUtil.KEY_ACTIONS)),
+                List<RuleUtil.Action>.class
+            );
+            for (RuleUtil.Action actionWrapper : actions) {
+                if (actionWrapper.type == Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION
+                    && String.isNotBlank(actionWrapper.webhookUrl)) {
+                    webhookUrls.add(actionWrapper.webhookUrl);
+                }
+            }
+            if (!webhookUrls.isEmpty()) {
+                // Make synchronous callout(s) BEFORE any DML operations
+                upsertWebhookRemoteSiteSettings(webhookUrls);
+            }
+        }
         if(!isOnlyRuleData) {
             RuleUtil.Rule ruleWrapper = getMonitoringRuleWrapper(deserializedRuleWrapper, input);
             if(ruleWrapper != null) {

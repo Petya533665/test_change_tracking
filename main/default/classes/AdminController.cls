@@ -48,15 +48,7 @@ public with sharing class AdminController {
     }
 
     public AdminController() {
-        String isDevParam = ApexPages.currentPage().getParameters().get('dev')?.escapeHtml4();
-        if (String.isNotBlank(isDevParam)) {
-            Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
-            ApexPages.currentPage().setCookies(new Cookie[]{ devCookie });
-            isDev = Boolean.valueOf(isDevParam);
-        } else {
-            Cookie devCookie = ApexPages.currentPage().getCookies().get('a2developmentMode');
-            isDev = devCookie != null ? Boolean.valueOf(devCookie.getValue()) : false;
-        }
+        isDev = ConfigUtil.initializeDevelopmentMode(ApexPages.currentPage());
     }
 
     @RemoteAction
@@ -366,6 +358,16 @@ public with sharing class AdminController {
                 response.data = AdminService.saveDebugLogServiceSettings(data);
             } else if (method == 'getIssueTicketCommentActionTemplate') {
                 response.data = AdminService.getIssueTicketCommentActionTemplate();
+            } else if (method == 'getDefaultWebhookActionTemplate') {
+                response.data = AdminService.getDefaultWebhookActionTemplate();
+            } else if (method == 'getIssueDefaultWebhookActionTemplate') {
+                response.data = AdminService.getIssueDefaultWebhookActionTemplate();
+            } else if (method == 'getIssueDefaultWebhookUpdateActionTemplate') {
+                response.data = AdminService.getIssueDefaultWebhookUpdateActionTemplate();
+            } else if (method == 'getDefaultMonitoringWebhookActionTemplate') {
+                response.data = AdminService.getDefaultMonitoringWebhookActionTemplate();
+            } else if (method == 'getTraceResultDefaultWebhookActionTemplate') {
+                response.data = AdminService.getTraceResultDefaultWebhookActionTemplate();
             } else if (method == 'getFlowWithVersions') {
                 response.data = AdminService.getFlowWithVersions();
             } else if (method == 'addFlowLogging') {

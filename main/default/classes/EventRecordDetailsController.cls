@@ -9,16 +9,9 @@ public with sharing class EventRecordDetailsController {
     } set; }
 
     public EventRecordDetailsController(ApexPages.StandardController stdController) {
-        String recordId = ApexPages.currentPage().getParameters().get('recordId');
-        String isDevParam = ApexPages.currentPage().getParameters().get('dev');
-        if (String.isNotBlank(isDevParam)) {
-            Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
-            // ApexPages.currentPage().setCookies(new Cookie[]{ devCookie });
-            isDev = Boolean.valueOf(isDevParam);
-        } else {
-            Cookie devCookie = ApexPages.currentPage().getCookies().get('a2developmentMode');
-            isDev = devCookie != null ? Boolean.valueOf(devCookie.getValue()) : false;
-        }
+        System.PageReference pageReference = ApexPages.currentPage();
+		String recordId = pageReference.getParameters().get('recordId');
+        isDev = ConfigUtil.initializeDevelopmentMode(pageReference);
 
         Event__c event = [
             SELECT Id, Name, Records__c

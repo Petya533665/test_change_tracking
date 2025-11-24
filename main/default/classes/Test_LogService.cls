@@ -728,4 +728,101 @@ public class Test_LogService {
         List<Log__c> logs = [SELECT Id, Hash_1__c FROM Log__c];
         System.assertEquals(log.Hash_1__c, logs[0].Hash_1__c, 'Hash_1__c should be set');
     }
+
+    /**
+     * Test that email log and event log with same error produce same Hash_1__c
+     * This tests the fix for the deduplication issue where different stacktrace formats
+     * caused different hash values for the same error
+     */
+    @IsTest
+    static void testStacktraceNormalizationProducesSameHash() {
+        // Setup - Create two logs with different stacktrace formats but same error
+        
+        // Email log format (simplified stacktrace)
+        Log__c emailLog = new Log__c();
+        emailLog.Category__c = 'Apex';
+        emailLog.Type__c = 'ListException';
+        emailLog.Summary__c = 'List index out of bounds: 0';
+        emailLog.Stacktrace__c = 'Class.TestBatchTwo.execute: line 8, column 1';
+        emailLog.Details__c = 'Apex script unhandled exception by user/organization: 005gL00000AApLF/00DgL00000EbjGg\n\n' +
+                               'Organization: 2.217S (orgfarm-5ef5f2519f-dev-ed.develop.my.salesforce.com).\n\n' +
+                               'Failed to process Queueable job for class TestBatchTwo for job ID 707gL00000OWRhD.\n\n' +
+                               'caused by: System.ListException: List index out of bounds: 0\n\n' +
+                               'Class.TestBatchTwo.execute: line 8, column 1';
+        emailLog.Organization_Id__c = '00DgL00000EbjGg';
+        emailLog.Created_At__c = DateTime.newInstance(2025, 11, 17, 10, 23, 19);
+        emailLog.Created_Timestamp__c = 1763374999017.0;
+        
+        // Event log format (full stacktrace with "caused by:" prefix)
+        Log__c eventLog = new Log__c();
+        eventLog.Category__c = 'Apex';
+        eventLog.Type__c = 'System.ListException';
+        eventLog.Summary__c = 'List index out of bounds: 0';
+        eventLog.Stacktrace__c = 'caused by: System.ListException: List index out of bounds: 0\n\n' +
+                                  'Class.TestBatchTwo.execute: line 8, column 1';
+        eventLog.Details__c = 'Developer script exception from 2.217S : TestBatchTwo for job ID 707gL00000OWRhD. : ' +
+                               'List index out of bounds: 0';
+        eventLog.Organization_Id__c = '00DgL00000EbjGg';
+        eventLog.Created_At__c = DateTime.newInstance(2025, 11, 17, 10, 23, 18);
+        eventLog.Created_Timestamp__c = 1763374998000.0;
+        eventLog.Request_Id_External__c = 'SLB:970d8b90b4a28a7def0edf8ef2ace9da';
+        
+        Test.startTest();
+        
+        // Calculate hashes for both logs
+        LogService.calculateHashes(emailLog);
+        LogService.calculateHashes(eventLog);
+        
+        Test.stopTest();
+        
+        // Verify that both logs have the same Hash_1__c
+        System.assertNotEquals(null, emailLog.Hash_1__c, 'Email log Hash_1__c should not be null');
+        System.assertNotEquals(null, eventLog.Hash_1__c, 'Event log Hash_1__c should not be null');
+        System.assertEquals(
+            emailLog.Hash_1__c, 
+            eventLog.Hash_1__c, 
+            'Email log and Event log should have the same Hash_1__c after normalization. ' +
+            'Email: ' + emailLog.Hash_1__c + ', Event: ' + eventLog.Hash_1__c
+        );
+    }
+    
+    /**
+     * Test the normalization method directly
+     */
+    @IsTest
+    static void testNormalizeStacktraceForHashing() {
+        // Test "caused by:" removal
+        String stacktrace1 = 'caused by: System.ListException: List index out of bounds: 0\n\nClass.TestBatchTwo.execute: line 8, column 1';
+        String normalized1 = LogService.normalizeStacktraceForHashing(stacktrace1);
+        System.assertEquals(
+            'List index out of bounds: 0\nClass.TestBatchTwo.execute: line 8, column 1',
+            normalized1,
+            'Should remove "caused by:" and exception type prefix and normalize newlines'
+        );
+        
+        // Test simple stacktrace (no prefix)
+        String stacktrace2 = 'Class.TestBatchTwo.execute: line 8, column 1';
+        String normalized2 = LogService.normalizeStacktraceForHashing(stacktrace2);
+        System.assertEquals(
+            'Class.TestBatchTwo.execute: line 8, column 1',
+            normalized2,
+            'Simple stacktrace should remain unchanged'
+        );
+        
+        // Test case insensitivity
+        String stacktrace3 = 'CAUSED BY: system.listexception: Error\nClass.Test.method: line 1, column 1';
+        String normalized3 = LogService.normalizeStacktraceForHashing(stacktrace3);
+        System.assertEquals(
+            'Error\nClass.Test.method: line 1, column 1',
+            normalized3,
+            'Should handle case-insensitive "caused by:" removal'
+        );
+        
+        // Test null/blank handling
+        String normalized4 = LogService.normalizeStacktraceForHashing(null);
+        System.assertEquals(null, normalized4, 'Null input should return null');
+        
+        String normalized5 = LogService.normalizeStacktraceForHashing('');
+        System.assertEquals('', normalized5, 'Empty input should return empty');
+    }
 }

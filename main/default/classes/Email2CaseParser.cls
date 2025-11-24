@@ -1,4 +1,4 @@
-global class Email2CaseParser extends ApexExceptionParser {
+global with sharing class Email2CaseParser extends ApexExceptionParser {
 
     private static final String CASE_ERROR_START = 'The following errors were encountered while processing an incoming email:';
     private static final String CASE_ERROR_END = 'From:';

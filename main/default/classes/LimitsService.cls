@@ -235,7 +235,6 @@ public with sharing class LimitsService {
 		}
 	}
 
-
 	/**
 	 * Populates limits using REST API for remote orgs
 	 * This method calls the Salesforce REST API to get current limits data

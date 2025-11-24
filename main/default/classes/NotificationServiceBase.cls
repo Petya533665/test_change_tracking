@@ -1,4 +1,4 @@
-public abstract class NotificationServiceBase implements NotificationServiceInterface {
+public with sharing abstract class NotificationServiceBase implements NotificationServiceInterface {
     
     // Batch processing constants
     public static final Integer QUERY_LIMIT = 200;
@@ -841,12 +841,16 @@ public abstract class NotificationServiceBase implements NotificationServiceInte
                         Boolean hasSlackActionAndDisabledPermission = ruleActionTypes.contains(RuleUtil.ActionType.SLACK) && !PermissionsUtil.SlackIntegrationEnabled;
                         Boolean noPagerDutyActions = !ruleActionTypes.contains(RuleUtil.ActionType.PAGERDUTY);
                         Boolean hasPagerDutyActionAndDisabledPermission = ruleActionTypes.contains(RuleUtil.ActionType.PAGERDUTY) && !PermissionsUtil.PagerDutyIntegrationEnabled;
+                        Boolean noWebhookActions = !ruleActionTypes.contains(RuleUtil.ActionType.WEBHOOK);
+                        Boolean hasWebhookActionAndDisabledPermission = ruleActionTypes.contains(RuleUtil.ActionType.WEBHOOK) && !PermissionsUtil.WebhookIntegrationEnabled;
+                        
                         Boolean hasEmailAction = ruleActionTypes.contains(RuleUtil.ActionType.EMAIL);
     
                         if((noTeamsActions || hasTeamsActionAndDisabledPermission)
                             && (noSlackActions || hasSlackActionAndDisabledPermission)
                             && (noPagerDutyActions || hasPagerDutyActionAndDisabledPermission)
-                            && !hasEmailAction) break;
+                            && (noWebhookActions || hasWebhookActionAndDisabledPermission)
+                            && !hasEmailAction ) break;
                     }
 
                     config.addToRun((String)rule.id);

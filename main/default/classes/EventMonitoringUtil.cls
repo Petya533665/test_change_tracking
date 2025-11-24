@@ -515,7 +515,8 @@ public with sharing class EventMonitoringUtil {
             Active__c = true
         );
         
-        insert rule;
+        DatabaseUtils.getInstance().performInsertDML(new List<Rule__c>{ rule }, Schema.SObjectType.Rule__c)
+            .handleError(EventMonitoringUtil.class.getName(), '.saveThresholdAsRule', Logger.getInstance());
         
         // Create RuleFilter records for thresholds
         List<RuleFilter__c> filters = new List<RuleFilter__c>();
@@ -529,7 +530,8 @@ public with sharing class EventMonitoringUtil {
         ));
         
         if (!filters.isEmpty()) {
-            insert filters;
+            DatabaseUtils.getInstance().performInsertDML(filters, Schema.SObjectType.RuleFilter__c)
+                .handleError(EventMonitoringUtil.class.getName(), '.saveThresholdAsRule', Logger.getInstance());
         }
         
         return rule;
@@ -650,7 +652,8 @@ public with sharing class EventMonitoringUtil {
         
         // Bulk insert all rules
         if (!rulesToInsert.isEmpty()) {
-            insert rulesToInsert;
+            DatabaseUtils.getInstance().performInsertDML(rulesToInsert, Schema.SObjectType.Rule__c)
+                .handleError(EventMonitoringUtil.class.getName(), '.createDefaultRulesForEventTypes', Logger.getInstance());
             createdRules.addAll(rulesToInsert);
             
             // Now create all RuleFilter records
@@ -673,7 +676,8 @@ public with sharing class EventMonitoringUtil {
             
             // Bulk insert all filters
             if (!allFilters.isEmpty()) {
-                insert allFilters;
+                DatabaseUtils.getInstance().performInsertDML(allFilters, Schema.SObjectType.RuleFilter__c)
+                    .handleError(EventMonitoringUtil.class.getName(), '.createDefaultRulesForEventTypes', Logger.getInstance());
             }
         }
         
@@ -701,7 +705,7 @@ public with sharing class EventMonitoringUtil {
         ];
         
         if (!rulesToDelete.isEmpty()) {
-            delete rulesToDelete;
+            DatabaseUtils.getInstance().performDeleteDML(rulesToDelete, Schema.SObjectType.Rule__c);
         }
     }
 
@@ -999,7 +1003,7 @@ public with sharing class EventMonitoringUtil {
         
         // Bulk update existing rules with new logs limits
         if (!rulesToUpdate.isEmpty()) {
-            update rulesToUpdate;
+            DatabaseUtils.getInstance().performUpdateDML(rulesToUpdate, Schema.SObjectType.Rule__c);
         }
         
         // Bulk delete rules for newly disabled event types

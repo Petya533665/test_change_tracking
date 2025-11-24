@@ -56,7 +56,7 @@ public without sharing class LogIndexBatch extends DatabaseUtils.PharosBatchImpl
     public Database.QueryLocator start(Database.BatchableContext bc) {
         if (runJobType == LogIndexBatch.JobType.DELETE_ABANDONED_INDEXES_BATCH) {
             return Database.getQueryLocator([
-                SELECT Id, Key__c, Hash__c, Organization_Id__c FROM Log_Index__c
+                SELECT Id, Key__c, Hash__c, Organization_Id__c FROM Log_Index__c LIMIT :Constants.QUERY_LIMITS.LARGE_DATA_QUERY_LIMIT
             ]);
         }
 		return Database.getQueryLocator([
@@ -64,6 +64,7 @@ public without sharing class LogIndexBatch extends DatabaseUtils.PharosBatchImpl
                 Id, Hash_1__c, Organization_Id__c, Bug_Tracker__c, First_Occurred_On__c, Resolved_On__c, Created_At__c, Area__c, Category__c
             FROM Log__c
             WHERE Hash_1__c != NULL
+            LIMIT :Constants.QUERY_LIMITS.LARGE_DATA_QUERY_LIMIT
 		]);
 	}
 
@@ -117,13 +118,15 @@ public without sharing class LogIndexBatch extends DatabaseUtils.PharosBatchImpl
                 List<Log_Index__c> logIndexesToDelete = new List<Log_Index__c>();
 
                 for (Log_Index__c logIndex : logIndexes) {
-                    Boolean uniqueByOrg = ConfigUtil.JIRA_SETTINGS.Create_Unique_Tickets_by_Org__c;
-                    Integer countLogs = uniqueByOrg 
-                        ? [SELECT COUNT() FROM Log__c WHERE Hash_1__c = :logIndex.Hash__c AND Organization_Id__c = :logIndex.Organization_Id__c]
-                        : [SELECT COUNT() FROM Log__c WHERE Hash_1__c = :logIndex.Hash__c];
-                    // If there are no logs for the log index, delete the log index
-                    if (countLogs == 0) {
-                        logIndexesToDelete.add(logIndex);
+                    if (Limits.getQueries() <= Limits.getLimitQueries()) {
+                        Boolean uniqueByOrg = ConfigUtil.JIRA_SETTINGS.Create_Unique_Tickets_by_Org__c;
+                        Integer countLogs = uniqueByOrg 
+                            ? [SELECT COUNT() FROM Log__c WHERE Hash_1__c = :logIndex.Hash__c AND Organization_Id__c = :logIndex.Organization_Id__c]
+                            : [SELECT COUNT() FROM Log__c WHERE Hash_1__c = :logIndex.Hash__c];
+                        // If there are no logs for the log index, delete the log index
+                        if (countLogs == 0) {
+                            logIndexesToDelete.add(logIndex);
+                        }
                     }
                 }
 

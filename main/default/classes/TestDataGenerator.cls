@@ -148,7 +148,7 @@ public with sharing class TestDataGenerator {
 	public static void deleteTestEmailExceptionLogs() {
 		List<Log__c> logs = getTestEmailExceptionLogs();
 		if(!logs.isEmpty() && !ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c) {
-			delete logs;
+			DatabaseUtils.getInstance().performDeleteDML(logs, Schema.SObjectType.Log__c);
 		}
 	}
 
@@ -269,9 +269,9 @@ public with sharing class TestDataGenerator {
 			Map<Id, Log__c> mapLogs = new Map<Id, Log__c>(logs);
 			List<Log__c> relatedErrors = getTestPlatformEventRelatedErrorLogs(new List<Id>(mapLogs.keySet()));
 			if(!relatedErrors.isEmpty()){
-				delete relatedErrors;
+				DatabaseUtils.getInstance().performDeleteDML(relatedErrors, Schema.SObjectType.Log__c);
 			}
-			delete logs;
+			DatabaseUtils.getInstance().performDeleteDML(logs, Schema.SObjectType.Log__c);
 		}
 
 	}

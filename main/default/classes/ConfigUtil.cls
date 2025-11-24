@@ -657,15 +657,15 @@ public with sharing class ConfigUtil {
 
     public static Map<String, String> getRemoteSiteSettingsHeadersMap(String accessToken) {
         return new Map<String, String> {
-            'Authorization' => 'Bearer ' + accessToken,
-            'Content-Type' => 'application/json'
+            HttpUtils.HEADER_AUTHORIZATION => HttpUtils.AUTH_TYPE_BEARER + accessToken,
+            HttpUtils.HEADER_CONTENT_TYPE => HttpUtils.HTTP_CONTENT_TYPE_JSON
         };
     }
 
     public static Map<String, String> getCspTrustedSitesHeadersMap(String accessToken) {
         return new Map<String, String> {
-            'Authorization' => 'Bearer ' + accessToken,
-            'Content-Type' => 'application/json'
+            HttpUtils.HEADER_AUTHORIZATION => HttpUtils.AUTH_TYPE_BEARER + accessToken,
+            HttpUtils.HEADER_CONTENT_TYPE => HttpUtils.HTTP_CONTENT_TYPE_JSON
         };
     }
 
@@ -686,7 +686,7 @@ public with sharing class ConfigUtil {
         get {
             return new Map<String, String> {
                 'SOAPAction' => '""',
-                'Content-Type' => 'text/xml'
+                HttpUtils.HEADER_CONTENT_TYPE => 'text/xml'
             };
         }
         private set;
@@ -699,8 +699,8 @@ public with sharing class ConfigUtil {
 
     public static Map<String, String> getToolingHeaders() {
         return new Map<String, String> {
-            'Authorization' => 'Bearer ' + ConnectedOrgService.getSelfConnectedOrgAccessToken(),
-            'Content-Type' => 'application/json'
+            HttpUtils.HEADER_AUTHORIZATION => HttpUtils.AUTH_TYPE_BEARER + ConnectedOrgService.getSelfConnectedOrgAccessToken(),
+            HttpUtils.HEADER_CONTENT_TYPE => HttpUtils.HTTP_CONTENT_TYPE_JSON
         };
     }
 
@@ -780,8 +780,8 @@ public with sharing class ConfigUtil {
     public static final String CONNECTED_APP_API_NAME = 'Pharos_ai';
     public static final String PHAROS_PACKAGE_PUBLISHER = 'Golden Ratio Systems LLC';
     public static final String PHAROS_PACKAGE_PUBLISHER_NAMESPACE = 'pharos';
-    // https://loggertest1.ap4.visual.force.com/apex/Settings
-    public static final String CONNECTED_APP_CALLBACK_PAGE_URL = '/apex/Settings';
+    // https://loggertest1.ap4.visual.force.com/apex/pharos__Settings
+    public static final String CONNECTED_APP_CALLBACK_PAGE_URL = '/apex/' + ConfigUtil.getNameSpacePrefix() + 'Settings';
 
     public static final String SENSETIVE_MASK_KEY_ID = 'id';
     public static final String SENSETIVE_MASK_KEY_TEXT = 'text';
@@ -791,6 +791,7 @@ public with sharing class ConfigUtil {
 	public static final String SLACK_SERVICE_NAME = 'Slack';
 	public static final String PAGER_DUTY_SERVICE_NAME = 'PagerDuty';
     public static final String TEAMS_SERVICE_NAME = 'Teams';
+    public static final String WEBHOOK_SERVICE_NAME = 'Webhook';
 
     public static final String LOG_CATEGORIES_KEY_CATEGORIES = 'categories';
     public static final String LOG_CATEGORIES_KEY_RECORDTYPES = 'recordtypes';
@@ -1194,7 +1195,7 @@ public with sharing class ConfigUtil {
         return key;
     }
     
-    public class LogIndexHelper {
+    public with sharing class LogIndexHelper {
         
         private Boolean uniqueByOrg = ConfigUtil.JIRA_SETTINGS.Create_Unique_Tickets_by_Org__c;
 
@@ -1380,5 +1381,23 @@ public with sharing class ConfigUtil {
         public Iterator<String> Iterator() {
             return this;
         }
+    }
+
+    public static Boolean initializeDevelopmentMode(System.PageReference pageReference) {
+        // OWASP: Validate parameter value using allow-list approach
+        String isDevParam = pageReference?.getParameters()?.get('dev')?.escapeHtml4();
+        if (String.isNotBlank(isDevParam)) {
+            // Security: Only accept 'true' or 'false' values (allow-list)
+            if (isDevParam.toLowerCase() == 'true' || isDevParam.toLowerCase() == 'false') {
+                Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
+                pageReference.setCookies(new Cookie[]{ devCookie });
+                return Boolean.valueOf(isDevParam);
+            }
+        } else {
+            Cookie devCookie = pageReference.getCookies().get('a2developmentMode');
+            return devCookie != null ? Boolean.valueOf(devCookie.getValue()) : false;
+        }
+
+        return false;
     }
 }

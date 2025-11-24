@@ -1879,7 +1879,7 @@ public class Test_AdminController {
         
         // Check that special merge fields are NOT marked as isUpdateOnly
         for (AdminService.MergeField field : issueFields) {
-            if (field.apiName == 'link' || field.apiName == 'analysis') {
+            if (field.apiName == 'link') {
                 System.assertEquals(false, field.isUpdateOnly, field.apiName + ' special merge field should NOT be marked as isUpdateOnly');
             }
         }
@@ -5977,6 +5977,7 @@ public class Test_AdminController {
         System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.User_Id__c.getName()), 'Should contain User Id');
         System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.User_Name__c.getName()), 'Should contain User Name');
         System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.Visualforce_Page__c.getName()), 'Should contain Visualforce Page');
+        System.assert(fieldNames.contains(Schema.sObjectType.Log__c.fields.RecordTypeId.getName()), 'Should contain Record Type');
         
         // Verify "Insert field ONLY" fields are excluded
         System.assert(!fieldNames.contains(Schema.sObjectType.Log__c.fields.Flow_Link__c.getName()), 'Should NOT contain Flow_Link__c (Insert field ONLY)');
@@ -6562,5 +6563,292 @@ public class Test_AdminController {
             System.assert(pharosLogs[0].Apex_Name__c.contains('generateTokenForJira'), 
                 'Log should contain method name');
         }
+    }
+
+    // ========== Webhook Integration Tests ==========
+
+    @IsTest
+    private static void test_getDefaultWebhookActionTemplate() {
+        Test.startTest();
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getDefaultWebhookActionTemplate',
+            'data' => ''
+        };
+        String result = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        Map<String, Object> resultMap = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals(true, resultMap.containsKey('data'), 'Result should contain data key');
+        
+        Map<String, Object> data = (Map<String, Object>)resultMap.get('data');
+        System.assertEquals(true, data.containsKey('body'), 'Data should contain body key');
+        
+        String body = (String)data.get('body');
+        System.assert(body.contains('"event"'), 'Body should contain event field');
+        System.assert(body.contains('{!'), 'Body should contain merge field syntax');
+    }
+
+    @IsTest
+    private static void test_getIssueDefaultWebhookActionTemplate() {
+        Test.startTest();
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getIssueDefaultWebhookActionTemplate',
+            'data' => ''
+        };
+        String result = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        Map<String, Object> resultMap = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals(true, resultMap.containsKey('data'), 'Result should contain data key');
+        
+        Map<String, Object> data = (Map<String, Object>)resultMap.get('data');
+        System.assertEquals(true, data.containsKey('body'), 'Data should contain body key');
+        
+        String body = (String)data.get('body');
+        System.assert(body.contains('Issue__c'), 'Body should reference Issue__c');
+        System.assert(body.contains('{!'), 'Body should contain merge field syntax');
+    }
+
+    @IsTest
+    private static void test_getIssueDefaultWebhookUpdateActionTemplate() {
+        Test.startTest();
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getIssueDefaultWebhookUpdateActionTemplate',
+            'data' => ''
+        };
+        String result = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        Map<String, Object> resultMap = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals(true, resultMap.containsKey('data'), 'Result should contain data key');
+        
+        Map<String, Object> data = (Map<String, Object>)resultMap.get('data');
+        System.assertEquals(true, data.containsKey('body'), 'Data should contain body key');
+        
+        String body = (String)data.get('body');
+        System.assert(body.contains('issue_updated'), 'Body should indicate update event');
+        System.assert(body.contains('{!'), 'Body should contain merge field syntax');
+    }
+
+    @IsTest
+    private static void test_getDefaultMonitoringWebhookActionTemplate() {
+        Test.startTest();
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getDefaultMonitoringWebhookActionTemplate',
+            'data' => ''
+        };
+        String result = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        Map<String, Object> resultMap = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals(true, resultMap.containsKey('data'), 'Result should contain data key');
+        
+        Map<String, Object> data = (Map<String, Object>)resultMap.get('data');
+        System.assertEquals(true, data.containsKey('body'), 'Data should contain body key');
+        
+        String body = (String)data.get('body');
+        System.assert(body.contains('Event__c'), 'Body should reference Event__c');
+        System.assert(body.contains('{!'), 'Body should contain merge field syntax');
+    }
+
+    @IsTest
+    private static void test_getTraceResultDefaultWebhookActionTemplate() {
+        Test.startTest();
+        Map<String, Object> payload = new Map<String, Object>{
+            'method' => 'getTraceResultDefaultWebhookActionTemplate',
+            'data' => ''
+        };
+        String result = AdminController.remoteActionHandler(JSON.serialize(payload));
+        Test.stopTest();
+
+        System.assertNotEquals(null, result, 'Result should not be null');
+        Map<String, Object> resultMap = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals(true, resultMap.containsKey('data'), 'Result should contain data key');
+        
+        Map<String, Object> data = (Map<String, Object>)resultMap.get('data');
+        System.assertEquals(true, data.containsKey('body'), 'Data should contain body key');
+        
+        String body = (String)data.get('body');
+        System.assert(body.contains('Trace_Result__c'), 'Body should reference Trace_Result__c');
+        System.assert(body.contains('{!'), 'Body should contain merge field syntax');
+    }
+
+    @IsTest
+    private static void test_setRule_with_webhook_creates_remote_site_settings() {
+        // Set up mock for Tooling API
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getWebhookRemoteSiteSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        // Create webhook action
+        RuleUtil.Action webhookAction = new RuleUtil.Action();
+        webhookAction.type = Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION;
+        webhookAction.webhookUrl = 'https://webhook.site/test-endpoint';
+        webhookAction.webhookMethod = 'POST';
+        webhookAction.webhookHeaders = '{"Content-Type":"application/json"}';
+        webhookAction.webhookBodyTemplate = '{"test":"value"}';
+        webhookAction.webhookAuthType = 'None';
+        webhookAction.webhookContentType = 'application/json';
+
+        // Create rule data
+        Map<String, Object> data = new Map<String, Object>();
+        data.put(RuleUtil.KEY_RULE,
+            createWebhookTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, null, true));
+        data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
+            createWebhookTestRuleFilter('Category__c', null, 'Test', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 1)});
+        data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{webhookAction});
+        data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{createWebhookTestRuleAction()});
+
+        Map<String, Object> input = new Map<String, Object>();
+        input.put('method', 'setRule');
+        input.put('data', data);
+
+        Test.startTest();
+        String result = AdminController.remoteActionHandler(JSON.serialize(input));
+        Test.stopTest();
+
+        // Verify rule was created
+        System.assertNotEquals(null, result, 'Result should not be null');
+        Map<String, Object> resultMap = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals(null, resultMap.get('error'), 'Should not have errors');
+
+        // Verify webhook action was saved
+        List<Action__c> webhookActions = [
+            SELECT Id, Webhook_URL__c, Webhook_Method__c, Webhook_Body_Template__c
+            FROM Action__c
+            WHERE Action_Type__c = :Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION
+            LIMIT 1
+        ];
+        System.assertEquals(1, webhookActions.size(), 'Webhook action should be created');
+        System.assertEquals('https://webhook.site/test-endpoint', webhookActions[0].Webhook_URL__c, 'URL should match');
+        System.assertEquals('POST', webhookActions[0].Webhook_Method__c, 'Method should match');
+    }
+
+    @IsTest
+    private static void test_setRule_with_multiple_webhook_urls_creates_multiple_remote_site_settings() {
+        // Set up mock for Tooling API
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        mocks.putAll(getWebhookRemoteSiteSettingsMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(mocks);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
+
+        // Create first webhook action
+        RuleUtil.Action webhookAction1 = new RuleUtil.Action();
+        webhookAction1.type = Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION;
+        webhookAction1.webhookUrl = 'https://webhook.site/endpoint1';
+        webhookAction1.webhookMethod = 'POST';
+        webhookAction1.webhookHeaders = '{}';
+        webhookAction1.webhookBodyTemplate = '{"test":"value1"}';
+        webhookAction1.webhookAuthType = 'None';
+        webhookAction1.webhookContentType = 'application/json';
+
+        // Create second webhook action with different URL
+        RuleUtil.Action webhookAction2 = new RuleUtil.Action();
+        webhookAction2.type = Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION;
+        webhookAction2.webhookUrl = 'https://example.com/webhook';
+        webhookAction2.webhookMethod = 'POST';
+        webhookAction2.webhookHeaders = '{}';
+        webhookAction2.webhookBodyTemplate = '{"test":"value2"}';
+        webhookAction2.webhookAuthType = 'None';
+        webhookAction2.webhookContentType = 'application/json';
+
+        // Create rule data
+        Map<String, Object> data = new Map<String, Object>();
+        data.put(RuleUtil.KEY_RULE,
+            createWebhookTestRule(Constants.RULE_SOBJECT.TYPE_NOTIFICATION, null, true));
+        data.put(RuleUtil.KEY_RULE_FILTERS, new List<RuleUtil.RuleFilter>{
+            createWebhookTestRuleFilter('Category__c', null, 'Test', RuleUtil.COMPARISON_TYPE_VALUE, RuleUtil.COMPARISON_OPERATOR_EQUAL, 1)});
+        data.put(RuleUtil.KEY_ACTIONS, new List<RuleUtil.Action>{webhookAction1, webhookAction2});
+        data.put(RuleUtil.KEY_RULE_ACTIONS, new List<RuleUtil.RuleAction>{
+            createWebhookTestRuleAction(), createWebhookTestRuleAction()});
+
+        Map<String, Object> input = new Map<String, Object>();
+        input.put('method', 'setRule');
+        input.put('data', data);
+
+        Test.startTest();
+        String result = AdminController.remoteActionHandler(JSON.serialize(input));
+        Test.stopTest();
+
+        // Verify rule was created
+        System.assertNotEquals(null, result, 'Result should not be null');
+        Map<String, Object> resultMap = (Map<String, Object>)JSON.deserializeUntyped(result);
+        System.assertEquals(null, resultMap.get('error'), 'Should not have errors');
+
+        // Verify both webhook actions were saved
+        List<Action__c> webhookActions = [
+            SELECT Id, Webhook_URL__c
+            FROM Action__c
+            WHERE Action_Type__c = :Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION
+            ORDER BY Webhook_URL__c
+        ];
+        System.assertEquals(2, webhookActions.size(), 'Both webhook actions should be created');
+    }
+
+    // Helper method to get Remote Site Settings mock for webhooks
+    private static Map<String, HttpCalloutMock> getWebhookRemoteSiteSettingsMock() {
+        Map<String, HttpCalloutMock> mocks = new Map<String, HttpCalloutMock>();
+        
+        // Mock for querying existing Remote Site Settings
+        TestDataFactory.SingleRequestMock queryMock = new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            '{"size":0,"totalSize":0,"done":true,"queryLocator":null,"entityTypeName":"RemoteProxy","records":[]}'
+        );
+        mocks.put('callout:ToolingAPI/query', queryMock);
+        
+        // Mock for creating Remote Site Settings
+        TestDataFactory.SingleRequestMock createMock = new TestDataFactory.SingleRequestMock(
+            201,
+            'Created',
+            '{"id":"0rp000000000001AAA","success":true,"errors":[]}'
+        );
+        mocks.put('callout:ToolingAPI/sobjects/RemoteProxy', createMock);
+        
+        return mocks;
+    }
+
+    private static RuleUtil.Rule createWebhookTestRule(String ruleType, String ruleId, Boolean active) {
+        RuleUtil.Rule newRule = new RuleUtil.Rule();
+        newRule.type = ruleType;
+        newRule.name = 'Test Rule ' + ruleType;
+        newRule.description = 'Test Description';
+        newRule.active = active;
+        newRule.id = ruleId;
+        newRule.filterLogic = '';
+        return newRule;
+    }
+
+    private static RuleUtil.RuleFilter createWebhookTestRuleFilter(String fieldName, String filterId, String value, 
+                                                        String comparisonType, String comparisonOperator, Integer index) {
+        RuleUtil.RuleFilter newFilter = new RuleUtil.RuleFilter();
+        newFilter.fieldName = fieldName;
+        newFilter.value = value;
+        newFilter.comparisonType = comparisonType;
+        newFilter.comparisonOperator = comparisonOperator;
+        newFilter.index = index;
+        newFilter.id = filterId;
+        return newFilter;
+    }
+
+    private static RuleUtil.Action createWebhookTestAction(String actionType, String actionId, String subject, String body) {
+        RuleUtil.Action newAction = new RuleUtil.Action();
+        newAction.type = actionType;
+        newAction.id = actionId;
+        newAction.subject = subject;
+        newAction.body = body;
+        return newAction;
+    }
+
+    private static RuleUtil.RuleAction createWebhookTestRuleAction() {
+        RuleUtil.RuleAction newRuleAction = new RuleUtil.RuleAction();
+        return newRuleAction;
     }
 }

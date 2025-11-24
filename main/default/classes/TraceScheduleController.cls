@@ -92,7 +92,8 @@ public with sharing class TraceScheduleController {
             traceSchedule.Name = issues[0].Name;
             traceSchedule.Description__c = issues[0].Summary__c;
             traceSchedule.Issue__c = issues[0].Id;
-            insert traceSchedule;
+            DatabaseUtils.getInstance().performInsertDML(new List<Trace_Schedule__c>{ traceSchedule }, Schema.SObjectType.Trace_Schedule__c)
+                        .handleError(TraceScheduleController.class.getName(), '.createTraceRequest', Logger.getInstance());
             return traceSchedule.Id;
         }
         return null;
@@ -100,21 +101,15 @@ public with sharing class TraceScheduleController {
 
     public TraceScheduleController(ApexPages.StandardSetController setController) {
         this.setController = setController;
-        this.traceScheduleId = ApexPages.currentPage().getParameters().get('Id');
+        System.PageReference pageReference = ApexPages.currentPage();
+        this.traceScheduleId = pageReference.getParameters().get('Id');
         List<Trace_Schedule__c> traceSchedules = [SELECT Id, Status__c FROM Trace_Schedule__c WHERE Id = :this.traceScheduleId];
         if (!traceSchedules.isEmpty()) {
             this.traceScheduleStatus = traceSchedules[0].Status__c;
         }
         this.lexOrigin = Url.getOrgDomainUrl().toExternalForm().split('.my.')[0]+'.lightning.force.com';
-        String isDevParam = ApexPages.currentPage().getParameters().get('dev').escapeHtml4();
-        if (String.isNotBlank(isDevParam)) {
-            Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
-            ApexPages.currentPage().setCookies(new Cookie[]{ devCookie });
-            isDev = Boolean.valueOf(isDevParam);
-        } else {
-            Cookie devCookie = ApexPages.currentPage().getCookies().get('a2developmentMode');
-            isDev = devCookie != null ? Boolean.valueOf(devCookie.getValue()) : false;
-        }
+
+        isDev = ConfigUtil.initializeDevelopmentMode(pageReference);
     }
 
     public PageReference doRedirect() {

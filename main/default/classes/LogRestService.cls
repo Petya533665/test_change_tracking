@@ -31,7 +31,7 @@ global with sharing class LogRestService {
         res.statusCode = result.statusCode;
     }
 
-    public class GetLogResult {
+    public with sharing class GetLogResult {
         public String status;
         public Integer statusCode;
         public String error;

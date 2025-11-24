@@ -189,9 +189,18 @@ public with sharing class MonitoringUtil {
     private static Map<String, List<Decimal>> extractFieldValues(List<Log__c> logs, RuleUtil.Rule rule) {
         Map<String, List<Decimal>> fieldValues = new Map<String, List<Decimal>>();
         
+        // Get the list of fields to monitor based on rule filters
+        Set<String> fieldsToMonitor = getFieldsToMonitorForSpike(rule);
+        
         for(String limitKey : LimitsService.FIELD_MAP.keySet()) {
             Schema.DescribeFieldResult fieldDescribe = LimitsService.FIELD_MAP.get(limitKey);
             String fieldName = fieldDescribe.getName();
+            
+            // Skip fields that are not in the filter (if filters exist)
+            if(!fieldsToMonitor.isEmpty() && !fieldsToMonitor.contains(fieldName)) {
+                continue;
+            }
+            
             List<Decimal> values = new List<Decimal>();
             
             for(Log__c log : logs) {
@@ -217,6 +226,25 @@ public with sharing class MonitoringUtil {
         }
         
         return fieldValues;
+    }
+    
+    /**
+     * Get the set of fields to monitor for spike detection based on rule filters
+     * @param rule The rule to check for filters
+     * @return Set of field names to monitor. Empty set means monitor all fields.
+     */
+    private static Set<String> getFieldsToMonitorForSpike(RuleUtil.Rule rule) {
+        Set<String> fieldsToMonitor = new Set<String>();
+        
+        if(rule.ruleFilters != null && !rule.ruleFilters.isEmpty()) {
+            for(RuleUtil.RuleFilter filter : rule.ruleFilters) {
+                if(String.isNotBlank(filter.fieldName)) {
+                    fieldsToMonitor.add(filter.fieldName);
+                }
+            }
+        }
+        
+        return fieldsToMonitor;
     }
 
     private static Log__c getLatestLog(List<Log__c> logs) {
@@ -347,10 +375,18 @@ public with sharing class MonitoringUtil {
         // 2. Get org limits
         Map<String, System.OrgLimit> orgLimits = OrgLimits.getMap();
         
+        // Get the list of fields to monitor based on rule filters
+        Set<String> fieldsToMonitor = getFieldsToMonitorForSpike(rule);
+        
         // 3. Calculate current percentages
         for(String limitKey : LimitsService.FIELD_MAP.keySet()) {
             Schema.DescribeFieldResult fieldDescribe = LimitsService.FIELD_MAP.get(limitKey);
             String fieldName = fieldDescribe.getName();
+            
+            // Skip fields that are not in the filter (if filters exist)
+            if(!fieldsToMonitor.isEmpty() && !fieldsToMonitor.contains(fieldName)) {
+                continue;
+            }
             
             // Get current usage from limits record only if field was queried
             Map<String, Object> populated = latestLog.Limits__r.getPopulatedFieldsAsMap();
@@ -497,9 +533,14 @@ public with sharing class MonitoringUtil {
                 result.add(rule);
             }
         }
-		// split rules by key groups
+		// split rules by key groups (but NOT for limits rules - they should create one event per rule)
         Map<String, RuleUtil.Rule> mapRulesByGroupKey = new Map<String, RuleUtil.Rule>();
         for(RuleUtil.Rule rule : result) {
+            // Exclude limits rules from splitting - they should create one consolidated event with all breached fields
+            if(rule.type.equals(Constants.RULE_SOBJECT.TYPE_LIMITS)) {
+                continue;
+            }
+            
             if(!rule.groupFieldNames.isEmpty() || rule.aggregateInterval != null || rule.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_FREQUENCY)) {
                 for(Integer interval : rule.groupValues.keySet()) {
                     for (String key : rule.groupValues.get(interval).keySet()) {
@@ -821,7 +862,8 @@ public with sharing class MonitoringUtil {
         }
 
         if(!newEvents.isEmpty()) {
-            insert newEvents;
+            DatabaseUtils.getInstance().performInsertDML(newEvents, Schema.SObjectType.Event__c)
+                .handleError(MonitoringUtil.class.getName(), '.createEvents', Logger.getInstance());
 
             for(Integer i = 0; i < newEvents.size(); i++) {
                 if(RuleUtil.IGNORE_RULE_TYPES_FOR_MONITORING_EVENTS.contains(rules.get(i).type)) continue;
@@ -897,6 +939,7 @@ public with sharing class MonitoringUtil {
             SELECT MAX(CreatedDate) CreatedDate, Rule__c RuleId
             FROM Event__c
             GROUP BY Rule__c
+            LIMIT :Constants.QUERY_LIMITS.LARGE_DATA_QUERY_LIMIT
         ];
         for(AggregateResult event : events) {
             DateTime createdDate = (DateTime)event.get('CreatedDate');

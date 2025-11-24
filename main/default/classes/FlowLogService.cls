@@ -1,4 +1,4 @@
-public class FlowLogService {
+public with sharing class FlowLogService {
 
     public class FlowLoggingException extends Exception {}
 

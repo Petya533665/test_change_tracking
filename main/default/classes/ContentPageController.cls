@@ -1,4 +1,4 @@
-public class ContentPageController {
+public with sharing class ContentPageController {
 
     public String getJsonData() {
         String contentDocumentId = (String)ApexPages.currentPage().getParameters().get('contentDocumentId');

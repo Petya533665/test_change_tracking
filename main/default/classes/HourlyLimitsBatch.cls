@@ -1,4 +1,4 @@
-public class HourlyLimitsBatch extends DatabaseUtils.PharosBatchImpl implements Database.Batchable<SObject>, Schedulable, Database.Stateful, Database.AllowsCallouts {
+public with sharing class HourlyLimitsBatch extends DatabaseUtils.PharosBatchImpl implements Database.Batchable<SObject>, Schedulable, Database.Stateful, Database.AllowsCallouts {
 
     public static final String CATEGORY = 'Pharos';
     public static final String TYPE = 'HourlyLimitsBatch';
