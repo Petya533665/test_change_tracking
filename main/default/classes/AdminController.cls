@@ -48,7 +48,15 @@ public with sharing class AdminController {
     }
 
     public AdminController() {
-        isDev = ConfigUtil.initializeDevelopmentMode(ApexPages.currentPage());
+        String isDevParam = ApexPages.currentPage().getParameters().get('dev')?.escapeHtml4();
+        if (String.isNotBlank(isDevParam)) {
+            Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
+            ApexPages.currentPage().setCookies(new Cookie[]{ devCookie });
+            isDev = Boolean.valueOf(isDevParam);
+        } else {
+            Cookie devCookie = ApexPages.currentPage().getCookies().get('a2developmentMode');
+            isDev = devCookie != null ? Boolean.valueOf(devCookie.getValue()) : false;
+        }
     }
 
     @RemoteAction
