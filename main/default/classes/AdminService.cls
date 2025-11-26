@@ -1297,6 +1297,7 @@ public without sharing class AdminService {
     }
 
     public static Map<String, Object> emailToCaseTracking(Object data) {
+        if (!PermissionsUtil.EmailToCaseErrorTracking) return new Map<String, Object>();
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         Boolean incomingValue = Boolean.valueOf(input.get(ConfigUtil.CONFIRM_EMAIL_SERVICE_KEY_VALUE));
 
@@ -2490,6 +2491,7 @@ public without sharing class AdminService {
     }
 
     public static Map<String, Object> setBatchErrorTrackingSetting(Object data) {
+        if (!PermissionsUtil.AsyncProcessErrorTracking) return new Map<String, Object>();
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         ConfigUtil.SETTINGS.Batch_Error_Tracking_Enabled__c = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
         DatabaseUtils.getInstance().performUpsertDML(new List<Logger_Settings__c>{ConfigUtil.SETTINGS}, Schema.SObjectType.Logger_Settings__c, true);
@@ -3025,6 +3027,7 @@ public without sharing class AdminService {
     private static final String DEFAULT_BULK_FREQUENCY_HOURS = '4';
 
     public static Map<String, Object> scheduleBulkAPIBatch(Object data) {
+        if (!PermissionsUtil.AsyncProcessErrorTracking) return new Map<String, Object>();
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         try {
             if (Integer.valueOf(input.get('cronParameter')) == 0) {
