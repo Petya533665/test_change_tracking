@@ -100,7 +100,7 @@ public with sharing class RuleExportImportService {
      * used to import rules
      */
     public static List<Rule__c> importRules(String jsonStr) {
-        if (String.isBlank(jsonStr)) {
+        if (String.isBlank(jsonStr) || !PermissionsUtil.RuleImportExport) {
             return new List<Rule__c>();
         }
 
