@@ -2759,6 +2759,9 @@ public without sharing class AdminService {
             && !input.containsKey(RuleUtil.KEY_ACTIONS)
             && !input.containsKey(RuleUtil.KEY_RULE_FILTERS);
         RuleUtil.Rule deserializedRuleWrapper = (RuleUtil.Rule)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE)), RuleUtil.Rule.class);
+        if (deserializedRuleWrapper.isUpdateRule && !PermissionsUtil.UpdateRules) {
+            return getRuleSettings(deserializedRuleWrapper.getRule().Type__c);
+        }
 
         // FIRST: Create Remote Site Settings for webhook actions (BEFORE any DML)
         // Collect all webhook URLs and make synchronous callout(s)
