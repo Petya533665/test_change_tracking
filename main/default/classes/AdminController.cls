@@ -48,6 +48,7 @@ public with sharing class AdminController {
     }
 
     public AdminController() {
+        System.debug('+++Init admincontroller');
         String isDevParam = ApexPages.currentPage().getParameters().get('dev').escapeHtml4();
         if (String.isNotBlank(isDevParam)) {
             Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
