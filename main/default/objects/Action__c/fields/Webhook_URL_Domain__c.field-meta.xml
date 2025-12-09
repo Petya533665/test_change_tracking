@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>Webhook_Auth_Type__c</fullName>
-    <description>Authentication method for the webhook (e.g., None, Basic, Bearer, API_Key, Custom)</description>
+    <fullName>Webhook_URL_Domain__c</fullName>
+    <description>Domain extracted from Webhook URL for determining unique active actions</description>
     <externalId>false</externalId>
-    <label>Webhook Auth Type</label>
+    <label>Webhook URL Domain</label>
     <length>255</length>
     <required>false</required>
     <trackHistory>false</trackHistory>
