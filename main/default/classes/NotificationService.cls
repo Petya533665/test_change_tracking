@@ -710,15 +710,19 @@ public with sharing class NotificationService {
 
         GraphAPIService.GraphApiSetting settings = new GraphAPIService.GraphApiSetting(action.Team_Id__c, action.Channel_Id__c);
         List<String> mergedMessages = renderMergeFields(recordId, new List<String>{action.Subject__c, action.Body__c}, new NotificationService.MergeFieldSettings(action.Action_Type__c));
+        
+        // Clean AutoChart fields from messages first
+        AutoChart.AutoChartFieldsResult autoChartFieldsResult = AutoChart.getChartFieldsAndClear(mergedMessages);
+        mergedMessages = autoChartFieldsResult.cleanedMessages;
+        List<String> chartsTypeForPrepare = autoChartFieldsResult.autoChartFields;
+        
+        // Create chat message with cleaned content
         String subject = mergedMessages.get(0);
         String body = mergedMessages.get(1);
         GraphAPIService.ChatMessage chatMessage = new GraphAPIService.ChatMessage(subject, body);
 
-        AutoChart.AutoChartFieldsResult autoChartFieldsResult = new MergeFields().getChartFieldsAndClear(mergedMessages);
-        mergedMessages = autoChartFieldsResult.cleanedMessages;
-        List<String> chartsTypeForPrepare = autoChartFieldsResult.autoChartFields;
-
-        if (autoChartFieldsResult?.autoChartFields.isEmpty()) {
+        // Only generate charts if AutoChart is enabled and chart fields were found
+        if (autoChartFieldsResult?.autoChartFields.isEmpty() || !AutoChart.isEnabled) {
             GraphAPIService.sendChannelMessage(settings.teamId, settings.channelId, chatMessage);
         } else {
             if (record != null) {
@@ -728,7 +732,14 @@ public with sharing class NotificationService {
                     parameters
                 );
 
+                // Set metadata for error tracking
+                Map<String, String> metadata = new Map<String, String>();
+                if (record != null && String.isNotBlank(record.Id)) {
+                    metadata.put('recordId', record.Id);
+                }
+
                 ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
+                    .setMetadata(metadata)
                     .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
                 chatMessage.addImagesByImageLambdaClient(chartGeneratorImageLambdaClient);
                 GraphAPIService.sendChannelMessage(settings.teamId, settings.channelId, chatMessage);
@@ -764,7 +775,7 @@ public with sharing class NotificationService {
         
         List<String> mergedMessages = renderMergeFields(recordId, new List<String>{action.Subject__c, action.Body__c}, new NotificationService.MergeFieldSettings(action.Action_Type__c));
 
-        AutoChart.AutoChartFieldsResult autoChartFieldsResult = new MergeFields().getChartFieldsAndClear(mergedMessages);
+        AutoChart.AutoChartFieldsResult autoChartFieldsResult = AutoChart.getChartFieldsAndClear(mergedMessages);
         mergedMessages = autoChartFieldsResult.cleanedMessages;
         List<String> chartsTypeForPrepare = autoChartFieldsResult.autoChartFields;
 
@@ -772,7 +783,8 @@ public with sharing class NotificationService {
         String body = mergedMessages.get(1);
         String message = subject + Constants.GLOBAL_VARIABLE.NEWLINE_CHARACTERS + body;
         
-        if (autoChartFieldsResult?.autoChartFields.isEmpty()) {
+        // Only generate charts if AutoChart is enabled and chart fields were found
+        if (autoChartFieldsResult?.autoChartFields.isEmpty() || !AutoChart.isEnabled) {
             SlackService.sendMessageToSlack(message, action.SlackChannels__c);
         } else {
             if (record != null) {
@@ -801,8 +813,14 @@ public with sharing class NotificationService {
                     chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient();
                     chartGeneratorImageLambdaClient.setChartImages(cachedImages);
                 } else {
-                    // Generate new images
+                    // Generate new images with metadata for error tracking
+                    Map<String, String> metadata = new Map<String, String>();
+                    if (String.isNotBlank(recordId)) {
+                        metadata.put('recordId', recordId);
+                    }
+                    
                     chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
+                        .setMetadata(metadata)
                         .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
                     
                     // Store images in batchContext for future use
@@ -821,6 +839,11 @@ public with sharing class NotificationService {
         }
 
         List<String> mergedMessages = renderMergeFields(recordId, new List<String>{action.Subject__c, action.Body__c}, new NotificationService.MergeFieldSettings(action.Action_Type__c));
+        
+        // Clean AutoChart fields from messages
+        AutoChart.AutoChartFieldsResult autoChartFieldsResult = AutoChart.getChartFieldsAndClear(mergedMessages);
+        mergedMessages = autoChartFieldsResult.cleanedMessages;
+        
         String subject = mergedMessages.get(0);
         String body = mergedMessages.get(1);
 
@@ -1071,14 +1094,7 @@ public with sharing class NotificationService {
                         filteredFields.add(field);
                     }
                 }
-                AIAnalysis analysis;
-                if (needMergeAnalysis) {
-                    analysis = AIAnalysis.getInstance(new Set<String>(ids));
-                    if (analysis != null) {
-                        analysis.init();
-                        analysis.setVersionData();
-                    }
-                }
+                AIAnalysis analysis = needMergeAnalysis ? getAIAnalysis(ids) : null;
                 String query = new QBuilder(objectAPIName)
                     .selectFields(filteredFields)
                     .add(QBuilder.condition('Id').isIn(':ids'))
@@ -1086,27 +1102,39 @@ public with sharing class NotificationService {
                 for (SObject obj : Database.query(query)) {
                     String objId = (String)obj.get('Id');
                     List<String> contents = contentsMap.get(objId);
-
+	                String context = this.mergeFieldSettingsMap?.containsKey(objId) ? this.mergeFieldSettingsMap.get(objId).notificationContext.name() : null;
                     Map<String, String> tempMap = new Map<String, String>();
                     for (String field : allFields) {
                         if (field == 'Link') {
                             tempMap.put(field, formatLinkField(objId));
                         } else if (field.endsWith('.Link')) {
                             tempMap.put(field, formatLinkField(String.valueOf(getFieldValue(obj, field.removeEnd('.Link')))));
-                        } else if (field == 'Analysis' && analysis != null && this.mergeFieldSettingsMap?.containsKey(objId)) {
-                            tempMap.put(field, analysis.getFormattedData(objId, this.mergeFieldSettingsMap.get(objId).notificationContext.name()));
+                        } else if (field == 'Analysis' && analysis != null && String.isNotBlank(context)) {
+	                        if (context == 'JIRA' && JiraService.isCloudJiraInstance()) {
+		                        tempMap.put(field, analysis.getFormattedDataADF(objId, 'JIRA_ADF'));
+	                        } else {
+		                        tempMap.put(field, analysis.getFormattedData(objId, context));
+	                        }
                         } else {
                             tempMap.put(field, String.valueOf(getFieldValue(obj, field)));
                         }
                     }
                     List<String> contentList = new List<String>();
-                    for (String content : contents) {
-                        contentList.add(matchContent(content, tempMap, objectAPIName));
-                    }
+
+	                if (!contents.isEmpty() && contents.size() > 0) {
+		                contentList.add(matchContent(contents[0], tempMap, objectAPIName));
+	                }
+	                if (!contents.isEmpty() && contents.size() > 1) {
+		                if (context == 'JIRA' && JiraService.isCloudJiraInstance()) {
+			                contentList.add(matchContentADF(contents[1], tempMap, objectAPIName));
+		                } else {
+			                contentList.add(matchContent(contents[1], tempMap, objectAPIName));
+		                }
+	                }
                     result.put(objId, contentList);
                 }
             }
-            else if(String.isNotBlank(objectAPIName) && allFields.isEmpty()) {
+            else if (String.isNotBlank(objectAPIName) && allFields.isEmpty()) {
                 result = contentsMap;
             }
             return result;
@@ -1139,6 +1167,15 @@ public with sharing class NotificationService {
             return '';
         }
 
+	    private AIAnalysis getAIAnalysis(Set<String> ids) {
+		    AIAnalysis analysis = AIAnalysis.getInstance(ids);
+		    if (analysis != null) {
+			    analysis.init();
+			    analysis.setVersionData();
+		    }
+		    return analysis;
+	    }
+
         public Object getFieldValue(SObject entity, String fieldName) {
             if(entity == null) {
                 return null;
@@ -1152,15 +1189,6 @@ public with sharing class NotificationService {
             }
         }
 
-        /**
-         * Process messages and extract AutoChart fields
-         * Delegates to AutoChart service for centralized processing
-         * 
-         * @deprecated Use AutoChart.getChartFieldsAndClear() directly for better performance
-         */
-        public AutoChart.AutoChartFieldsResult getChartFieldsAndClear(List<String> mergedMessages) {
-            return AutoChart.getChartFieldsAndClear(mergedMessages);
-        }
 
         private Set<String> getFields(String content, String objectAPIName) {
             Set<String> fieldAPINames = new Set<String>();
@@ -1183,16 +1211,83 @@ public with sharing class NotificationService {
             return fieldAPINames;
         }
 
-        private String matchContent(String content, Map<String, String> objValues, String objectAPIName) {
-            if(content == null) return '';
-            for(String keyFieldName : objValues.keySet()) {
-                String fieldValue = objValues.get(keyFieldName);
-                fieldValue = fieldValue == null ? '' : fieldValue;
-                String fullName = '{!' + objectAPIName + '.' + keyFieldName + '}';
-                content = content.replace(fullName, fieldValue);
-            }
-            return content;
-        }
+	    private String matchContent(String content, Map<String, String> objValues, String objectAPIName) {
+		    if (content == null) return '';
+		    for (String keyFieldName : objValues.keySet()) {
+			    String fieldValue = objValues.get(keyFieldName);
+			    fieldValue = fieldValue == null ? '' : fieldValue;
+			    String fullName = '{!' + objectAPIName + '.' + keyFieldName + '}';
+			    content = content.replace(fullName, fieldValue);
+		    }
+		    return content;
+	    }
+
+	    private String matchContentADF(String content, Map<String, String> objValues, String objectAPIName) {
+		    ADFBuilder builder = new ADFBuilder();
+
+		    if (String.isBlank(content)) {
+			    return builder.buildJSON();
+		    }
+
+		    if (content == null) {
+			    content = '';
+		    }
+
+		    String markerStart = '{!' + objectAPIName + '.';
+		    String markerEnd = '}';
+
+		    Integer pos = 0;
+		    Integer len = content.length();
+
+		    while (pos < len) {
+			    Integer start = content.indexOf(markerStart, pos);
+			    if (start == -1) {
+				    String tail = content.substring(pos);
+				    if (String.isNotBlank(tail)) {
+					    builder.addText(tail);
+				    }
+				    break;
+			    }
+
+			    if (start > pos) {
+				    String before = content.substring(pos, start);
+				    if (String.isNotBlank(before)) {
+					    builder.addText(before);
+				    }
+			    }
+
+			    Integer valueStart = start + markerStart.length();
+			    Integer valueEnd = content.indexOf(markerEnd, valueStart);
+			    if (valueEnd == -1) {
+				    String rest = content.substring(start);
+				    builder.addText(rest);
+				    break;
+			    }
+
+			    String fieldName = content.substring(valueStart, valueEnd);
+			    String fieldValue = objValues.get(fieldName);
+			    fieldValue = fieldValue == null ? '' : fieldValue;
+			    if ('Analysis'.equalsIgnoreCase(fieldName) && String.isNotBlank(fieldValue)) {
+				    try {
+					    Map<String, Object> adfDoc =
+							    (Map<String, Object>) JSON.deserializeUntyped(fieldValue);
+					    builder.appendDoc(adfDoc);
+				    } catch (Exception e) {
+					    builder.addText(fieldValue);
+				    }
+			    }
+			    else if ('Link'.equalsIgnoreCase(fieldName) && String.isNotBlank(fieldValue)) {
+				    builder.addLink(fieldValue, null);
+			    }
+			    else {
+				    builder.addText(fieldValue);
+			    }
+
+			    pos = valueEnd + markerEnd.length();
+		    }
+
+		    return builder.buildJSON();
+	    }
 
         private String getObjectAPI(String recordId) {
             String keyCode  = recordId.subString(0,3);
@@ -1204,8 +1299,6 @@ public with sharing class NotificationService {
             }
             return null;
         }
-
-
 
     }
 

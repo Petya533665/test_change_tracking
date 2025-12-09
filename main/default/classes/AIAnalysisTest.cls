@@ -260,9 +260,6 @@ public class AIAnalysisTest {
 		System.assertEquals(1, [SELECT Id FROM ContentDocumentLink WHERE LinkedEntityId = :issues[0].Id].size());
 	}
 	
-	
-	
-	
 	@IsTest
 	private static void testGetAnalysis() {
 		enableIssuePermissions();
@@ -324,6 +321,28 @@ public class AIAnalysisTest {
 		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.AUDIT_TRAIL, Test_LogService.getTestStub('AUDIT_TRAIL_ANALYSIS_RESPONSE'));
 		responseInterface.setContext('JIRA');
 		System.assertEquals(Test_LogService.getTestStub('AUDIT_TRAIL_ANALYSIS_JIRA_MARKDOWN').trim(), responseInterface.getFormattedData().trim());
+	}
+
+	@IsTest
+	private static void testBasicAnalysisJiraADFMarkdown() {
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.BASIC, Test_LogService.getTestStub('BASIC_ANALYSIS_RESPONSE'));
+		responseInterface.setContext('JIRA_ADF');
+		System.assertEquals(Test_LogService.getTestStub('BASIC_ANALYSIS_JIRA_ADF_MARKDOWN').trim(), JSON.serialize(responseInterface.getFormattedDataADF()).trim());
+	}
+
+	@IsTest
+	private static void testExplainAnalysisJiraADFMarkdown() {
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.CODE_EXPLAIN, Test_LogService.getTestStub('EXPLAIN_ANALYSIS_RESPONSE'));
+		responseInterface.setContext('JIRA_ADF');
+		System.debug(JSON.serialize(responseInterface.getFormattedDataADF()).trim());
+		System.assertEquals(Test_LogService.getTestStub('EXPLAIN_ANALYSIS_JIRA_ADF_MARKDOWN').trim(), JSON.serialize(responseInterface.getFormattedDataADF()).trim());
+	}
+
+	@IsTest
+	private static void testAuditTrailAnalysisJiraADFMarkdown() {
+		AIAnalysisService.ResponseInterface responseInterface = AIAnalysisService.getResponseInterface(AIAnalysisService.Analysis.AUDIT_TRAIL, Test_LogService.getTestStub('AUDIT_TRAIL_ANALYSIS_RESPONSE'));
+		responseInterface.setContext('JIRA_ADF');
+		System.assertEquals(Test_LogService.getTestStub('AUDIT_TRAIL_ANALYSIS_JIRA_ADF_MARKDOWN').trim(), JSON.serialize(responseInterface.getFormattedDataADF()).trim());
 	}
 
 	@IsTest

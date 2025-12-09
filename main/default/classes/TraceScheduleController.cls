@@ -1,6 +1,32 @@
 public with sharing class TraceScheduleController {
     // Updated to support AutoTrace functionality
 
+    private static final Set<String> TRACE_SCHEDULE_NO_ACTIVE_STATUSES = new Set<String>{
+        Constants.TRACE_SCHEDULE_SOBJECT.STATUS_COMPLETED,
+        Constants.TRACE_SCHEDULE_SOBJECT.STATUS_INACTIVE
+    };
+
+    @TestVisible
+    private static final String OUTPUT_KEY_CONNECTED_ORGS = 'connectedOrgs';
+    @TestVisible
+    private static final String OUTPUT_KEY_USER_OPTIONS = 'userOptions';
+    @TestVisible
+    private static final String OUTPUT_KEY_LOGS = 'logs';
+    @TestVisible
+    private static final String OUTPUT_KEY_RESULT = 'result';
+    @TestVisible
+    private static final String OUTPUT_KEY_TRACE_REQUESTS = 'traceRequests';
+    @TestVisible
+    private static final String INPUT_KEY_RECORD_ID = 'recordId';
+    @TestVisible
+    private static final String INPUT_KEY_RANGE = 'range';
+    @TestVisible
+    private static final String INPUT_KEY_ORGANIZATION_ID = 'organizationId';
+    @TestVisible
+    private static final String INPUT_KEY_START_DATE = 'startDate';
+    @TestVisible
+    private static final String INPUT_KEY_END_DATE = 'endDate';
+
     private ApexPages.StandardSetController setController;
 
     public String traceScheduleId { get; set; }
@@ -37,14 +63,6 @@ public with sharing class TraceScheduleController {
         }
         set;
     }
-
-    private static final Set<String> TRACE_SCHEDULE_NO_ACTIVE_STATUSES = new Set<String>{'Completed', 'Inactive'};
-    private static final String RECORD_ID = 'recordId';
-    private static final String RANGE = 'range';
-    private static final String ORGANIZATION_ID = 'organizationId';
-    private static final String START_DATE = 'startDate';
-    private static final String END_DATE = 'endDate';
-
 
     public class ConnectedOrgInfo {
         @AuraEnabled
@@ -188,7 +206,7 @@ public with sharing class TraceScheduleController {
                 mapConnectedOrgs.put(corg.Name, corg.Title__c);
             }
         }
-        output.put('connectedOrgs', mapConnectedOrgs);
+        output.put(OUTPUT_KEY_CONNECTED_ORGS, mapConnectedOrgs);
         return output;
     }
 
@@ -196,7 +214,7 @@ public with sharing class TraceScheduleController {
         Map<String, Object> output = new Map<String, Object>();
         if (data != null) {
             Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
-            String recordId = String.valueOf(input.get('recordId'));
+            String recordId = String.valueOf(input.get(INPUT_KEY_RECORD_ID));
             String filter = input.containsKey('filter') ? ('%' + String.valueOf(input.get('filter')) + '%') : null;
             List<Trace_Schedule__c> traceSchedules = [SELECT Id, Issue__c FROM Trace_Schedule__c WHERE Id = :recordId];
             if (!traceSchedules.isEmpty()) {
@@ -216,7 +234,7 @@ public with sharing class TraceScheduleController {
                         userOptions.put(user.Id, user.Name);
                     }
                 }
-                output.put('userOptions', userOptions);
+                output.put(OUTPUT_KEY_USER_OPTIONS, userOptions);
             }
         }
         return output;
@@ -226,8 +244,8 @@ public with sharing class TraceScheduleController {
         Map<String, Object> output = new Map<String, Object>();
         if (data != null) {
             Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
-            String recordId = (String)input.get(RECORD_ID);
-            Integer range = (Integer)input.get(RANGE);
+            String recordId = (String)input.get(INPUT_KEY_RECORD_ID);
+            Integer range = (Integer)input.get(INPUT_KEY_RANGE);
             List<Trace_Schedule__c> traceSchedules = [SELECT Id, Issue__c FROM Trace_Schedule__c WHERE Id = :recordId];
             if (!traceSchedules.isEmpty()) {
                 List<Map<String, Object>> logs = new List<Map<String, Object>>();
@@ -274,7 +292,7 @@ public with sharing class TraceScheduleController {
                 for (String intervalKey : intervalGroups.keySet()) {
                     intervalGroupsList.add(intervalGroups.get(intervalKey));
                 }
-                output.put('logs', intervalGroupsList);
+                output.put(OUTPUT_KEY_LOGS, intervalGroupsList);
             }
         }
         return output;
@@ -304,9 +322,9 @@ public with sharing class TraceScheduleController {
                 traceRequest.Source__c = sourceId;
                 traceRequestsToInsert.add(traceRequest);
             }
-            output.put('result', DatabaseUtils.getInstance().performInsertDML(traceRequestsToInsert, Schema.SObjectType.Trace_Request__c)
+            output.put(OUTPUT_KEY_RESULT, DatabaseUtils.getInstance().performInsertDML(traceRequestsToInsert, Schema.SObjectType.Trace_Request__c)
                     .handleError(TraceScheduleController.class.getName(), '.createTraceRequests').saveResults);
-            output.put('traceRequests', getTraceRequestWrappers(traceRequestsToInsert));
+            output.put(OUTPUT_KEY_TRACE_REQUESTS, getTraceRequestWrappers(traceRequestsToInsert));
         }
         return output;
     }
@@ -320,9 +338,9 @@ public with sharing class TraceScheduleController {
                 Trace_Request__c traceRequest = traceRequestWrapper.getTraceRequest();
                 traceRequestsToUpdate.add(traceRequest);
             }
-            output.put('result', DatabaseUtils.getInstance().performUpdateDML(traceRequestsToUpdate, Schema.SObjectType.Trace_Request__c)
+            output.put(OUTPUT_KEY_RESULT, DatabaseUtils.getInstance().performUpdateDML(traceRequestsToUpdate, Schema.SObjectType.Trace_Request__c)
                     .handleError(TraceScheduleController.class.getName(), '.updateTraceRequests').saveResults);
-            output.put('traceRequests', getTraceRequestWrappers(traceRequestsToUpdate));
+            output.put(OUTPUT_KEY_TRACE_REQUESTS, getTraceRequestWrappers(traceRequestsToUpdate));
         }
         return output;
     }
@@ -344,7 +362,7 @@ public with sharing class TraceScheduleController {
                 Trace_Request__c traceRequest = traceRequestWrapper.getTraceRequest();
                 traceRequestsToDelete.add(traceRequest);
             }
-            output.put('result', DatabaseUtils.getInstance().performDeleteDML(traceRequestsToDelete, Schema.SObjectType.Trace_Request__c)
+            output.put(OUTPUT_KEY_RESULT, DatabaseUtils.getInstance().performDeleteDML(traceRequestsToDelete, Schema.SObjectType.Trace_Request__c)
                 .handleError(TraceScheduleController.class.getName(), '.deleteTraceRequests').deleteResults);
         }
         return output;
@@ -354,9 +372,9 @@ public with sharing class TraceScheduleController {
         Map<String, Object> output = new Map<String, Object>();
         if (data != null) {
             Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
-            String organizationId = (String)input.get(ORGANIZATION_ID);
-            Date startDate = Date.valueOf((String)input.get(START_DATE)).addDays(-1);
-            Date endDate = Date.valueOf((String)input.get(END_DATE)).addDays(1);
+            String organizationId = (String)input.get(INPUT_KEY_ORGANIZATION_ID);
+            Date startDate = Date.valueOf((String)input.get(INPUT_KEY_START_DATE)).addDays(-1);
+            Date endDate = Date.valueOf((String)input.get(INPUT_KEY_END_DATE)).addDays(1);
             List<Trace_Request__c> traceRequests = [
                 SELECT Id, Name, Parent__c, Status__c, Schedule__c, Start_Date__c, End_Date__c, Trace_Schedule__c, Issue__c, Traced_Entity_Id__c, Type__c 
                 FROM Trace_Request__c 
@@ -380,7 +398,7 @@ public with sharing class TraceScheduleController {
                 FROM Trace_Request__c 
                 WHERE Issue__c IN :issueIds
             ];
-            output.put('traceRequests', !traceRequests.isEmpty() ? getTraceRequests(traceRequests) : new List<TraceRequest>());
+            output.put(OUTPUT_KEY_TRACE_REQUESTS, !traceRequests.isEmpty() ? getTraceRequests(traceRequests) : new List<TraceRequest>());
         }
         return output;
     }
@@ -393,7 +411,7 @@ public with sharing class TraceScheduleController {
             FROM Trace_Request__c 
             WHERE Trace_Schedule__c = :traceScheduleId
         ];
-        output.put('traceRequests', traceRequests.isEmpty() ? new List<TraceRequest>() : getTraceRequests(traceRequests));
+        output.put(OUTPUT_KEY_TRACE_REQUESTS, traceRequests.isEmpty() ? new List<TraceRequest>() : getTraceRequests(traceRequests));
         return output;
     }
 
@@ -465,31 +483,6 @@ public with sharing class TraceScheduleController {
             }
         }
         return output;
-    }
-
-    public class TraceSchedule {
-        public String id;
-        public String name;
-        public String status;
-        public String description;
-        public List<TraceRequest> traceRequests;
-
-        public TraceSchedule() {}
-
-        public TraceSchedule(Trace_Schedule__c traceSchedule) {
-            this.id = traceSchedule.Id;
-            this.name = traceSchedule.Name;
-            this.status = traceSchedule.Status__c;
-            this.description = traceSchedule.Description__c;
-            this.traceRequests = new List<TraceRequest>();
-        }
-
-        public TraceSchedule addTraceRequest(List<Trace_Request__c> traceRequests) {
-            for (Trace_Request__c traceRequest : traceRequests) {
-                this.traceRequests.add(new TraceRequest(traceRequest));
-            }
-            return this;
-        }
     }
 
     public class TraceRequest {

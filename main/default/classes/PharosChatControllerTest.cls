@@ -208,6 +208,7 @@ public class PharosChatControllerTest {
 
     @IsTest
     static void test_getSendMessageData() {
+        ConfigUtil.CHANGE_TRACKING_SETTINGS.Git_Change_Tracking__c = true;
         Id testRecordId = TestDataFactory.getFakeIds(Log__c.SObjectType, 1).get(0);
         
         Test.startTest();
@@ -215,7 +216,7 @@ public class PharosChatControllerTest {
         Test.stopTest();
         
         Assert.areNotEqual(null, result, 'Result should not be null');
-        Assert.areEqual(7, result.size(), 'Result should contain 7 keys');
+        Assert.areEqual(8, result.size(), 'Result should contain 8 keys');
         
         Assert.isTrue(result.containsKey('sf_session'), 'Result should contain sf_session key');
         Assert.isTrue(String.isNotBlank(result.get('sf_session')), 'sf_session should not be blank');
@@ -228,6 +229,9 @@ public class PharosChatControllerTest {
         
         Assert.isTrue(result.containsKey('sf_timezone_offset'), 'Result should contain sf_timezone_offset key');
         Assert.isTrue(String.isNotBlank(result.get('sf_timezone_offset')), 'sf_timezone_offset should not be blank');
+        
+        Assert.isTrue(result.containsKey('change_tracking_enabled'), 'Result should contain change_tracking_enabled key');
+        Assert.areEqual('true', result.get('change_tracking_enabled'), 'change_tracking_enabled should be true');
         
         Assert.isTrue(result.containsKey('git_user'), 'Result should contain git_user key');
         Assert.areEqual(TEST_GIT_OWNER, result.get('git_user'), 'git_user should match configured username');

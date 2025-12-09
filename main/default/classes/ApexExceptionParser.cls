@@ -12,6 +12,7 @@ global with sharing virtual class ApexExceptionParser implements IErrorParser {
     public static final Pattern PATTERN_CAUSED_BY_NAME_LONG = Pattern.compile('caused by: [\\s\\S]+?: ([\\s\\S]+?)([\\n|\\r\\n|\\r]|\\Z)');
     public static final Pattern PATTERN_FAILED_BATCH = Pattern.compile('Failed to process batch for class \'([^\' ]+)\'');
     public static final Pattern PATTERN_BY_USER_OR_ORG_ID = Pattern.compile('by user/organization: ([\\s\\S]{15})/([\\s\\S]{15})');
+    public static final Pattern PATTERN_FOR_JOB_ID = Pattern.compile('for job id \'(707[a-zA-Z0-9]{12,15})\'');
     public static final String REGEX_SANDBOX = '^Sandbox[\\n|\\r\\n|\\r]{2}';
     public static final String REGEX_DEBUG_LOG = 'Debug Log:[\\S\\s]+$';
     public static final String REGEX_SOURCE_ORGANIZATION = 'Source organization: [^\\n|\\r\\n|\\r]*';
@@ -460,6 +461,28 @@ global with sharing virtual class ApexExceptionParser implements IErrorParser {
             result = new List<String>(uniqueStackTraceLines).get(uniqueStackTraceLines.size() - 1);
         }
         return result;
+    }
+
+    /**
+     * Extracts Async Apex Job ID from exception message pattern: "for job id 'XXXXXXXXXXXXXXX'"
+     * @param exceptionMessage The exception message to parse
+     * @return The Async Apex Job ID (15 or 18 characters starting with '707'), or null if not found
+     */
+    public static String extractAsyncApexJobId(String exceptionMessage) {
+        if (String.isBlank(exceptionMessage)) {
+            return null;
+        }
+
+        Matcher jobIdMatcher = PATTERN_FOR_JOB_ID.matcher(exceptionMessage);
+        if (jobIdMatcher.find()) {
+            String jobId = jobIdMatcher.group(1);
+            // Ensure it's 15 characters (Salesforce ID format)
+            if (jobId.length() == 18) {
+                jobId = jobId.left(15);
+            }
+            return jobId;
+        }
+        return null;
     }
 
 }

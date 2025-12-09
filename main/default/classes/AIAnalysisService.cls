@@ -139,6 +139,7 @@ public with sharing class AIAnalysisService {
 				if (analysisStatusDetails.status == COMPLETED_STATUS) status = COMPLETED_STATUS;
 
 				if (issue.Analysis_Status__c != COMPLETED_STATUS
+						&& status != COMPLETED_STATUS
 						&& analysisStatusDetails.status == FAILED_STATUS) status = FAILED_STATUS;
 			}
 		}
@@ -166,6 +167,10 @@ public with sharing class AIAnalysisService {
 		return this.strategies.get(ANALYSIS_MAP.get(analysis)).getFormattedData(context);
 	}
 
+	public Map<String, Object> getFormattedDataADF(String analysis, String context) {
+		return this.strategies.get(ANALYSIS_MAP.get(analysis)).getFormattedDataADF(context);
+	}
+
 	public interface AIAnalysisServiceInterface {
 		void inProgress();
 		void Pending();
@@ -177,6 +182,7 @@ public with sharing class AIAnalysisService {
 		ContentVersion createContentVersion();
 		AnalysisStatusDetails getAnalysisStatusDetails();
 		String getFormattedData(String context);
+		Map<String, Object> getFormattedDataADF(String context);
 	}
 
 	public abstract class AIAnalysisServiceAbstract implements AIAnalysisServiceInterface {
@@ -278,6 +284,17 @@ public with sharing class AIAnalysisService {
 					ResponseInterface responseInterface = getResponseInterface(analysis, versionData);
 					responseInterface.setContext(context);
 					return responseInterface.getFormattedData();
+				} catch (JSONException e) {
+				}
+			}
+			return null;
+		}
+		public virtual Map<String, Object> getFormattedDataADF(String context) {
+			if (versionData != null && analysisStatusDetails.status == COMPLETED_STATUS) {
+				try {
+					ResponseInterface responseInterface = getResponseInterface(analysis, versionData);
+					responseInterface.setContext(context);
+					return responseInterface.getFormattedDataADF();
 				} catch (JSONException e) {
 				}
 			}
@@ -561,6 +578,7 @@ public with sharing class AIAnalysisService {
 		String formatCode(String code);
 		String formatOptions(List<String> options);
 		String formatTable(List<AuditTrailAnalysisResult> rows);
+		Map<String, Object> formatTextADF(String text);
 	}
 
 	public abstract class ContextFormatterAbstract implements ContextFormatterInterface {
@@ -571,6 +589,10 @@ public with sharing class AIAnalysisService {
 
 		public virtual String formatText(String text) {
 			return '<p>' + replaceParagraphTag(text).replaceAll('\n', '<br>') + '</p>\n';
+		}
+
+		public virtual Map<String, Object> formatTextADF(String text) {
+			return new ADFBuilder().build();
 		}
 
 		public virtual String formatCode(String code) {
@@ -762,11 +784,120 @@ public with sharing class AIAnalysisService {
 
 	}
 
+	public class JiraADFContextFormatter extends ContextFormatterAbstract {
+
+		public override String formatTitle(String title) {
+			return '\n' + title + '\n';
+		}
+
+		public override Map<String, Object> formatTextADF(String text) {
+
+			String src = text.replaceAll('<li>', '\n* ').replaceAll('</li>', '');
+
+			ADFBuilder builder = new ADFBuilder();
+
+			Integer pos = 0;
+			Integer len = src.length();
+
+			Boolean bold = false;
+			Boolean code = false;
+
+			while (pos < len) {
+				Integer lt = src.indexOf('<', pos);
+				if (lt == -1) {
+					String tail = src.substring(pos);
+					if (String.isNotBlank(tail)) {
+						addFormattedChunk(builder, tail, bold, code);
+					}
+					break;
+				}
+
+				if (lt > pos) {
+					String before = src.substring(pos, lt);
+					if (String.isNotBlank(before)) {
+						addFormattedChunk(builder, before, bold, code);
+					}
+				}
+
+				Integer gt = src.indexOf('>', lt + 1);
+				if (gt == -1) {
+					String rest = src.substring(lt);
+					addFormattedChunk(builder, rest, bold, code);
+					break;
+				}
+
+				String tag = src.substring(lt + 1, gt).trim();
+				Boolean closing = tag.startsWith('/');
+				String lowerTag = closing ? tag.substring(1).toLowerCase() : tag.toLowerCase();
+
+				if (closing) {
+					if (lowerTag == 'code') {
+						code = false;
+					} else if (lowerTag == 'strong' || lowerTag == 'b') {
+						bold = false;
+					}
+				} else {
+					if (lowerTag == 'code') {
+						code = true;
+					} else if (lowerTag == 'strong' || lowerTag == 'b') {
+						bold = true;
+					} else if (lowerTag == 'br') {
+						builder.addHardBreak();
+					} else if (lowerTag == 'p') {
+						builder.newParagraph();
+					}
+				}
+
+				pos = gt + 1;
+			}
+
+			return builder.build();
+		}
+
+		private void addFormattedChunk(ADFBuilder builder, String chunk, Boolean bold, Boolean code) {
+			if (String.isBlank(chunk)) return;
+			if (code) {
+				builder.addFormattedText(chunk, 'code');
+			} else if (bold) {
+				builder.addFormattedText(chunk, 'strong');
+			} else {
+				builder.addText(chunk);
+			}
+		}
+
+		public override String formatCode(String code) {
+			if (String.isBlank(code)) return '';
+			return replaceBackticks(code);
+		}
+
+		public override String formatOptions(List<String> options) {
+			if (options == null || options.isEmpty()) return '';
+			String formattedOptions = '';
+			for (String option : options) {
+				formattedOptions += formatText(option);
+			}
+			return formattedOptions + '\n';
+		}
+
+		public override String formatTable(List<AuditTrailAnalysisResult> rows) {
+			if (rows == null || rows.isEmpty()) return '';
+			String table = '\n';
+			for (AuditTrailAnalysisResult row : rows) {
+				table += '- Action: ' + row.display + '\n';
+				table += '  Section: ' + row.section + '\n';
+				table += '  Created By: ' + row.userName + '\n';
+				table += '  Created Date: ' + row.createdDate + '\n\n';
+			}
+			return table;
+		}
+	}
+
 	private static final Map<String, ContextFormatterInterface> FORMATTERS = new Map<String, ContextFormatterInterface>{
 			'LWC' => new LwcContextFormatter(),
 			'AZURE_DEV_OPS' => new AzureDevOpsContextFormatter(),
 			'TEAMS' => new TeamsContextFormatter(),
 			'JIRA' => new JiraContextFormatter(),
+			'JIRA_ADF' => new JiraADFContextFormatter(),
 			'SLACK' => new SlackContextFormatter(),
 			'MARKDOWN' => new MarkdownContextFormatter()
 	};
@@ -775,6 +906,7 @@ public with sharing class AIAnalysisService {
 	public interface ResponseInterface {
 		void setContext(String context);
 		String getFormattedData();
+		Map<String, Object> getFormattedDataADF();
 	}
 
 	public abstract class ResponseAbstract implements ResponseInterface {
@@ -784,9 +916,15 @@ public with sharing class AIAnalysisService {
 			this.context = context;
 			this.formatter = FORMATTERS.get(this.context);
 		}
+		
 		public virtual String getFormattedData() {
 			return '';
 		}
+		
+		public virtual Map<String, Object> getFormattedDataADF() {
+			return new ADFBuilder().build();
+		}
+		
 		public virtual String formatTitle(String title) {
 			if (String.isBlank(title)) return '';
 			return formatter.formatTitle(title);
@@ -795,6 +933,11 @@ public with sharing class AIAnalysisService {
 		public virtual String formatText(String text) {
 			if (String.isBlank(text)) return '';
 			return formatter.formatText(text);
+		}
+
+		public virtual Map<String, Object> formatTextADF(String text) {
+			if (String.isBlank(text)) return new ADFBuilder().build();
+			return formatter.formatTextADF(text);
 		}
 
 		public virtual String formatCode(String code) {
@@ -814,6 +957,11 @@ public with sharing class AIAnalysisService {
 
 	}
 
+	private static final String PROBLEM_ID_TITLE = 'Problem Identification';
+	private static final String SOLUTIONS_TITLE = 'Recommended Solutions';
+	private static final String SEVERITY_TITLE = 'Severity Level';
+	private static final String SEVERITY_DETAILS_TITLE = 'Severity Assessment Details';
+
 	public class BasicAnalysisResponse extends ResponseAbstract {
 		public String rootCauseAnalysis;
 		public List<String> resolutionOptions;
@@ -821,17 +969,39 @@ public with sharing class AIAnalysisService {
 		public String justification;
 		public override String getFormattedData() {
 			String formattedData = '';
-			formattedData += formatTitle('Problem Identification');
+			formattedData += formatTitle(PROBLEM_ID_TITLE);
 			formattedData += formatText(rootCauseAnalysis);
-			formattedData += formatTitle('Recommended Solutions');
+			formattedData += formatTitle(SOLUTIONS_TITLE);
 			formattedData += formatOptions(resolutionOptions);
-			formattedData += formatTitle('Severity Level');
+			formattedData += formatTitle(SEVERITY_TITLE);
 			formattedData += formatText(severityEstimate);
-			formattedData += formatTitle('Severity Assessment Details');
+			formattedData += formatTitle(SEVERITY_DETAILS_TITLE);
 			formattedData += formatText(justification);
 			return formattedData;
 		}
+		public override Map<String, Object> getFormattedDataADF() {
+			ADFBuilder builder = new ADFBuilder();
+
+			builder.addHeading(3, PROBLEM_ID_TITLE)
+					.addText(rootCauseAnalysis);
+
+			builder.addHeading(3, SOLUTIONS_TITLE);
+			if (resolutionOptions != null && !resolutionOptions.isEmpty()) {
+				builder.addBulletList(resolutionOptions);
+			}
+
+			builder.addHeading(3, SEVERITY_TITLE)
+					.addText(severityEstimate);
+
+			builder.addHeading(3, SEVERITY_DETAILS_TITLE)
+					.addText(justification);
+
+			return builder.build();
+		}
 	}
+
+	private static final String FIXED_CODE_TITLE = 'Fixed Code';
+	private static final String SOLUTION_DESCRIPTION_TITLE = 'Solution Description';
 
 	public class ExplainAnalysisResponse extends ResponseAbstract {
 		public String title;
@@ -844,11 +1014,11 @@ public with sharing class AIAnalysisService {
 			formattedData += formatTitle(title);
 			if (String.isNotBlank(summary)) formattedData += formatText(summary);
 			if (String.isNotBlank(fixed_code)) {
-				formattedData += formatTitle('Fixed Code');
+				formattedData += formatTitle(FIXED_CODE_TITLE);
 				formattedData += formatCode(fixed_code);
 			}
 			if (String.isNotBlank(solution_description)) {
-				formattedData += formatTitle('Solution Description');
+				formattedData += formatTitle(SOLUTION_DESCRIPTION_TITLE);
 				formattedData += formatText(solution_description);
 			}
 			for (ExplainAnalysisSection section : sections) {
@@ -857,7 +1027,44 @@ public with sharing class AIAnalysisService {
 			}
 			return formattedData;
 		}
+		public override Map<String, Object> getFormattedDataADF() {
+			ADFBuilder builder = new ADFBuilder();
+
+			if (String.isNotBlank(title)) {
+				builder.addHeading(3, formatTitle(title));
+			}
+
+			if (String.isNotBlank(summary)) {
+				builder.appendDoc(formatTextADF(summary));
+			}
+
+			if (String.isNotBlank(fixed_code)) {
+				builder.addHeading(3, FIXED_CODE_TITLE)
+						.addCodeBlock(fixed_code, 'java');
+			}
+
+			if (String.isNotBlank(solution_description)) {
+				builder.addHeading(3, SOLUTION_DESCRIPTION_TITLE);
+				builder.appendDoc(formatTextADF(solution_description));
+			}
+
+			if (sections != null) {
+				for (ExplainAnalysisSection section : sections) {
+					if (String.isNotBlank(section.subtitle)) {
+						builder.addHeading(3, formatTitle(section.subtitle));
+					}
+					if (String.isNotBlank(section.description)) {
+						builder.appendDoc(formatTextADF(section.description));
+					}
+				}
+			}
+
+			return builder.build();
+		}
 	}
+
+	private static final String CHANGE_IMPACT_OVERVIEW_TITLE = 'Change Impact Overview';
+	private static final String CHANGE_SIGNIFICANCE_TITLE = 'Change Significance';
 
 	public class AuditTrailAnalysisResponse extends ResponseAbstract {
 		public String summary;
@@ -865,12 +1072,39 @@ public with sharing class AIAnalysisService {
 		public List<AuditTrailAnalysisResult> result;
 		public override String getFormattedData() {
 			String formattedData = '';
-			formattedData += formatTitle('Change Impact Overview');
+			formattedData += formatTitle(CHANGE_IMPACT_OVERVIEW_TITLE);
 			formattedData += formatText(summary);
-			formattedData += formatTitle('Change Significance');
+			formattedData += formatTitle(CHANGE_SIGNIFICANCE_TITLE);
 			formattedData += formatText(relevance);
 			formattedData += formatTable(result);
 			return formattedData;
+		}
+		public override Map<String, Object> getFormattedDataADF() {
+			ADFBuilder builder = new ADFBuilder();
+
+			builder.addHeading(3, CHANGE_IMPACT_OVERVIEW_TITLE);
+			builder.appendDoc(formatTextADF(summary));
+
+			builder.addHeading(3, CHANGE_SIGNIFICANCE_TITLE);
+			builder.appendDoc(formatTextADF(relevance));
+
+			if (result != null && !result.isEmpty()) {
+				List<String> header = new List<String>{
+						'ACTION', 'SECTION', 'CREATED BY', 'CREATED DATE'
+				};
+				List<List<String>> dataRows = new List<List<String>>();
+				for (AuditTrailAnalysisResult row : result) {
+					dataRows.add(new List<String>{
+							row.display,
+							row.section,
+							row.userName,
+							row.createdDate
+					});
+				}
+				builder.addTable(header, dataRows);
+			}
+
+			return builder.build();
 		}
 	}
 

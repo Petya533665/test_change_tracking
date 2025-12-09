@@ -3300,6 +3300,7 @@ public class Test_StackTraceParser {
 
         // Enable post processing batch to run in test
         LogTriggerHelper.runPostProcessingBatchInTest = true;
+        PermissionsUtil.AsyncProcessErrorTracking = true;
 
         Test.startTest();
         
@@ -3317,5 +3318,118 @@ public class Test_StackTraceParser {
         List<Inbound_Email__c> inboundEmails = [SELECT Id, Error__c, Log__c FROM Inbound_Email__c WHERE Log__c = :logs[0].Id];
         System.assertEquals(1, inboundEmails.size(), 'Inbound email record should be created');
         System.assertEquals(logs[0].Id, inboundEmails[0].Log__c, 'Should be linked to our log');
+    }
+
+    @IsTest
+    static void test_email_log_hash1_calculation_matches_event_log() {
+        // This test verifies that Email Log Hash1 is calculated consistently with Event Log
+        // by using sorted List serialization in ApexExceptionParser.getHash1()
+        Test_LogService.initSettings();
+
+        String orgId = Test_LogService.CONNECETED_ORG_NAME;
+        String userId = UserInfo.getUserId();
+        String jobId = '707gL00000Pf3vZ';
+        // Single-line stacktrace matching the actual email from remote org
+        String stacktraceLine = 'Class.TestBatchTwo.execute: line 8, column 1';
+        String summary = 'List index out of bounds: 0';
+
+        // Create Email Log via ErrorEmailHandler
+        String apexErrorContent = 'Apex script unhandled exception by user/organization: ' + userId.left(15) + '/' + orgId.left(15) + '\n\n' +
+                                'Organization: 2.217S (orgfarm-5ef5f2519f-dev-ed.develop.my.salesforce.com).\n\n' +
+                                'Failed to process Queueable job for class TestBatchTwo for job ID ' + jobId + '.\n\n' +
+                                'caused by: System.ListException: List index out of bounds: 0\n\n' +
+                                stacktraceLine + '\n';
+
+        Messaging.InboundEmail email = new Messaging.InboundEmail();
+        Messaging.InboundEnvelope env = new Messaging.InboundEnvelope();
+        
+        email.subject = 'Developer script exception from 2.217S : TestBatchTwo for job ID ' + jobId + '. : ' + summary;
+        email.fromAddress = 'system@salesforce.com';
+        email.toAddresses = new List<String>{'test@pharos.com'};
+        email.plainTextBody = apexErrorContent;
+        
+        Messaging.InboundEmail.Header dateHeader = new Messaging.InboundEmail.Header();
+        dateHeader.name = 'Date';
+        dateHeader.value = '01 Jun 2023 14:31:46 -0700';
+        email.headers = new List<Messaging.InboundEmail.Header>{dateHeader};
+
+        // Setup mocks for post processing
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        endpoint2TestResp.putAll(createPostProcessingMock(null, null, 1));
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        LogTriggerHelper.runPostProcessingBatchInTest = true;
+        PermissionsUtil.AsyncProcessErrorTracking = true;
+
+        Test.startTest();
+        
+        ErrorEmailHandler testInbound = new ErrorEmailHandler();
+        testInbound.handleInboundEmail(email, env);
+        
+        Test.stopTest();
+
+        // Retrieve Email Log
+        List<Log__c> emailLogs = [
+            SELECT Id, Hash_1__c, Stacktrace__c, Summary__c, Category__c 
+            FROM Log__c 
+            WHERE Category__c = 'Apex' 
+            AND Summary__c = :summary
+            ORDER BY CreatedDate DESC
+            LIMIT 10
+        ];
+        
+        System.assert(!emailLogs.isEmpty(), 'Email log should be created');
+        Log__c emailLog = emailLogs[0];
+        System.assertEquals(summary, emailLog.Summary__c, 'Email log summary should match');
+        System.assertNotEquals(null, emailLog.Hash_1__c, 'Email log Hash1 should be populated');
+        
+        // Verify the hash calculation method used by ApexExceptionParser
+        // Calculate expected hash using sorted List (consistent method from LogService.calculateHashes)
+        Set<String> stackTraceUniqueLines = new Set<String>();
+        stackTraceUniqueLines.add(stacktraceLine);
+        
+        List<String> sortedStackTraceLines = new List<String>(stackTraceUniqueLines);
+        sortedStackTraceLines.sort();
+        
+        String valueForSortedHash = JSON.serialize(sortedStackTraceLines) + summary;
+        String sortedHash = LogService.generateHash_1(valueForSortedHash);
+
+        // The key assertion: Email log hash should match the expected sorted hash
+        // This ensures ApexExceptionParser.getHash1() produces consistent hashes with LogService.calculateHashes()
+        System.assertEquals(sortedHash, emailLog.Hash_1__c,
+            'Email log Hash1 should match expected hash calculated using sorted List serialization. ' +
+            'If this fails, ApexExceptionParser.getHash1() needs to sort stacktrace lines before JSON serialization.');
+    }
+
+    @IsTest
+    static void test_extractAsyncApexJobId() {
+        // Test with valid Async Apex Job ID (starts with '707')
+        String messageWithJobId = 'Developer script exception from 2.217S : \'pharos.MonitoringBatch\' for job id \'707gL00000PvD5s\' : Attempt to de-reference a null object';
+        String extractedJobId = ApexExceptionParser.extractAsyncApexJobId(messageWithJobId);
+        System.assertEquals('707gL00000PvD5s', extractedJobId, 'Should extract valid Async Apex Job ID');
+
+        // Test with 18-character job ID (should be truncated to 15)
+        String messageWith18CharJobId = 'Developer script exception from 2.217S : \'pharos.MonitoringBatch\' for job id \'707gL00000PvD5sABC\' : Attempt to de-reference a null object';
+        String extracted18CharJobId = ApexExceptionParser.extractAsyncApexJobId(messageWith18CharJobId);
+        System.assertEquals('707gL00000PvD5s', extracted18CharJobId, 'Should truncate 18-character job ID to 15 characters');
+
+        // Test with job ID that doesn't start with '707' (should return null)
+        String messageWithInvalidJobId = 'Developer script exception from 2.217S : \'pharos.MonitoringBatch\' for job id \'008gL00000PvD5s\' : Attempt to de-reference a null object';
+        String extractedInvalidJobId = ApexExceptionParser.extractAsyncApexJobId(messageWithInvalidJobId);
+        System.assertEquals(null, extractedInvalidJobId, 'Should return null for job IDs not starting with 707');
+
+        // Test with no job ID
+        String messageWithoutJobId = 'Developer script exception from 2.217S : \'pharos.MonitoringBatch\' : Attempt to de-reference a null object';
+        String extractedNoJobId = ApexExceptionParser.extractAsyncApexJobId(messageWithoutJobId);
+        System.assertEquals(null, extractedNoJobId, 'Should return null when no job ID is found');
+
+        // Test with null input
+        String extractedNull = ApexExceptionParser.extractAsyncApexJobId(null);
+        System.assertEquals(null, extractedNull, 'Should return null for null input');
+
+        // Test with empty string
+        String extractedEmpty = ApexExceptionParser.extractAsyncApexJobId('');
+        System.assertEquals(null, extractedEmpty, 'Should return null for empty string');
     }
 }

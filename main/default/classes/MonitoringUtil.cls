@@ -192,14 +192,24 @@ public with sharing class MonitoringUtil {
         // Get the list of fields to monitor based on rule filters
         Set<String> fieldsToMonitor = getFieldsToMonitorForSpike(rule);
         
+        // Build reverse map: full API name -> limitKey (for efficient lookup)
+        Map<String, String> fullApiNameToLimitKey = new Map<String, String>();
         for(String limitKey : LimitsService.FIELD_MAP.keySet()) {
             Schema.DescribeFieldResult fieldDescribe = LimitsService.FIELD_MAP.get(limitKey);
-            String fieldName = fieldDescribe.getName();
+            String fullApiName = fieldDescribe.getName();
+            fullApiNameToLimitKey.put(fullApiName, limitKey);
+        }
+        
+        // If filters exist, iterate only over filtered fields; otherwise iterate over all fields
+        Set<String> fieldsToProcess = fieldsToMonitor.isEmpty() 
+            ? fullApiNameToLimitKey.keySet() 
+            : fieldsToMonitor;
+        
+        for(String fieldName : fieldsToProcess) {
+            String limitKey = fullApiNameToLimitKey.get(fieldName);
+            if(limitKey == null) continue; // Skip if field not found in FIELD_MAP
             
-            // Skip fields that are not in the filter (if filters exist)
-            if(!fieldsToMonitor.isEmpty() && !fieldsToMonitor.contains(fieldName)) {
-                continue;
-            }
+            Schema.DescribeFieldResult fieldDescribe = LimitsService.FIELD_MAP.get(limitKey);
             
             List<Decimal> values = new List<Decimal>();
             
@@ -230,8 +240,9 @@ public with sharing class MonitoringUtil {
     
     /**
      * Get the set of fields to monitor for spike detection based on rule filters
+     * Converts filter field names (which are LimitsService.FIELD_MAP keys) to full API names
      * @param rule The rule to check for filters
-     * @return Set of field names to monitor. Empty set means monitor all fields.
+     * @return Set of full API field names to monitor. Empty set means monitor all fields.
      */
     private static Set<String> getFieldsToMonitorForSpike(RuleUtil.Rule rule) {
         Set<String> fieldsToMonitor = new Set<String>();
@@ -239,7 +250,13 @@ public with sharing class MonitoringUtil {
         if(rule.ruleFilters != null && !rule.ruleFilters.isEmpty()) {
             for(RuleUtil.RuleFilter filter : rule.ruleFilters) {
                 if(String.isNotBlank(filter.fieldName)) {
-                    fieldsToMonitor.add(filter.fieldName);
+                    // filter.fieldName is always a key in LimitsService.FIELD_MAP (e.g., "DataStorageMB")
+                    // Get the full API name directly from the field describe
+                    Schema.DescribeFieldResult fieldDescribe = LimitsService.FIELD_MAP.get(filter.fieldName);
+                    if(fieldDescribe != null) {
+                        String fullApiName = fieldDescribe.getName(); // e.g., "pharos__DataStorageMB__c"
+                        fieldsToMonitor.add(fullApiName);
+                    }
                 }
             }
         }
@@ -378,15 +395,25 @@ public with sharing class MonitoringUtil {
         // Get the list of fields to monitor based on rule filters
         Set<String> fieldsToMonitor = getFieldsToMonitorForSpike(rule);
         
-        // 3. Calculate current percentages
+        // Build reverse map: full API name -> limitKey (for efficient lookup)
+        Map<String, String> fullApiNameToLimitKey = new Map<String, String>();
         for(String limitKey : LimitsService.FIELD_MAP.keySet()) {
             Schema.DescribeFieldResult fieldDescribe = LimitsService.FIELD_MAP.get(limitKey);
-            String fieldName = fieldDescribe.getName();
+            String fullApiName = fieldDescribe.getName();
+            fullApiNameToLimitKey.put(fullApiName, limitKey);
+        }
+        
+        // 3. Calculate current percentages
+        // If filters exist, iterate only over filtered fields; otherwise iterate over all fields
+        Set<String> fieldsToProcess = fieldsToMonitor.isEmpty() 
+            ? fullApiNameToLimitKey.keySet() 
+            : fieldsToMonitor;
+        
+        for(String fieldName : fieldsToProcess) {
+            String limitKey = fullApiNameToLimitKey.get(fieldName);
+            if(limitKey == null) continue; // Skip if field not found in FIELD_MAP
             
-            // Skip fields that are not in the filter (if filters exist)
-            if(!fieldsToMonitor.isEmpty() && !fieldsToMonitor.contains(fieldName)) {
-                continue;
-            }
+            Schema.DescribeFieldResult fieldDescribe = LimitsService.FIELD_MAP.get(limitKey);
             
             // Get current usage from limits record only if field was queried
             Map<String, Object> populated = latestLog.Limits__r.getPopulatedFieldsAsMap();
@@ -405,8 +432,34 @@ public with sharing class MonitoringUtil {
                 Decimal usage = Decimal.valueOf(String.valueOf(currentUsage));
                 Decimal currentPercentage = (usage / orgLimit.getLimit()) * 100;
                 
-                // 4. Check against threshold
-                if(currentPercentage >= rule.threshold) {
+                // 4. Check against threshold using rule's comparison operator
+                Boolean meetsThreshold = false;
+                switch on RuleUtil.MAP_COMPARISON_OPERATOR_BY_STRING.get(rule.comparisonOperator) {
+                    when EQUAL {
+                        meetsThreshold = currentPercentage == rule.threshold;
+                    }
+                    when NOT_EQUAL {
+                        meetsThreshold = currentPercentage != rule.threshold;
+                    }
+                    when GREATER_THAN {
+                        meetsThreshold = currentPercentage > rule.threshold;
+                    }
+                    when GREATER_OR_EQUAL {
+                        meetsThreshold = currentPercentage >= rule.threshold;
+                    }
+                    when LESS_THAN {
+                        meetsThreshold = currentPercentage < rule.threshold;
+                    }
+                    when LESS_OR_EQUAL {
+                        meetsThreshold = currentPercentage <= rule.threshold;
+                    }
+                    when else {
+                        // Default to GREATER_OR_EQUAL for backward compatibility
+                        meetsThreshold = currentPercentage >= rule.threshold;
+                    }
+                }
+                
+                if(meetsThreshold) {
                     // Mark this field as triggered for the rule
                     if(rule.groupValues == null) {
                         rule.groupValues = new Map<Integer, Map<String, Decimal>>();
@@ -692,6 +745,9 @@ public with sharing class MonitoringUtil {
                     when EXTERNAL_ARCHIVAL {
                         newEventAction.Delivered_to__c = ConfigUtil.EVENT_ACTION_DELIVERED_TO_SPLUNK;
                     }
+                    when WEBHOOK {
+                        newEventAction.Delivered_to__c = ConfigUtil.EVENT_ACTION_DELIVERED_TO_WEBHOOK + action.fields.Webhook_URL__c;
+                    }
                 }
 
                 if ((RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.SLACK
@@ -706,7 +762,8 @@ public with sharing class MonitoringUtil {
                     || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.PAGERDUTY && PermissionsUtil.PagerDutyIntegrationEnabled)
                     || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.REMOVAL && PermissionsUtil.ArchivalEnabled)
                     || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.ARCHIVAL_TO_BIG_OBJECT && PermissionsUtil.ArchivalEnabled)
-                    || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.EXTERNAL_ARCHIVAL && PermissionsUtil.SplunkIntegrationEnabled)) {
+                    || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.EXTERNAL_ARCHIVAL && PermissionsUtil.SplunkIntegrationEnabled)
+                    || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.WEBHOOK && PermissionsUtil.WebhookIntegrationEnabled)) {
 
                     newEventActions.add(newEventAction);
                 }

@@ -252,6 +252,15 @@ public class EventMonitoringProcessors {
                     Boolean isMatch = config.evaluateValue(value, fieldMetadataConfig);
                     if (isMatch) {
                         Log__c logRecord = createLogRecord(metric, value, config, event);
+
+                        if (event instanceof EventLogProcessors.ApexUnexpectedExceptionData 
+                            && String.isNotBlank(logRecord?.Async_Job_Id__c)
+                            && !PermissionsUtil.AsyncProcessErrorTracking) {
+                            
+                            // Skip log creation for Async Apex Job logs if AsyncProcessErrorTracking is disabled
+                            continue;
+                        }
+
                         if (logRecord != null) {
                             matches.add(logRecord);
                             // Use the new global tracking method instead of simple increment
@@ -522,12 +531,25 @@ public class EventMonitoringProcessors {
                 }
             }
 
-            return super.baseLogBuilder(metric, value, config, event)
+            String asyncApexJobId = ApexExceptionParser.extractAsyncApexJobId(unexpectedExceptionData.exceptionMessage);
+
+            // Extract clean stacktrace from enhanced format (removes "caused by:" prefix)
+            // This ensures consistent format matching email logs and avoids normalization issues
+            String cleanStacktrace = LogService.extractCleanStacktrace(unexpectedExceptionData.stackTrace);
+
+            LogBuilder logBuilder = super.baseLogBuilder(metric, value, config, event)
                 .summary(summary)
                 .details(String.valueOf(value))
-                .stackTrace(unexpectedExceptionData.stackTrace)
+                .stackTrace(cleanStacktrace)
                 .type(logType)
                 .createIssue();
+
+            // Add Async Job ID if extracted
+            if (String.isNotBlank(asyncApexJobId)) {
+                logBuilder.attribute(Schema.SObjectType.Log__c.fields.Async_Job_Id__c.getName(), asyncApexJobId);
+            }
+
+            return logBuilder;
         }
     }
 

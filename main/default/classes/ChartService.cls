@@ -159,7 +159,7 @@ public with sharing class ChartService {
 	}
 
 	public static List<AdminService.MergeField> getChartsFields() {
-		return new List<AdminService.MergeField> {
+		List<AdminService.MergeField> chartFields = new List<AdminService.MergeField> {
 			//Issue object
 			new AdminService.MergeField(
 				CHART_PREFIX_Label + ' -> ' + ISSUE_CHART_USER_IMPACT_LAST_7_DAYS_DETAILS,
@@ -208,6 +208,13 @@ public with sharing class ChartService {
 				false
 			)
 		};
+		
+		// Mark all chart fields as update-only (not available for Create rules)
+		for (AdminService.MergeField chartField : chartFields) {
+			chartField.setIsUpdateOnly(true);
+		}
+		
+		return chartFields;
 	}
 
 	private static final String ALL_RELATED_OPTION = 'All';

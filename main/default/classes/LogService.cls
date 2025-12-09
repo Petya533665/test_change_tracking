@@ -992,6 +992,41 @@ global with sharing class LogService {
         return normalized;
     }
 
+    /**
+     * Extract clean stacktrace lines from enhanced stacktrace format
+     * Removes "caused by:" prefix and exception type prefixes, extracts only actual stacktrace lines
+     * This ensures consistent format matching email logs
+     * Only processes enhanced stacktraces (with "caused by:" prefix), leaves simple stacktraces unchanged
+     * @param enhancedStacktrace The enhanced stacktrace from event logs (may include "caused by:" prefix)
+     * @return Clean stacktrace string with only the actual stacktrace lines
+     */
+    public static String extractCleanStacktrace(String enhancedStacktrace) {
+        if (String.isBlank(enhancedStacktrace)) {
+            return enhancedStacktrace;
+        }
+        
+        // Check if this is an enhanced stacktrace (has "caused by:" prefix)
+        // If not, return as-is (it's already in the correct format)
+        if (!PATTERN_CAUSED_BY.matcher(enhancedStacktrace).find() && 
+            !PATTERN_SYSTEM_EXCEPTION.matcher(enhancedStacktrace).find()) {
+            // Simple stacktrace format - return as-is
+            return enhancedStacktrace;
+        }
+        
+        // Normalize to remove prefixes
+        String normalized = normalizeStacktraceForHashing(enhancedStacktrace);
+        
+        // Extract only the stacktrace lines (Class.xxx or Trigger.xxx)
+        List<String> stackTraceLines = ApexExceptionParser.getStackTraceLines(normalized, ApexExceptionParser.PATTERN_CLASS_2);
+        
+        if (stackTraceLines.isEmpty()) {
+            return normalized;
+        }
+        
+        // Join the lines with newlines to create clean stacktrace
+        return String.join(stackTraceLines, '\n');
+    }
+
     public static Log__c calculateHashes(Log__c log) {
 
         String valueForHash1;
@@ -1009,7 +1044,12 @@ global with sharing class LogService {
             firstLineStacktrace = ApexExceptionParser.getFirstStacktraceLine(stackTraceUniqueLines);
             lastLineStacktrace = ApexExceptionParser.getLastStacktraceLine(stackTraceUniqueLines);
         }
-        valueForHash1 = (!stackTraceUniqueLines?.isEmpty()) ? (JSON.serialize(stackTraceUniqueLines) + logSummary) : log.Details__c;
+        
+        // Sort stacktrace lines before JSON serialization to ensure consistent hash generation
+        // Set iteration order is not guaranteed, so we must sort to get consistent JSON
+        List<String> sortedStackTraceLines = new List<String>(stackTraceUniqueLines);
+        sortedStackTraceLines.sort();
+        valueForHash1 = (!stackTraceUniqueLines?.isEmpty()) ? (JSON.serialize(sortedStackTraceLines) + logSummary) : log.Details__c;
         valueForHash2 = (!stackTraceUniqueLines?.isEmpty()) ? (firstLineStacktrace + lastLineStacktrace + logSummary) : log.Stacktrace__c;
         valueForHash3 = (!stackTraceUniqueLines?.isEmpty()) ? (lastLineStacktrace + logSummary) : log.Apex_Name__c;
 

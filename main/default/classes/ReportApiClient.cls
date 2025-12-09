@@ -118,7 +118,7 @@ public with sharing class ReportApiClient {
     public HttpResponse getResponse() {
         return this.response;
     }
-    
+
     /**
      * @description Checks if the API call was successful based on the HTTP status code.
      * 
@@ -127,7 +127,7 @@ public with sharing class ReportApiClient {
     public Boolean isSuccess() {
         return this.response != null && this.response.getStatusCode() >= 200 && this.response.getStatusCode() < 300;
     }
-    
+
     /**
      * @description Gets the response body as a string from the API call.
      * 
@@ -136,7 +136,7 @@ public with sharing class ReportApiClient {
     public String getResponseBody() {
         return this.response != null ? this.response.getBody() : null;
     }
-    
+
     /**
      * @description Gets the HTTP status code from the API response.
      * 
@@ -201,7 +201,7 @@ public with sharing class ReportApiClient {
         if (String.isBlank(operator)) {
             throw new IllegalArgumentException('Operator parameter cannot be blank');
         }
-        
+
         return new Map<String, Object>{
             'column' => column,
             'operator' => operator,
@@ -228,22 +228,21 @@ public with sharing class ReportApiClient {
      */
     public static List<Map<String, Object>> createDateRangeFilters(String column, DateTime startDateTime, DateTime endDateTime) {
         List<Map<String, Object>> filters = new List<Map<String, Object>>();
-        
+
         if (String.isBlank(column)) {
             throw new IllegalArgumentException('Column parameter cannot be blank');
         }
-        
+
         if (startDateTime != null) {
             filters.add(createFilter(column, 'greaterOrEqual', startDateTime));
         }
-        
+
         if (endDateTime != null) {
             filters.add(createFilter(column, 'lessOrEqual', endDateTime));
         }
-        
+
         return filters;
     }
-
 
 
     /**

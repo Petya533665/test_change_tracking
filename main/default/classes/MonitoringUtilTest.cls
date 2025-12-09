@@ -4483,13 +4483,11 @@ public class MonitoringUtilTest {
         insert limitsRule;
 
         // Create filter to monitor DailyApiRequests field for spike detection
-        // Use actual field API name from schema to handle namespace correctly
-        String apiFieldName = Schema.SObjectType.Limits__c.fields.DailyApiRequests__c.getName();
-        
+        // Use key from LimitsService.FIELD_MAP (e.g., "DailyApiRequests")
         RuleFilter__c apiRequestsFilter = new RuleFilter__c(
             Rule__c = limitsRule.Id,
             Index__c = 1,
-            FieldName__c = apiFieldName,
+            FieldName__c = 'DailyApiRequests',
             ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
             Value__c = '1',
             Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
@@ -4607,7 +4605,7 @@ public class MonitoringUtilTest {
         RuleFilter__c ruleFilter = new RuleFilter__c(
             Rule__c = limitsRule.Id,
             Index__c = 1,
-            FieldName__c = Schema.SObjectType.Limits__c.fields.DataStorageMB__c.getName(),
+            FieldName__c = 'DataStorageMB',
             ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
             Value__c = '80%', // Alert when data storage >= 80% of org limit
             Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
@@ -4704,7 +4702,7 @@ public class MonitoringUtilTest {
         RuleFilter__c ruleFilter = new RuleFilter__c(
             Rule__c = limitsRule.Id,
             Index__c = 1,
-            FieldName__c = Schema.SObjectType.Limits__c.fields.DailyApiRequests__c.getName(),
+            FieldName__c = 'DailyApiRequests',
             ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_THEN,
             Value__c = '10000', // Much higher than our test value of 100
             Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
@@ -4793,12 +4791,12 @@ public class MonitoringUtilTest {
         insert limitsRule;
 
         // Create filters to monitor specific fields for spike detection
-        // Use actual field API names from schema to handle namespace correctly
+        // Use keys from LimitsService.FIELD_MAP (e.g., "DailyApiRequests", "DataStorageMB", "FileStorageMB")
         List<RuleFilter__c> filters = new List<RuleFilter__c>{
             new RuleFilter__c(
                 Rule__c = limitsRule.Id,
                 Index__c = 1,
-                FieldName__c = Schema.SObjectType.Limits__c.fields.DailyApiRequests__c.getName(),
+                FieldName__c = 'DailyApiRequests',
                 ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
                 Value__c = '1',
                 Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
@@ -4807,7 +4805,7 @@ public class MonitoringUtilTest {
             new RuleFilter__c(
                 Rule__c = limitsRule.Id,
                 Index__c = 2,
-                FieldName__c = Schema.SObjectType.Limits__c.fields.DataStorageMB__c.getName(),
+                FieldName__c = 'DataStorageMB',
                 ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
                 Value__c = '1',
                 Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
@@ -4816,7 +4814,7 @@ public class MonitoringUtilTest {
             new RuleFilter__c(
                 Rule__c = limitsRule.Id,
                 Index__c = 3,
-                FieldName__c = Schema.SObjectType.Limits__c.fields.FileStorageMB__c.getName(),
+                FieldName__c = 'FileStorageMB',
                 ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
                 Value__c = '1',
                 Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,

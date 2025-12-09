@@ -81,6 +81,11 @@ public with sharing class Constants {
         private set;
     }
 
+    public static final TraceScheduleSObject TRACE_SCHEDULE_SOBJECT { 
+        get { return TRACE_SCHEDULE_SOBJECT == null ? (TRACE_SCHEDULE_SOBJECT = new TraceScheduleSObject()) : TRACE_SCHEDULE_SOBJECT; }
+        private set;
+    }
+
     public static final UI UI { 
         get { return UI == null ? (UI = new UI()) : UI; }
         private set;
@@ -817,6 +822,16 @@ public with sharing class Constants {
     public inherited sharing class TraceResultSObject extends SObjectTypeConstants {
         private TraceResultSObject() {
             this.objectType = Trace_Result__c.SObjectType;
+        }
+    }
+
+    public inherited sharing class TraceScheduleSObject extends SObjectTypeConstants {
+        public final String STATUS_IN_PROGRESS = 'In Progress';
+        public final String STATUS_COMPLETED = 'Completed';
+        public final String STATUS_INACTIVE = 'Inactive';
+        
+        private TraceScheduleSObject() {
+            this.objectType = Trace_Schedule__c.SObjectType;
         }
     }
 

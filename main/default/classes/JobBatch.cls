@@ -42,7 +42,8 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
     }
 
     public override Boolean initialValidation() {
-        return ConfigUtil.SETTINGS.Batch_Error_Tracking_Enabled__c;
+        // Skip processing if async process error tracking is disabled
+        return PermissionsUtil.AsyncProcessErrorTracking && ConfigUtil.SETTINGS.Batch_Error_Tracking_Enabled__c;
     }
 
     public override Integer getIterationsCount() {
@@ -69,25 +70,37 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
     }
 
     public void execute(Database.BatchableContext BC, List<AsyncApexJob> scope) {
-        Set<String> hashes = new Set<String>();
+        // Phase 2 & 3: Use Async_Job_Id__c for deduplication instead of Hash_1
+        // This ensures consistency with logs created by Email/EventLog that have correct Hash_1
+        Set<String> asyncJobIds = new Set<String>();
         for (AsyncApexJob asyncApexJob : scope) {
-            hashes.add(getHash1(asyncApexJob));
+            asyncJobIds.add(asyncApexJob.Id.to15());
         }
-        List<Log__c> existLogs = getLogs(hashes);
+        List<Log__c> existLogs = getLogsByAsyncJobId(asyncJobIds);
+        Map<String, Log__c> existLogsByAsyncJobId = new Map<String, Log__c>();
+        for (Log__c existLog : existLogs) {
+            if (String.isNotBlank(existLog.Async_Job_Id__c)) {
+                existLogsByAsyncJobId.put(existLog.Async_Job_Id__c.left(15), existLog);
+            }
+        }
+        
         for (AsyncApexJob asyncApexJob : scope) {
             Log__c log;
             Boolean isInternalError = isInternalError(asyncApexJob);
-            String hash = getHash1(asyncApexJob);
-            for (Log__c existLog : existLogs) {
-                if (hash == existLog.Hash_1__c
-                        && ((asyncApexJob.CompletedDate != null
+            String asyncJobId = asyncApexJob.Id.to15();
+            
+            // Find existing log by Async_Job_Id__c and date
+            Log__c existLog = existLogsByAsyncJobId.get(asyncJobId);
+            if (existLog != null) {
+                if ((asyncApexJob.CompletedDate != null
                         && existLog.Created_At__c.dateGmt() == asyncApexJob.CompletedDate.dateGmt())
-                        || existLog.Created_At__c.dateGmt() == asyncApexJob.CreatedDate.dateGmt())) {
+                        || existLog.Created_At__c.dateGmt() == asyncApexJob.CreatedDate.dateGmt()) {
                     log = existLog;
-                    break;
                 }
             }
+            
             if (isInternalError) {
+                String hash = getHash1(asyncApexJob);
                 String hashByDate = hash + String.valueOfGmt(asyncApexJob.CompletedDate != null ? asyncApexJob.CompletedDate.dateGmt() : asyncApexJob.CreatedDate.dateGmt());
                 if (!internalLogByHash.containsKey(hashByDate)) {
                     internalLogByHash.put(hashByDate, log != null ? log : createLog(asyncApexJob, corg));
@@ -112,10 +125,11 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
         loggerInstance?.flush();
     }
 
-    private static List<Log__c> getLogs(Set<String> hashes) {
+    // Phase 3: Query logs by Async_Job_Id__c instead of Hash_1 for deduplication
+    private static List<Log__c> getLogsByAsyncJobId(Set<String> asyncJobIds) {
         String query = new QBuilder(Log__c.SObjectType)
                 .selectFields(LOG_FIELDS)
-                .add(QBuilder.condition(Log__c.Hash_1__c.getDescribe().getName()).isIn(new List<String>(hashes)))
+                .add(QBuilder.condition(Log__c.Async_Job_Id__c.getDescribe().getName()).isIn(new List<String>(asyncJobIds)))
                 .build();
         return (List<Log__c>)JSON.deserialize(JSON.serialize(
                 isPassthroughMode()
@@ -193,6 +207,7 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
     }
 
     public static void asyncApexJobHandler(List<Log__c> logs) {
+        // Get AsyncApexJob info for ALL logs
         Set<String> asyncApexJobIds = new Set<String>();
         for (Log__c log : logs) {
             asyncApexJobIds.add(log.Async_Job_Id__c.left(15));
@@ -203,6 +218,8 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
             if (String.isNotBlank(asyncApexJob.ParentJobId)) parentAsyncApexJobIds.add(asyncApexJob.ParentJobId);
         }
         Map<Id, AsyncApexJob> parentJobs = getAsyncApexJobsById(parentAsyncApexJobIds);
+        
+        // Find classes that implement RaisesPlatformEvents
         Set<String> apexClassNames = new Set<String>();
         for (Log__c log : logs) {
             AsyncApexJob asyncApexJob = getAsyncApexJob(log.Async_Job_Id__c, jobs, parentJobs);
@@ -215,25 +232,39 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
         for (ApexClass apexClass : apexClasses) {
             apexClassNamesRaisesPlatformEvents.add(apexClass.Name);
         }
+        
         List<Log__c> logsToUpsert = new List<Log__c>();
+        
         for (Log__c log : logs) {
             AsyncApexJob asyncApexJob = getAsyncApexJob(log.Async_Job_Id__c, jobs, parentJobs);
             if (asyncApexJob != null) {
                 Boolean isInternalError = isInternalError(asyncApexJob);
+                // Skip if internal error or class implements RaisesPlatformEvents
                 if (!isInternalError && !apexClassNamesRaisesPlatformEvents.contains(asyncApexJob.ApexClass.Name)) {
-                    PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Async_Job_Id__c, asyncApexJob.Id.to15());
-                    PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Area__c, getArea(asyncApexJob));
-                    PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Hash__c, getHash(asyncApexJob));
-                    PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Hash_1__c, getHash1(asyncApexJob));
-                    PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Hash_2__c, getHash2(asyncApexJob));
-                    PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Hash_3__c, getHash3(asyncApexJob));
-                    logsToUpsert.add(log);
+                    // Logs WITH stacktrace: upsert without Hash_1 modification
+                    // Logs WITHOUT stacktrace: calculate Hash_1 from AsyncApexJob
+                    if (String.isNotBlank(log.Stacktrace__c)) {
+                        // Has stacktrace - preserve existing Hash_1
+                        logsToUpsert.add(log);
+                    } else {
+                        // No stacktrace - calculate Hash_1 from AsyncApexJob
+                        PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Async_Job_Id__c, asyncApexJob.Id.to15());
+                        PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Area__c, getArea(asyncApexJob));
+                        PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Hash__c, getHash(asyncApexJob));
+                        PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Hash_1__c, getHash1(asyncApexJob));
+                        PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Hash_2__c, getHash2(asyncApexJob));
+                        PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Hash_3__c, getHash3(asyncApexJob));
+                        logsToUpsert.add(log);
+                    }
                 }
             } else {
                 logsToUpsert.add(log);
             }
         }
-        if (!logsToUpsert.isEmpty()) upsertLogs(logsToUpsert, Logger.getInstance());
+        
+        if (!logsToUpsert.isEmpty()) {
+            upsertLogs(logsToUpsert, Logger.getInstance());
+        }
     }
 
     public static Map<Id, AsyncApexJob> getAsyncApexJobsById(Set<String> asyncApexJobIds) {
