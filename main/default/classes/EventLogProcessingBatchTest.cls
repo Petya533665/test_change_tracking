@@ -1283,16 +1283,34 @@ private class EventLogProcessingBatchTest {
         String csvHeader = '"EXCEPTION_CATEGORY","EXCEPTION_MESSAGE","EXCEPTION_TYPE","STACK_TRACE",' +
                           '"REQUEST_ID","ORGANIZATION_ID","USER_ID","USER_ID_DERIVED","TIMESTAMP_DERIVED",' +
                           '"TIMESTAMP","HASH_1"';
-        
+
         DateTime testTime = DateTime.now();
         String formattedTiming = testTime.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
         String timestampFormat = testTime.formatGMT('yyyyMMddHHmmss') + '.000';
-        
+
         String csvData = '"APEX_CODE","List index out of bounds: 0","System.ListException",' +
                         '"Class.TestClass.processData: line 15\\nClass.TestClass.execute: line 5",' +
                         '"REQ-TEST-001","00D123456789012345","005xx000001234A","005xx000001234A",' +
                         '"' + formattedTiming + '","' + timestampFormat + '","TEST-HASH-001"';
-        
+
+        return csvHeader + '\n' + csvData;
+    }
+
+    private static String generateApexUnexpectedExceptionWithJobIdCsvData() {
+        String csvHeader = '"EXCEPTION_CATEGORY","EXCEPTION_MESSAGE","EXCEPTION_TYPE","STACK_TRACE",' +
+                          '"REQUEST_ID","ORGANIZATION_ID","USER_ID","USER_ID_DERIVED","TIMESTAMP_DERIVED",' +
+                          '"TIMESTAMP"';
+
+        DateTime testTime = DateTime.now();
+        String formattedTiming = testTime.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String timestampFormat = testTime.formatGMT('yyyyMMddHHmmss') + '.000';
+
+        // Test message with job ID pattern: "for job id '707gL00000PvD5s'"
+        String csvData = '"APEX_CODE","Developer script exception from 2.217S : \'pharos.MonitoringBatch\' for job id \'707gL00000PvD5s\' : Attempt to de-reference a null object","System.NullPointerException",' +
+                        '"Class.pharos.MonitoringBatch.execute: line 15",' +
+                        '"REQ-JOBID-001","00D123456789012345","005xx000001234A","005xx000001234A",' +
+                        '"' + formattedTiming + '","' + timestampFormat + '"';
+
         return csvHeader + '\n' + csvData;
     }
 
@@ -2735,6 +2753,359 @@ private class EventLogProcessingBatchTest {
     }
     
     @IsTest
+    static void testDeduplicationWithEnhancedStacktrace() {
+        // Test that verifies deduplication works when:
+        // 1. Log1 exists in DB with simple stacktrace (like email logs)
+        // 2. Log2 comes from CSV with enhanced stacktrace (with "caused by:" prefix)
+        // Both should get the same Hash_1__c and be deduplicated
+        
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+        
+        // Create existing log with simple stacktrace (like email logs)
+        String simpleStacktrace = 'Class.TestBatchTwo.execute: line 8, column 1';
+        String exceptionMessage = 'List index out of bounds: 0';
+        
+        Log__c existingLog = new Log__c(
+            Summary__c = exceptionMessage,
+            Details__c = exceptionMessage,
+            Stacktrace__c = simpleStacktrace,
+            Created_At__c = DateTime.now().addSeconds(-10),
+            Organization_Id__c = UserInfo.getOrganizationId(),
+            Type__c = 'System.ListException',
+            Category__c = 'Error',
+            Area__c = 'Apex'
+        );
+        insert existingLog;
+        
+        // Calculate hash for existing log
+        LogService.calculateHashes(existingLog);
+        update existingLog;
+        
+        String existingHash1 = existingLog.Hash_1__c;
+        System.assertNotEquals(null, existingHash1, 'Existing log should have Hash_1__c calculated');
+        
+        // Create CSV with enhanced stacktrace (with "caused by:" prefix)
+        String enhancedStacktrace = 'caused by: System.ListException: List index out of bounds: 0\n\nClass.TestBatchTwo.execute: line 8, column 1';
+        String csvData = generateApexUnexpectedExceptionWithEnhancedStacktraceCsvData(
+            exceptionMessage, 
+            enhancedStacktrace,
+            existingLog.Created_At__c.addSeconds(1) // 1 second after existing log
+        );
+        
+        SObject testLogFile = createMockEventLogFile(eventType, csvData);
+        
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionWithRequestIdFieldNames();
+        EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionWithRequestIdFieldTypes();
+        
+        // Enable the event type
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        util.enableEventType(eventType);
+        
+        Integer logsBefore = [SELECT COUNT() FROM Log__c];
+        
+        Test.startTest();
+        EventLogProcessingBatch.getInstance().startBatch();
+        Test.stopTest();
+        
+        Integer logsAfter = [SELECT COUNT() FROM Log__c];
+        
+        // Verify no new log was created (deduplication worked)
+        System.assertEquals(logsBefore, logsAfter, 
+            'No new log should be created - enhanced stacktrace should match simple stacktrace and be deduplicated');
+        
+        // Verify the existing log still has the same hash
+        Log__c updatedExistingLog = [SELECT Id, Hash_1__c, Stacktrace__c FROM Log__c WHERE Id = :existingLog.Id];
+        System.assertEquals(existingHash1, updatedExistingLog.Hash_1__c, 
+            'Existing log Hash_1__c should remain unchanged');
+        
+        // Verify that if we calculate hash for enhanced stacktrace, it matches
+        Log__c testLogForEnhanced = new Log__c(
+            Summary__c = exceptionMessage,
+            Details__c = exceptionMessage,
+            Stacktrace__c = enhancedStacktrace
+        );
+        LogService.calculateHashes(testLogForEnhanced);
+        
+        System.assertEquals(existingHash1, testLogForEnhanced.Hash_1__c, 
+            'Enhanced stacktrace should produce the same Hash_1__c as simple stacktrace');
+        
+        // Verify the stacktrace was cleaned (extractCleanStacktrace should remove "caused by:" prefix)
+        String cleanedStacktrace = LogService.extractCleanStacktrace(enhancedStacktrace);
+        System.assertEquals(simpleStacktrace, cleanedStacktrace, 
+            'extractCleanStacktrace should remove "caused by:" prefix and match simple stacktrace');
+    }
+
+    @IsTest
+    static void testDeduplicationWithSimpleLogFromJobBatch() {
+        // Test that verifies deduplication works when:
+        // 1. JobBatch creates a simple log (no stacktrace, has Async_Job_Id__c)
+        // 2. EventLogProcessingBatch processes event with same Summary but different Hash_1
+        // 3. findAndUpdateSimpleLogs should find the simple log by Summary and update it
+        // 4. Hash_1 should be recalculated correctly with stacktrace
+        
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+        
+        // Create simple log (like from JobBatch - no stacktrace, has Async_Job_Id)
+        String exceptionMessage = 'List index out of bounds: 0';
+        DateTime simpleLogTime = DateTime.now().addSeconds(-10);
+        
+        Log__c simpleLog = new Log__c(
+            Summary__c = exceptionMessage,
+            Details__c = exceptionMessage + '\n\nClass: TestBatchTwo',
+            Stacktrace__c = null,  // No stacktrace (simple log from JobBatch)
+            Async_Job_Id__c = '707000000000010',  // Has Async_Job_Id (created by JobBatch)
+            Created_At__c = simpleLogTime,
+            Organization_Id__c = UserInfo.getOrganizationId(),
+            Type__c = 'Queueable',
+            Category__c = 'Apex',
+            Area__c = 'Async Apex',
+            Hash_1__c = 'simple_hash_from_jobbatch_different_formula'  // Different hash (JobBatch uses different formula)
+        );
+        insert simpleLog;
+        
+        String originalHash1 = simpleLog.Hash_1__c;
+        System.assert(String.isBlank(simpleLog.Stacktrace__c), 'Simple log should have no stacktrace');
+        System.assertNotEquals(null, simpleLog.Async_Job_Id__c, 'Simple log should have Async_Job_Id__c');
+        
+        // Create CSV with full stacktrace (from EventLog)
+        String fullStacktrace = 'caused by: System.ListException: List index out of bounds: 0\n\nClass.TestBatchTwo.execute: line 8, column 1';
+        String csvData = generateApexUnexpectedExceptionForSimpleLogDedup(
+            exceptionMessage, 
+            fullStacktrace,
+            simpleLogTime.addSeconds(1)  // 1 second after simple log
+        );
+        
+        SObject testLogFile = createMockEventLogFile(eventType, csvData);
+        
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionWithRequestIdFieldNames();
+        EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionWithRequestIdFieldTypes();
+        
+        // Enable the event type
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        util.enableEventType(eventType);
+        
+        Integer logsBefore = [SELECT COUNT() FROM Log__c];
+        
+        Test.startTest();
+        EventLogProcessingBatch.getInstance().startBatch();
+        Test.stopTest();
+        
+        Integer logsAfter = [SELECT COUNT() FROM Log__c];
+        
+        // Verify no new log was created (simple log was found and updated instead)
+        System.assertEquals(logsBefore, logsAfter, 
+            'No new log should be created - simple log should be found by Summary and updated');
+        
+        // Verify the simple log was updated with stacktrace
+        Log__c updatedLog = [
+            SELECT Id, Hash_1__c, Stacktrace__c, Summary__c, Async_Job_Id__c, 
+                   Request_Id_External__c, Post_Processing_Status__c 
+            FROM Log__c 
+            WHERE Id = :simpleLog.Id
+        ];
+        
+        System.assertNotEquals(null, updatedLog.Stacktrace__c, 
+            'Simple log should now have stacktrace from EventLog');
+        System.assert(updatedLog.Stacktrace__c.contains('TestBatchTwo.execute'), 
+            'Stacktrace should contain the class name');
+        System.assertNotEquals(originalHash1, updatedLog.Hash_1__c, 
+            'Hash_1 should be recalculated with correct formula (including stacktrace)');
+        System.assertEquals(exceptionMessage, updatedLog.Summary__c, 
+            'Summary should remain unchanged');
+        System.assertEquals('707000000000010', updatedLog.Async_Job_Id__c, 
+            'Async_Job_Id__c should remain unchanged');
+        System.assertNotEquals(null, updatedLog.Request_Id_External__c, 
+            'Request_Id_External__c should be populated from EventLog');
+        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED, updatedLog.Post_Processing_Status__c,
+            'Post_Processing_Status should be NEEDED for post-processing');
+    }
+
+    @IsTest
+    static void testDeduplicationSimpleLogNotFoundWhenHasStacktrace() {
+        // Test that verifies logs with existing stacktrace are NOT matched by findAndUpdateSimpleLogs
+        // Only simple logs (no stacktrace) should be matched
+        
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+        
+        // Create log WITH stacktrace (should NOT be matched by findAndUpdateSimpleLogs)
+        String exceptionMessage = 'Divide by 0';
+        DateTime logTime = DateTime.now().addSeconds(-10);
+        
+        Log__c logWithStacktrace = new Log__c(
+            Summary__c = exceptionMessage,
+            Details__c = exceptionMessage,
+            Stacktrace__c = 'Class.Calculator.divide: line 5, column 1',  // Has stacktrace
+            Async_Job_Id__c = '707000000000011',
+            Created_At__c = logTime,
+            Organization_Id__c = UserInfo.getOrganizationId(),
+            Type__c = 'Queueable',
+            Category__c = 'Apex',
+            Area__c = 'Async Apex',
+            Hash_1__c = 'hash_with_stacktrace'
+        );
+        insert logWithStacktrace;
+        
+        String originalHash1 = logWithStacktrace.Hash_1__c;
+        
+        // Create CSV with same Summary but different stacktrace
+        String newStacktrace = 'caused by: System.MathException: Divide by 0\n\nClass.Calculator.divide: line 10, column 1';
+        String csvData = generateApexUnexpectedExceptionForSimpleLogDedup(
+            exceptionMessage, 
+            newStacktrace,
+            logTime.addSeconds(1)
+        );
+        
+        SObject testLogFile = createMockEventLogFile(eventType, csvData);
+        
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionWithRequestIdFieldNames();
+        EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionWithRequestIdFieldTypes();
+        
+        // Enable the event type
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        util.enableEventType(eventType);
+        
+        Integer logsBefore = [SELECT COUNT() FROM Log__c];
+        
+        Test.startTest();
+        EventLogProcessingBatch.getInstance().startBatch();
+        Test.stopTest();
+        
+        Integer logsAfter = [SELECT COUNT() FROM Log__c];
+        
+        // Verify the existing log was NOT updated (it already has stacktrace)
+        Log__c unchangedLog = [SELECT Id, Hash_1__c, Stacktrace__c FROM Log__c WHERE Id = :logWithStacktrace.Id];
+        System.assertEquals(originalHash1, unchangedLog.Hash_1__c, 
+            'Hash_1 should remain unchanged for log with existing stacktrace');
+        System.assertEquals('Class.Calculator.divide: line 5, column 1', unchangedLog.Stacktrace__c, 
+            'Stacktrace should remain unchanged');
+        
+        // A new log might be created since findAndUpdateSimpleLogs won't match this one
+        // (depends on other dedup logic with Hash_1)
+    }
+
+    @IsTest
+    static void testDeduplicationSimpleLogRequiresAsyncJobId() {
+        // Test that verifies findAndUpdateSimpleLogs only matches logs with Async_Job_Id__c
+        // Logs without Async_Job_Id__c should NOT be matched (they weren't created by JobBatch)
+        
+        PermissionsUtil.EventMonitoringEnabled = true;
+        setupTestDataSettings();
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+        
+        // Create log WITHOUT Async_Job_Id__c (should NOT be matched by findAndUpdateSimpleLogs)
+        String exceptionMessage = 'Unique error without async job id';
+        DateTime logTime = DateTime.now().addSeconds(-10);
+        
+        Log__c logWithoutAsyncJobId = new Log__c(
+            Summary__c = exceptionMessage,
+            Details__c = exceptionMessage,
+            Stacktrace__c = null,  // No stacktrace
+            Async_Job_Id__c = null,  // No Async_Job_Id (not from JobBatch)
+            Created_At__c = logTime,
+            Organization_Id__c = UserInfo.getOrganizationId(),
+            Type__c = 'Error',
+            Category__c = 'Apex',
+            Area__c = 'Error',
+            Hash_1__c = 'log_without_async_job_id'
+        );
+        insert logWithoutAsyncJobId;
+        
+        String originalHash1 = logWithoutAsyncJobId.Hash_1__c;
+        
+        // Create CSV with same Summary
+        String stacktrace = 'caused by: System.CustomException: Unique error without async job id\n\nClass.Test.method: line 1, column 1';
+        String csvData = generateApexUnexpectedExceptionForSimpleLogDedup(
+            exceptionMessage, 
+            stacktrace,
+            logTime.addSeconds(1)
+        );
+        
+        SObject testLogFile = createMockEventLogFile(eventType, csvData);
+        
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionWithRequestIdFieldNames();
+        EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionWithRequestIdFieldTypes();
+        
+        // Enable the event type
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        util.enableEventType(eventType);
+        
+        Integer logsBefore = [SELECT COUNT() FROM Log__c];
+        
+        Test.startTest();
+        EventLogProcessingBatch.getInstance().startBatch();
+        Test.stopTest();
+        
+        // Verify the existing log was NOT updated (it has no Async_Job_Id__c)
+        Log__c unchangedLog = [SELECT Id, Hash_1__c, Stacktrace__c FROM Log__c WHERE Id = :logWithoutAsyncJobId.Id];
+        System.assertEquals(originalHash1, unchangedLog.Hash_1__c, 
+            'Hash_1 should remain unchanged for log without Async_Job_Id__c');
+        System.assert(String.isBlank(unchangedLog.Stacktrace__c), 
+            'Stacktrace should remain blank');
+    }
+    
+    /**
+     * Helper method to generate CSV data for simple log deduplication tests
+     */
+    private static String generateApexUnexpectedExceptionForSimpleLogDedup(
+        String exceptionMessage, 
+        String stacktrace,
+        DateTime timestamp
+    ) {
+        String csvHeader = '"EXCEPTION_CATEGORY","EXCEPTION_MESSAGE","EXCEPTION_TYPE","STACK_TRACE",' +
+                          '"REQUEST_ID","ORGANIZATION_ID","USER_ID","USER_ID_DERIVED","TIMESTAMP_DERIVED",' +
+                          '"TIMESTAMP"';
+        
+        String formattedTiming = timestamp.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String timestampFormat = timestamp.formatGMT('yyyyMMddHHmmss') + '.000';
+        
+        // Escape newlines in stacktrace for CSV
+        String escapedStacktrace = stacktrace.replace('\n', '\\n');
+        
+        String csvData = '"APEX_CODE","' + exceptionMessage + '","System.ListException",' +
+                        '"' + escapedStacktrace + '",' +
+                        '"REQ-SIMPLE-LOG-DEDUP-001","00D123456789012345","005xx000001234A","005xx000001234A",' +
+                        '"' + formattedTiming + '","' + timestampFormat + '"';
+        
+        return csvHeader + '\n' + csvData;
+    }
+    
+    /**
+     * Helper method to generate CSV data with enhanced stacktrace format
+     */
+    private static String generateApexUnexpectedExceptionWithEnhancedStacktraceCsvData(
+        String exceptionMessage, 
+        String enhancedStacktrace,
+        DateTime timestamp
+    ) {
+        String csvHeader = '"EXCEPTION_CATEGORY","EXCEPTION_MESSAGE","EXCEPTION_TYPE","STACK_TRACE",' +
+                          '"REQUEST_ID","ORGANIZATION_ID","USER_ID","USER_ID_DERIVED","TIMESTAMP_DERIVED",' +
+                          '"TIMESTAMP"';
+        
+        String formattedTiming = timestamp.formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'');
+        String timestampFormat = timestamp.formatGMT('yyyyMMddHHmmss') + '.000';
+        
+        // Escape newlines in stacktrace for CSV
+        String escapedStacktrace = enhancedStacktrace.replace('\n', '\\n');
+        
+        String csvData = '"APEX_CODE","' + exceptionMessage + '","System.ListException",' +
+                        '"' + escapedStacktrace + '",' +
+                        '"REQ-ENHANCED-STACKTRACE-001","00D123456789012345","005xx000001234A","005xx000001234A",' +
+                        '"' + formattedTiming + '","' + timestampFormat + '"';
+        
+        return csvHeader + '\n' + csvData;
+    }
+
+    @IsTest
     static void test_csv_timestamp_parsing_fix() {
         // Test to verify the fix for CSV timestamp parsing issue
         // After the fix, logs should get different Created_At__c values from TIMESTAMP_DERIVED
@@ -3136,4 +3507,68 @@ private class EventLogProcessingBatchTest {
         return 'Text,Text,Text,Text,Text,Text,Text,Text,Text,DateTime,Text';
     }
 
+    @IsTest
+    static void testApexUnexpectedExceptionWithJobIdExtraction() {
+        PermissionsUtil.EventMonitoringEnabled = true;
+        PermissionsUtil.AsyncProcessErrorTracking = true;
+        setupTestDataSettings();
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        util.enableEventType(eventType);
+
+        // Create test data with job ID in the exception message
+        String csvData = generateApexUnexpectedExceptionWithJobIdCsvData();
+        SObject testLogFile = createMockEventLogFile(eventType, csvData);
+
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionWithRequestIdFieldNames();
+        EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionWithRequestIdFieldTypes();
+
+        Test.startTest();
+        EventLogProcessingBatch.getInstance().startBatch();
+        Test.stopTest();
+
+        // Verify log properties for ApexUnexpectedException with job ID extraction
+        List<Log__c> logs = [SELECT Id, Area__c, Summary__c, Details__c, Type__c, Stacktrace__c, Request_Id_External__c, Async_Job_Id__c FROM Log__c];
+        System.assertEquals(1, logs.size(), 'One log should be created');
+        Log__c log = logs[0];
+        // For EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION, the area should be 'Apex' based on EventMonitoringProcessors metadata
+        EventMonitoringProcessors.EventTypeMetadata expectedMetadata = EventMonitoringProcessors.EVENT_TYPE_METADATA.get(eventType);
+        System.assertEquals(expectedMetadata.area, log.Area__c, 'Area should match expected metadata');
+        System.assertEquals('Attempt to de-reference a null object', log.Summary__c, 'Summary should be cleaned');
+        System.assert(log.Details__c.contains('for job id'), 'Details should contain the job id reference');
+        // Type is set to 'System.' + exceptionCategory, where exceptionCategory is 'APEX_CODE' from the CSV
+        System.assertEquals('System.APEX_CODE', log.Type__c, 'Type should be System.APEX_CODE');
+        System.assert(log.Stacktrace__c.contains('Class.pharos.MonitoringBatch.execute'), 'Stacktrace should be correct');
+        System.assertEquals('REQ-JOBID-001', log.Request_Id_External__c, 'Request ID should be set');
+        System.assertEquals('707gL00000PvD5s'.left(15), log.Async_Job_Id__c, 'Async Job ID should be extracted and set');
+    }
+
+    @IsTest
+    static void testApexUnexpectedExceptionSkipsWhenAsyncProcessErrorTrackingDisabled() {
+        PermissionsUtil.EventMonitoringEnabled = true;
+        PermissionsUtil.AsyncProcessErrorTracking = false; // Disable the permission
+        setupTestDataSettings();
+        String eventType = EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION;
+
+        EventMonitoringUtil util = new EventMonitoringUtil();
+        util.enableEventType(eventType);
+
+        // Create test data with job ID in the exception message
+        String csvData = generateApexUnexpectedExceptionWithJobIdCsvData();
+        SObject testLogFile = createMockEventLogFile(eventType, csvData);
+
+        EventMonitoringUtil.testEventLogs = new List<SObject>{testLogFile};
+        EventLogProcessors.testEventLogFieldNames = generateApexUnexpectedExceptionWithRequestIdFieldNames();
+        EventLogProcessors.testEventLogFieldTypes = generateApexUnexpectedExceptionWithRequestIdFieldTypes();
+
+        Test.startTest();
+        EventLogProcessingBatch.getInstance().startBatch();
+        Test.stopTest();
+
+        // Verify NO logs were created when AsyncProcessErrorTracking is disabled and job ID is present
+        List<Log__c> logs = [SELECT Id FROM Log__c];
+        System.assertEquals(0, logs.size(), 'No logs should be created when AsyncProcessErrorTracking is disabled and job ID is present');
+    }
 }

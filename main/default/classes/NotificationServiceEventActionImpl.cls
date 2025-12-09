@@ -46,7 +46,9 @@ public with sharing class NotificationServiceEventActionImpl extends Notificatio
                 Event__r.Records__c, Event__r.Grouped_Field_Values__c,
                 Event__r.Rule__r.EventTimeInterval__c, Event__r.CreatedDate,
                 Action__r.PagerDuty_Type__c, Action__r.Contact__c, Action__r.Additional_Metadata__c,
-                Action__r.Action_Type__c, Action__r.SobjectType__c, Action__r.Is_Update__c
+                Action__r.Action_Type__c, Action__r.SobjectType__c, Action__r.Is_Update__c,
+                Action__r.Webhook_URL__c, Action__r.Webhook_Method__c, Action__r.Webhook_Headers__c,
+                Action__r.Webhook_Body_Template__c, Action__r.Webhook_Auth_Type__c
             FROM EventAction__c
             WHERE Executed_On__c = NULL AND Action__c != NULL
         ]);
@@ -119,6 +121,9 @@ public with sharing class NotificationServiceEventActionImpl extends Notificatio
             }
             when PAGERDUTY {
                 NotificationService.sendPagerDuty(eventAction.Event__c, eventAction.Action__r);
+            }
+            when WEBHOOK {
+                new NotificationService.WebhookActionHandler().execute(eventAction.Event__c, eventAction.Action__r);
             }
         }
     }

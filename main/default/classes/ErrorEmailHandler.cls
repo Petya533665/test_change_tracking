@@ -158,7 +158,7 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                         }
                     }
                 }
-                if (!logsToAsyncJob.isEmpty()) {
+                if (!logsToAsyncJob.isEmpty() && PermissionsUtil.AsyncProcessErrorTracking) {
                     JobBatch.asyncApexJobHandler(logsToAsyncJob);
                     // Set the lookup to the last async job log (matching behavior of createdLogs)
                     Log__c lastAsyncLog = logsToAsyncJob.get(logsToAsyncJob.size() - 1);

@@ -193,6 +193,7 @@ private class RuleExportImportServiceTest {
     
     @IsTest
     static void testImportRules() {
+        PermissionsUtil.RuleImportExport = true;
         // Store original data for comparison before any export or deletion
         Map<String, Rule__c> originalRulesByName = new Map<String, Rule__c>();
         List<String> ruleIds = new List<String>();
@@ -275,6 +276,7 @@ private class RuleExportImportServiceTest {
 
     @IsTest
     static void testImportRulesWithInvalidJson() {
+        PermissionsUtil.RuleImportExport = true;
         Test.startTest();
             List<Rule__c> importedRules = RuleExportImportService.importRules('{');
             Logger.getInstance().flush();
@@ -288,6 +290,7 @@ private class RuleExportImportServiceTest {
 
     @IsTest
     static void testImportRulesWithBlankJson() {
+        PermissionsUtil.RuleImportExport = true;
         Test.startTest();
         List<Rule__c> importedRules = RuleExportImportService.importRules('');
         Test.stopTest();
@@ -298,6 +301,7 @@ private class RuleExportImportServiceTest {
 
     @IsTest
     static void testImportRulesWithEmptyWrappers() {
+        PermissionsUtil.RuleImportExport = true;
         Test.startTest();
         List<Rule__c> importedRules = RuleExportImportService.importRules(JSON.serialize(new List<RuleExportImportService.RuleExportImportWrapper>()));
         Test.stopTest();

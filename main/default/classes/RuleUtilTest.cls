@@ -2580,27 +2580,48 @@ private class RuleUtilTest {
 	}
 
 	/**
-	 * Test that AutoChart fields are NOT available for JIRA mapping
+	 * Test that AutoChart fields are NOT available for JIRA mapping and are marked as update-only
 	 */
 	@IsTest
 	public static void test_getMergeFields_autochart_fields_not_available() {
 		Test.startTest();
 		
+		// Always verify ChartService directly first to ensure fields are created with correct flags
+		List<AdminService.MergeField> chartFields = ChartService.getChartsFields();
+		System.assert(chartFields.size() > 0, 'ChartService should return chart fields');
+		for (AdminService.MergeField chartField : chartFields) {
+			System.assertEquals(false, chartField.availableForJiraMapping, 'Chart field should NOT be available for JIRA mapping: ' + chartField.apiName);
+			System.assertEquals(true, chartField.isUpdateOnly, 'Chart field should be marked as isUpdateOnly: ' + chartField.apiName);
+		}
+		
+		// Now check if AutoChart fields are included in AdminService.getMergeFields()
+		// This depends on AutoChart.isEnabled flag
 		List<AdminService.MergeField> mergeFields = (List<AdminService.MergeField>)AdminService.getMergeFields();
 		
 		// Find AutoChart fields
 		List<AdminService.MergeField> autoChartFields = new List<AdminService.MergeField>();
 		for (AdminService.MergeField field : mergeFields) {
-			if (field.apiName.contains('System_Auto_Chart') || field.value.contains('System_Auto_Chart')) {
+			if (field.apiName != null && field.apiName.contains('System_Auto_Chart')) {
+				autoChartFields.add(field);
+			} else if (field.value != null && field.value.contains('System_Auto_Chart')) {
 				autoChartFields.add(field);
 			}
 		}
 		
-		System.assert(autoChartFields.size() > 0, 'Should have AutoChart fields');
-		
-		// Verify AutoChart fields are not available for JIRA mapping
-		for (AdminService.MergeField autoChartField : autoChartFields) {
-			System.assertEquals(false, autoChartField.availableForJiraMapping, 'AutoChart field should NOT be available for JIRA mapping: ' + autoChartField.apiName);
+		// AutoChart fields are only added if AutoChart.isEnabled is true
+		if (AutoChart.isEnabled) {
+			// If AutoChart is enabled, fields should be present in mergeFields
+			System.assert(autoChartFields.size() > 0, 'Should have AutoChart fields when AutoChart is enabled. Found ' + autoChartFields.size() + ' fields. AutoChart.isEnabled=' + AutoChart.isEnabled);
+			
+			// Verify AutoChart fields are not available for JIRA mapping and are marked as update-only
+			for (AdminService.MergeField autoChartField : autoChartFields) {
+				System.assertEquals(false, autoChartField.availableForJiraMapping, 'AutoChart field should NOT be available for JIRA mapping: ' + autoChartField.apiName);
+				System.assertEquals(true, autoChartField.isUpdateOnly, 'AutoChart field should be marked as isUpdateOnly: ' + autoChartField.apiName);
+			}
+		} else {
+			// If AutoChart is disabled, fields should not be in mergeFields, but ChartService should still work
+			// This is expected behavior - AdminService.getMergeFields() only includes chart fields when AutoChart.isEnabled is true
+			System.assertEquals(0, autoChartFields.size(), 'AutoChart fields should not be in mergeFields when AutoChart is disabled');
 		}
 		
 		Test.stopTest();
@@ -2617,9 +2638,10 @@ private class RuleUtilTest {
 		
 		System.assert(chartFields.size() > 0, 'ChartService should return chart fields');
 		
-		// Verify all chart fields are not available for JIRA mapping
+		// Verify all chart fields are not available for JIRA mapping and are marked as update-only
 		for (AdminService.MergeField chartField : chartFields) {
 			System.assertEquals(false, chartField.availableForJiraMapping, 'Chart field should NOT be available for JIRA mapping: ' + chartField.apiName);
+			System.assertEquals(true, chartField.isUpdateOnly, 'Chart field should be marked as isUpdateOnly: ' + chartField.apiName);
 			System.assert(chartField.apiName.contains('System_Auto_Chart'), 'Chart field apiName should contain System_Auto_Chart: ' + chartField.apiName);
 			System.assert(chartField.value.contains('System_Auto_Chart'), 'Chart field value should contain System_Auto_Chart: ' + chartField.value);
 		}
@@ -2836,8 +2858,7 @@ private class RuleUtilTest {
 			Webhook_Method__c = 'POST',
 			Webhook_Headers__c = '{}',
 			Webhook_Body_Template__c = '{"test":"value"}',
-			Webhook_Auth_Type__c = 'None',
-			Webhook_Content_Type__c = 'application/json'
+			Webhook_Auth_Type__c = 'None'
 		);
 		insert webhookAction;
 
@@ -2881,8 +2902,7 @@ private class RuleUtilTest {
 			Webhook_Method__c = 'POST',
 			Webhook_Headers__c = '{}',
 			Webhook_Body_Template__c = '{"test":"value"}',
-			Webhook_Auth_Type__c = 'None',
-			Webhook_Content_Type__c = 'application/json'
+			Webhook_Auth_Type__c = 'None'
 		);
 		insert webhookAction;
 
@@ -2923,8 +2943,7 @@ private class RuleUtilTest {
 			Webhook_Method__c = 'POST',
 			Webhook_Headers__c = '{}',
 			Webhook_Body_Template__c = '{"test":"value1"}',
-			Webhook_Auth_Type__c = 'None',
-			Webhook_Content_Type__c = 'application/json'
+			Webhook_Auth_Type__c = 'None'
 		);
 		insert webhookAction1;
 
@@ -2934,8 +2953,7 @@ private class RuleUtilTest {
 			Webhook_Method__c = 'POST',
 			Webhook_Headers__c = '{}',
 			Webhook_Body_Template__c = '{"test":"value2"}',
-			Webhook_Auth_Type__c = 'None',
-			Webhook_Content_Type__c = 'application/json'
+			Webhook_Auth_Type__c = 'None'
 		);
 		insert webhookAction2;
 
@@ -2977,8 +2995,7 @@ private class RuleUtilTest {
 			Webhook_Method__c = 'POST',
 			Webhook_Headers__c = '{}',
 			Webhook_Body_Template__c = '{"test":"value"}',
-			Webhook_Auth_Type__c = 'None',
-			Webhook_Content_Type__c = 'application/json'
+			Webhook_Auth_Type__c = 'None'
 		);
 		insert webhookAction;
 
@@ -3135,6 +3152,296 @@ private class RuleUtilTest {
 		// Verify the field name is included in the GROUP BY clause
 		System.assert(monitoringRule.criteria.contains('Category__c'), 
 			'GROUP BY clause should include the group field name');
+	}
+
+	// ========== MultiselectPicklist Filter Tests ==========
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_positive_all_values_match() {
+		// Test case: Record has "Value1;Value2;Value3", filter checks for "Value1;Value2" - should return true
+		test_evaluate_MultiselectPicklist_filter('Equal', 'Value1;Value2', 'Value1;Value2;Value3', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_positive_exact_match() {
+		// Test case: Record has "Value1;Value2", filter checks for "Value1;Value2" - should return true
+		test_evaluate_MultiselectPicklist_filter('Equal', 'Value1;Value2', 'Value1;Value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_positive_single_value() {
+		// Test case: Record has "Value1;Value2", filter checks for "Value1" - should return true
+		test_evaluate_MultiselectPicklist_filter('Equal', 'Value1', 'Value1;Value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_negative_missing_value() {
+		// Test case: Record has "Value1;Value2", filter checks for "Value3" - should return false
+		test_evaluate_MultiselectPicklist_filter('Equal', 'Value3', 'Value1;Value2', false);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_negative_partial_match() {
+		// Test case: Record has "Value1;Value2", filter checks for "Value2;Value3" - should return false
+		test_evaluate_MultiselectPicklist_filter('Equal', 'Value2;Value3', 'Value1;Value2', false);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_empty_field() {
+		// Test case: Record has empty multipicklist, filter checks for "Value1" - should return false
+		test_evaluate_MultiselectPicklist_filter('Equal', 'Value1', null, false);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_not_equal_positive_missing_value() {
+		// Test case: Record has "Value1;Value2", filter checks NOT EQUAL "Value3" - should return true
+		test_evaluate_MultiselectPicklist_filter('Not equal', 'Value3', 'Value1;Value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_not_equal_positive_partial_match() {
+		// Test case: Record has "Value1;Value2", filter checks NOT EQUAL "Value2;Value3" - should return true
+		test_evaluate_MultiselectPicklist_filter('Not equal', 'Value2;Value3', 'Value1;Value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_not_equal_negative_all_match() {
+		// Test case: Record has "Value1;Value2;Value3", filter checks NOT EQUAL "Value1;Value2" - should return false
+		test_evaluate_MultiselectPicklist_filter('Not equal', 'Value1;Value2', 'Value1;Value2;Value3', false);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_not_equal_negative_exact_match() {
+		// Test case: Record has "Value1;Value2", filter checks NOT EQUAL "Value1;Value2" - should return false
+		test_evaluate_MultiselectPicklist_filter('Not equal', 'Value1;Value2', 'Value1;Value2', false);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_not_equal_empty_field() {
+		// Test case: Record has empty multipicklist, filter checks NOT EQUAL "Value1" - should return true
+		test_evaluate_MultiselectPicklist_filter('Not equal', 'Value1', null, true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_with_whitespace() {
+		// Test case: Record has values with different whitespace - should still match
+		test_evaluate_MultiselectPicklist_filter('Equal', 'Value1;Value2', 'Value1; Value2 ;Value3', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_case_insensitive_lowercase() {
+		// Test case: Record has "value1;value2", filter checks for "Value1;Value2" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Equal', 'Value1;Value2', 'value1;value2;value3', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_case_insensitive_uppercase() {
+		// Test case: Record has "VALUE1;VALUE2", filter checks for "Value1;Value2" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Equal', 'Value1;Value2', 'VALUE1;VALUE2;VALUE3', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_case_insensitive_mixed() {
+		// Test case: Record has "VaLuE1;vAlUe2", filter checks for "value1;value2" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Equal', 'value1;value2', 'VaLuE1;vAlUe2;VALUE3', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_not_equal_case_insensitive() {
+		// Test case: Record has "value1;value2", filter checks NOT EQUAL "Value3" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Not equal', 'Value3', 'value1;value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_contains_positive_all_values_match() {
+		// Test case: Record has "Value1;Value2;Value3", filter checks CONTAINS "Value1;Value2" - should return true
+		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1;Value2', 'Value1;Value2;Value3', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_contains_positive_single_value() {
+		// Test case: Record has "Value1;Value2", filter checks CONTAINS "Value1" - should return true
+		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1', 'Value1;Value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_contains_negative_missing_value() {
+		// Test case: Record has "Value1;Value2", filter checks CONTAINS "Value3" - should return false
+		test_evaluate_MultiselectPicklist_filter('Contains', 'Value3', 'Value1;Value2', false);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_contains_empty_field() {
+		// Test case: Record has empty multipicklist, filter checks CONTAINS "Value1" - should return false
+		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1', null, false);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_contains_case_insensitive_lowercase() {
+		// Test case: Record has "value1;value2", filter checks CONTAINS "Value1" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1', 'value1;value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_contains_case_insensitive_uppercase() {
+		// Test case: Record has "VALUE1;VALUE2", filter checks CONTAINS "value1;value2" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Contains', 'value1;value2', 'VALUE1;VALUE2;VALUE3', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_positive_missing_value() {
+		// Test case: Record has "Value1;Value2", filter checks DOES NOT CONTAIN "Value3" 
+		// Record contains NONE of the filter values - should return true
+		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value3', 'Value1;Value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_positive_partial_match() {
+		// Test case: Record has "Value1;Value2", filter checks DOES NOT CONTAIN "Value2;Value3"
+		// Record contains Value2 (one of the filter values) - should return false
+		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value2;Value3', 'Value1;Value2', false);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_negative_all_match() {
+		// Test case: Record has "Value1;Value2;Value3", filter checks DOES NOT CONTAIN "Value1;Value2"
+		// Record contains both filter values - should return false
+		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value1;Value2', 'Value1;Value2;Value3', false);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_negative_contains_one() {
+		// Test case: Record has "Value1;Value2", filter checks DOES NOT CONTAIN "Value1"
+		// Record contains the filter value - should return false
+		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value1', 'Value1;Value2', false);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_empty_field() {
+		// Test case: Record has empty multipicklist, filter checks DOES NOT CONTAIN "Value1" - should return true
+		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value1', null, true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_case_insensitive_positive() {
+		// Test case: Record has "value1;value2", filter checks DOES NOT CONTAIN "Value3" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value3', 'value1;value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_case_insensitive_negative() {
+		// Test case: Record has "VALUE1;VALUE2", filter checks DOES NOT CONTAIN "value1" - should return false (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'value1', 'VALUE1;VALUE2', false);
+	}
+
+	// ========== Comma Delimiter Tests ==========
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_comma_delimiter() {
+		// Test case: Record has "Value1,Value2,Value3", filter checks for "Value1,Value2" - should return true
+		test_evaluate_MultiselectPicklist_filter('Equal', 'Value1,Value2', 'Value1,Value2,Value3', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_equal_mixed_delimiters() {
+		// Test case: Record has "Value1;Value2,Value3", filter checks for "Value1,Value2" - should return true
+		test_evaluate_MultiselectPicklist_filter('Equal', 'Value1,Value2', 'Value1;Value2,Value3', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_contains_comma_delimiter() {
+		// Test case: Record has "Value1,Value2", filter checks CONTAINS "Value1" - should return true
+		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1', 'Value1,Value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_contains_mixed_delimiters_positive() {
+		// Test case: Record has "Value1;Value2,Value3", filter checks CONTAINS "Value2,Value3" - should return true
+		test_evaluate_MultiselectPicklist_filter('Contains', 'Value2,Value3', 'Value1;Value2,Value3', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_comma_delimiter_positive() {
+		// Test case: Record has "Value1,Value2", filter checks DOES NOT CONTAIN "Value3" - should return true
+		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value3', 'Value1,Value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_comma_delimiter_negative() {
+		// Test case: Record has "Value1,Value2", filter checks DOES NOT CONTAIN "Value1" - should return false
+		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value1', 'Value1,Value2', false);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_not_equal_comma_delimiter() {
+		// Test case: Record has "Value1,Value2", filter checks NOT EQUAL "Value3" - should return true
+		test_evaluate_MultiselectPicklist_filter('Not equal', 'Value3', 'Value1,Value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_comma_case_insensitive() {
+		// Test case: Record has "value1,value2", filter checks CONTAINS "Value1,Value2" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1,Value2', 'value1,value2,value3', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_mixed_delimiters_case_insensitive() {
+		// Test case: Record has "VALUE1;value2,Value3", filter checks EQUAL "value1,VALUE2" - should return true (case-insensitive, mixed delimiters)
+		test_evaluate_MultiselectPicklist_filter('Equal', 'value1,VALUE2', 'VALUE1;value2,Value3', true);
+	}
+
+	/**
+	 * Helper method to test MultiselectPicklist filter evaluation
+	 * @param comparisonOperator The comparison operator to test ('Equal', 'Not equal', 'Contains', 'Does not contain')
+	 * @param filterValue The value specified in the filter criteria (semicolon-separated)
+	 * @param recordValue The actual value on the record (semicolon-separated or null)
+	 * @param expectedTestResult The expected result of the filter evaluation
+	 */
+	private static void test_evaluate_MultiselectPicklist_filter(
+		String comparisonOperator,
+		String filterValue,
+		String recordValue,
+		Boolean expectedTestResult) {
+
+		String packagePrefix = ConfigUtil.nameSpacePrefix;
+
+		// Create a test rule
+		Rule__c mr1 = TestDataFactory.createTestFilterRule();
+
+		// Create a filter for the Exception_Codes__c multipicklist field on Issue__c
+		RuleFilter__c rf1 = new RuleFilter__c();
+		rf1.Index__c = 1;
+		rf1.FieldName__c = packagePrefix + 'Exception_Codes__c';
+		rf1.Comparison_Type__c = 'Value';
+		rf1.Value__c = filterValue;
+		rf1.Field_Type__c = RuleUtil.FIELD_TYPE_MULTIPICKLIST; // 'MULTIPICKLIST' - REQUIRED!
+		rf1.Rule__c = mr1.Id;
+		rf1.ComparisonOperator__c = comparisonOperator;
+		insert rf1;
+
+		// Create a test Issue record with the multipicklist value
+		Issue__c issue = new Issue__c();
+		issue.Exception_Codes__c = recordValue;
+		insert issue;
+
+		// Query the issue to ensure we have the field populated
+		issue = [SELECT Id, Exception_Codes__c FROM Issue__c WHERE Id = :issue.Id LIMIT 1];
+		Boolean testResult;
+
+		Test.startTest();
+
+		// Load the filter and evaluate it
+		RuleFilter__c rf = [SELECT Id, Index__c, Comparison_Type__c, Value__c, Field_Type__c, FieldName__c, Rule__c, ComparisonOperator__c, Is_Old__c 
+							FROM RuleFilter__c WHERE Id = :rf1.Id LIMIT 1];
+		RuleUtil.RuleFilter rfInstance = new RuleUtil.RuleFilter(rf, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
+		Map<String, Object> objectMap = issue.getPopulatedFieldsAsMap();
+		testResult = rfInstance.evaluateFilter(objectMap);
+
+		Test.stopTest();
+
+		System.assertEquals(expectedTestResult, testResult, 
+			String.format('Filter evaluation failed. Operator: {0}, Filter Value: {1}, Record Value: {2}, Expected: {3}, Actual: {4}',
+				new List<String>{comparisonOperator, filterValue, String.valueOf(recordValue), String.valueOf(expectedTestResult), String.valueOf(testResult)}));
 	}
 
 }

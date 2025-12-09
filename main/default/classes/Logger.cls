@@ -47,12 +47,7 @@ global with sharing class Logger {
      * passthrough mode attempts HTTP callouts from trigger execution contexts.
      */
     global void flush() {
-        // Check if we're in a trigger context (regular or platform event) AND passthrough mode is enabled
-        // Trigger.isExecuting returns true for: Object triggers, Platform Event triggers
-        // For testing: testOverrideTriggerContext can override the actual trigger context
-        Boolean isTriggerContext = (testOverrideTriggerContext != null) ? testOverrideTriggerContext : Trigger.isExecuting;
-        
-        if (isTriggerContext && ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c) {
+        if (ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c) {
             // Use async flush to prevent "Callout from triggers are currently not supported" exception
             // The AsyncLogSave Queueable has Database.AllowsCallouts interface for HTTP callouts
             asyncFlushInternal();
@@ -86,26 +81,8 @@ global with sharing class Logger {
     public List<Log__c> logsQueue = new List<Log__c>();
 
     private static Logger instance = null;
-    
-    /**
-     * Test support: Override trigger context detection for testing.
-     * null = use actual Trigger.isExecuting value
-     * true = simulate trigger context
-     * false = simulate non-trigger context
-     */
-    @TestVisible
-    private Boolean testOverrideTriggerContext = null;
 
     private Logger() {
-    }
-    
-    /**
-     * Test support: Set the trigger context override value for testing
-     * Call on the logger instance: Logger.getInstance().setTestTriggerContext(true)
-     */
-    @TestVisible
-    public void setTestTriggerContext(Boolean value) {
-        this.testOverrideTriggerContext = value;
     }
 
     private String getCurrentStackTraceInternal(Integer topOffset) {

@@ -392,7 +392,7 @@ public with sharing class TicketingService {
             try {
                 if (String.isNotBlank(this.taskInfo.additionalMetadata)) {
                     // Use the helper method to parse both old and new formats
-                    Map<String, String> customFields = TicketingTaskInfo.parseAdditionalMetadataForMergeFields(this.taskInfo.additionalMetadata);
+                    Map<String, String> customFields = TicketingService.parseAdditionalMetadataForMergeFields(this.taskInfo.additionalMetadata);
                     for (String key : customFields.keySet()) {
                         if (projectCustomFields.contains(key)) {
                             this.taskInfo.customFields.put(key, customFields.get(key));
@@ -422,8 +422,7 @@ public with sharing class TicketingService {
             }
             Integer detailsFieldLength = Integer.valueOf(ConfigUtil.JIRA_SETTINGS.Jira_Details_Field_Length__c > 0 ? ConfigUtil.JIRA_SETTINGS.Jira_Details_Field_Length__c : 30000);
             this.taskInfo.details = this.taskInfo.details.abbreviate(detailsFieldLength);
-            
-            this.bodyRequest = new Map<String, Object>{
+	        this.bodyRequest = new Map<String, Object>{
                 'fields' => new Map<String, Object>{
                     'project' => new Map<String, Object>{
                         'id' => this.taskInfo.projectId
@@ -432,7 +431,7 @@ public with sharing class TicketingService {
                         'id' => this.taskInfo.issueTypeId
                     },
                     'summary' => this.taskInfo.summary,
-                    'description' => JiraService.isCloudJiraInstance() ? textToAtlassianDocumentFormatContent(this.taskInfo.details, true) : this.taskInfo.details
+                    'description' => JiraService.isCloudJiraInstance() ? (Object)JSON.deserializeUntyped(this.taskInfo.details) : this.taskInfo.details
                 }
             };
         }
@@ -607,7 +606,18 @@ public with sharing class TicketingService {
                             parameters
                         );
 
+                        // Set metadata for error tracking
+                        Map<String, String> metadata = new Map<String, String>();
+                        if (this.sobjectWrapper.sObjectRecord != null && String.isNotBlank(this.sobjectWrapper.sObjectRecord.Id)) {
+                            metadata.put('recordId', this.sobjectWrapper.sObjectRecord.Id);
+                        }
+                        // Add Jira issue key to metadata if available
+                        if (String.isNotBlank(issueKey)) {
+                            metadata.put('issueId', issueKey);
+                        }
+
                         ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
+                            .setMetadata(metadata)
                             .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
 
                         String comment = jiraServiceInterface.addCommentToIssueWithAttachments(comments, issueKey, chartGeneratorImageLambdaClient);
@@ -624,18 +634,10 @@ public with sharing class TicketingService {
                         }
                     }
                 } else {
-                    if (JiraService.isCloudJiraInstance()) {
-                        // For Jira Cloud, convert to ADF format
-                        Map<String, Object> adfContent = (Map<String, Object>) TicketingService.textToAtlassianDocumentFormatContent(comments, true);
-                        String adfJson = JSON.serialize(new Map<String, Object>{ 'body' => adfContent });
-                        jiraServiceInterface.createNewTicketComment(adfJson, issueKey);
-                    } else {
-                        // For Jira Server, use simple body format
-                        this.bodyRequest = new Map<String, Object>{
-                            'body' => comments
-                        };
-                        jiraServiceInterface.createNewTicketComment(JSON.serialize(this.bodyRequest), issueKey);
-                    }
+	                this.bodyRequest = new Map<String, Object>{
+			                'body' => JiraService.isCloudJiraInstance() ? (Object)JSON.deserializeUntyped(comments) : comments
+	                };
+	                jiraServiceInterface.createNewTicketComment(JSON.serialize(this.bodyRequest), issueKey);
                 }
             }
         }
@@ -971,7 +973,7 @@ public with sharing class TicketingService {
 
     }
 
-    static private Map<Schema.SObjectType, Set<String>> MAP_SOBJECT_FIELDS = new Map<Schema.SObjectType, Set<String>> {
+    private static final Map<Schema.SObjectType, Set<String>> MAP_SOBJECT_FIELDS = new Map<Schema.SObjectType, Set<String>> {
         Log__c.SObjectType => new Set<String>{
             'Id',
             'Summary__c',
@@ -1138,7 +1140,7 @@ public with sharing class TicketingService {
                 new List<String>{eventAction.Action__r.Subject__c, eventAction.Action__r.Body__c},
                 new NotificationService.MergeFieldSettings(eventAction.Action__r.Action_Type__c, isJiraAction));
 
-            AutoChart.AutoChartFieldsResult autoChartFieldsResult = new NotificationService.MergeFields().getChartFieldsAndClear(renderMessages);
+            AutoChart.AutoChartFieldsResult autoChartFieldsResult = AutoChart.getChartFieldsAndClear(renderMessages);
             renderMessages = autoChartFieldsResult.cleanedMessages;
             this.chartsTypeForPrepare = autoChartFieldsResult.autoChartFields;
 
@@ -1168,7 +1170,7 @@ public with sharing class TicketingService {
                 new List<String>{jiraAction.Subject__c, jiraAction.Body__c},
                 new NotificationService.MergeFieldSettings(jiraAction.Action_Type__c, isJiraAction));
 
-            AutoChart.AutoChartFieldsResult autoChartFieldsResult = new NotificationService.MergeFields().getChartFieldsAndClear(renderMessages);
+            AutoChart.AutoChartFieldsResult autoChartFieldsResult = AutoChart.getChartFieldsAndClear(renderMessages);
             renderMessages = autoChartFieldsResult.cleanedMessages;
             this.chartsTypeForPrepare = autoChartFieldsResult.autoChartFields;
 
@@ -1202,7 +1204,7 @@ public with sharing class TicketingService {
 
         public String getAdditionalMetadata(String whoId, String whatId, String additionalMetadataJSON, NotificationService.MergeFieldSettings settings) {
             // Parse additional metadata supporting both old and new formats
-            Map<String, String> additionalMetadata = TicketingTaskInfo.parseAdditionalMetadataForMergeFields(additionalMetadataJSON);
+            Map<String, String> additionalMetadata = TicketingService.parseAdditionalMetadataForMergeFields(additionalMetadataJSON);
             Map<String, List<String>> contentsMap = new Map<String, List<String>>();
             contentsMap.put(whatId, additionalMetadata.values());
             Map<String, NotificationService.MergeFieldSettings> mergeFieldSettingsMap = new Map<String, NotificationService.MergeFieldSettings>{
@@ -1212,11 +1214,9 @@ public with sharing class TicketingService {
 
             Integer index = 0;
 
-            NotificationService.MergeFields mergeFields = new NotificationService.MergeFields();
-
             for (String key : additionalMetadata.keySet()) {
                 List<String> results = renderResult.get(whatId);
-                        AutoChart.AutoChartFieldsResult autoChartFieldsResult = mergeFields.getChartFieldsAndClear(results);
+                        AutoChart.AutoChartFieldsResult autoChartFieldsResult = AutoChart.getChartFieldsAndClear(results);
                 results = autoChartFieldsResult.cleanedMessages;
                 additionalMetadata.put(key, results.get(index++));
             }

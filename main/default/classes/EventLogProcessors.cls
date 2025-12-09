@@ -8537,8 +8537,39 @@ public with sharing class EventLogProcessors {
                         logsToCreate.add(eventLog);
                     }
                 } else {
-                    // No existing email logs, create event log
+                    // No existing email logs by Hash_1
+                    // Try to find simple log from JobBatch by Summary + timestamp
+                    // (JobBatch creates logs without stacktrace, with different Hash_1 formula)
                     logsToCreate.add(eventLog);
+                }
+            }
+            
+            // Before creating new logs, check for simple logs (from JobBatch) to update
+            // Simple logs have: no stacktrace, have Async_Job_Id__c, created by JobBatch
+            if (!logsToCreate.isEmpty()) {
+                Map<Id, Log__c> simpleLogsToUpdateMap = findAndUpdateSimpleLogs(logsToCreate, logger);
+                
+                // Remove logs that will update existing simple logs from logsToCreate
+                if (!simpleLogsToUpdateMap.isEmpty()) {
+                    List<Log__c> remainingLogsToCreate = new List<Log__c>();
+                    Set<String> updatedSummaries = new Set<String>();
+                    
+                    for (Log__c simpleLog : simpleLogsToUpdateMap.values()) {
+                        updatedSummaries.add(simpleLog.Summary__c);
+                    }
+                    
+                    for (Log__c logToCreate : logsToCreate) {
+                        // Keep logs that didn't match a simple log
+                        if (!updatedSummaries.contains(logToCreate.Summary__c)) {
+                            remainingLogsToCreate.add(logToCreate);
+                        }
+                    }
+                    logsToCreate = remainingLogsToCreate;
+                    
+                    // Update the simple logs with full data
+                    List<Log__c> simpleLogsToUpdate = simpleLogsToUpdateMap.values();
+                    DatabaseUtils.getInstance().performUpdateDML(simpleLogsToUpdate, Schema.SObjectType.Log__c)
+                        .handleError(EventLogProcessors.class.getName(), '.processEventLogsWithEmailAwareness.simpleLogUpdate', logger);
                 }
             }
             
@@ -8553,6 +8584,108 @@ public with sharing class EventLogProcessors {
         }
         
         return logsToCreate;
+    }
+
+    /**
+     * Find simple logs from JobBatch and update them with full data from EventLog
+     * Simple logs are created by JobBatch without stacktrace (ExtendedStatus never has stacktrace)
+     * They have Async_Job_Id__c but different Hash_1 formula (className + error + jobType)
+     * @param eventLogsToCreate List of event logs that would be created (no Hash_1 match found)
+     * @param logger Logger instance for error handling
+     * @return Map of simple logs to update (Id -> updated Log__c)
+     */
+    public static Map<Id, Log__c> findAndUpdateSimpleLogs(List<Log__c> eventLogsToCreate, Logger logger) {
+        Map<Id, Log__c> simpleLogsToUpdate = new Map<Id, Log__c>();
+        
+        if (eventLogsToCreate.isEmpty()) {
+            return simpleLogsToUpdate;
+        }
+        
+        // Collect summaries and timestamps from event logs
+        Set<String> summaries = new Set<String>();
+        Map<String, Log__c> eventLogBySummary = new Map<String, Log__c>();
+        DateTime earliestTime = null;
+        DateTime latestTime = null;
+        
+        for (Log__c eventLog : eventLogsToCreate) {
+            if (String.isNotBlank(eventLog.Summary__c)) {
+                summaries.add(eventLog.Summary__c);
+                eventLogBySummary.put(eventLog.Summary__c, eventLog);
+                
+                if (eventLog.Created_At__c != null) {
+                    if (earliestTime == null || eventLog.Created_At__c < earliestTime) {
+                        earliestTime = eventLog.Created_At__c;
+                    }
+                    if (latestTime == null || eventLog.Created_At__c > latestTime) {
+                        latestTime = eventLog.Created_At__c;
+                    }
+                }
+            }
+        }
+        
+        if (summaries.isEmpty() || earliestTime == null) {
+            return simpleLogsToUpdate;
+        }
+        
+        // Expand time window to account for delays between JobBatch and EventLogProcessingBatch
+        // JobBatch runs ~1h after error, EventLog available ~3h after error
+        DateTime windowStart = earliestTime.addHours(-4);
+        DateTime windowEnd = (latestTime != null ? latestTime : earliestTime).addHours(1);
+        
+        // Query for candidate logs (with Async_Job_Id) with matching Summary
+        // These are logs created by JobBatch that should be updated with full EventLog data
+        // Note: Can't filter by Stacktrace__c in SOQL (Long Text Area), filter in Apex instead
+        try {
+            List<Log__c> candidateLogs = [
+                SELECT Id, Summary__c, Stacktrace__c, Details__c, Hash__c, Hash_1__c, Hash_2__c, Hash_3__c, 
+                       Async_Job_Id__c, Created_At__c, Request_Id_External__c,
+                       Post_Processing_Status__c
+                FROM Log__c
+                WHERE Summary__c IN :summaries
+                AND Async_Job_Id__c != null
+                AND Created_At__c >= :windowStart
+                AND Created_At__c <= :windowEnd
+                LIMIT 200
+            ];
+            
+            // Match simple logs (no stacktrace) with event logs by Summary
+            for (Log__c candidateLog : candidateLogs) {
+                // Skip logs that already have stacktrace (not simple logs from JobBatch)
+                if (String.isNotBlank(candidateLog.Stacktrace__c)) {
+                    continue;
+                }
+                
+                Log__c eventLog = eventLogBySummary.get(candidateLog.Summary__c);
+                
+                if (eventLog != null && !simpleLogsToUpdate.containsKey(candidateLog.Id)) {
+                    // Update simple log with full data from event log
+                    candidateLog.Stacktrace__c = eventLog.Stacktrace__c;
+                    candidateLog.Details__c = eventLog.Details__c;
+                    candidateLog.Request_Id_External__c = eventLog.Request_Id_External__c;
+                    
+                    // Clear existing hashes so calculateHashes will recalculate them
+                    // (calculateHashes only sets hash fields if they're currently blank)
+                    candidateLog.Hash_1__c = null;
+                    candidateLog.Hash_2__c = null;
+                    candidateLog.Hash_3__c = null;
+                    
+                    // Recalculate hashes using correct formula (with stacktrace)
+                    LogService.calculateHashes(candidateLog);
+                    
+                    // Mark for post-processing (stacktrace parsing, etc.)
+                    candidateLog.Post_Processing_Status__c = LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED;
+                    
+                    simpleLogsToUpdate.put(candidateLog.Id, candidateLog);
+                    
+                    // Remove from eventLogBySummary to prevent multiple matches
+                    eventLogBySummary.remove(candidateLog.Summary__c);
+                }
+            }
+        } catch (Exception e) {
+            logger?.add(logger?.getInternalError(e, null, EventLogProcessors.class.getName(), 'Error finding simple logs for update'));
+        }
+        
+        return simpleLogsToUpdate;
     }
 
     /**

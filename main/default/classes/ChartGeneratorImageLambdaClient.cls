@@ -40,9 +40,28 @@ public with sharing class ChartGeneratorImageLambdaClient {
 
     private Map<String, String> chartImages;
     private LambdaErrorResponse errorResponse;
+    private Map<String, String> metadata;
 
 
     public ChartGeneratorImageLambdaClient() {
+    }
+    
+    /**
+     * Set metadata to be sent with the request (e.g., issueId, recordId)
+     * @param metadata Map containing metadata fields (e.g., {'issueId' => 'ISS-123', 'recordId' => 'a0X...'})
+     * @return ChartGeneratorImageLambdaClient instance for method chaining
+     */
+    public ChartGeneratorImageLambdaClient setMetadata(Map<String, String> metadata) {
+        this.metadata = metadata;
+        return this;
+    }
+    
+    /**
+     * Get the metadata that was set
+     * @return Map of metadata fields
+     */
+    public Map<String, String> getMetadata() {
+        return this.metadata != null ? this.metadata : new Map<String, String>();
     }
 
     /**
@@ -56,10 +75,20 @@ public with sharing class ChartGeneratorImageLambdaClient {
         }
         
         try {
+            // Parse chart config to add metadata if available
+            String requestBody = chartConfig;
+            if (this.metadata != null && !this.metadata.isEmpty()) {
+                Map<String, Object> configMap = (Map<String, Object>) JSON.deserializeUntyped(chartConfig);
+                // Add metadata as _metadata field
+                Map<String, String> metadataCopy = new Map<String, String>(this.metadata);
+                configMap.put('_metadata', metadataCopy);
+                requestBody = JSON.serialize(configMap);
+            }
+            
             //HttpUtils.enableHttpDebug = true;
             String response = HttpUtils.post(
                 URL_ENDPOINT,
-                chartConfig,
+                requestBody,
                 HttpUtils.getHeadersWithApiKeyAndJson(),
                 200
             );
@@ -78,7 +107,28 @@ public with sharing class ChartGeneratorImageLambdaClient {
                 this.errorResponse.error = (String) responseMap.get('error');
                 this.errorResponse.statusCode = 500; // Default error status code
                 
-                throw new ChartGeneratorException('Lambda Error: ' + this.errorResponse.message + ' - ' + this.errorResponse.error);
+                // Extract metadata from error response if available
+                if (responseMap.containsKey('metadata')) {
+                    Object metadataObj = responseMap.get('metadata');
+                    if (metadataObj instanceof Map<String, Object>) {
+                        Map<String, Object> metadataMap = (Map<String, Object>) metadataObj;
+                        this.errorResponse.metadata = new Map<String, String>();
+                        for (String key : metadataMap.keySet()) {
+                            Object value = metadataMap.get(key);
+                            if (value != null) {
+                                this.errorResponse.metadata.put(key, String.valueOf(value));
+                            }
+                        }
+                    }
+                }
+                
+                // Build error message with metadata context if available
+                String errorMsg = 'Lambda Error: ' + this.errorResponse.message + ' - ' + this.errorResponse.error;
+                if (this.errorResponse.metadata != null && !this.errorResponse.metadata.isEmpty()) {
+                    errorMsg += ' [Metadata: ' + JSON.serialize(this.errorResponse.metadata) + ']';
+                }
+                
+                throw new ChartGeneratorException(errorMsg);
             }
 
             // Parse as successful chart response
@@ -269,6 +319,7 @@ public with sharing class ChartGeneratorImageLambdaClient {
         public Integer statusCode;
         public String message;
         public String error;
+        public Map<String, String> metadata; // Contains issueId, recordId, etc. when available
     }
 
     public class ChartGeneratorException extends Exception {}

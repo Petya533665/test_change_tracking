@@ -172,11 +172,6 @@ public with sharing class WebhookService {
             : HttpUtils.HTTP_METHOD_POST;
         config.bodyTemplate = action.Webhook_Body_Template__c;
         
-        // Optional fields
-        config.contentType = String.isNotBlank(action.Webhook_Content_Type__c)
-            ? action.Webhook_Content_Type__c
-            : DEFAULT_CONTENT_TYPE;
-        
         // Parse headers from JSON
         if (String.isNotBlank(action.Webhook_Headers__c)) {
             try {
@@ -192,6 +187,17 @@ public with sharing class WebhookService {
                     'buildConfigFromAction - Invalid headers JSON'
                 );
                 config.headers = new Map<String, String>();
+            }
+        }
+        
+        // Extract Content-Type from headers, or use default
+        config.contentType = DEFAULT_CONTENT_TYPE;
+        if (config.headers != null) {
+            for (String headerKey : config.headers.keySet()) {
+                if (headerKey.equalsIgnoreCase('Content-Type')) {
+                    config.contentType = config.headers.get(headerKey);
+                    break;
+                }
             }
         }
         

@@ -47,13 +47,13 @@ public with sharing class ReportService {
      * @description Maps SystemReport enum values to their corresponding report names in Salesforce.
      * This mapping is used to query for report IDs by name.
      */
-    private static final Map<SystemReport, String> SystemChartType = new Map<SystemReport, String> {
-        SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_ISSUE       => 'System Chart Log Occurrence by Issue',
-        SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH1       => 'System Chart Log Occurrence by Hash1',
-        SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH2       => 'System Chart Log Occurrence by Hash2',
-        SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH3       => 'System Chart Log Occurrence by Hash3',
-        SystemReport.SYSTEM_CHART_USER_IMPACT_DETAILS_LINKED    => 'System Chart: User Impact (Linked)',
-        SystemReport.SYSTEM_CHART_USER_IMPACT_DETAILS_DUP       => 'System Chart: User Impact (Dup)'
+    private static final Map<SystemReport, String> SystemChartType = new Map<SystemReport, String>{
+        SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_ISSUE => 'System Chart Log Occurrence by Issue',
+        SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH1 => 'System Chart Log Occurrence by Hash1',
+        SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH2 => 'System Chart Log Occurrence by Hash2',
+        SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH3 => 'System Chart Log Occurrence by Hash3',
+        SystemReport.SYSTEM_CHART_USER_IMPACT_DETAILS_LINKED => 'System Chart: User Impact (Linked)',
+        SystemReport.SYSTEM_CHART_USER_IMPACT_DETAILS_DUP => 'System Chart: User Impact (Dup)'
     };
 
     /**
@@ -76,7 +76,7 @@ public with sharing class ReportService {
         if (record == null) {
             throw new IllegalArgumentException('Record cannot be null');
         }
-        
+
         Map<String, Object> parameters = new Map<String, Object>();
         String objectType = record.getSObjectType().getDescribe().getName();
 
@@ -87,7 +87,7 @@ public with sharing class ReportService {
         String eventActionObjectName = EventAction__c.SObjectType.getDescribe().getName();
 
         if (objectType == logObjectName) {
-            Log__c logRecord = (Log__c)record;
+            Log__c logRecord = (Log__c) record;
             parameters.put('hash1', logRecord.Hash_1__c);
             parameters.put('hash2', logRecord.Hash_2__c);
             parameters.put('hash3', logRecord.Hash_3__c);
@@ -102,7 +102,7 @@ public with sharing class ReportService {
         } else if (objectType == eventActionObjectName) {
             // EventAction__c processing
         }
-       return parameters;
+        return parameters;
     }
 
     /**
@@ -119,7 +119,7 @@ public with sharing class ReportService {
             FROM Report
             WHERE Name IN :SystemChartType.values()
         ];
-        
+
         for (Report report : reports) {
             for (SystemReport reportType : SystemChartType.keySet()) {
                 if (SystemChartType.get(reportType) == report.Name) {
@@ -137,10 +137,10 @@ public with sharing class ReportService {
     private static final String LOG_HASH2_FIELD = Schema.SObjectType.Log__c.getName() + '.' + Schema.SObjectType.Log__c.fields.Hash_2__c.getName();
     private static final String LOG_HASH3_FIELD = Schema.SObjectType.Log__c.getName() + '.' + Schema.SObjectType.Log__c.fields.Hash_3__c.getName();
     private static final String LOG_ID_FIELD = 'CUST_ID';
-    private static final String LOG_ISSUE_Related_Issue_Name =  Schema.SObjectType.Log__c.getName() + '.' + ConfigUtil.nameSpacePrefix + 'Issue__c.' + ConfigUtil.nameSpacePrefix + 'Related_Issue__c.' + 'Name__lookup';
-    private static final String LOG_ISSUE_Status =   Schema.SObjectType.Log__c.getName() + '.' + ConfigUtil.nameSpacePrefix + 'Issue__c.' + ConfigUtil.nameSpacePrefix + 'Status__c';
-    
-    private static final List<String> REQUIRED_HASH_PARAMETERS = new List<String> {
+    private static final String LOG_ISSUE_Related_Issue_Name = Schema.SObjectType.Log__c.getName() + '.' + ConfigUtil.nameSpacePrefix + 'Issue__c.' + ConfigUtil.nameSpacePrefix + 'Related_Issue__c.' + 'Name__lookup';
+    private static final String LOG_ISSUE_Status = Schema.SObjectType.Log__c.getName() + '.' + ConfigUtil.nameSpacePrefix + 'Issue__c.' + ConfigUtil.nameSpacePrefix + 'Status__c';
+
+    private static final List<String> REQUIRED_HASH_PARAMETERS = new List<String>{
         'organizationId', 'hash1', 'hash2', 'hash3', 'currentLogId'
     };
 
@@ -188,16 +188,16 @@ public with sharing class ReportService {
         ReportService.SystemReport systemReport
     ) {
         String issueName = (String) parameters.get('issueName');
-        
+
         if (String.isBlank(issueName)) {
             return new List<Map<String, Object>>();
         }
 
         List<Map<String, Object>> filters = new List<Map<String, Object>>();
-        
+
 
         filters.addAll(ReportApiClient.createDateRangeFilters(LOG_CREATED_AT_FIELD, startDateTime, endDateTime));
-        
+
         if (systemReport == ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_ISSUE) {
             filters.add(ReportApiClient.createIssueFilter(issueName));
         }
@@ -221,13 +221,13 @@ public with sharing class ReportService {
         } else if (systemReport == ReportService.SystemReport.SYSTEM_CHART_USER_IMPACT_DETAILS_DUP) {
             filters.add(ReportApiClient.createFilter(
                 LOG_ISSUE_Related_Issue_Name,
-                'equals', 
+                'equals',
                 issueName
             ));
 
             filters.add(ReportApiClient.createFilter(
                 LOG_ISSUE_Status,
-                'equals', 
+                'equals',
                 IssueService.ISSUE_STATUS_DUPLICATE
             ));
 
@@ -247,9 +247,9 @@ public with sharing class ReportService {
         }
 
         List<Map<String, Object>> filters = new List<Map<String, Object>>();
-        
+
         filters.addAll(createBaseLogsFilters(parameters, startDateTime, endDateTime));
-        
+
         filters.addAll(createHashSpecificFilters(systemReport, parameters));
 
         return filters;
@@ -262,9 +262,9 @@ public with sharing class ReportService {
         DateTime endDateTime
     ) {
         List<Map<String, Object>> filters = new List<Map<String, Object>>();
-        
+
         filters.addAll(ReportApiClient.createDateRangeFilters(LOG_CREATED_AT_FIELD, startDateTime, endDateTime));
-        
+
         filters.add(ReportApiClient.createFilter(
             LOG_ORGANIZATION_ID_FIELD,
             'equals',
@@ -296,25 +296,25 @@ public with sharing class ReportService {
         return filters;
     }
 
- 
+
     private static List<Map<String, Object>> createHash1Filters(Map<String, Object> parameters) {
         List<Map<String, Object>> filters = new List<Map<String, Object>>();
-        
+
         filters.add(ReportApiClient.createFilter(LOG_HASH1_FIELD, 'equals', parameters.get('hash1')));
         filters.add(ReportApiClient.createFilter(LOG_HASH1_FIELD, 'notEqual', ''));
 
         return filters;
     }
 
-  
+
     private static List<Map<String, Object>> createHash2Filters(Map<String, Object> parameters) {
         List<Map<String, Object>> filters = new List<Map<String, Object>>();
-        
+
         filters.add(ReportApiClient.createFilter(LOG_HASH2_FIELD, 'equals', parameters.get('hash2')));
         filters.add(ReportApiClient.createFilter(LOG_HASH2_FIELD, 'notEqual', ''));
-        
+
         filters.add(ReportApiClient.createFilter(LOG_HASH1_FIELD, 'notEqual', parameters.get('hash1')));
-        
+
         filters.add(ReportApiClient.createFilter(LOG_ID_FIELD, 'notEqual', parameters.get('currentLogId')));
 
         return filters;
@@ -322,13 +322,13 @@ public with sharing class ReportService {
 
     private static List<Map<String, Object>> createHash3Filters(Map<String, Object> parameters) {
         List<Map<String, Object>> filters = new List<Map<String, Object>>();
-        
+
         filters.add(ReportApiClient.createFilter(LOG_HASH3_FIELD, 'equals', parameters.get('hash3')));
         filters.add(ReportApiClient.createFilter(LOG_HASH3_FIELD, 'notEqual', ''));
-        
+
         filters.add(ReportApiClient.createFilter(LOG_HASH1_FIELD, 'notEqual', parameters.get('hash1')));
         filters.add(ReportApiClient.createFilter(LOG_HASH2_FIELD, 'notEqual', parameters.get('hash2')));
-        
+
         filters.add(ReportApiClient.createFilter(LOG_ID_FIELD, 'notEqual', parameters.get('currentLogId')));
 
         return filters;
@@ -394,7 +394,7 @@ public with sharing class ReportService {
                 ReportService.SystemReport systemReport = chartToSystemReport.get(key);
 
                 String reportId = (ReportService.REPORT_NAME_TO_ID).get(systemReport);
-                
+
                 // Skip if report ID is not found
                 if (String.isBlank(reportId)) {
                     continue;
@@ -602,7 +602,7 @@ public with sharing class ReportService {
             DateTime current = this.startDateTime;
             while (current <= this.endDateTime) {
                 String dateLabel = current.format('yyyy-MM-dd');
-                
+
                 // Find matching data from report if available
                 Integer rowCount = 0;
                 if (report.groupingsDown != null && report.groupingsDown.groupings != null) {
@@ -624,7 +624,7 @@ public with sharing class ReportService {
                                 reportDateLabel = parts[2] + '-' + parts[0].leftPad(2, '0') + '-' + parts[1].leftPad(2, '0');
                             }
                         }
-                        
+
                         if (reportDateLabel == dateLabel) {
                             String factKey = i + '!T';
                             if (report.factMap != null && report.factMap.containsKey(factKey)) {
@@ -643,7 +643,7 @@ public with sharing class ReportService {
                     'logCount' => rowCount,
                     'titleY' => this.titleY
                 });
-                
+
                 current = current.addDays(1);
             }
 
@@ -681,7 +681,7 @@ public with sharing class ReportService {
             DateTime current = this.startDateTime;
             while (current <= this.endDateTime) {
                 String dateLabel = current.format('yyyy-MM-dd');
-                
+
                 // Find matching date in groupingsAcross
                 Integer dateIndex = -1;
                 if (dateGroupings != null) {
@@ -701,7 +701,7 @@ public with sharing class ReportService {
                                 reportDateLabel = parts[2] + '-' + parts[0].leftPad(2, '0') + '-' + parts[1].leftPad(2, '0');
                             }
                         }
-                        
+
                         if (reportDateLabel == dateLabel) {
                             dateIndex = i;
                             break;
@@ -714,7 +714,7 @@ public with sharing class ReportService {
                     for (Integer userIndex = 0; userIndex < userGroupings.size(); userIndex++) {
                         String userName = userGroupings[userIndex].label;
                         Integer userCount = 0;
-                        
+
                         // Get the fact key for this user and date combination
                         String factKey = userIndex + '!' + dateIndex;
                         if (report.factMap != null && report.factMap.containsKey(factKey)) {
@@ -723,7 +723,7 @@ public with sharing class ReportService {
                                 userCount = factEntry.aggregates[0].value;
                             }
                         }
-                        
+
                         // Only add entries with data
                         if (userCount > 0) {
                             result.add(new Map<String, Object>{
@@ -743,7 +743,7 @@ public with sharing class ReportService {
                         'titleY' => this.titleY
                     });
                 }
-                
+
                 current = current.addDays(1);
             }
 

@@ -225,8 +225,23 @@ public with sharing class AIAnalysis {
 		return convertedData;
 	}
 
+	public String getFormattedDataADF(String issueId, String context) {
+		ADFBuilder builder = new ADFBuilder();
+		for (String analysis : AIAnalysisService.ANALYSIS_MAP.keySet()) {
+			Map<String, Object> formattedDataADF = getFormattedDataADF(issueId, analysis, context);
+			if (formattedDataADF != null) {
+				builder.appendDoc(formattedDataADF);
+			}
+		}
+		return JSON.serialize(builder.build());
+	}
+
 	public String getFormattedData(String issueId, String analysis, String context) {
 		return analysisServiceByIssueId.get(issueId).getFormattedData(analysis, context);
+	}
+
+	public Map<String, Object> getFormattedDataADF(String issueId, String analysis, String context) {
+		return analysisServiceByIssueId.get(issueId).getFormattedDataADF(analysis, context);
 	}
 
 	public static String getTitleString(String issueName, String analysis) {

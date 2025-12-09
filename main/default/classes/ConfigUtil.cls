@@ -811,6 +811,7 @@ public with sharing class ConfigUtil {
     public static final String EVENT_ACTION_DELIVERED_TO_REMOVAL = 'Record Removed';
     public static final String EVENT_ACTION_DELIVERED_TO_LOCAL_ARCHIVAL = 'Archival_Log__b Big Object';
     public static final String EVENT_ACTION_DELIVERED_TO_SPLUNK = 'Sent to Splunk';
+    public static final String EVENT_ACTION_DELIVERED_TO_WEBHOOK = 'Webhook:';
 
     public static final String SIMPLE_KEY_WITH_COLON_SEPARATOR = '{0}:{1}';
 

@@ -155,6 +155,9 @@ private class ThresholdManagerTest {
         Map<String, Map<String, ThresholdConfig>> thresholds = new Map<String, Map<String, ThresholdConfig>>();
         Map<String, ThresholdConfig> metrics = new Map<String, ThresholdConfig>();
         
+        // TIME threshold
+        metrics.put(EventLogProcessors.FIELD_TIME, ThresholdManager.time(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+        
         // RUN_TIME threshold
         metrics.put(EventLogProcessors.FIELD_RUN_TIME, ThresholdManager.runTime(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
         
@@ -167,42 +170,84 @@ private class ThresholdManagerTest {
         // DB_TOTAL_TIME threshold
         metrics.put(EventLogProcessors.FIELD_DB_TOTAL_TIME, ThresholdManager.dbTotalTimeMs(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
         
+        // REQUEST_STATUS threshold
+        metrics.put(EventLogProcessors.FIELD_REQUEST_STATUS, ThresholdManager.requestStatus(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+        
         // REQUEST_SIZE threshold
-        metrics.put(EventLogProcessors.FIELD_REQUEST_SIZE, new ThresholdConfig.Builder()
-            .setEventType(EventLogProcessors.EVENT_TYPE_APEX_REST_API)
-            .setMetric(EventLogProcessors.FIELD_REQUEST_SIZE)
-            .setThreshold(1000000) // 1MB
-            .setEvalType(ThresholdConfig.EvaluationType.GREATER_THAN)
-            .build());
+        metrics.put(EventLogProcessors.FIELD_REQUEST_SIZE, ThresholdManager.requestSize(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
             
         // RESPONSE_SIZE threshold
-        metrics.put(EventLogProcessors.FIELD_RESPONSE_SIZE, new ThresholdConfig.Builder()
-            .setEventType(EventLogProcessors.EVENT_TYPE_APEX_REST_API)
-            .setMetric(EventLogProcessors.FIELD_RESPONSE_SIZE)
-            .setThreshold(1000000) // 1MB
-            .setEvalType(ThresholdConfig.EvaluationType.GREATER_THAN)
-            .build());
+        metrics.put(EventLogProcessors.FIELD_RESPONSE_SIZE, ThresholdManager.responseSize(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
             
         // STATUS_CODE threshold (HTTP 400+)
-        metrics.put(EventLogProcessors.FIELD_STATUS_CODE, new ThresholdConfig.Builder()
-            .setEventType(EventLogProcessors.EVENT_TYPE_APEX_REST_API)
-            .setMetric(EventLogProcessors.FIELD_STATUS_CODE)
-            .setThreshold(399) // HTTP 400+ errors
-            .setEvalType(ThresholdConfig.EvaluationType.GREATER_THAN)
-            .build());
+        metrics.put(EventLogProcessors.FIELD_STATUS_CODE, ThresholdManager.statusCode(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+
+        // LIMIT_USAGE_PERCENT threshold
+        metrics.put(EventLogProcessors.FIELD_LIMIT_USAGE_PERCENT, ThresholdManager.limitUsagePercent(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+
+        // EXEC_TIME threshold
+        metrics.put(EventLogProcessors.FIELD_EXEC_TIME, ThresholdManager.execTime(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+
+        // NUMBER_SOQL_QUERIES threshold
+        metrics.put(EventLogProcessors.FIELD_NUMBER_SOQL_QUERIES, ThresholdManager.numberSoqlQueries(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+
+        // DB_BLOCKS threshold
+        metrics.put(EventLogProcessors.FIELD_DB_BLOCKS, ThresholdManager.dbBlocks(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+
+        // OWS_PROCESSED threshold
+        metrics.put(EventLogProcessors.FIELD_ROWS_PROCESSED, ThresholdManager.rowsProcessed(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+
+        // QUERY_COUNT threshold
+        metrics.put(EventLogProcessors.FIELD_QUERY_COUNT, ThresholdManager.queryCount(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+        
+        // AVERAGE_ROW_SIZE threshold
+        metrics.put(EventLogProcessors.FIELD_AVERAGE_ROW_SIZE, ThresholdManager.avgRowSize(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+        
+        // NUMBER_COLUMNS threshold
+        metrics.put(EventLogProcessors.FIELD_NUMBER_COLUMNS, ThresholdManager.numberColumns(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+        
+        // EXCEPTION_MESSAGE threshold
+        metrics.put(EventLogProcessors.FIELD_EXCEPTION_MESSAGE, ThresholdManager.exceptionMessage(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
             
         thresholds.put(EventLogProcessors.EVENT_TYPE_APEX_REST_API, metrics);
         
         Map<String, ThresholdConfig> resultMetrics = thresholds.get(EventLogProcessors.EVENT_TYPE_APEX_REST_API);
         
         // Verify all expected metrics exist
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_TIME));
         System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_RUN_TIME));
         System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_CPU_TIME));
         System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_DB_CPU_TIME));
         System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_DB_TOTAL_TIME));
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_REQUEST_STATUS));
         System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_REQUEST_SIZE));
         System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_RESPONSE_SIZE));
         System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_STATUS_CODE));
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_LIMIT_USAGE_PERCENT));
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_EXEC_TIME));
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_NUMBER_SOQL_QUERIES));
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_DB_BLOCKS));
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_ROWS_PROCESSED));
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_QUERY_COUNT));
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_AVERAGE_ROW_SIZE));
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_NUMBER_COLUMNS));
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_EXCEPTION_MESSAGE));
+    }
+
+    @IsTest
+    static void testApexRestApiThresholds_dbTotalTimeNs() {
+        // Create inline thresholds for Apex REST API
+        Map<String, Map<String, ThresholdConfig>> thresholds = new Map<String, Map<String, ThresholdConfig>>();
+        Map<String, ThresholdConfig> metrics = new Map<String, ThresholdConfig>();
+
+        // DB_TOTAL_TIME threshold
+        metrics.put(EventLogProcessors.FIELD_DB_TOTAL_TIME, ThresholdManager.dbTotalTimeNs(EventLogProcessors.EVENT_TYPE_APEX_REST_API));
+
+        thresholds.put(EventLogProcessors.EVENT_TYPE_APEX_REST_API, metrics);
+        
+        Map<String, ThresholdConfig> resultMetrics = thresholds.get(EventLogProcessors.EVENT_TYPE_APEX_REST_API);
+
+        System.assert(resultMetrics.containsKey(EventLogProcessors.FIELD_DB_TOTAL_TIME));
     }
     
     @IsTest

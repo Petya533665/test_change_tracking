@@ -172,7 +172,8 @@ public with sharing class RuleUtil {
 		FT_PICKLIST,
 		FT_STRING,
 		FT_NUMBER,
-		FT_BOOLEAN
+		FT_BOOLEAN,
+		FT_MULTIPICKLIST
 	}
 	public static final String FIELD_TYPE_DOUBLE = 'DOUBLE';
 	public static final String FIELD_TYPE_DATE = 'DATE';
@@ -185,18 +186,23 @@ public with sharing class RuleUtil {
 	public static final String FIELD_TYPE_STRING = 'STRING';
 	public static final String FIELD_TYPE_NUMBER = 'NUMBER';
 	public static final String FIELD_TYPE_BOOLEAN = 'BOOLEAN';
+	public static final String FIELD_TYPE_MULTIPICKLIST = 'MULTIPICKLIST';
+	public static final String FIELD_TYPE_MULTISELECTPICKLIST = 'MULTISELECTPICKLIST';
+
 	public static final Map<String, FieldType> MAP_FIELD_TYPES_BY_STRINGS = new Map<String, FieldType> {
-			FIELD_TYPE_DOUBLE => FieldType.FT_DOUBLE,
-			FIELD_TYPE_DATE => FieldType.FT_DATE,
-			FIELD_TYPE_DATETIME => FieldType.FT_DATETIME,
-			FIELD_TYPE_ID => FieldType.FT_ID,
-			FIELD_TYPE_REFERENCE => FieldType.FT_REFERENCE,
-			FIELD_TYPE_TEXTAREA => FieldType.FT_TEXTAREA,
-			FIELD_TYPE_URL => FieldType.FT_URL,
-			FIELD_TYPE_PICKLIST => FieldType.FT_PICKLIST,
-			FIELD_TYPE_STRING => FieldType.FT_STRING,
-			FIELD_TYPE_NUMBER => FieldType.FT_NUMBER,
-			FIELD_TYPE_BOOLEAN => FieldType.FT_BOOLEAN
+		FIELD_TYPE_DOUBLE => FieldType.FT_DOUBLE,
+		FIELD_TYPE_DATE => FieldType.FT_DATE,
+		FIELD_TYPE_DATETIME => FieldType.FT_DATETIME,
+		FIELD_TYPE_ID => FieldType.FT_ID,
+		FIELD_TYPE_REFERENCE => FieldType.FT_REFERENCE,
+		FIELD_TYPE_TEXTAREA => FieldType.FT_TEXTAREA,
+		FIELD_TYPE_URL => FieldType.FT_URL,
+		FIELD_TYPE_PICKLIST => FieldType.FT_PICKLIST,
+		FIELD_TYPE_STRING => FieldType.FT_STRING,
+		FIELD_TYPE_NUMBER => FieldType.FT_NUMBER,
+		FIELD_TYPE_BOOLEAN => FieldType.FT_BOOLEAN,
+		FIELD_TYPE_MULTIPICKLIST => FieldType.FT_MULTIPICKLIST,
+		FIELD_TYPE_MULTISELECTPICKLIST => FieldType.FT_MULTIPICKLIST
 	};
 
 	public enum ActionSubtype {
@@ -280,7 +286,8 @@ public with sharing class RuleUtil {
 			Constants.ACTION_SOBJECT.ACTION_TYPE_TEAMS_NOTIFICATION,
 			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
 			Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT,
-			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT
+			Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_WORK_ITEM_COMMENT,
+			Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION
 		}
 	};
 	public static final Map<String, String> MAP_ACTION_SUBTYPES = new Map<String, String> {
@@ -302,7 +309,7 @@ public with sharing class RuleUtil {
 			'Action__r.JIRAAssignee__c','Action__r.JIRAAssignee_Id__c', 'Action__r.JIRAComponents__c', 'Action__r.JIRAEpic__c', 'Action__r.JIRAIssueType__c', 'Action__r.JIRALabels__c', 'Action__r.JIRAPriority__c', 'Action__r.JIRAProject__c',
 			'Action__r.SlackChannels__c', 'Action__r.Subject__c', 'Action__r.Action_Type__c', 'Action__r.Subtype__c', 'Action__r.PagerDuty_Type__c', 'Action__r.Contact__c', 'Action__r.Contact__r.Name', 'Action__r.CreatedBy.Name', 'Action__r.RecordTypeId', 'Action__r.Type__c',
 			'Action__r.Team_Id__c', 'Action__r.Channel_Id__c', 'Action__r.SlackChannels__c', 'Action__r.SObjectType__c', 'Action__r.Additional_Metadata__c', 'Action__r.Iteration__c', 'Action__r.Is_Update__c',
-			'Action__r.Webhook_URL__c', 'Action__r.Webhook_Method__c', 'Action__r.Webhook_Headers__c', 'Action__r.Webhook_Body_Template__c', 'Action__r.Webhook_Auth_Type__c', 'Action__r.Webhook_Content_Type__c'
+			'Action__r.Webhook_URL__c', 'Action__r.Webhook_Method__c', 'Action__r.Webhook_Headers__c', 'Action__r.Webhook_Body_Template__c', 'Action__r.Webhook_Auth_Type__c'
 	};
 
 	public final static List<String> ACTION_FIELDS = new List<String>{
@@ -310,7 +317,7 @@ public with sharing class RuleUtil {
 			'JIRAAssignee__c','JIRAAssignee_Id__c', 'JIRAComponents__c', 'JIRAEpic__c', 'JIRAIssueType__c', 'JIRALabels__c', 'JIRAPriority__c', 'JIRAProject__c',
 			'SlackChannels__c', 'Subject__c', 'Action_Type__c', 'Subtype__c', 'PagerDuty_Type__c', 'Contact__c', 'Contact__r.Name', 'CreatedBy.Name', 'RecordTypeId','Type__c',
 			'Team_Id__c', 'Channel_Id__c', 'SlackChannels__c', 'SObjectType__c', 'Additional_Metadata__c', 'Iteration__c', 'CreatedDate', 'Is_Update__c',
-			'Webhook_URL__c', 'Webhook_Method__c', 'Webhook_Headers__c', 'Webhook_Body_Template__c', 'Webhook_Auth_Type__c', 'Webhook_Content_Type__c'
+			'Webhook_URL__c', 'Webhook_Method__c', 'Webhook_Headers__c', 'Webhook_Body_Template__c', 'Webhook_Auth_Type__c'
 	};
 
 	private static final List<String> REQUIRED_RULE_FIELDS = new List<String> {
@@ -1157,8 +1164,7 @@ public with sharing class RuleUtil {
 					Action__r.Webhook_Method__c,
 					Action__r.Webhook_Headers__c,
 					Action__r.Webhook_Body_Template__c,
-					Action__r.Webhook_Auth_Type__c,
-					Action__r.Webhook_Content_Type__c
+					Action__r.Webhook_Auth_Type__c
 				FROM RuleActions__r
 				)
 				FROM Rule__c
@@ -1224,8 +1230,7 @@ public with sharing class RuleUtil {
 					Action__r.Webhook_Method__c,
 					Action__r.Webhook_Headers__c,
 					Action__r.Webhook_Body_Template__c,
-					Action__r.Webhook_Auth_Type__c,
-					Action__r.Webhook_Content_Type__c
+					Action__r.Webhook_Auth_Type__c
 				FROM RuleActions__r
 				)
 				FROM Rule__c
@@ -2051,6 +2056,40 @@ public with sharing class RuleUtil {
 						}
 					}
 				}
+			when FT_MULTIPICKLIST {
+				switch on MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) {
+					when EQUAL {
+						Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
+						Set<String> values = getStringValuesLowerCase(this.value);
+						result = stringValues.size() > 0 && stringValues.containsAll(values);
+					}
+					when NOT_EQUAL {
+						Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
+						Set<String> values = getStringValuesLowerCase(this.value);
+						// If field is empty/null, it's considered not equal to any non-empty filter value
+						result = stringValues.isEmpty() ? true : !stringValues.containsAll(values);
+					}
+					when CONTAINS {
+						// CONTAINS means field must have ALL filter values (AND logic, case-insensitive)
+						Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
+						Set<String> values = getStringValuesLowerCase(this.value);
+						result = stringValues.size() > 0 && stringValues.containsAll(values);
+					}
+					when DOESNT_CONTAIN {
+						// DOES NOT CONTAIN means field must have NONE of the filter values (contains none, case-insensitive)
+						Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
+						Set<String> values = getStringValuesLowerCase(this.value);
+						// Create a clone and find intersection
+						Set<String> intersection = stringValues.clone();
+						intersection.retainAll(values);
+						// If intersection is empty, field contains none of the filter values
+						result = intersection.isEmpty();
+					}
+					when else {
+						// undefined comparison operator
+					}
+				}
+			}
 				when FT_NUMBER, FT_DOUBLE {
 					switch on MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) {
 						when EQUAL {
@@ -2130,6 +2169,26 @@ public with sharing class RuleUtil {
 						when else {
 							// undefined comparison operator
 						}
+					}
+				}
+			}
+			return result;
+		}
+
+		/**
+		 * Get multipicklist values as lowercase set for case-insensitive comparison
+		 * Supports both semicolon (;) and comma (,) as delimiters
+		 */
+		private Set<String> getStringValuesLowerCase(Object obj) {
+			Set<String> result = new Set<String>();
+			if (obj != null) {
+				String valueStr = obj.toString();
+				// Split by both semicolon and comma delimiters
+				List<String> splitValues = valueStr?.split('[;,]') ?? new List<String>();
+				// Trim whitespace and convert to lowercase
+				for (String val : splitValues) {
+					if (String.isNotBlank(val)) {
+						result.add(val.trim().toLowerCase());
 					}
 				}
 			}
@@ -2313,7 +2372,6 @@ public with sharing class RuleUtil {
 		public String webhookBodyTemplate;
 		public String webhookAuthType;
 		public String webhookAuthValue;
-		public String webhookContentType;
 
 		public String content;
 		public Action__c fields;
@@ -2366,7 +2424,6 @@ public with sharing class RuleUtil {
 			this.webhookAuthValue = String.isNotBlank(action.Webhook_URL__c) 
 				? WebhookService.getWebhookTokenFromSettings(action.Webhook_URL__c) 
 				: null;
-			this.webhookContentType = action.Webhook_Content_Type__c;
 
 			this.fields = action;
 
@@ -2452,9 +2509,8 @@ public with sharing class RuleUtil {
 				Webhook_Method__c = webhookMethod,
 				Webhook_Headers__c = webhookHeaders,
 				Webhook_Body_Template__c = webhookBodyTemplate,
-				Webhook_Auth_Type__c = webhookAuthType,
+				Webhook_Auth_Type__c = webhookAuthType
 				// Webhook_Auth_Value__c is not set here - tokens are saved to custom settings instead
-				Webhook_Content_Type__c = webhookContentType
 			);
 			
 			// Populate Webhook_URL_Domain__c from Webhook_URL__c

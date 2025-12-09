@@ -229,8 +229,10 @@ public without sharing class AdminService {
         mergeFields.addAll(addCustomMergeFields(traceResultDsR, 'traceResult'));
         mergeFields.addAll(getSobjectFields(traceResultDsR, 'traceResult'));
 
-        mergeFields.addAll(ChartService.getChartsFields());
-        
+        if (AutoChart.isEnabled) {
+            mergeFields.addAll(ChartService.getChartsFields());
+        }
+
         mergeFields.sort();
         return mergeFields;
     }
@@ -2457,8 +2459,8 @@ public without sharing class AdminService {
 
     public static Event_Monitoring__c setEventMonitoringSetting(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
-        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
         Boolean incomingValue = Boolean.valueOf(input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED));
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = incomingValue;
 
         // if the incoming value is true and the enabled value is false, enable the event log generation in metadata settings
         if(incomingValue && !ConfigUtil.EVENT_MONITORING_SETTINGS?.Enabled__c) {
@@ -2467,8 +2469,11 @@ public without sharing class AdminService {
                 MetadataServiceUtil.setEventSettingsLogGeneration(incomingValue);
             }
         }
-        // set the enabled value to the input value
-        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = incomingValue;
+        Boolean monitoringEnabledFirstTime = incomingValue && !ConfigUtil.EVENT_MONITORING_SETTINGS?.Initialized__c;
+        if (monitoringEnabledFirstTime) {
+            EventMonitoringUtil.createDefaultRulesForEventType(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION);
+            ConfigUtil.EVENT_MONITORING_SETTINGS.Initialized__c = true;
+        }
 
         List<EventMonitoringUtil.EventTypeStatus> eventTypeStatuses = null;
         Object enabledTypesData = input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES);
@@ -2759,8 +2764,9 @@ public without sharing class AdminService {
             && !input.containsKey(RuleUtil.KEY_ACTIONS)
             && !input.containsKey(RuleUtil.KEY_RULE_FILTERS);
         RuleUtil.Rule deserializedRuleWrapper = (RuleUtil.Rule)JSON.deserialize(JSON.serialize(input.get(RuleUtil.KEY_RULE)), RuleUtil.Rule.class);
-        if (deserializedRuleWrapper.isUpdateRule && !PermissionsUtil.UpdateRules) {
-            return getRuleSettings(deserializedRuleWrapper.getRule().Type__c);
+        String type = deserializedRuleWrapper?.type;
+        if (!PermissionsUtil.UpdateRules && deserializedRuleWrapper?.isUpdateRule == true && (type == Constants.RULE_SOBJECT.TYPE_NOTIFICATION || type == Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE || type == Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS)) {
+            return getRuleSettings(type);
         }
 
         // FIRST: Create Remote Site Settings for webhook actions (BEFORE any DML)
@@ -3043,7 +3049,12 @@ public without sharing class AdminService {
             ConfigUtil.PHAROS_SETTINGS.Archival_Scheduler_Cron_Exp__c = DEFAULT_BULK_FREQUENCY_HOURS;
             upsert ConfigUtil.PHAROS_SETTINGS;
         }
-        return new Map<String, Object>{'schedule' => true};
+        return new Map<String, Object>{'isScheduled' => true};
+    }
+
+    public static Map<String, Object> runJobBatchImmediately() {
+        JobBatch.getInstance().forceStartBatch();
+        return new Map<String, Object>{'isScheduled' => true};
     }
 
     // data for logs charts

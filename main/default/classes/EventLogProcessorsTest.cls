@@ -3931,4 +3931,184 @@ private class EventLogProcessorsTest {
         mockAccount.Description = JSON.serialize(testData);
         return (SObject)mockAccount;
     }
+
+    // ==========================================
+    // Tests for findAndUpdateSimpleLogs
+    // ==========================================
+
+    /**
+     * Test findAndUpdateSimpleLogs finds and updates simple logs from JobBatch
+     * When EventLogProcessingBatch finds a simple log (no stacktrace) by Summary,
+     * it should update it with stacktrace and recalculate Hash_1
+     */
+    @IsTest
+    static void test_findAndUpdateSimpleLogs_updates_simple_log() {
+        // Use a fixed unique summary to ensure exact match
+        String testSummary = 'Unique test error ABC123XYZ';
+        DateTime testTime = DateTime.now();
+        
+        // Create a simple log (simulating JobBatch log with no stacktrace)
+        // Use valid 15-char ID format for Async_Job_Id__c
+        Log__c simpleLog = new Log__c(
+            Summary__c = testSummary,
+            Details__c = 'Simple error from JobBatch',
+            Stacktrace__c = null,
+            Async_Job_Id__c = '707000000000002',  // Valid 15-char ID format
+            Category__c = 'Apex',
+            Hash_1__c = 'simple_hash_from_jobbatch',
+            Created_At__c = testTime
+        );
+        insert simpleLog;
+        
+        // Re-query to get the actual values after insert
+        simpleLog = [SELECT Id, Summary__c, Hash_1__c, Async_Job_Id__c, Created_At__c, Stacktrace__c FROM Log__c WHERE Id = :simpleLog.Id];
+        String originalHash1 = simpleLog.Hash_1__c;
+        
+        // Verify preconditions
+        System.assertEquals(testSummary, simpleLog.Summary__c, 'Summary should match');
+        System.assert(String.isBlank(simpleLog.Stacktrace__c), 'Stacktrace should be blank');
+        System.assertNotEquals(null, simpleLog.Async_Job_Id__c, 'Async_Job_Id should be set');
+        
+        // Create event log (simulating EventLogProcessingBatch log with stacktrace)
+        // Use same summary and time within the window
+        Log__c eventLog = new Log__c(
+            Summary__c = testSummary,  // Same summary - exact match
+            Details__c = 'Full error details from EventLog',
+            Stacktrace__c = 'Class.TestBatchTwo.execute: line 8, column 1',
+            Request_Id_External__c = 'REQ-12345',
+            Category__c = 'Apex',
+            Hash_1__c = 'correct_hash_with_stacktrace',
+            Created_At__c = testTime  // Same time - within window
+        );
+        
+        Test.startTest();
+        Map<Id, Log__c> result = EventLogProcessors.findAndUpdateSimpleLogs(
+            new List<Log__c>{eventLog}, 
+            Logger.getInstance()
+        );
+        Test.stopTest();
+
+        // Verify simple log was found
+        System.assertEquals(1, result.size(), 'Should find 1 simple log to update');
+        System.assert(result.containsKey(simpleLog.Id), 'Should find the simple log by Id');
+        
+        // Verify the simple log was updated with stacktrace
+        Log__c updatedSimpleLog = result.get(simpleLog.Id);
+        System.assertEquals('Class.TestBatchTwo.execute: line 8, column 1', updatedSimpleLog.Stacktrace__c,
+            'Stacktrace should be copied from event log');
+        System.assertEquals('REQ-12345', updatedSimpleLog.Request_Id_External__c,
+            'Request_Id_External__c should be copied from event log');
+        System.assertNotEquals(originalHash1, updatedSimpleLog.Hash_1__c,
+            'Hash_1 should be recalculated');
+        System.assertEquals(LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED, updatedSimpleLog.Post_Processing_Status__c,
+            'Post_Processing_Status should be set to NEEDED');
+    }
+
+    /**
+     * Test findAndUpdateSimpleLogs skips logs that already have stacktrace
+     * Logs with existing stacktrace should not be matched
+     */
+    @IsTest
+    static void test_findAndUpdateSimpleLogs_skips_logs_with_stacktrace() {
+        // Create a log with stacktrace (not a simple log)
+        Log__c logWithStacktrace = new Log__c(
+            Summary__c = 'List index out of bounds: 0',
+            Details__c = 'Error with stacktrace',
+            Stacktrace__c = 'Class.ExistingClass.method: line 1, column 1',  // Has stacktrace
+            Async_Job_Id__c = '707gL00000FullLog',
+            Category__c = 'Apex',
+            Hash_1__c = 'hash_with_stacktrace',
+            Created_At__c = DateTime.now()
+        );
+        insert logWithStacktrace;
+        
+        // Create event log with same summary
+        Log__c eventLog = new Log__c(
+            Summary__c = 'List index out of bounds: 0',
+            Details__c = 'New event log',
+            Stacktrace__c = 'Class.TestBatchTwo.execute: line 8, column 1',
+            Request_Id_External__c = 'REQ-67890',
+            Category__c = 'Apex',
+            Created_At__c = DateTime.now()
+        );
+        
+        Test.startTest();
+        Map<Id, Log__c> result = EventLogProcessors.findAndUpdateSimpleLogs(
+            new List<Log__c>{eventLog}, 
+            Logger.getInstance()
+        );
+        Test.stopTest();
+        
+        // Verify log with stacktrace was NOT matched
+        System.assertEquals(0, result.size(), 
+            'Should not find logs that already have stacktrace');
+    }
+
+    /**
+     * Test findAndUpdateSimpleLogs returns empty when no matching simple logs
+     * When there are no simple logs with matching Summary, should return empty map
+     */
+    @IsTest
+    static void test_findAndUpdateSimpleLogs_no_match() {
+        // Create event log with unique summary
+        Log__c eventLog = new Log__c(
+            Summary__c = 'Unique error that has no existing log',
+            Details__c = 'New event log',
+            Stacktrace__c = 'Class.UniqueClass.method: line 1, column 1',
+            Request_Id_External__c = 'REQ-UNIQUE',
+            Category__c = 'Apex',
+            Created_At__c = DateTime.now()
+        );
+        
+        Test.startTest();
+        Map<Id, Log__c> result = EventLogProcessors.findAndUpdateSimpleLogs(
+            new List<Log__c>{eventLog}, 
+            Logger.getInstance()
+        );
+        Test.stopTest();
+        
+        // Verify no matches found
+        System.assertEquals(0, result.size(), 
+            'Should return empty map when no matching simple logs exist');
+    }
+
+    /**
+     * Test findAndUpdateSimpleLogs requires Async_Job_Id
+     * Simple logs must have Async_Job_Id to be matched (indicating they came from JobBatch)
+     */
+    @IsTest
+    static void test_findAndUpdateSimpleLogs_requires_asyncJobId() {
+        // Create a simple log WITHOUT Async_Job_Id
+        Log__c simpleLogNoAsyncId = new Log__c(
+            Summary__c = 'Error without async job id',
+            Details__c = 'Simple error',
+            Stacktrace__c = null,
+            Async_Job_Id__c = null,  // No Async_Job_Id
+            Category__c = 'Apex',
+            Hash_1__c = 'some_hash',
+            Created_At__c = DateTime.now()
+        );
+        insert simpleLogNoAsyncId;
+        
+        // Create event log with same summary
+        Log__c eventLog = new Log__c(
+            Summary__c = 'Error without async job id',
+            Details__c = 'Event log data',
+            Stacktrace__c = 'Class.SomeClass.method: line 1, column 1',
+            Request_Id_External__c = 'REQ-NOASYNC',
+            Category__c = 'Apex',
+            Created_At__c = DateTime.now()
+        );
+        
+        Test.startTest();
+        Map<Id, Log__c> result = EventLogProcessors.findAndUpdateSimpleLogs(
+            new List<Log__c>{eventLog}, 
+            Logger.getInstance()
+        );
+        Test.stopTest();
+        
+        // Verify log without Async_Job_Id was NOT matched
+        System.assertEquals(0, result.size(), 
+            'Should not match logs without Async_Job_Id');
+    }
 }

@@ -1080,7 +1080,7 @@ public with sharing class AzureService {
     public static List<AzureDevOpsAccount> getAccountsByOwnerId(String ownerId, String oAuthToken) {
 		List<AzureDevOpsAccount> result = new List<AzureDevOpsAccount>();
 
-        String endpoint = AZURE_DEVOPS_REST_API_MY_ACCOUNTS + '?memberId='+ ownerId + '&'+ AZURE_DEVOPS_REST_API_VERSION;
+        String endpoint = getAccountsByOwnerIdEndpoint(ownerId);
 		String b = HttpUtils.get(
 			endpoint,
 			HttpUtils.getHeadersAuthorizationAcceptJson(AZURE_DEVOPS_REST_API_TOKEN_TYPE_BEARER + oAuthToken),
@@ -1089,6 +1089,10 @@ public with sharing class AzureService {
 		AzureDevOpsAccountWrapper ow = (AzureDevOpsAccountWrapper)JSON.deserialize(b, AzureDevOpsAccountWrapper.class);
 		result = ow.value;
 		return result;
+	}
+
+	public static String getAccountsByOwnerIdEndpoint(String ownerId) {
+		return AZURE_DEVOPS_REST_API_MY_ACCOUNTS + '?memberId='+ ownerId + '&'+ AZURE_DEVOPS_REST_API_VERSION;
 	}
 
     public class AzureDevOpsMyProfile {

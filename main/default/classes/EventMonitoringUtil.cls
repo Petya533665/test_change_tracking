@@ -854,17 +854,18 @@ public with sharing class EventMonitoringUtil {
 
     public static List<EventTypeStatus> getEventTypesWithStatus() {
         List<EventTypeStatus> result = new List<EventTypeStatus>();
-        List<Boolean> enabledStatuses = getEnabledMembersFromSettings();
         
-        // Get existing rules with logs limits
+        // Get existing rules with active status and logs limits
+        Map<String, Boolean> existingActiveStatuses = new Map<String, Boolean>();
         Map<String, Integer> existingLogsLimits = new Map<String, Integer>();
         List<Rule__c> existingRules = [
-            SELECT Subtype__c, Logs_Limit__c 
+            SELECT Subtype__c, Active__c, Logs_Limit__c 
             FROM Rule__c 
             WHERE Type__c = :EVENT_MONITORING_TYPE
         ];
         
         for (Rule__c rule : existingRules) {
+            existingActiveStatuses.put(rule.Subtype__c, rule.Active__c);
             if (rule.Logs_Limit__c != null) {
                 existingLogsLimits.put(rule.Subtype__c, Integer.valueOf(rule.Logs_Limit__c));
             }
@@ -875,17 +876,13 @@ public with sharing class EventMonitoringUtil {
             if (!DEFAULT_ENABLED_EVENT_TYPES.contains(eventType)) {
                 continue;
             }
-            Integer index = MAP_ENABLED_EVENT_TYPES.get(eventType);
-            Boolean isActive = false;
-            if (index != null && index < enabledStatuses.size()) {
-                isActive = enabledStatuses[index];
-            }
             
-            // Get logs limit from existing rule or default
+            Boolean isActive = existingActiveStatuses.containsKey(eventType) 
+                ? existingActiveStatuses.get(eventType) 
+                : false;
             Integer logsLimit = existingLogsLimits.containsKey(eventType) 
                 ? existingLogsLimits.get(eventType) 
                 : getDefaultLogsLimitForEventType(eventType);
-                
             result.add(new EventTypeStatus(eventType, isActive, logsLimit));
         }
         

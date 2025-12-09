@@ -47,8 +47,7 @@ private class WebhookService_Test {
             Webhook_Method__c = 'POST',
             Webhook_Headers__c = '{"X-Custom-Header": "test-value"}',
             Webhook_Body_Template__c = '{"message": "{!Log__c.Summary__c}"}',
-            Webhook_Auth_Type__c = 'Bearer',
-            Webhook_Content_Type__c = 'application/json'
+            Webhook_Auth_Type__c = 'Bearer'
         );
         
         // Save token to custom settings

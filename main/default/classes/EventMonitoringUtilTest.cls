@@ -735,7 +735,7 @@ private class EventMonitoringUtilTest {
         }
         
         System.assertNotEquals(null, apiStatus, 'API event type should be found');
-        System.assertEquals(true, apiStatus.active, 'API should be active based on settings');
+        System.assertEquals(false, apiStatus.active, 'API should be disabled based on settings');
         System.assertEquals(100, apiStatus.logsLimit, 'API should have default logs limit');
     }
 

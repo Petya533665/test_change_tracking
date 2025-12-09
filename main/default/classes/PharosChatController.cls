@@ -119,15 +119,19 @@ public with sharing class PharosChatController {
 
     @AuraEnabled
     public static Map<String, String> getSendMessageData(String recordId) {
+        Boolean changeTrackingEnabled = ConfigUtil.CHANGE_TRACKING_SETTINGS.Git_Change_Tracking__c;
         Map<String, String> data = new Map<String, String> {
             'sf_session' => EncodingUtil.base64Encode(Blob.valueOf(ConnectedOrgService.getSelfConnectedOrgAccessToken())),
             'sf_instance' => System.Url.getOrgDomainUrl().toExternalForm(),
             'sf_namespace' => ConfigUtil.nameSpacePrefix,
             'sf_timezone_offset' => AdminService.getUserTimezoneOffset().toString(),
-            'git_user' => GitHubUtils.GIT_USERNAME,
-            'git_repo' => GitHubUtils.GIT_REPONAME,
-            'record_id' => recordId
+            'record_id' => recordId,
+            'change_tracking_enabled' => String.valueOf(changeTrackingEnabled)
         };
+        if (changeTrackingEnabled) {
+            data.put('git_user', GitHubUtils.GIT_USERNAME);
+            data.put('git_repo', GitHubUtils.GIT_REPONAME);
+        }
         return data;
     }
 

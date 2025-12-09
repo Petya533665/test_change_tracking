@@ -1,6 +1,8 @@
 public with sharing class PassthroughtModeService {
 
     private static final String EXCEPTION_INVALID_SESSION_ID = 'INVALID_SESSION_ID';
+    // Recursion guard to prevent infinite loop when logging passthrough errors
+    private static Boolean isHandlingPassthroughError = false;
 
     private static Connected_Org__c getPassthroughConnectedOrg() {
         Connected_Org__c corg = ConnectedOrgService.getPassthroughConnectedOrg();
@@ -58,8 +60,16 @@ public with sharing class PassthroughtModeService {
                 DatabaseUtils.getInstance().performUpdateDML(new List<Connected_Org__c>{corg}, Schema.SObjectType.Connected_Org__c)
                         .handleError(PassthroughtModeService.class.getName(), '.sendPassthroughData');
             }
-            Logger.getInstance().addInternalError(e, PassthroughtModeService.class.getName(), '.sendPassthroughData');
-            Logger.getInstance().flush();
+            // Prevent infinite recursion: only log error if not already handling a passthrough error
+            if (!isHandlingPassthroughError) {
+                isHandlingPassthroughError = true;
+                try {
+                    Logger.getInstance().addInternalError(e, PassthroughtModeService.class.getName(), '.sendPassthroughData');
+                    Logger.getInstance().flush();
+                } finally {
+                    isHandlingPassthroughError = false;
+                }
+            }
         }
     }
 

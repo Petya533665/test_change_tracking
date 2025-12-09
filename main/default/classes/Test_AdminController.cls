@@ -436,6 +436,12 @@ public class Test_AdminController {
         AdminController.remoteActionHandler(JSON.serialize(payload));
 
         payload = new Map<String, Object>{
+            'method' => 'runJobBatchImmediately',
+            'data' => ''
+        };
+        AdminController.remoteActionHandler(JSON.serialize(payload));
+
+        payload = new Map<String, Object>{
             'method' => 'resetAllSettingsForRefreshSandbox',
             'data' => ''
         };
@@ -5618,7 +5624,8 @@ public class Test_AdminController {
             FROM Rule__c 
             WHERE Type__c = :EventMonitoringUtil.EVENT_MONITORING_TYPE
         ];
-        System.assertEquals(2, createdRules.size(), 'Should create 2 rules');
+        // 2 rules + 1 Apex unexpected exception rule created by default
+        System.assertEquals(3, createdRules.size(), 'Should create 3 rules');
     }
     
     @IsTest
@@ -6694,7 +6701,6 @@ public class Test_AdminController {
         webhookAction.webhookHeaders = '{"Content-Type":"application/json"}';
         webhookAction.webhookBodyTemplate = '{"test":"value"}';
         webhookAction.webhookAuthType = 'None';
-        webhookAction.webhookContentType = 'application/json';
 
         // Create rule data
         Map<String, Object> data = new Map<String, Object>();
@@ -6747,7 +6753,6 @@ public class Test_AdminController {
         webhookAction1.webhookHeaders = '{}';
         webhookAction1.webhookBodyTemplate = '{"test":"value1"}';
         webhookAction1.webhookAuthType = 'None';
-        webhookAction1.webhookContentType = 'application/json';
 
         // Create second webhook action with different URL
         RuleUtil.Action webhookAction2 = new RuleUtil.Action();
@@ -6757,7 +6762,6 @@ public class Test_AdminController {
         webhookAction2.webhookHeaders = '{}';
         webhookAction2.webhookBodyTemplate = '{"test":"value2"}';
         webhookAction2.webhookAuthType = 'None';
-        webhookAction2.webhookContentType = 'application/json';
 
         // Create rule data
         Map<String, Object> data = new Map<String, Object>();
@@ -6790,6 +6794,22 @@ public class Test_AdminController {
             ORDER BY Webhook_URL__c
         ];
         System.assertEquals(2, webhookActions.size(), 'Both webhook actions should be created');
+    }
+
+    @IsTest
+    static void test_runJobBatchImmediately() {
+        Logger_Settings__c loggerSettings = Logger_Settings__c.getOrgDefaults();
+        loggerSettings.Batch_Error_Tracking_Enabled__c = true;
+        upsert loggerSettings;
+
+        PermissionsUtil.AsyncProcessErrorTracking = true;
+
+        Test.startTest();
+            Map<String, Object> result = AdminService.runJobBatchImmediately();
+        Test.stopTest();
+
+        Assert.isTrue(result.containsKey('isScheduled'));
+        Assert.isTrue((Boolean) result.get('isScheduled'));
     }
 
     // Helper method to get Remote Site Settings mock for webhooks
