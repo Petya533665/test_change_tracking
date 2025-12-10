@@ -118,7 +118,9 @@ public with sharing class RuleUtil {
 		LESS_OR_EQUAL,
 		CONTAINS,
 		DOESNT_CONTAIN,
-		IS_CHANGED
+		IS_CHANGED,
+		INCLUDES,
+		EXCLUDES
 	}
 	public static final String COMPARISON_OPERATOR_EQUAL = 'Equal';
 	public static final String COMPARISON_OPERATOR_NOT_EQUAL = 'Not equal';
@@ -129,6 +131,9 @@ public with sharing class RuleUtil {
 	public static final String COMPARISON_OPERATOR_CONTAINS = 'Contains';
 	public static final String COMPARISON_OPERATOR_DOSENT_CONTAINS = 'Doesn\'t Contain';
 	public static final String COMPARISON_OPERATOR_ISCHANGED = 'Is Changed';
+	public static final String COMPARISON_OPERATOR_INCLUDES = 'Includes';
+	public static final String COMPARISON_OPERATOR_EXCLUDES = 'Excludes';
+
 	public static Map<String, ComparisonOperator> MAP_COMPARISON_OPERATOR_BY_STRING = new Map<String, ComparisonOperator> {
 			COMPARISON_OPERATOR_EQUAL => ComparisonOperator.EQUAL,
 			COMPARISON_OPERATOR_NOT_EQUAL => ComparisonOperator.NOT_EQUAL,
@@ -138,7 +143,9 @@ public with sharing class RuleUtil {
 			COMPARISON_OPERATOR_LESS_OR_EQUAL => ComparisonOperator.LESS_OR_EQUAL,
 			COMPARISON_OPERATOR_CONTAINS => ComparisonOperator.CONTAINS,
 			COMPARISON_OPERATOR_DOSENT_CONTAINS => ComparisonOperator.DOESNT_CONTAIN,
-			COMPARISON_OPERATOR_ISCHANGED => ComparisonOperator.IS_CHANGED
+			COMPARISON_OPERATOR_ISCHANGED => ComparisonOperator.IS_CHANGED,
+			COMPARISON_OPERATOR_INCLUDES => ComparisonOperator.INCLUDES,
+			COMPARISON_OPERATOR_EXCLUDES => ComparisonOperator.EXCLUDES
 	};
 
 	public enum AggregateType {
@@ -1895,7 +1902,9 @@ public with sharing class RuleUtil {
 
 			this.isFilterable = fieldDR != null && fieldDR.isFilterable()
 				&& MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) != RuleUtil.ComparisonOperator.CONTAINS
-				&& MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) != RuleUtil.ComparisonOperator.DOESNT_CONTAIN;
+				&& MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) != RuleUtil.ComparisonOperator.DOESNT_CONTAIN
+				&& MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) != RuleUtil.ComparisonOperator.INCLUDES
+				&& MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) != RuleUtil.ComparisonOperator.EXCLUDES;
 		}
 
 		public RuleFilter(RuleFilter__c ruleFilter) {
@@ -2056,40 +2065,46 @@ public with sharing class RuleUtil {
 						}
 					}
 				}
-			when FT_MULTIPICKLIST {
-				switch on MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) {
-					when EQUAL {
-						Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
-						Set<String> values = getStringValuesLowerCase(this.value);
-						result = stringValues.size() > 0 && stringValues.containsAll(values);
-					}
-					when NOT_EQUAL {
-						Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
-						Set<String> values = getStringValuesLowerCase(this.value);
-						// If field is empty/null, it's considered not equal to any non-empty filter value
-						result = stringValues.isEmpty() ? true : !stringValues.containsAll(values);
-					}
-					when CONTAINS {
-						// CONTAINS means field must have ALL filter values (AND logic, case-insensitive)
-						Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
-						Set<String> values = getStringValuesLowerCase(this.value);
-						result = stringValues.size() > 0 && stringValues.containsAll(values);
-					}
-					when DOESNT_CONTAIN {
-						// DOES NOT CONTAIN means field must have NONE of the filter values (contains none, case-insensitive)
-						Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
-						Set<String> values = getStringValuesLowerCase(this.value);
-						// Create a clone and find intersection
-						Set<String> intersection = stringValues.clone();
-						intersection.retainAll(values);
-						// If intersection is empty, field contains none of the filter values
-						result = intersection.isEmpty();
-					}
-					when else {
-						// undefined comparison operator
+				when FT_MULTIPICKLIST {
+					switch on MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) {
+						when EQUAL {
+							// EQUAL means field must have ALL filter values (AND logic, case-insensitive)
+							Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
+							Set<String> values = getStringValuesLowerCase(this.value);
+							result = stringValues.size() > 0 && stringValues.containsAll(values);
+						}
+						when NOT_EQUAL {
+							// NOT EQUAL means field doesn't have ALL filter values (inverse of AND logic)
+							Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
+							Set<String> values = getStringValuesLowerCase(this.value);
+							// If field is empty/null, it's considered not equal to any non-empty filter value
+							result = stringValues.isEmpty() ? true : !stringValues.containsAll(values);
+						}
+						when INCLUDES {
+							// INCLUDES means field must have AT LEAST ONE filter value (OR logic, case-insensitive)
+							Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
+							Set<String> values = getStringValuesLowerCase(this.value);
+							// Create a clone and find intersection
+							Set<String> intersection = stringValues.clone();
+							intersection.retainAll(values);
+							// If intersection is not empty, field contains at least one filter value
+							result = !intersection.isEmpty();
+						}
+						when EXCLUDES {
+							// EXCLUDES means field must have NONE of the filter values (excludes all, case-insensitive)
+							Set<String> stringValues = getStringValuesLowerCase(objectMap.get(this.fieldName));
+							Set<String> values = getStringValuesLowerCase(this.value);
+							// Create a clone and find intersection
+							Set<String> intersection = stringValues.clone();
+							intersection.retainAll(values);
+							// If intersection is empty, field contains none of the filter values
+							result = intersection.isEmpty();
+						}
+						when else {
+							// undefined comparison operator
+						}
 					}
 				}
-			}
 				when FT_NUMBER, FT_DOUBLE {
 					switch on MAP_COMPARISON_OPERATOR_BY_STRING.get(this.comparisonOperator) {
 						when EQUAL {

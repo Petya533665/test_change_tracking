@@ -245,4 +245,97 @@ private class JobBatchTest {
         System.assert(logsWithAsyncJobId.size() >= 1, 'Should have at least 1 log with the Async_Job_Id');
     }
 
+    /**
+     * Test hybrid deduplication: First try Hash_1__c, then Async_Job_Id__c
+     * When simple log exists by Hash_1__c, JobBatch should find and update it
+     */
+    @IsTest
+    private static void test_execute_hybrid_deduplication_finds_by_hash1() {
+        TestDataFactory.createConnectedOrg();
+        
+        // Parse test data to get AsyncApexJob info
+        List<AsyncApexJob> testJobs = (List<AsyncApexJob>)JSON.deserialize(TestDataFactory.ASYNC_APEX_JOBS_JSON, List<AsyncApexJob>.class);
+        AsyncApexJob testJob = testJobs[1]; // Second job from test data
+        
+        // Calculate Hash_1__c that JobBatch would generate for this job (simple formula)
+        String expectedHash1 = JobBatch.getHash1(testJob);
+        
+        // Create existing simple log with Hash_1__c (before EventLogProcessingBatch updated it)
+        Log__c simpleLog = new Log__c(
+            Summary__c = 'Test error',
+            Details__c = 'Simple log',
+            Hash_1__c = expectedHash1,
+            Async_Job_Id__c = String.valueOf(testJob.Id).left(15),
+            Category__c = 'Apex',
+            Created_At__c = testJob.CompletedDate != null ? testJob.CompletedDate : testJob.CreatedDate
+        );
+        insert simpleLog;
+        
+        Test.startTest();
+        ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c = false;
+        update ConfigUtil.CONNECTED_ORGS_SETTINGS;
+        JobBatch jobBatch = JobBatch.getInstance();
+        jobBatch.execute(null, testJobs);
+        jobBatch.finish(null);
+        Test.stopTest();
+        
+        // Should find by Hash_1__c and not create duplicate
+        List<Log__c> logsWithHash = [
+            SELECT Id, Hash_1__c, Async_Job_Id__c 
+            FROM Log__c 
+            WHERE Hash_1__c = :expectedHash1
+        ];
+        
+        System.assertEquals(1, logsWithHash.size(), 'Should find existing log by Hash_1__c without creating duplicate');
+    }
+
+    /**
+     * Test hybrid deduplication: Fallback to Async_Job_Id__c when Hash_1__c changed
+     * After EventLogProcessingBatch updates log with stacktrace, Hash_1__c changes
+     * JobBatch should still find the log using Async_Job_Id__c fallback
+     */
+    @IsTest
+    private static void test_execute_hybrid_deduplication_fallback_to_asyncJobId() {
+        TestDataFactory.createConnectedOrg();
+        
+        // Parse test data to get AsyncApexJob info
+        List<AsyncApexJob> testJobs = (List<AsyncApexJob>)JSON.deserialize(TestDataFactory.ASYNC_APEX_JOBS_JSON, List<AsyncApexJob>.class);
+        AsyncApexJob testJob = testJobs[1]; // Second job from test data
+        
+        // Create existing log with different Hash_1__c (simulating EventLogProcessingBatch update)
+        // but same Async_Job_Id__c
+        Log__c enrichedLog = new Log__c(
+            Summary__c = 'Test error with stacktrace',
+            Details__c = 'Enriched log from EventLogProcessingBatch',
+            Hash_1__c = 'different_hash_with_stacktrace',  // Changed after EventLogProcessingBatch
+            Stacktrace__c = 'Class.Test.method: line 1',
+            Async_Job_Id__c = String.valueOf(testJob.Id).left(15),
+            Category__c = 'Apex',
+            Created_At__c = testJob.CompletedDate != null ? testJob.CompletedDate : testJob.CreatedDate
+        );
+        insert enrichedLog;
+        
+        Test.startTest();
+        ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c = false;
+        update ConfigUtil.CONNECTED_ORGS_SETTINGS;
+        JobBatch jobBatch = JobBatch.getInstance();
+        jobBatch.execute(null, testJobs);
+        jobBatch.finish(null);
+        Test.stopTest();
+        
+        // Should find by Async_Job_Id__c fallback and not create duplicate
+        List<Log__c> logsWithAsyncJobId = [
+            SELECT Id, Hash_1__c, Async_Job_Id__c, Stacktrace__c 
+            FROM Log__c 
+            WHERE Async_Job_Id__c = :String.valueOf(testJob.Id).left(15)
+        ];
+        
+        System.assertEquals(1, logsWithAsyncJobId.size(), 
+            'Should find existing log by Async_Job_Id__c fallback without creating duplicate');
+        System.assertEquals('different_hash_with_stacktrace', logsWithAsyncJobId[0].Hash_1__c,
+            'Hash_1__c should remain unchanged (from EventLogProcessingBatch)');
+        System.assertNotEquals(null, logsWithAsyncJobId[0].Stacktrace__c,
+            'Stacktrace should remain intact');
+    }
+
 }

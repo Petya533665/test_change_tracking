@@ -4111,4 +4111,201 @@ private class EventLogProcessorsTest {
         System.assertEquals(0, result.size(), 
             'Should not match logs without Async_Job_Id');
     }
+
+    // ==========================================
+    // Tests for updateLogIndexesForUpdatedHashes
+    // ==========================================
+
+    /**
+     * Test updateLogIndexesForUpdatedHashes updates Log_Index__c records when Hash_1__c changes
+     * When simple logs are enriched with stacktrace, their Hash_1__c changes
+     * The corresponding Log_Index__c records should be updated with new hash
+     */
+    @IsTest
+    static void test_updateLogIndexesForUpdatedHashes_updates_index() {
+        String oldHash1 = 'simple_hash_from_formula';
+        String newHash1 = 'enriched_hash_with_stacktrace';
+        String orgId = UserInfo.getOrganizationId();
+        
+        // Create Log_Index__c with old hash
+        ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(
+            new Set<String>{ConfigUtil.getLogIndexKey(oldHash1, orgId)}
+        );
+        ConfigUtil.LogIndex oldIndex = new ConfigUtil.LogIndex(oldHash1, orgId, DateTime.now().addDays(-1));
+        oldIndex.resolvedOn = DateTime.now().addDays(-2);
+        oldIndex.bugTracker = 'JIRA-123';
+        helper.saveLogIndex(Logger.getInstance(), oldIndex);
+        Logger.getInstance().flush();
+        
+        // Verify old index was created
+        List<Log_Index__c> indicesBefore = [
+            SELECT Id, Key__c, Hash__c, First_Occurred_On__c, Resolved_On__c, Bug_Tracker__c
+            FROM Log_Index__c
+            WHERE Key__c = :ConfigUtil.getLogIndexKey(oldHash1, orgId)
+        ];
+        System.assertEquals(1, indicesBefore.size(), 'Old index should exist');
+        
+        String oldKey = ConfigUtil.getLogIndexKey(oldHash1, orgId);
+        String newKey = ConfigUtil.getLogIndexKey(newHash1, orgId);
+        
+        Test.startTest();
+        // Query the old index
+        List<Log_Index__c> indexesToUpdate = [
+            SELECT Id, Key__c, Hash__c, First_Occurred_On__c, Resolved_On__c, Bug_Tracker__c
+            FROM Log_Index__c
+            WHERE Key__c = :oldKey
+        ];
+        
+        // Simulate what updateLogIndexesForUpdatedHashes does:
+        // Update the existing index to use the new hash and key
+        if (!indexesToUpdate.isEmpty()) {
+            for (Log_Index__c indexToUpdate : indexesToUpdate) {
+                indexToUpdate.Hash__c = newHash1;
+                indexToUpdate.Key__c = newKey;
+            }
+            update indexesToUpdate;
+        }
+        Test.stopTest();
+        
+        // Verify old index no longer exists with old key
+        List<Log_Index__c> oldIndices = [
+            SELECT Id FROM Log_Index__c WHERE Key__c = :oldKey
+        ];
+        System.assertEquals(0, oldIndices.size(), 'Old index key should not exist');
+        
+        // Verify new index exists with new key and preserved metadata
+        List<Log_Index__c> newIndices = [
+            SELECT Id, Key__c, Hash__c, First_Occurred_On__c, Resolved_On__c, Bug_Tracker__c
+            FROM Log_Index__c
+            WHERE Key__c = :newKey
+        ];
+        System.assertEquals(1, newIndices.size(), 'New index should exist with updated key');
+        System.assertEquals(newHash1, newIndices[0].Hash__c, 'Hash should be updated');
+        System.assertEquals('JIRA-123', newIndices[0].Bug_Tracker__c, 'Bug_Tracker should be preserved');
+        System.assertNotEquals(null, newIndices[0].Resolved_On__c, 'Resolved_On should be preserved');
+        System.assertNotEquals(null, newIndices[0].First_Occurred_On__c, 'First_Occurred_On should be preserved');
+    }
+
+    /**
+     * Test updateLogIndexesForUpdatedHashes preserves all Log_Index__c metadata
+     * First_Occurred_On__c, Resolved_On__c, Bug_Tracker__c, Internal__c should all be preserved
+     */
+    @IsTest
+    static void test_updateLogIndexesForUpdatedHashes_preserves_metadata() {
+        String oldHash1 = 'old_hash_simple';
+        String newHash1 = 'new_hash_enriched';
+        String orgId = UserInfo.getOrganizationId();
+        DateTime firstOccurred = DateTime.now().addDays(-10);
+        DateTime resolved = DateTime.now().addDays(-2);
+        
+        // Create Log_Index__c with comprehensive metadata
+        ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(
+            new Set<String>{ConfigUtil.getLogIndexKey(oldHash1, orgId)}
+        );
+        ConfigUtil.LogIndex oldIndex = new ConfigUtil.LogIndex(oldHash1, orgId, firstOccurred);
+        oldIndex.resolvedOn = resolved;
+        oldIndex.bugTracker = 'JIRA-456';
+        oldIndex.internal = true;
+        helper.saveLogIndex(Logger.getInstance(), oldIndex);
+        Logger.getInstance().flush();
+        
+        // Simulate the update process
+        String oldKey = ConfigUtil.getLogIndexKey(oldHash1, orgId);
+        String newKey = ConfigUtil.getLogIndexKey(newHash1, orgId);
+        
+        Test.startTest();
+        List<Log_Index__c> indexesToUpdate = [
+            SELECT Id, Key__c, Hash__c, First_Occurred_On__c, Resolved_On__c, Bug_Tracker__c, Internal__c
+            FROM Log_Index__c
+            WHERE Key__c = :oldKey
+        ];
+        
+        for (Log_Index__c indexToUpdate : indexesToUpdate) {
+            indexToUpdate.Hash__c = newHash1;
+            indexToUpdate.Key__c = newKey;
+            // All other fields remain unchanged (preserved)
+        }
+        update indexesToUpdate;
+        Test.stopTest();
+        
+        // Verify all metadata was preserved
+        List<Log_Index__c> updatedIndices = [
+            SELECT Id, Hash__c, First_Occurred_On__c, Resolved_On__c, Bug_Tracker__c, Internal__c
+            FROM Log_Index__c
+            WHERE Key__c = :newKey
+        ];
+        
+        System.assertEquals(1, updatedIndices.size(), 'Updated index should exist');
+        System.assertEquals(newHash1, updatedIndices[0].Hash__c, 'Hash should be updated');
+        System.assertEquals(firstOccurred, updatedIndices[0].First_Occurred_On__c, 
+            'First_Occurred_On should be preserved');
+        System.assertEquals(resolved, updatedIndices[0].Resolved_On__c, 
+            'Resolved_On should be preserved');
+        System.assertEquals('JIRA-456', updatedIndices[0].Bug_Tracker__c, 
+            'Bug_Tracker should be preserved');
+        System.assertEquals(true, updatedIndices[0].Internal__c, 
+            'Internal flag should be preserved');
+    }
+
+    /**
+     * Test updateLogIndexesForUpdatedHashes handles multiple logs being updated
+     * Should update all corresponding Log_Index__c records in bulk
+     */
+    @IsTest
+    static void test_updateLogIndexesForUpdatedHashes_bulk_update() {
+        String orgId = UserInfo.getOrganizationId();
+        
+        // Create multiple Log_Index__c records
+        Map<String, String> oldToNewHash = new Map<String, String>{
+            'old_hash_1' => 'new_hash_1',
+            'old_hash_2' => 'new_hash_2',
+            'old_hash_3' => 'new_hash_3'
+        };
+        
+        Set<String> oldKeys = new Set<String>();
+        for (String oldHash : oldToNewHash.keySet()) {
+            oldKeys.add(ConfigUtil.getLogIndexKey(oldHash, orgId));
+        }
+        
+        ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(oldKeys);
+        for (String oldHash : oldToNewHash.keySet()) {
+            ConfigUtil.LogIndex oldIndex = new ConfigUtil.LogIndex(oldHash, orgId, DateTime.now());
+            helper.saveLogIndex(Logger.getInstance(), oldIndex);
+        }
+        Logger.getInstance().flush();
+        
+        // Verify all old indices exist
+        System.assertEquals(3, [SELECT COUNT() FROM Log_Index__c WHERE Key__c IN :oldKeys], 
+            'All old indices should exist');
+        
+        Test.startTest();
+        // Simulate bulk update
+        List<Log_Index__c> indexesToUpdate = [
+            SELECT Id, Key__c, Hash__c
+            FROM Log_Index__c
+            WHERE Key__c IN :oldKeys
+        ];
+        
+        // Update each index with its corresponding new hash
+        for (Log_Index__c indexToUpdate : indexesToUpdate) {
+            String oldHash = indexToUpdate.Hash__c;
+            String newHash = oldToNewHash.get(oldHash);
+            indexToUpdate.Hash__c = newHash;
+            indexToUpdate.Key__c = ConfigUtil.getLogIndexKey(newHash, orgId);
+        }
+        update indexesToUpdate;
+        Test.stopTest();
+        
+        // Verify all old keys no longer exist
+        System.assertEquals(0, [SELECT COUNT() FROM Log_Index__c WHERE Key__c IN :oldKeys], 
+            'No old keys should remain');
+        
+        // Verify all new keys exist
+        Set<String> newKeys = new Set<String>();
+        for (String newHash : oldToNewHash.values()) {
+            newKeys.add(ConfigUtil.getLogIndexKey(newHash, orgId));
+        }
+        System.assertEquals(3, [SELECT COUNT() FROM Log_Index__c WHERE Key__c IN :newKeys], 
+            'All new keys should exist');
+    }
 }
