@@ -1120,17 +1120,9 @@ public with sharing class NotificationService {
                         }
                     }
                     List<String> contentList = new List<String>();
-
-	                if (!contents.isEmpty() && contents.size() > 0) {
-		                contentList.add(matchContent(contents[0], tempMap, objectAPIName));
-	                }
-	                if (!contents.isEmpty() && contents.size() > 1) {
-		                if (context == 'JIRA' && JiraService.isCloudJiraInstance()) {
-			                contentList.add(matchContentADF(contents[1], tempMap, objectAPIName));
-		                } else {
-			                contentList.add(matchContent(contents[1], tempMap, objectAPIName));
-		                }
-	                }
+                    for (String content : contents) {
+                        contentList.add(matchContent(content, tempMap, objectAPIName));
+                    }
                     result.put(objId, contentList);
                 }
             }
