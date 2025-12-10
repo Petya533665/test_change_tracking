@@ -17,11 +17,19 @@ public with sharing class IssueJiraTaskController {
 				WHERE Id = :stdController.getId()
 		];
 		
+		String isDevParam = ApexPages.currentPage().getParameters().get('dev')?.escapeHtml4();
 		isBlurMode = !PermissionsUtil.JiraIntegrationEnabled && !PermissionsUtil.AzureDevOpsIntegrationEnabled;
 		if (isBlurMode) {
 			blurModeUrlParameter = BlurModeService.getEncryptedUrlParameter();
 		}
-		isDev = ConfigUtil.initializeDevelopmentMode(ApexPages.currentPage());
+		if (String.isNotBlank(isDevParam)) {
+			Cookie devCookie = new Cookie('a2developmentMode', isDevParam, null, -1, false);
+			ApexPages.currentPage().setCookies(new Cookie[]{ devCookie });
+			isDev = Boolean.valueOf(isDevParam);
+		} else {
+			Cookie devCookie = ApexPages.currentPage().getCookies().get('a2developmentMode');
+			isDev = devCookie != null ? Boolean.valueOf(devCookie.getValue()) : false;
+		}
 	}
 
 	public static TicketingService.TicketCreateResult createTask(Object payload) {
@@ -117,14 +125,14 @@ public with sharing class IssueJiraTaskController {
 		catch(Exception e) {
 			response.error = e.getMessage();
 			response.stack = e.getStackTraceString();
-			Logger.getInstance().internalError(e, TraceResultController.class.getName(), 'remoteActionHandler' + (String.isNotBlank(methodName) ? '.' + methodName : ''));
+			Logger.getInstance().internalError(e, IssueJiraTaskController.class.getName(), 'remoteActionHandler' + (String.isNotBlank(methodName) ? '.' + methodName : ''));
 		}
 		finally {
 			try {
 				result = JSON.serialize(response);
 			}
 			catch(Exception e) {
-				Logger.getInstance().internalError(e, TraceResultController.class.getName(), 'remoteActionHandler.serializeResponse');
+				Logger.getInstance().internalError(e, IssueJiraTaskController.class.getName(), 'remoteActionHandler.serializeResponse');
 			}
 		}
 		return result;
