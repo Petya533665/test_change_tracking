@@ -48,7 +48,6 @@ public with sharing class AdminController {
     }
 
     public AdminController() {
-        String isDevParam = ApexPages.currentPage().getParameters().get('dev').escapeHtml4();
         isDev = ConfigUtil.initializeDevelopmentMode(ApexPages.currentPage());
     }
 
@@ -303,8 +302,6 @@ public with sharing class AdminController {
                 response.data = AdminService.getRuleSettings(data);
             } else if (method == 'setRule') {
                 response.data = AdminService.setRule(data);
-            } else if (method.equals('runJobBatchImmediately')) {
-                response.data = AdminService.runJobBatchImmediately();
             } else if (method == 'getScheduleBulkAPIBatch') {
                 response.data = AdminService.getScheduleBulkAPIBatch();
             }  else if (method == 'abortScheduleBulkAPIBatch') {
