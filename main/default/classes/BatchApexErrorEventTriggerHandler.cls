@@ -23,24 +23,51 @@ public with sharing class BatchApexErrorEventTriggerHandler {
 		}
 
 		Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(UserInfo.getOrganizationId());
+		// Hybrid approach: check both Hash_1__c and Async_Job_Id__c
+		Map<String, String> hash1ByAsyncJobId = new Map<String, String>();
+		for (BatchApexErrorEvent evt : errorEvents) {
+			AsyncApexJob asyncApexJob = JobBatch.getAsyncApexJob(evt.AsyncApexJobId, jobs, parentJobs);
+			if (asyncApexJob != null && JobBatch.isInternalError(asyncApexJob)) {
+				String hash1 = JobBatch.getHash1(asyncApexJob);
+				hash1ByAsyncJobId.put(evt.AsyncApexJobId, hash1);
+			}
+		}
+		
+		// Check for existing logs by Hash_1__c
+		Set<String> existHash1Values = new Set<String>();
+		if (!hash1ByAsyncJobId.isEmpty() && [SELECT COUNT() FROM Log__c WHERE Created_At__c = TODAY AND Hash_1__c IN :hash1ByAsyncJobId.values()] < Constants.QUERY_LIMITS.MAX_COUNT_FOR_SAFE_AGGREGATE_RESULT_QUERY) {
+			List<AggregateResult> aggregateResults = [SELECT Hash_1__c hash1 FROM Log__c WHERE Created_At__c = TODAY AND Hash_1__c IN :hash1ByAsyncJobId.values() GROUP BY Hash_1__c];
+			for (AggregateResult aggregateResult : aggregateResults) {
+				existHash1Values.add((String)aggregateResult.get('hash1'));
+			}
+		}
+		
+		// Check for existing logs by Async_Job_Id__c (fallback for logs updated by EventLogProcessingBatch)
 		Set<String> existAsyncJobIds = new Set<String>();
-		if ([SELECT COUNT() FROM Log__c WHERE Created_At__c = TODAY AND Async_Job_Id__c IN :asyncJobIds] < 49000) {
+		if ([SELECT COUNT() FROM Log__c WHERE Created_At__c = TODAY AND Async_Job_Id__c IN :asyncJobIds] < Constants.QUERY_LIMITS.MAX_COUNT_FOR_SAFE_AGGREGATE_RESULT_QUERY) {
 			List<AggregateResult> aggregateResults = [SELECT Async_Job_Id__c asyncJobId FROM Log__c WHERE Created_At__c = TODAY AND Async_Job_Id__c IN :asyncJobIds GROUP BY Async_Job_Id__c];
 			for (AggregateResult aggregateResult : aggregateResults) {
 				existAsyncJobIds.add((String)aggregateResult.get('asyncJobId'));
 			}
 		}
+		
 		for (BatchApexErrorEvent evt : errorEvents) {
 			AsyncApexJob asyncApexJob = JobBatch.getAsyncApexJob(evt.AsyncApexJobId, jobs, parentJobs);
 			if (asyncApexJob != null) {
-				if (!JobBatch.isInternalError(asyncApexJob) || !existAsyncJobIds.contains(evt.AsyncApexJobId)) {
+				String hash1 = hash1ByAsyncJobId.get(evt.AsyncApexJobId);
+				// Skip if: internal error AND (found by Hash_1__c OR found by Async_Job_Id__c)
+				Boolean foundByHash1 = hash1 != null && existHash1Values.contains(hash1);
+				Boolean foundByAsyncJobId = existAsyncJobIds.contains(evt.AsyncApexJobId);
+				if (!JobBatch.isInternalError(asyncApexJob) || (!foundByHash1 && !foundByAsyncJobId)) {
 					Log__c log = JobBatch.createLog(asyncApexJob, corg);
 					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Summary__c, evt.Message);
 					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Details__c, evt.Phase + '\n\n' + evt.Message + '\n\n' + evt.StackTrace);
 					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Type__c, String.isNotBlank(evt.ExceptionType) ? evt.ExceptionType : asyncApexJob.JobType);
 					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Stacktrace__c, evt.StackTrace);
 					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Related_Id__c, getRelatedId(evt.JobScope));
-					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Created_At__c, existAsyncJobIds.add(evt.AsyncApexJobId) ? Datetime.now() : Datetime.now().addSeconds(1));
+					// Track both hash1 and asyncJobId to prevent duplicates within this batch
+					Boolean isFirstOccurrence = (hash1 != null && existHash1Values.add(hash1)) || existAsyncJobIds.add(evt.AsyncApexJobId);
+					PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Created_At__c, isFirstOccurrence ? Datetime.now() : Datetime.now().addSeconds(1));
 					Logger.getInstance().add(log);
 				}
 			}

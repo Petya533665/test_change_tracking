@@ -904,6 +904,9 @@ public with sharing class Constants {
         
         // Standard limit for large queries (ApexClass, ApexTrigger, Events, Rules, Actions)
         public final Integer LARGE_DATA_QUERY_LIMIT = 10000;
+
+        // Used for safe check for aggregate result query
+        public final Integer MAX_COUNT_FOR_SAFE_AGGREGATE_RESULT_QUERY = 49000;
     }
     
     public inherited sharing virtual class SObjectTypeConstants {

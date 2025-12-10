@@ -3253,85 +3253,102 @@ private class RuleUtilTest {
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_contains_positive_all_values_match() {
-		// Test case: Record has "Value1;Value2;Value3", filter checks CONTAINS "Value1;Value2" - should return true
-		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1;Value2', 'Value1;Value2;Value3', true);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_positive_all_values_match() {
+		// Test case: Record has "Value1;Value2;Value3", filter checks INCLUDES "Value1;Value2" (OR logic)
+		// Record includes Value1 OR Value2 - should return true
+		test_evaluate_MultiselectPicklist_filter('Includes', 'Value1;Value2', 'Value1;Value2;Value3', true);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_contains_positive_single_value() {
-		// Test case: Record has "Value1;Value2", filter checks CONTAINS "Value1" - should return true
-		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1', 'Value1;Value2', true);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_positive_single_value() {
+		// Test case: Record has "Value1;Value2", filter checks INCLUDES "Value1"
+		// Record includes Value1 - should return true
+		test_evaluate_MultiselectPicklist_filter('Includes', 'Value1', 'Value1;Value2', true);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_contains_negative_missing_value() {
-		// Test case: Record has "Value1;Value2", filter checks CONTAINS "Value3" - should return false
-		test_evaluate_MultiselectPicklist_filter('Contains', 'Value3', 'Value1;Value2', false);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_positive_partial_match() {
+		// Test case: Record has "Value1;Value2", filter checks INCLUDES "Value2;Value3" (OR logic)
+		// Record includes Value2 (at least one) - should return true
+		test_evaluate_MultiselectPicklist_filter('Includes', 'Value2;Value3', 'Value1;Value2', true);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_contains_empty_field() {
-		// Test case: Record has empty multipicklist, filter checks CONTAINS "Value1" - should return false
-		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1', null, false);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_negative_missing_value() {
+		// Test case: Record has "Value1;Value2", filter checks INCLUDES "Value3"
+		// Record doesn't include Value3 - should return false
+		test_evaluate_MultiselectPicklist_filter('Includes', 'Value3', 'Value1;Value2', false);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_contains_case_insensitive_lowercase() {
-		// Test case: Record has "value1;value2", filter checks CONTAINS "Value1" - should return true (case-insensitive)
-		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1', 'value1;value2', true);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_negative_no_match() {
+		// Test case: Record has "Value1;Value2", filter checks INCLUDES "Value3;Value4" (OR logic)
+		// Record includes neither Value3 nor Value4 - should return false
+		test_evaluate_MultiselectPicklist_filter('Includes', 'Value3;Value4', 'Value1;Value2', false);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_contains_case_insensitive_uppercase() {
-		// Test case: Record has "VALUE1;VALUE2", filter checks CONTAINS "value1;value2" - should return true (case-insensitive)
-		test_evaluate_MultiselectPicklist_filter('Contains', 'value1;value2', 'VALUE1;VALUE2;VALUE3', true);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_empty_field() {
+		// Test case: Record has empty multipicklist, filter checks INCLUDES "Value1" - should return false
+		test_evaluate_MultiselectPicklist_filter('Includes', 'Value1', null, false);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_positive_missing_value() {
-		// Test case: Record has "Value1;Value2", filter checks DOES NOT CONTAIN "Value3" 
-		// Record contains NONE of the filter values - should return true
-		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value3', 'Value1;Value2', true);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_case_insensitive_lowercase() {
+		// Test case: Record has "value1;value2", filter checks INCLUDES "Value1" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Includes', 'Value1', 'value1;value2', true);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_positive_partial_match() {
-		// Test case: Record has "Value1;Value2", filter checks DOES NOT CONTAIN "Value2;Value3"
-		// Record contains Value2 (one of the filter values) - should return false
-		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value2;Value3', 'Value1;Value2', false);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_case_insensitive_uppercase() {
+		// Test case: Record has "VALUE1;VALUE2", filter checks INCLUDES "value1;value2" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Includes', 'value1;value2', 'VALUE1;VALUE2;VALUE3', true);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_negative_all_match() {
-		// Test case: Record has "Value1;Value2;Value3", filter checks DOES NOT CONTAIN "Value1;Value2"
-		// Record contains both filter values - should return false
-		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value1;Value2', 'Value1;Value2;Value3', false);
+	private static void test_evaluate_filter_MultiselectPicklist_excludes_positive_missing_value() {
+		// Test case: Record has "Value1;Value2", filter checks EXCLUDES "Value3" 
+		// Record excludes Value3 (has NONE) - should return true
+		test_evaluate_MultiselectPicklist_filter('Excludes', 'Value3', 'Value1;Value2', true);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_negative_contains_one() {
-		// Test case: Record has "Value1;Value2", filter checks DOES NOT CONTAIN "Value1"
-		// Record contains the filter value - should return false
-		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value1', 'Value1;Value2', false);
+	private static void test_evaluate_filter_MultiselectPicklist_excludes_positive_partial_match() {
+		// Test case: Record has "Value1;Value2", filter checks EXCLUDES "Value2;Value3"
+		// Record includes Value2 (has one of them) - should return false
+		test_evaluate_MultiselectPicklist_filter('Excludes', 'Value2;Value3', 'Value1;Value2', false);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_empty_field() {
-		// Test case: Record has empty multipicklist, filter checks DOES NOT CONTAIN "Value1" - should return true
-		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value1', null, true);
+	private static void test_evaluate_filter_MultiselectPicklist_excludes_negative_all_match() {
+		// Test case: Record has "Value1;Value2;Value3", filter checks EXCLUDES "Value1;Value2"
+		// Record includes both filter values - should return false
+		test_evaluate_MultiselectPicklist_filter('Excludes', 'Value1;Value2', 'Value1;Value2;Value3', false);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_case_insensitive_positive() {
-		// Test case: Record has "value1;value2", filter checks DOES NOT CONTAIN "Value3" - should return true (case-insensitive)
-		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value3', 'value1;value2', true);
+	private static void test_evaluate_filter_MultiselectPicklist_excludes_negative_includes_one() {
+		// Test case: Record has "Value1;Value2", filter checks EXCLUDES "Value1"
+		// Record includes the filter value - should return false
+		test_evaluate_MultiselectPicklist_filter('Excludes', 'Value1', 'Value1;Value2', false);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_case_insensitive_negative() {
-		// Test case: Record has "VALUE1;VALUE2", filter checks DOES NOT CONTAIN "value1" - should return false (case-insensitive)
-		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'value1', 'VALUE1;VALUE2', false);
+	private static void test_evaluate_filter_MultiselectPicklist_excludes_empty_field() {
+		// Test case: Record has empty multipicklist, filter checks EXCLUDES "Value1" - should return true
+		test_evaluate_MultiselectPicklist_filter('Excludes', 'Value1', null, true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_excludes_case_insensitive_positive() {
+		// Test case: Record has "value1;value2", filter checks EXCLUDES "Value3" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Excludes', 'Value3', 'value1;value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_excludes_case_insensitive_negative() {
+		// Test case: Record has "VALUE1;VALUE2", filter checks EXCLUDES "value1" - should return false (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Excludes', 'value1', 'VALUE1;VALUE2', false);
 	}
 
 	// ========== Comma Delimiter Tests ==========
@@ -3349,27 +3366,35 @@ private class RuleUtilTest {
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_contains_comma_delimiter() {
-		// Test case: Record has "Value1,Value2", filter checks CONTAINS "Value1" - should return true
-		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1', 'Value1,Value2', true);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_comma_delimiter() {
+		// Test case: Record has "Value1,Value2", filter checks INCLUDES "Value1" - should return true
+		test_evaluate_MultiselectPicklist_filter('Includes', 'Value1', 'Value1,Value2', true);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_contains_mixed_delimiters_positive() {
-		// Test case: Record has "Value1;Value2,Value3", filter checks CONTAINS "Value2,Value3" - should return true
-		test_evaluate_MultiselectPicklist_filter('Contains', 'Value2,Value3', 'Value1;Value2,Value3', true);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_mixed_delimiters_positive() {
+		// Test case: Record has "Value1;Value2,Value3", filter checks INCLUDES "Value2,Value3" (OR logic)
+		// Record includes Value2 OR Value3 - should return true
+		test_evaluate_MultiselectPicklist_filter('Includes', 'Value2,Value3', 'Value1;Value2,Value3', true);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_comma_delimiter_positive() {
-		// Test case: Record has "Value1,Value2", filter checks DOES NOT CONTAIN "Value3" - should return true
-		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value3', 'Value1,Value2', true);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_comma_partial_match() {
+		// Test case: Record has "Value1,Value2", filter checks INCLUDES "Value2,Value4" (OR logic)
+		// Record includes Value2 (at least one) - should return true
+		test_evaluate_MultiselectPicklist_filter('Includes', 'Value2,Value4', 'Value1,Value2', true);
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_does_not_contain_comma_delimiter_negative() {
-		// Test case: Record has "Value1,Value2", filter checks DOES NOT CONTAIN "Value1" - should return false
-		test_evaluate_MultiselectPicklist_filter('Doesn\'t Contain', 'Value1', 'Value1,Value2', false);
+	private static void test_evaluate_filter_MultiselectPicklist_excludes_comma_delimiter_positive() {
+		// Test case: Record has "Value1,Value2", filter checks EXCLUDES "Value3" - should return true
+		test_evaluate_MultiselectPicklist_filter('Excludes', 'Value3', 'Value1,Value2', true);
+	}
+
+	@IsTest
+	private static void test_evaluate_filter_MultiselectPicklist_excludes_comma_delimiter_negative() {
+		// Test case: Record has "Value1,Value2", filter checks EXCLUDES "Value1" - should return false
+		test_evaluate_MultiselectPicklist_filter('Excludes', 'Value1', 'Value1,Value2', false);
 	}
 
 	@IsTest
@@ -3379,9 +3404,9 @@ private class RuleUtilTest {
 	}
 
 	@IsTest
-	private static void test_evaluate_filter_MultiselectPicklist_comma_case_insensitive() {
-		// Test case: Record has "value1,value2", filter checks CONTAINS "Value1,Value2" - should return true (case-insensitive)
-		test_evaluate_MultiselectPicklist_filter('Contains', 'Value1,Value2', 'value1,value2,value3', true);
+	private static void test_evaluate_filter_MultiselectPicklist_includes_comma_case_insensitive() {
+		// Test case: Record has "value1,value2", filter checks INCLUDES "Value1,Value2" - should return true (case-insensitive)
+		test_evaluate_MultiselectPicklist_filter('Includes', 'Value1,Value2', 'value1,value2,value3', true);
 	}
 
 	@IsTest
@@ -3392,9 +3417,9 @@ private class RuleUtilTest {
 
 	/**
 	 * Helper method to test MultiselectPicklist filter evaluation
-	 * @param comparisonOperator The comparison operator to test ('Equal', 'Not equal', 'Contains', 'Does not contain')
-	 * @param filterValue The value specified in the filter criteria (semicolon-separated)
-	 * @param recordValue The actual value on the record (semicolon-separated or null)
+	 * @param comparisonOperator The comparison operator to test ('Equal', 'Not equal', 'Includes', 'Excludes')
+	 * @param filterValue The value specified in the filter criteria (semicolon or comma-separated)
+	 * @param recordValue The actual value on the record (semicolon or comma-separated or null)
 	 * @param expectedTestResult The expected result of the filter evaluation
 	 */
 	private static void test_evaluate_MultiselectPicklist_filter(

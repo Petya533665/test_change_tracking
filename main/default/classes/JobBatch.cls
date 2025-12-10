@@ -70,27 +70,42 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
     }
 
     public void execute(Database.BatchableContext BC, List<AsyncApexJob> scope) {
-        // Phase 2 & 3: Use Async_Job_Id__c for deduplication instead of Hash_1
-        // This ensures consistency with logs created by Email/EventLog that have correct Hash_1
+        // Hybrid approach: Try Hash_1__c first, then Async_Job_Id__c as fallback
+        // This handles both simple logs and logs already updated by EventLogProcessingBatch
+        Set<String> hash1Values = new Set<String>();
         Set<String> asyncJobIds = new Set<String>();
         for (AsyncApexJob asyncApexJob : scope) {
+            hash1Values.add(getHash1(asyncApexJob));
             asyncJobIds.add(asyncApexJob.Id.to15());
         }
-        List<Log__c> existLogs = getLogsByAsyncJobId(asyncJobIds);
-        Map<String, Log__c> existLogsByAsyncJobId = new Map<String, Log__c>();
-        for (Log__c existLog : existLogs) {
+        
+        // Get existing logs by both Hash_1__c and Async_Job_Id__c
+        List<Log__c> existLogsByHash1 = getLogsByHash1(hash1Values);
+        List<Log__c> existLogsByAsyncJobId = getLogsByAsyncJobId(asyncJobIds);
+        
+        // Build lookup maps
+        Map<String, Log__c> existLogsByHash1Map = new Map<String, Log__c>();
+        for (Log__c existLog : existLogsByHash1) {
+            if (String.isNotBlank(existLog.Hash_1__c)) {
+                existLogsByHash1Map.put(existLog.Hash_1__c, existLog);
+            }
+        }
+        
+        Map<String, Log__c> existLogsByAsyncJobIdMap = new Map<String, Log__c>();
+        for (Log__c existLog : existLogsByAsyncJobId) {
             if (String.isNotBlank(existLog.Async_Job_Id__c)) {
-                existLogsByAsyncJobId.put(existLog.Async_Job_Id__c.left(15), existLog);
+                existLogsByAsyncJobIdMap.put(existLog.Async_Job_Id__c.left(15), existLog);
             }
         }
         
         for (AsyncApexJob asyncApexJob : scope) {
             Log__c log;
             Boolean isInternalError = isInternalError(asyncApexJob);
+            String hash1 = getHash1(asyncApexJob);
             String asyncJobId = asyncApexJob.Id.to15();
             
-            // Find existing log by Async_Job_Id__c and date
-            Log__c existLog = existLogsByAsyncJobId.get(asyncJobId);
+            // First try to find by Hash_1__c (simple log not yet updated by EventLogProcessingBatch)
+            Log__c existLog = existLogsByHash1Map.get(hash1);
             if (existLog != null) {
                 if ((asyncApexJob.CompletedDate != null
                         && existLog.Created_At__c.dateGmt() == asyncApexJob.CompletedDate.dateGmt())
@@ -99,9 +114,20 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
                 }
             }
             
+            // If not found by Hash_1__c, try Async_Job_Id__c (log already updated by EventLogProcessingBatch)
+            if (log == null) {
+                existLog = existLogsByAsyncJobIdMap.get(asyncJobId);
+                if (existLog != null) {
+                    if ((asyncApexJob.CompletedDate != null
+                            && existLog.Created_At__c.dateGmt() == asyncApexJob.CompletedDate.dateGmt())
+                            || existLog.Created_At__c.dateGmt() == asyncApexJob.CreatedDate.dateGmt()) {
+                        log = existLog;
+                    }
+                }
+            }
+            
             if (isInternalError) {
-                String hash = getHash1(asyncApexJob);
-                String hashByDate = hash + String.valueOfGmt(asyncApexJob.CompletedDate != null ? asyncApexJob.CompletedDate.dateGmt() : asyncApexJob.CreatedDate.dateGmt());
+                String hashByDate = hash1 + String.valueOfGmt(asyncApexJob.CompletedDate != null ? asyncApexJob.CompletedDate.dateGmt() : asyncApexJob.CreatedDate.dateGmt());
                 if (!internalLogByHash.containsKey(hashByDate)) {
                     internalLogByHash.put(hashByDate, log != null ? log : createLog(asyncApexJob, corg));
                 }
@@ -125,17 +151,34 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
         loggerInstance?.flush();
     }
 
-    // Phase 3: Query logs by Async_Job_Id__c instead of Hash_1 for deduplication
+    // Query logs by Hash_1__c for deduplication to properly update simple log counters
+    private static List<Log__c> getLogsByHash1(Set<String> hash1Values) {
+        String query = new QBuilder(Log__c.SObjectType)
+                .selectFields(LOG_FIELDS)
+                .add(QBuilder.condition(Log__c.Hash_1__c.getDescribe().getName()).isIn(new List<String>(hash1Values)))
+                .build();
+        if (isPassthroughMode()) {
+            return (List<Log__c>)JSON.deserialize(JSON.serialize(
+                    runQueryAll(ConnectedOrgService.getPassthroughConnectedOrg(), ConfigUtil.QUERY_ALL_REST_API_PATH + EncodingUtil.urlEncode(query, 'UTF-8'), new List<Object>())
+            ), List<Log__c>.class);
+        } else {
+            return Database.query(query + ' ALL ROWS');
+        }
+    }
+
+    // Query logs by Async_Job_Id__c as fallback when log was already updated by EventLogProcessingBatch
     private static List<Log__c> getLogsByAsyncJobId(Set<String> asyncJobIds) {
         String query = new QBuilder(Log__c.SObjectType)
                 .selectFields(LOG_FIELDS)
                 .add(QBuilder.condition(Log__c.Async_Job_Id__c.getDescribe().getName()).isIn(new List<String>(asyncJobIds)))
                 .build();
-        return (List<Log__c>)JSON.deserialize(JSON.serialize(
-                isPassthroughMode()
-                        ? runQueryAll(ConnectedOrgService.getPassthroughConnectedOrg(), ConfigUtil.QUERY_ALL_REST_API_PATH + EncodingUtil.urlEncode(query, 'UTF-8'), new List<Object>())
-                        : Database.query(query + ' ALL ROWS')
-        ), List<Log__c>.class);
+        if (isPassthroughMode()) {
+            return (List<Log__c>)JSON.deserialize(JSON.serialize(
+                    runQueryAll(ConnectedOrgService.getPassthroughConnectedOrg(), ConfigUtil.QUERY_ALL_REST_API_PATH + EncodingUtil.urlEncode(query, 'UTF-8'), new List<Object>())
+            ), List<Log__c>.class);
+        } else {
+            return Database.query(query + ' ALL ROWS');
+        }
     }
 
     private static Boolean isPassthroughMode() {

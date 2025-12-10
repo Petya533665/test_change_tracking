@@ -8570,6 +8570,9 @@ public with sharing class EventLogProcessors {
                     List<Log__c> simpleLogsToUpdate = simpleLogsToUpdateMap.values();
                     DatabaseUtils.getInstance().performUpdateDML(simpleLogsToUpdate, Schema.SObjectType.Log__c)
                         .handleError(EventLogProcessors.class.getName(), '.processEventLogsWithEmailAwareness.simpleLogUpdate', logger);
+                    
+                    // Update Log_Index__c records to reflect new Hash_1__c values
+                    updateLogIndexesForUpdatedHashes(simpleLogsToUpdate, logger);
                 }
             }
             
@@ -8638,7 +8641,7 @@ public with sharing class EventLogProcessors {
         try {
             List<Log__c> candidateLogs = [
                 SELECT Id, Summary__c, Stacktrace__c, Details__c, Hash__c, Hash_1__c, Hash_2__c, Hash_3__c, 
-                       Async_Job_Id__c, Created_At__c, Request_Id_External__c,
+                       Async_Job_Id__c, Created_At__c, Request_Id_External__c, Organization_Id__c,
                        Post_Processing_Status__c
                 FROM Log__c
                 WHERE Summary__c IN :summaries
@@ -8658,6 +8661,9 @@ public with sharing class EventLogProcessors {
                 Log__c eventLog = eventLogBySummary.get(candidateLog.Summary__c);
                 
                 if (eventLog != null && !simpleLogsToUpdate.containsKey(candidateLog.Id)) {
+                    // Store old Hash_1__c for Log_Index update tracking
+                    String oldHash1 = candidateLog.Hash_1__c;
+                    
                     // Update simple log with full data from event log
                     candidateLog.Stacktrace__c = eventLog.Stacktrace__c;
                     candidateLog.Details__c = eventLog.Details__c;
@@ -8671,6 +8677,9 @@ public with sharing class EventLogProcessors {
                     
                     // Recalculate hashes using correct formula (with stacktrace)
                     LogService.calculateHashes(candidateLog);
+                    
+                    // Store old Hash_1__c in Hash__c temporarily for Log_Index cleanup
+                    candidateLog.Hash__c = oldHash1;
                     
                     // Mark for post-processing (stacktrace parsing, etc.)
                     candidateLog.Post_Processing_Status__c = LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED;
@@ -8686,6 +8695,65 @@ public with sharing class EventLogProcessors {
         }
         
         return simpleLogsToUpdate;
+    }
+    
+    /**
+     * Update Log_Index__c records when simple logs' Hash_1__c values change
+     * Updates existing index records to use the new stacktrace-based hash, preserving all metadata
+     * @param updatedLogs List of logs that had their Hash_1__c updated (Hash__c contains old Hash_1__c value)
+     * @param logger Logger instance
+     */
+    private static void updateLogIndexesForUpdatedHashes(List<Log__c> updatedLogs, Logger logger) {
+        try {
+            // Build mapping of old keys to new hash values
+            Map<String, String> oldKeyToNewHash = new Map<String, String>();
+            Map<String, String> oldKeyToOrgId = new Map<String, String>();
+            
+            for (Log__c log : updatedLogs) {
+                // Old Hash_1__c was stored in Hash__c field temporarily
+                String oldHash1 = log.Hash__c;
+                String newHash1 = log.Hash_1__c;
+                
+                if (String.isNotBlank(oldHash1) && String.isNotBlank(newHash1) 
+                    && String.isNotBlank(log.Organization_Id__c) 
+                    && oldHash1 != newHash1) {
+                    String oldKey = ConfigUtil.getLogIndexKey(oldHash1, log.Organization_Id__c);
+                    oldKeyToNewHash.put(oldKey, newHash1);
+                    oldKeyToOrgId.put(oldKey, log.Organization_Id__c);
+                }
+            }
+            
+            if (!oldKeyToNewHash.isEmpty()) {
+                // Query existing Log_Index__c records with old keys
+                List<Log_Index__c> indexesToUpdate = [
+                    SELECT Id, Key__c, Hash__c, Organization_Id__c, 
+                           First_Occurred_On__c, Resolved_On__c, Bug_Tracker__c, Internal__c
+                    FROM Log_Index__c 
+                    WHERE Key__c IN :oldKeyToNewHash.keySet()
+                ];
+                
+                if (!indexesToUpdate.isEmpty()) {
+                    // Update each index with new hash and key
+                    for (Log_Index__c indexToUpdate : indexesToUpdate) {
+                        String newHash = oldKeyToNewHash.get(indexToUpdate.Key__c);
+                        String orgId = oldKeyToOrgId.get(indexToUpdate.Key__c);
+                        
+                        if (String.isNotBlank(newHash)) {
+                            // Update hash and recalculate key
+                            indexToUpdate.Hash__c = newHash;
+                            indexToUpdate.Key__c = ConfigUtil.getLogIndexKey(newHash, orgId);
+                            // Keep all other fields: First_Occurred_On__c, Resolved_On__c, Bug_Tracker__c, Internal__c
+                        }
+                    }
+                    
+                    // Perform bulk update
+                    DatabaseUtils.getInstance().performUpdateDML(indexesToUpdate, Schema.SObjectType.Log_Index__c)
+                        .handleError(EventLogProcessors.class.getName(), '.updateLogIndexesForUpdatedHashes', logger);
+                }
+            }
+        } catch (Exception e) {
+            logger?.add(logger?.getInternalError(e, null, EventLogProcessors.class.getName(), 'Error updating log indexes for changed hashes'));
+        }
     }
 
     /**
