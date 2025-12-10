@@ -48,6 +48,7 @@ public with sharing class AdminController {
     }
 
     public AdminController() {
+        String isDevParam = ApexPages.currentPage().getParameters().get('dev').escapeHtml4();
         isDev = ConfigUtil.initializeDevelopmentMode(ApexPages.currentPage());
     }
 
