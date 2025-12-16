@@ -1,27 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
-    <apiVersion>53.0</apiVersion>
+    <apiVersion>65.0</apiVersion>
     <assignments>
-        <name>Assignment_Id</name>
-        <label>Assignment Id</label>
-        <locationX>176</locationX>
-        <locationY>158</locationY>
+        <name>Assignment_Data</name>
+        <label>Assignment Data</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <assignmentItems>
-            <assignToReference>account.Fax</assignToReference>
+            <assignToReference>TritonErrorDataRecord.Name</assignToReference>
             <operator>Assign</operator>
-            <value>
-                <stringValue>Flow #1</stringValue>
-            </value>
         </assignmentItems>
         <assignmentItems>
-            <assignToReference>account.Id</assignToReference>
+            <assignToReference>TritonErrorDataRecord.Description__c</assignToReference>
             <operator>Assign</operator>
             <value>
-                <booleanValue>false</booleanValue>
+                <stringValue>123</stringValue>
             </value>
         </assignmentItems>
         <connector>
-            <targetReference>Create_Account</targetReference>
+            <targetReference>Create_Triton_Error_Data</targetReference>
         </connector>
     </assignments>
     <interviewLabel>Flow #1 Error {!$Flow.CurrentDateTime}</interviewLabel>
@@ -46,26 +43,26 @@
     </processMetadataValues>
     <processType>AutoLaunchedFlow</processType>
     <recordCreates>
-        <name>Create_Account</name>
-        <label>Create Account</label>
-        <locationX>176</locationX>
-        <locationY>278</locationY>
-        <inputReference>account</inputReference>
+        <name>Create_Triton_Error_Data</name>
+        <label>Create Triton Error Data</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <inputReference>TritonErrorDataRecord</inputReference>
     </recordCreates>
     <start>
-        <locationX>50</locationX>
+        <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Assignment_Id</targetReference>
+            <targetReference>Assignment_Data</targetReference>
         </connector>
     </start>
     <status>Active</status>
     <variables>
-        <name>account</name>
+        <name>TritonErrorDataRecord</name>
         <dataType>SObject</dataType>
         <isCollection>false</isCollection>
         <isInput>true</isInput>
         <isOutput>false</isOutput>
-        <objectType>Account</objectType>
+        <objectType>Triton_Error_Data__c</objectType>
     </variables>
 </Flow>

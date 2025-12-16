@@ -1,11 +1,11 @@
 /**
- * Copyright (C) 2024 Pharos AI, Inc.
+ * Copyright (C) 2024 petriv AI, Inc.
  *
- * This file is part of Pharos Triton.
+ * This file is part of petriv Triton.
  *
- * Pharos Triton is free software: you can redistribute it and/or modify
+ * petriv Triton is free software: you can redistribute it and/or modify
  * it under the terms of the MIT License.
- * See LICENSE file or go to https://github.com/Pharos-AI/triton/blob/main/LICENSE.
+ * See LICENSE file or go to https://github.com/petriv-AI/triton/blob/main/LICENSE.
  *
  * The LogLimitsController class provides functionality to retrieve and display
  * Salesforce governor limit usage information from log records. It allows for
@@ -47,7 +47,7 @@ public with sharing class LogLimitsController {
     @AuraEnabled(cacheable=true)
     public static List<LimitUsage> getLimitUsage(Id logId) {
         List<LimitUsage> limits = new List<LimitUsage>();
-        pharos__Log__c log = [
+        petriv__Log__c log = [
             SELECT 
                 Batch_Jobs__c, Batch_Jobs_Limit__c,
                 Callouts__c, Callouts_Limit__c,
@@ -64,7 +64,7 @@ public with sharing class LogLimitsController {
                 SOQL_Queries__c, SOQL_Queries_Limit__c,
                 SOQL_Rows__c, SOQL_Rows_Limit__c,
                 SOSL_Queries__c, SOSL_Queries_Limit__c
-            FROM pharos__Log__c 
+            FROM petriv__Log__c 
             WHERE Id = :logId
         ];
         

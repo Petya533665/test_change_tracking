@@ -30,7 +30,7 @@
             <name>comment</name>
         </inputParameters>
     </actionCalls>
-    <apiVersion>53.0</apiVersion>
+    <apiVersion>65.0</apiVersion>
     <decisions>
         <processMetadataValues>
             <name>index</name>
@@ -71,7 +71,7 @@
                         <stringValue>String</stringValue>
                     </value>
                 </processMetadataValues>
-                <leftValueReference>myVariable_current.Description</leftValueReference>
+                <leftValueReference>myVariable_current.Description__c</leftValueReference>
                 <operator>EqualTo</operator>
                 <rightValue>
                     <stringValue>Process Builder Error</stringValue>
@@ -88,7 +88,7 @@
     <processMetadataValues>
         <name>ObjectType</name>
         <value>
-            <stringValue>Account</stringValue>
+            <stringValue>Triton_Error_Data__c</stringValue>
         </value>
     </processMetadataValues>
     <processMetadataValues>
@@ -118,7 +118,7 @@
         <isCollection>false</isCollection>
         <isInput>true</isInput>
         <isOutput>true</isOutput>
-        <objectType>Account</objectType>
+        <objectType>Triton_Error_Data__c</objectType>
     </variables>
     <variables>
         <name>myVariable_old</name>
@@ -126,6 +126,6 @@
         <isCollection>false</isCollection>
         <isInput>true</isInput>
         <isOutput>false</isOutput>
-        <objectType>Account</objectType>
+        <objectType>Triton_Error_Data__c</objectType>
     </variables>
 </Flow>

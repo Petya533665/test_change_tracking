@@ -1,11 +1,11 @@
 /**
- * Copyright (C) 2024 Pharos AI, Inc.
+ * Copyright (C) 2024 petriv AI, Inc.
  *
- * This file is part of Pharos Triton.
+ * This file is part of petriv Triton.
  *
- * Pharos Triton is free software: you can redistribute it and/or modify
+ * petriv Triton is free software: you can redistribute it and/or modify
  * it under the terms of the MIT License.
- * See LICENSE file or go to https://github.com/Pharos-AI/triton/blob/main/LICENSE.
+ * See LICENSE file or go to https://github.com/petriv-AI/triton/blob/main/LICENSE.
  */
 
 /**
@@ -14,7 +14,7 @@
  * - Log level management and comparison
  * - UUID generation for transaction tracking
  * - HTTP request/response JSON serialization for integration logging
- * - Pre and post-processing controls for Pharos logging configuration
+ * - Pre and post-processing controls for petriv logging configuration
  * - Message formatting utilities
  * 
  * The class serves as a central utility hub for the Triton logging system, offering
@@ -144,15 +144,15 @@ public with sharing class TritonHelper {
     */
     public static String toJson(RestRequest request, RestResponse response) {
         return JSON.serialize(new TritonHelper.IntegrationWrapper(
-            new pharos.HttpRequestWrapper(request).formatRequest(),
-            new pharos.HttpResponseWrapper(response).formatResponse()
+            new petriv.HttpRequestWrapper(request).formatRequest(),
+            new petriv.HttpResponseWrapper(response).formatResponse()
         ));
     }
 
     public static String toJson(HttpRequest request, HttpResponse response) {
         return JSON.serialize(new TritonHelper.IntegrationWrapper(
-            new pharos.HttpRequestWrapper(request).formatRequest(),
-            new pharos.HttpResponseWrapper(response).formatResponse()
+            new petriv.HttpRequestWrapper(request).formatRequest(),
+            new petriv.HttpResponseWrapper(response).formatResponse()
         ));
     }
 
@@ -170,14 +170,14 @@ public with sharing class TritonHelper {
     }
 
     /**
-     * Builder class for constructing Pharos pre processing settings
+     * Builder class for constructing petriv pre processing settings
      */
     public class PreProcessingControlsBuilder {
     }
 
 
     /**
-     * Builder class for constructing Pharos post processing settings
+     * Builder class for constructing petriv post processing settings
      */
     public class PostProcessingControlsBuilder {
 
@@ -209,7 +209,7 @@ public with sharing class TritonHelper {
         }
 
         /**
-         * Controls whether Pharos fetches recent audit trail
+         * Controls whether petriv fetches recent audit trail
          */
         public PostProcessingControlsBuilder auditTrail(Boolean value) {
             controls.put(AUDIT_TRAIL_KEY, value);
@@ -224,7 +224,7 @@ public with sharing class TritonHelper {
         }
 
         /**
-         * Controls whether Pharos fetches recent deployments
+         * Controls whether petriv fetches recent deployments
          */
         public PostProcessingControlsBuilder deployResult(Boolean value) {
             controls.put(DEPLOY_RESULT_KEY, value);
@@ -232,7 +232,7 @@ public with sharing class TritonHelper {
         }
 
         /**
-         * Controls whether Pharos fetches the number of currently installed packages
+         * Controls whether petriv fetches the number of currently installed packages
          */
         public PostProcessingControlsBuilder installedPackages(Boolean value) {
             controls.put(INSTALLED_PACKAGES_KEY, value);
@@ -240,7 +240,7 @@ public with sharing class TritonHelper {
         }
         
         /**
-         * Controls whether Pharos automatically sets functional area
+         * Controls whether petriv automatically sets functional area
          */
         public PostProcessingControlsBuilder area(Boolean value) {
             controls.put(AREA_KEY, value);
@@ -248,7 +248,7 @@ public with sharing class TritonHelper {
         }
 
         /**
-         * Controls whether Pharos fetches jobs currently in the flox queue
+         * Controls whether petriv fetches jobs currently in the flox queue
          */
         public PostProcessingControlsBuilder pendingJobs(Boolean value) {
             controls.put(PENDING_JOBS_KEY, value);
@@ -256,7 +256,7 @@ public with sharing class TritonHelper {
         }
 
         /**
-         * Controls whether Pharos fetches related objects names
+         * Controls whether petriv fetches related objects names
          */
         public PostProcessingControlsBuilder relatedObjects(Boolean value) {
             controls.put(RELATED_OBJECTS_KEY, value);
@@ -274,7 +274,7 @@ public with sharing class TritonHelper {
         }
 
         /**
-         * Controls whether stack trace is enhanced by Pharos
+         * Controls whether stack trace is enhanced by petriv
          * Only applicable to Apex and Integration logs
          */
         public PostProcessingControlsBuilder stackTrace(Boolean value) {
@@ -283,7 +283,7 @@ public with sharing class TritonHelper {
         }
         
         /**
-         * Controls whether Pharos fetches User name
+         * Controls whether petriv fetches User name
          */
         public PostProcessingControlsBuilder userInfo(Boolean value) {
             controls.put(USER_INFO_KEY, value);
@@ -291,7 +291,7 @@ public with sharing class TritonHelper {
         }
 
         /**
-         * Controls whether Pharos fetches the number of currently logged in users
+         * Controls whether petriv fetches the number of currently logged in users
          */
         public PostProcessingControlsBuilder totalActiveSession(Boolean value) {
             controls.put(TOTAL_ACTIVE_SESSION_KEY, value);
