@@ -57,6 +57,67 @@ public with sharing class TraceServiceTest {
     }
 
     @IsTest
+    private static void test_start_debug_log_service_with_active_trace_request() {
+        // Given - no Debug_Log_Service_Flag__c exists (dt will be null)
+        // Create active Trace_Request__c with End_Date__c in the future
+        Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(EXTERNAL_ORG_ID);
+        
+        DateTime expectedStartDate = DateTime.now().addHours(-2);
+        Trace_Request__c traceRequest = createTraceRequest(true, true);
+        traceRequest.Status__c = TraceService.TRACE_REQUEST_STATUS_NEW;
+        traceRequest.Start_Date__c = expectedStartDate;
+        traceRequest.End_Date__c = DateTime.now().addHours(24);
+        insert traceRequest;
+
+        Test.startTest();
+        Map<String, HttpCalloutMock> endpoint2TestResp = getStartDebugLogServiceMock(true);
+        // Mock empty flags to ensure dt is null
+        endpoint2TestResp.putAll(getDebugLogServiceFlagMockEmpty());
+        endpoint2TestResp.putAll(getConnectedOrgStorageInfoMockEmptyMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        
+        PermissionsUtil.DebugLogServiceEnabled = true;
+        TraceService traceServiceInstance = TraceService.getInstance();
+        traceServiceInstance.setConnectedOrgById(EXTERNAL_ORG_ID);
+        TraceService.DebugLogServiceResponse result = traceServiceInstance.startDebugLogService(corg, false, null);
+        Test.stopTest();
+        
+        // Then - method should execute successfully
+        System.assertNotEquals(null, result, 'Result should not be null');
+    }
+
+    @IsTest
+    private static void test_start_debug_log_service_without_active_trace_request() {
+        // Given - no Debug_Log_Service_Flag__c exists and no active Trace_Request__c
+        Connected_Org__c corg = ConnectedOrgService.getConnectedOrgById(EXTERNAL_ORG_ID);
+        
+        // Create Trace_Request__c with End_Date__c in the past (not active)
+        Trace_Request__c traceRequest = createTraceRequest(true, true);
+        traceRequest.Status__c = TraceService.TRACE_REQUEST_STATUS_NEW;
+        traceRequest.Start_Date__c = DateTime.now().addHours(-5);
+        traceRequest.End_Date__c = DateTime.now().addHours(-1); // Past date
+        insert traceRequest;
+
+        Test.startTest();
+        Map<String, HttpCalloutMock> endpoint2TestResp = getStartDebugLogServiceMock(true);
+        // Mock empty flags to ensure dt is null
+        endpoint2TestResp.putAll(getDebugLogServiceFlagMockEmpty());
+        endpoint2TestResp.putAll(getConnectedOrgStorageInfoMockEmptyMock());
+        HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        
+        PermissionsUtil.DebugLogServiceEnabled = true;
+        TraceService traceServiceInstance = TraceService.getInstance();
+        traceServiceInstance.setConnectedOrgById(EXTERNAL_ORG_ID);
+        TraceService.DebugLogServiceResponse result = traceServiceInstance.startDebugLogService(corg, false, null);
+        Test.stopTest();
+        
+        // Then - method should execute successfully using default DateTime.now().addHours(-1)
+        System.assertNotEquals(null, result, 'Result should not be null');
+    }
+
+    @IsTest
     private static void test_start_debug_log_service_chunk_success() {
         test_start_debug_log_service_chunk(true);
     }
@@ -404,6 +465,23 @@ public with sharing class TraceServiceTest {
                         Schema.sObjectType.Debug_Log_Service_Flag__c.fields.Last_Processed_Log__c.Name => flag.Last_Processed_Log__c
                     }
                 }
+            })
+        ));
+        
+        return endpoint2TestResp;
+    }
+
+    private static Map<String, HttpCalloutMock> getDebugLogServiceFlagMockEmpty() {
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+        String query = new QBuilder(Debug_Log_Service_Flag__c.SObjectType)
+            .selectFields(new Set<String>{Schema.sObjectType.Debug_Log_Service_Flag__c.fields.Last_Created_Log__c.Name, Schema.sObjectType.Debug_Log_Service_Flag__c.fields.Last_Processed_Log__c.Name})
+            .add(QBuilder.condition('SetupOwnerId').equalsTo(EXTERNAL_ORG_ID))
+            .build();
+        endpoint2TestResp.put(INSTANCE_URL + ConfigUtil.QUERY_REST_API_PATH + EncodingUtil.urlEncode(query, 'UTF-8'), new TestDataFactory.SingleRequestMock(
+            200,
+            'OK',
+            JSON.serialize(new Map<String, Object>{
+                ConfigUtil.REMOTE_SITE_SETTINGS_KEY_RECORDS => new List<Map<String, Object>>()
             })
         ));
         

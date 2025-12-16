@@ -106,6 +106,31 @@ public with sharing class LimitsService {
 		return PermissionsUtil.MaxIssues;
 	}
 
+	public static Integer getMaxJiraRules() {
+		if (PermissionsUtil.MaxJiraRules == 0) return null;
+		return PermissionsUtil.MaxJiraRules;
+	}
+
+	public static Integer getMaxMonitoringRules() {
+		if (PermissionsUtil.MaxMonitoringRules == 0) return null;
+		return PermissionsUtil.MaxMonitoringRules;
+	}
+
+	public static Integer getMaxArchivalRules() {
+		if (PermissionsUtil.MaxArchivalRules == 0) return null;
+		return PermissionsUtil.MaxArchivalRules;
+	}
+
+	public static Integer getMaxConnectedOrgs() {
+		if (PermissionsUtil.MaxConnectedOrgs == 0) return null;
+		return PermissionsUtil.MaxConnectedOrgs;
+	}
+
+	public static Integer getMaxNotificationRules() {
+		if (PermissionsUtil.MaxNotificationRules == 0) return null;
+		return PermissionsUtil.MaxNotificationRules;
+	}
+
 	public static Integer getAvailableNotifications24hr() {
 		if (PermissionsUtil.MaxNotifications24hr == 0) return null;
 		Integer notifications24hr = Integer.valueOf(ConfigUtil.SETTINGS.Notifications_24hr_Counter__c != null ? ConfigUtil.SETTINGS.Notifications_24hr_Counter__c : 0);

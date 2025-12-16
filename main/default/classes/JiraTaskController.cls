@@ -121,14 +121,14 @@ public with sharing class JiraTaskController {
 		catch(Exception e) {
 			response.error = e.getMessage();
 			response.stack = e.getStackTraceString();
-			Logger.getInstance().internalError(e, JiraTaskController.class.getName(), 'remoteActionHandler' + (String.isNotBlank(methodName) ? '.' + methodName : ''));
+			Logger.getInstance().internalError(e, TraceResultController.class.getName(), 'remoteActionHandler' + (String.isNotBlank(methodName) ? '.' + methodName : ''));
 		}
 		finally {
 			try {
 				result = JSON.serialize(response);
 			}
 			catch(Exception e) {
-				Logger.getInstance().internalError(e, JiraTaskController.class.getName(), 'remoteActionHandler.serializeResponse');
+				Logger.getInstance().internalError(e, TraceResultController.class.getName(), 'remoteActionHandler.serializeResponse');
 			}
 		}
 		return result;

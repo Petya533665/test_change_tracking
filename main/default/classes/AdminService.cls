@@ -2385,7 +2385,11 @@ public without sharing class AdminService {
         ruleSettings.put(RuleUtil.KEY_RULES, RuleUtil.getRuleWrappers(ruleType));
         if(ruleType != Constants.RULE_SOBJECT.TYPE_EVENT_MONITORING) {
             ruleSettings.put(RuleUtil.KEY_RULE_COMPARISON_OPERATORS, SObjectType.Rule__c.fields.ComparisonOperator__c.getPicklistValues());
-            ruleSettings.put(RuleUtil.KEY_RULE_FILTER_COMPARISON_OPERATORS, SObjectType.RuleFilter__c.fields.ComparisonOperator__c.getPicklistValues());
+            List<SelectOptionWrapper> filterComparisonOperators = new List<SelectOptionWrapper>();
+            for (String comparisonOperatorLabel : RuleUtil.RULE_FILTER_COMPARISON_OPERATORS) {
+                filterComparisonOperators.add(new SelectOptionWrapper(comparisonOperatorLabel, comparisonOperatorLabel));
+            }
+            ruleSettings.put(RuleUtil.KEY_RULE_FILTER_COMPARISON_OPERATORS, filterComparisonOperators);
         }
         else {
             ruleSettings.put(RuleUtil.KEY_RULE_COMPARISON_OPERATORS, new List<SelectOptionWrapper>());
@@ -2732,27 +2736,31 @@ public without sharing class AdminService {
 
             switch on ruleType {
                 when MONITORING {
-                    limitRules = PermissionsUtil.MaxMonitoringRules;
+                    limitRules = LimitsService.getMaxMonitoringRules();
                 }
                 when ARCHIVAL {
-                    limitRules = PermissionsUtil.MaxArchivalRules;
+                    limitRules = LimitsService.getMaxArchivalRules();
                 }
                 when JIRA_UPDATE, AZURE_DEV_OPS {
-                    limitRules = PermissionsUtil.MaxJiraRules;
+                    limitRules = LimitsService.getMaxJiraRules();
                 }
                 when NOTIFICATION {
-                    limitRules = PermissionsUtil.MaxNotificationRules;
+                    limitRules = LimitsService.getMaxNotificationRules();
                 }
             }
-            Integer rulesCount = [SELECT COUNT() FROM Rule__c WHERE Type__c = :type AND Active__c = TRUE];
-            Boolean oldActvieValue = String.isNotBlank(ruleId) 
-                ? [SELECT Active__c FROM Rule__c WHERE Id = :ruleId LIMIT 1].Active__c
-                : false;
-            Integer newRuleCount = String.isNotBlank(ruleId) 
-                ? (oldActvieValue ? 0 : 1) 
-                : 1;
-            if(isActive && (rulesCount + newRuleCount > limitRules)) {
-                throw new AdminServiceValidationException(RULE_MAX_ACTIVE_RULES_REACHED + limitRules);
+            
+            // If limitRules is null, it means unlimited - skip validation
+            if (limitRules != null) {
+                Integer rulesCount = [SELECT COUNT() FROM Rule__c WHERE Type__c = :type AND Active__c = TRUE];
+                Boolean oldActvieValue = String.isNotBlank(ruleId) 
+                    ? [SELECT Active__c FROM Rule__c WHERE Id = :ruleId LIMIT 1].Active__c
+                    : false;
+                Integer newRuleCount = String.isNotBlank(ruleId) 
+                    ? (oldActvieValue ? 0 : 1) 
+                    : 1;
+                if(isActive && (rulesCount + newRuleCount > limitRules)) {
+                    throw new AdminServiceValidationException(RULE_MAX_ACTIVE_RULES_REACHED + limitRules);
+                }
             }
         }
     }

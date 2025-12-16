@@ -886,6 +886,7 @@ public without sharing class PermissionsUtil {
 		private set;
 	}
 
+	@TestVisible
 	public static Integer MaxConnectedOrgs {
 		get {
 			if(MaxConnectedOrgs == null) {

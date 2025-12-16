@@ -22,17 +22,21 @@ public with sharing class RetentionBatch extends DatabaseUtils.PharosBatchImpl i
 	}
 
 	public override Integer getIterationsCount() {
-		return [SELECT COUNT() FROM Rule__c WHERE Type__c = :Constants.RULE_SOBJECT.TYPE_ARCHIVAL AND Active__c = TRUE LIMIT :PermissionsUtil.MaxArchivalRules];
+		Integer maxRules = LimitsService.getMaxArchivalRules();
+		if (maxRules == null) maxRules = Constants.QUERY_LIMITS.MAX_RULES_RECORDS_QUERY_LIMIT;
+		return [SELECT COUNT() FROM Rule__c WHERE Type__c = :Constants.RULE_SOBJECT.TYPE_ARCHIVAL AND Active__c = TRUE LIMIT :maxRules];
 	}
 
 	public Database.QueryLocator start(Database.BatchableContext bc) {
+		Integer maxRules = LimitsService.getMaxArchivalRules();
+		if (maxRules == null) maxRules = Constants.QUERY_LIMITS.MAX_RULES_RECORDS_QUERY_LIMIT;
 		return Database.getQueryLocator([
 				SELECT Id, Type__c
 				FROM Rule__c
 				WHERE Type__c = :Constants.RULE_SOBJECT.TYPE_ARCHIVAL
 				AND Active__c = TRUE
 				ORDER BY Index__c
-				LIMIT :PermissionsUtil.MaxArchivalRules
+				LIMIT :maxRules
 		]);
 	}
 

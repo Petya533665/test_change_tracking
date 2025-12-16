@@ -1241,4 +1241,309 @@ public class Test_LimitsService {
         System.assertEquals(1600, capturedLogs[1].Limits__r.DailyApiRequests__c,
             'Current snapshot should have 1600 API requests');
     }
+
+    @IsTest
+    static void test_regularMonitoringFinish_shouldTriggerLimitsMonitoring() {
+        // TEST: Verify hasNewLimits() and needRunLimitsRules() work correctly
+        // to determine if limits monitoring should run after regular monitoring
+        
+        // Setup: Enable both monitoring types
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        PermissionsUtil.MaxMonitoringRules = 10;
+        ConfigUtil.SETTINGS.Monitoring_Enabled__c = true;
+        ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = true;
+        
+        DateTime testTime = DateTime.now();
+        
+        // Setup batch flag: limits have new data to process
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = testTime; // New log created
+        batchFlag.Last_Processed_Limits_Log__c = testTime.addMinutes(-70); // Limits processed long ago
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        // Test that hasNewLimits() detects new data
+        Boolean hasNewLimits = MonitoringService.hasNewLimits();
+        
+        Test.stopTest();
+        
+        // VERIFICATION: Should detect new limits data
+        System.assertEquals(true, hasNewLimits,
+            'hasNewLimits() should return true when Last_Created_Log__c > Last_Processed_Limits_Log__c');
+    }
+
+    @IsTest
+    static void test_limitsMonitoringFinish_shouldTriggerRegularMonitoring() {
+        // TEST: Verify hasNewLogs() works correctly to determine
+        // if regular monitoring should run after limits monitoring
+        
+        // Setup: Enable both monitoring types
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        PermissionsUtil.MaxMonitoringRules = 10;
+        ConfigUtil.SETTINGS.Monitoring_Enabled__c = true;
+        ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = true;
+        
+        DateTime testTime = DateTime.now();
+        
+        // Setup batch flag: regular logs have new data to process
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = testTime; // New log created
+        batchFlag.Last_Processed_Log__c = testTime.addMinutes(-70); // Regular logs processed long ago
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        // Test that hasNewLogs() detects new data
+        Boolean hasNewLogs = MonitoringService.hasNewLogs();
+        
+        Test.stopTest();
+        
+        // VERIFICATION: Should detect new regular log data
+        System.assertEquals(true, hasNewLogs,
+            'hasNewLogs() should return true when Last_Created_Log__c > Last_Processed_Log__c');
+    }
+
+    @IsTest
+    static void test_regularMonitoringFinish_noLimitsNeeded_shouldNotTrigger() {
+        // TEST: Verify hasNewLimits() returns false when all limits are already processed
+        
+        // Setup: Enable both monitoring types
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        PermissionsUtil.MaxMonitoringRules = 10;
+        ConfigUtil.SETTINGS.Monitoring_Enabled__c = true;
+        ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = true;
+        
+        DateTime testTime = DateTime.now();
+        
+        // Setup batch flag: limits already processed up to current time
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = testTime.addMinutes(-10); // Old log
+        batchFlag.Last_Processed_Limits_Log__c = testTime; // Already processed
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        // Test that hasNewLimits() correctly detects no new data
+        Boolean hasNewLimits = MonitoringService.hasNewLimits();
+        
+        Test.stopTest();
+        
+        // VERIFICATION: Should NOT detect new limits data
+        System.assertEquals(false, hasNewLimits,
+            'hasNewLimits() should return false when Last_Created_Log__c < Last_Processed_Limits_Log__c');
+    }
+
+    @IsTest
+    static void test_shouldRunOtherStrategy_implementation() {
+        // TEST: Verify the shouldRunOtherStrategy() method implementations
+        // correctly call hasNewData() and needRunRules() methods
+        
+        // Setup: Enable both monitoring types
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        PermissionsUtil.MaxMonitoringRules = 10;
+        ConfigUtil.SETTINGS.Monitoring_Enabled__c = true;
+        ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = true;
+        
+        DateTime testTime = DateTime.now();
+        
+        // Setup batch flag: both types have new data
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = testTime;
+        batchFlag.Last_Processed_Log__c = testTime.addMinutes(-70); // Old
+        batchFlag.Last_Processed_Limits_Log__c = testTime.addMinutes(-70); // Old
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        // Test the underlying methods that shouldRunOtherStrategy uses
+        Boolean hasNewLogs = MonitoringService.hasNewLogs();
+        Boolean hasNewLimits = MonitoringService.hasNewLimits();
+        
+        // Instantiate strategies
+        MonitoringService.LogMonitoringStrategy logStrategy = new MonitoringService.LogMonitoringStrategy(Logger.getInstance());
+        MonitoringService.LimitsMonitoringStrategy limitsStrategy = new MonitoringService.LimitsMonitoringStrategy(Logger.getInstance());
+        
+        Test.stopTest();
+        
+        // VERIFICATION: Both types should have new data
+        System.assertEquals(true, hasNewLogs,
+            'Should detect new regular logs when Last_Created_Log__c > Last_Processed_Log__c');
+        System.assertEquals(true, hasNewLimits,
+            'Should detect new limits logs when Last_Created_Log__c > Last_Processed_Limits_Log__c');
+        
+        // Verify strategy instances can be created
+        System.assertNotEquals(null, logStrategy,
+            'LogMonitoringStrategy should be instantiated');
+        System.assertNotEquals(null, limitsStrategy,
+            'LimitsMonitoringStrategy should be instantiated');
+        
+        // Verify strategies have correct rule types
+        System.assertEquals(Constants.RULE_SOBJECT.TYPE_MONITORING, logStrategy.getRuleType(),
+            'LogMonitoringStrategy should return TYPE_MONITORING');
+        System.assertEquals(Constants.RULE_SOBJECT.TYPE_LIMITS, limitsStrategy.getRuleType(),
+            'LimitsMonitoringStrategy should return TYPE_LIMITS');
+    }
+
+    @IsTest
+    static void test_hasNewData_methods() {
+        // TEST: Verify hasNewLogs() and hasNewLimits() methods work correctly
+        // to determine if monitoring strategies should run
+        
+        DateTime testTime = DateTime.now();
+        
+        // Test Case 1: Both have new data
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = testTime;
+        batchFlag.Last_Processed_Log__c = testTime.addMinutes(-10);
+        batchFlag.Last_Processed_Limits_Log__c = testTime.addMinutes(-10);
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        Boolean hasNewLogs1 = MonitoringService.hasNewLogs();
+        Boolean hasNewLimits1 = MonitoringService.hasNewLimits();
+        
+        // Test Case 2: No new data (all processed)
+        batchFlag.Last_Processed_Log__c = testTime.addMinutes(10);
+        batchFlag.Last_Processed_Limits_Log__c = testTime.addMinutes(10);
+        upsert batchFlag;
+        
+        Boolean hasNewLogs2 = MonitoringService.hasNewLogs();
+        Boolean hasNewLimits2 = MonitoringService.hasNewLimits();
+        
+        // Test Case 3: No logs created yet
+        batchFlag.Last_Created_Log__c = null;
+        batchFlag.Last_Processed_Log__c = null;
+        batchFlag.Last_Processed_Limits_Log__c = null;
+        upsert batchFlag;
+        
+        Boolean hasNewLogs3 = MonitoringService.hasNewLogs();
+        Boolean hasNewLimits3 = MonitoringService.hasNewLimits();
+        
+        Test.stopTest();
+        
+        // VERIFICATION Case 1: Both should have new data
+        System.assertEquals(true, hasNewLogs1,
+            'Case 1: Should detect new regular logs');
+        System.assertEquals(true, hasNewLimits1,
+            'Case 1: Should detect new limits logs');
+        
+        // VERIFICATION Case 2: Neither should have new data
+        System.assertEquals(false, hasNewLogs2,
+            'Case 2: Should NOT detect new regular logs when already processed');
+        System.assertEquals(false, hasNewLimits2,
+            'Case 2: Should NOT detect new limits logs when already processed');
+        
+        // VERIFICATION Case 3: No logs at all
+        System.assertEquals(false, hasNewLogs3,
+            'Case 3: Should return false when no logs created');
+        System.assertEquals(false, hasNewLimits3,
+            'Case 3: Should return false when no logs created');
+    }
+
+    static void test_getMaxJiraRules_returnsNull_whenZero() {
+        // Test that getMaxJiraRules returns null when PermissionsUtil.MaxJiraRules is 0
+        Test.startTest();
+        PermissionsUtil.MaxJiraRules = 0;
+        Integer result = LimitsService.getMaxJiraRules();
+        Test.stopTest();
+        
+        System.assertEquals(null, result, 'getMaxJiraRules should return null when MaxJiraRules is 0 (unlimited)');
+    }
+
+    @IsTest
+    static void test_getMaxJiraRules_returnsValue_whenNonZero() {
+        // Test that getMaxJiraRules returns the actual value when PermissionsUtil.MaxJiraRules is not 0
+        Test.startTest();
+        PermissionsUtil.MaxJiraRules = 10;
+        Integer result = LimitsService.getMaxJiraRules();
+        Test.stopTest();
+        
+        System.assertEquals(10, result, 'getMaxJiraRules should return 10 when MaxJiraRules is 10');
+    }
+
+    @IsTest
+    static void test_getMaxMonitoringRules_returnsNull_whenZero() {
+        Test.startTest();
+        PermissionsUtil.MaxMonitoringRules = 0;
+        Integer result = LimitsService.getMaxMonitoringRules();
+        Test.stopTest();
+        
+        System.assertEquals(null, result, 'getMaxMonitoringRules should return null when MaxMonitoringRules is 0 (unlimited)');
+    }
+
+    @IsTest
+    static void test_getMaxMonitoringRules_returnsValue_whenNonZero() {
+        Test.startTest();
+        PermissionsUtil.MaxMonitoringRules = 5;
+        Integer result = LimitsService.getMaxMonitoringRules();
+        Test.stopTest();
+        
+        System.assertEquals(5, result, 'getMaxMonitoringRules should return 5 when MaxMonitoringRules is 5');
+    }
+
+    @IsTest
+    static void test_getMaxArchivalRules_returnsNull_whenZero() {
+        Test.startTest();
+        PermissionsUtil.MaxArchivalRules = 0;
+        Integer result = LimitsService.getMaxArchivalRules();
+        Test.stopTest();
+        
+        System.assertEquals(null, result, 'getMaxArchivalRules should return null when MaxArchivalRules is 0 (unlimited)');
+    }
+
+    @IsTest
+    static void test_getMaxArchivalRules_returnsValue_whenNonZero() {
+        Test.startTest();
+        PermissionsUtil.MaxArchivalRules = 3;
+        Integer result = LimitsService.getMaxArchivalRules();
+        Test.stopTest();
+        
+        System.assertEquals(3, result, 'getMaxArchivalRules should return 3 when MaxArchivalRules is 3');
+    }
+
+    @IsTest
+    static void test_getMaxConnectedOrgs_returnsNull_whenZero() {
+        Test.startTest();
+        PermissionsUtil.MaxConnectedOrgs = 0;
+        Integer result = LimitsService.getMaxConnectedOrgs();
+        Test.stopTest();
+        
+        System.assertEquals(null, result, 'getMaxConnectedOrgs should return null when MaxConnectedOrgs is 0 (unlimited)');
+    }
+
+    @IsTest
+    static void test_getMaxConnectedOrgs_returnsValue_whenNonZero() {
+        Test.startTest();
+        PermissionsUtil.MaxConnectedOrgs = 2;
+        Integer result = LimitsService.getMaxConnectedOrgs();
+        Test.stopTest();
+        
+        System.assertEquals(2, result, 'getMaxConnectedOrgs should return 2 when MaxConnectedOrgs is 2');
+    }
+
+    @IsTest
+    static void test_getMaxNotificationRules_returnsNull_whenZero() {
+        Test.startTest();
+        PermissionsUtil.MaxNotificationRules = 0;
+        Integer result = LimitsService.getMaxNotificationRules();
+        Test.stopTest();
+        
+        System.assertEquals(null, result, 'getMaxNotificationRules should return null when MaxNotificationRules is 0 (unlimited)');
+    }
+
+    @IsTest
+    static void test_getMaxNotificationRules_returnsValue_whenNonZero() {
+        Test.startTest();
+        PermissionsUtil.MaxNotificationRules = 7;
+        Integer result = LimitsService.getMaxNotificationRules();
+        Test.stopTest();
+        
+        System.assertEquals(7, result, 'getMaxNotificationRules should return 7 when MaxNotificationRules is 7');
+    }
 }

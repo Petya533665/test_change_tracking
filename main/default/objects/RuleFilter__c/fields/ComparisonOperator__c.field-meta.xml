@@ -50,6 +50,16 @@
                 <default>false</default>
                 <label>Doesn&apos;t Contain</label>
             </value>
+            <value>
+                <fullName>Includes</fullName>
+                <default>false</default>
+                <label>Includes</label>
+            </value>
+            <value>
+                <fullName>Excludes</fullName>
+                <default>false</default>
+                <label>Excludes</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

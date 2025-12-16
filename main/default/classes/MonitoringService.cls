@@ -99,6 +99,11 @@ public with sharing class MonitoringService {
             qb.add(QBuilder.condition(Constants.LOG_SOBJECT.LIMITS).isNotNull());
             parser.addOperand();
         }
+        // for regular monitoring logs, skip limits logs
+        else {
+            qb.add(QBuilder.condition(Constants.LOG_SOBJECT.LIMITS).isNull());
+            parser.addOperand();
+        }
         
         qb.setConditionOrder(parser.toConditionString());
         return qb;
@@ -218,6 +223,7 @@ public with sharing class MonitoringService {
         public abstract Boolean needRunRules(Datetime currentTime);
         public abstract List<RuleUtil.Rule> getRules(List<Id> ruleIds);
         public abstract void evaluateRulesForStrategy(List<Id> ruleIds, List<RuleUtil.Rule> rules, Datetime lastProcessedDatetime, Datetime startTime, Map<Id, RuleUtil.Event> eventsMap);
+        public abstract Boolean shouldRunOtherStrategy(Datetime currentTime);
         
         // Common implementation for processStrategySpecific
         public void processStrategySpecific(List<Rule__c> rules, Map<Id, RuleUtil.Event> eventsMap, Datetime currentTime, DateTime startTime) {
@@ -237,20 +243,24 @@ public with sharing class MonitoringService {
         
         // Common implementation for getStrategyIterationsCount
         public Integer getStrategyIterationsCount() {
+            Integer maxRules = LimitsService.getMaxMonitoringRules();
+            if (maxRules == null) maxRules = Constants.QUERY_LIMITS.MAX_RULES_RECORDS_QUERY_LIMIT;
             return [SELECT COUNT() FROM Rule__c 
                 WHERE Type__c = :getRuleType() AND Active__c = TRUE 
-                LIMIT :PermissionsUtil.MaxMonitoringRules];
+                LIMIT :maxRules];
         }
         
         // Common implementation for start method
         public virtual Database.QueryLocator start(Database.BatchableContext bc, DateTime startTime) {
+            Integer maxRules = LimitsService.getMaxMonitoringRules();
+            if (maxRules == null) maxRules = Constants.QUERY_LIMITS.MAX_RULES_RECORDS_QUERY_LIMIT;
             return Database.getQueryLocator([
                 SELECT Id, Type__c
                 FROM Rule__c
                 WHERE Type__c = :getRuleType()
                 AND Active__c = TRUE
                 ORDER BY Index__c
-                LIMIT :PermissionsUtil.MaxMonitoringRules
+                LIMIT :maxRules
             ]);
         }
         
@@ -269,7 +279,12 @@ public with sharing class MonitoringService {
         
         // Common implementation for finish method
         public virtual void finish(Database.BatchableContext BC, Datetime currentTime) {
+            // Check if the current strategy needs to run again
             if (hasNewData() && needRunRules(currentTime)) {
+                MonitoringBatch.getInstance().startBatch();
+            }
+            // Check if the other strategy type needs to run
+            else if (shouldRunOtherStrategy(currentTime)) {
                 MonitoringBatch.getInstance().startBatch();
             }
             else {
@@ -331,6 +346,11 @@ public with sharing class MonitoringService {
             MonitoringUtil.evaluateRules(logs, ruleIds, startTime, eventsMap, logger);
         }
         
+        public override Boolean shouldRunOtherStrategy(Datetime currentTime) {
+            // After regular monitoring finishes, check if limits monitoring needs to run
+            return MonitoringService.hasNewLimits() && MonitoringService.needRunLimitsRules(currentTime);
+        }
+        
         public Datetime getLastProcessedDatetime() {
             Monitoring_Batch_Flag__c flag = Monitoring_Batch_Flag__c.getOrgDefaults();
             return flag.Last_Processed_Log__c;
@@ -385,6 +405,11 @@ public with sharing class MonitoringService {
         public override void evaluateRulesForStrategy(List<Id> ruleIds, List<RuleUtil.Rule> rules, Datetime lastProcessedDatetime, Datetime startTime, Map<Id, RuleUtil.Event> eventsMap) {
             List<Log__c> logs = MonitoringService.queryAndProcessLogs(rules.get(0), lastProcessedDatetime, rules);
             MonitoringUtil.evaluateLimitsRules(logs, ruleIds, startTime, eventsMap, logger);
+        }
+        
+        public override Boolean shouldRunOtherStrategy(Datetime currentTime) {
+            // After limits monitoring finishes, check if regular monitoring needs to run
+            return MonitoringService.hasNewLogs() && MonitoringService.needRunMonitoringRules(currentTime);
         }
         
         public Datetime getLastProcessedDatetime() {

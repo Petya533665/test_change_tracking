@@ -148,6 +148,20 @@ public with sharing class RuleUtil {
 			COMPARISON_OPERATOR_EXCLUDES => ComparisonOperator.EXCLUDES
 	};
 
+	// Operators allowed for rule filters
+	public static final List<String> RULE_FILTER_COMPARISON_OPERATORS = new List<String>{
+		COMPARISON_OPERATOR_EQUAL,
+		COMPARISON_OPERATOR_NOT_EQUAL,
+		COMPARISON_OPERATOR_GREATER_THEN,
+		COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+		COMPARISON_OPERATOR_LESS_THAN,
+		COMPARISON_OPERATOR_LESS_OR_EQUAL,
+		COMPARISON_OPERATOR_CONTAINS,
+		COMPARISON_OPERATOR_DOSENT_CONTAINS,
+		COMPARISON_OPERATOR_INCLUDES,
+		COMPARISON_OPERATOR_EXCLUDES
+	};
+
 	public enum AggregateType {
 		COUNT,
 		AVERAGE
@@ -1099,22 +1113,27 @@ public with sharing class RuleUtil {
 		List<Rule__c> rules;
 		Integer limitRules = 0;
 		if(ruleType.equals(Constants.RULE_SOBJECT.TYPE_ARCHIVAL)) {
-			limitRules = PermissionsUtil.MaxArchivalRules;
+			limitRules = LimitsService.getMaxArchivalRules();
 		}
 		else if(ruleType.equals(Constants.RULE_SOBJECT.TYPE_MONITORING)) {
-			limitRules = PermissionsUtil.MaxMonitoringRules;
+			limitRules = LimitsService.getMaxMonitoringRules();
 		}
 		else if(ruleType.equals(Constants.RULE_SOBJECT.TYPE_LIMITS)) {
-			limitRules = PermissionsUtil.MaxMonitoringRules;
+			limitRules = LimitsService.getMaxMonitoringRules();
 		}
 		else if(ruleType.equals(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE) || ruleType.equals(Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS)) {
-			limitRules = PermissionsUtil.MaxJiraRules;
+			limitRules = LimitsService.getMaxJiraRules();
 		}
 		else if(ruleType.equals(Constants.RULE_SOBJECT.TYPE_NOTIFICATION)) {
-			limitRules = PermissionsUtil.MaxNotificationRules;
+			limitRules = LimitsService.getMaxNotificationRules();
 		}
 		else if (ruleType.equals(Constants.RULE_SOBJECT.TYPE_BROADCAST)) {
-			limitRules = PermissionsUtil.MaxConnectedOrgs;
+			limitRules = LimitsService.getMaxConnectedOrgs();
+		}
+		
+		// If limitRules is null (unlimited), set to maximum SOQL LIMIT
+		if (limitRules == null) {
+			limitRules = Constants.QUERY_LIMITS.MAX_RULES_RECORDS_QUERY_LIMIT;
 		}
 
 		if(ruleIds != null) {

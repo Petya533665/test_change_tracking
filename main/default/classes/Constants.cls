@@ -907,6 +907,8 @@ public with sharing class Constants {
 
         // Used for safe check for aggregate result query
         public final Integer MAX_COUNT_FOR_SAFE_AGGREGATE_RESULT_QUERY = 49000;
+
+        public final Integer MAX_RULES_RECORDS_QUERY_LIMIT = 255;
     }
     
     public inherited sharing virtual class SObjectTypeConstants {
