@@ -7,20 +7,28 @@
         <locationX>0</locationX>
         <locationY>0</locationY>
         <assignmentItems>
-            <assignToReference>TritonErrorDataRecord.Name</assignToReference>
+            <assignToReference>account.Fax</assignToReference>
             <operator>Assign</operator>
         </assignmentItems>
         <assignmentItems>
-            <assignToReference>TritonErrorDataRecord.Description__c</assignToReference>
+            <assignToReference>account.Phone</assignToReference>
             <operator>Assign</operator>
             <value>
                 <stringValue>123</stringValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>account.Industry</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>456</stringValue>
             </value>
         </assignmentItems>
         <connector>
             <targetReference>Create_Triton_Error_Data</targetReference>
         </connector>
     </assignments>
+    <description>excludes operator test</description>
     <interviewLabel>Flow #1 Error {!$Flow.CurrentDateTime}</interviewLabel>
     <label>Flow #1 Error</label>
     <processMetadataValues>
@@ -47,7 +55,7 @@
         <label>Create Triton Error Data</label>
         <locationX>0</locationX>
         <locationY>0</locationY>
-        <inputReference>TritonErrorDataRecord</inputReference>
+        <inputReference>account</inputReference>
     </recordCreates>
     <start>
         <locationX>0</locationX>
@@ -56,7 +64,15 @@
             <targetReference>Assignment_Data</targetReference>
         </connector>
     </start>
-    <status>Active</status>
+    <status>Draft</status>
+    <variables>
+        <name>account</name>
+        <dataType>SObject</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+        <objectType>Account</objectType>
+    </variables>
     <variables>
         <name>TritonErrorDataRecord</name>
         <dataType>SObject</dataType>
