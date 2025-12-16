@@ -1,11 +1,11 @@
 /**
- * Copyright (C) 2024 Pharos AI, Inc.
+ * Copyright (C) 2024 petriv AI, Inc.
  *
- * This file is part of Pharos Triton.
+ * This file is part of petriv Triton.
  *
- * Pharos Triton is free software: you can redistribute it and/or modify
+ * petriv Triton is free software: you can redistribute it and/or modify
  * it under the terms of the MIT License.
- * See LICENSE file or go to https://github.com/Pharos-AI/triton/blob/main/LICENSE.
+ * See LICENSE file or go to https://github.com/petriv-AI/triton/blob/main/LICENSE.
  */
 
 /**

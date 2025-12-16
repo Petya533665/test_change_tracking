@@ -1,11 +1,11 @@
 /**
- * Copyright (C) 2024 Pharos AI, Inc.
+ * Copyright (C) 2024 petriv AI, Inc.
  *
- * This file is part of Pharos Triton.
+ * This file is part of petriv Triton.
  *
- * Pharos Triton is free software: you can redistribute it and/or modify
+ * petriv Triton is free software: you can redistribute it and/or modify
  * it under the terms of the MIT License.
- * See LICENSE file or go to https://github.com/Pharos-AI/triton/blob/main/LICENSE.
+ * See LICENSE file or go to https://github.com/petriv-AI/triton/blob/main/LICENSE.
  *
  * Test class for LogLimitsController. Verifies the functionality for retrieving
  * and displaying Salesforce governor limit usage information from log records.
@@ -73,7 +73,7 @@ private class LogLimitsControllerTest {
         Test.stopTest();
         
         // Query for the log ID after platform events are processed
-        pharos__Log__c log = [SELECT Id FROM pharos__Log__c WHERE pharos__Summary__c = 'Test Log with Limits' LIMIT 1];
+        petriv__Log__c log = [SELECT Id FROM petriv__Log__c WHERE petriv__Summary__c = 'Test Log with Limits' LIMIT 1];
         
         // Call the method to test
         List<LogLimitsController.LimitUsage> results = LogLimitsController.getLimitUsage(log.Id);
@@ -151,7 +151,7 @@ private class LogLimitsControllerTest {
         Test.stopTest();
         
         // Query for the log ID after platform events are processed
-        pharos__Log__c log = [SELECT Id FROM pharos__Log__c WHERE pharos__Summary__c = 'Test Log with Partial Limits' LIMIT 1];
+        petriv__Log__c log = [SELECT Id FROM petriv__Log__c WHERE petriv__Summary__c = 'Test Log with Partial Limits' LIMIT 1];
         
         // Call the method to test
         List<LogLimitsController.LimitUsage> results = LogLimitsController.getLimitUsage(log.Id);

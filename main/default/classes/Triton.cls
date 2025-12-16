@@ -1,11 +1,11 @@
 /**
- * Copyright (C) 2024 Pharos AI, Inc.
+ * Copyright (C) 2024 petriv AI, Inc.
  *
- * This file is part of Pharos Triton.
+ * This file is part of petriv Triton.
  *
- * Pharos Triton is free software: you can redistribute it and/or modify
+ * petriv Triton is free software: you can redistribute it and/or modify
  * it under the terms of the MIT License.
- * See LICENSE file or go to https://github.com/Pharos-AI/triton/blob/main/LICENSE.
+ * See LICENSE file or go to https://github.com/petriv-AI/triton/blob/main/LICENSE.
  *
  * The Triton class provides a robust logging framework for Salesforce applications.
  * It enables structured logging with different severity levels (ERROR, WARNING, DEBUG, INFO),
@@ -28,7 +28,7 @@ global with sharing class Triton {
     public static Triton instance {
         get {
             if (instance == null) {
-                instance = new Triton(pharos.Logger.getInstance());
+                instance = new Triton(petriv.Logger.getInstance());
             }
             return instance;
         }
@@ -36,7 +36,7 @@ global with sharing class Triton {
     }
 
     //singleton instance
-    private final pharos.Logger logger;
+    private final petriv.Logger logger;
 
     /**
     * Helper map for storing current log levels
@@ -64,10 +64,10 @@ global with sharing class Triton {
 
     // Logs buffer (queue) property
     @TestVisible
-    private List<pharos__Log__c> logs {
+    private List<petriv__Log__c> logs {
         get {
             if (logs == null) {
-                logs = new List<pharos__Log__c>();
+                logs = new List<petriv__Log__c>();
             }
             return logs;
         }
@@ -102,7 +102,7 @@ global with sharing class Triton {
     private Boolean withCache = false;
 
     // Constructor
-    private Triton(pharos.Logger logger) {
+    private Triton(petriv.Logger logger) {
         this.logger = logger;
         this.template = makeBuilder();
     }
@@ -132,7 +132,7 @@ global with sharing class Triton {
 
     /**
     * Sets a builder template that can be re-used
-    * @param builder -- Pharos builder to be used as a template
+    * @param builder -- petriv builder to be used as a template
     */
     public void setTemplate(TritonBuilder builder) {
         this.template = builder;
@@ -140,7 +140,7 @@ global with sharing class Triton {
 
     /**
     * Retrieves a copy of a previously saved template
-    * @return builder -- Pharos builder previously saved as a template
+    * @return builder -- petriv builder previously saved as a template
     */
     public TritonBuilder fromTemplate() {
         return (TritonBuilder)this.template.cloneBuilder()
@@ -159,7 +159,7 @@ global with sharing class Triton {
             return;
         }
         
-        for(pharos__Log__c log : logs) {
+        for(petriv__Log__c log : logs) {
             this.logger.add(log);
         }
         this.logger.flush();
@@ -256,7 +256,7 @@ global with sharing class Triton {
     * @param builder TritonBuilder instance containing log details
     */
     public void addLog(TritonBuilder builder) {
-        pharos__Log__c log = builder.build();
+        petriv__Log__c log = builder.build();
 
         if (!isLogAllowedForLogLevel(log)) {
             return;
@@ -264,14 +264,14 @@ global with sharing class Triton {
         builder.transactionId(TRANSACTION_ID);
 
         //get the stacktrace if one isn't provided
-        String stackTrace = log.pharos__Stacktrace__c;
-        if(String.isBlank(log.pharos__Stacktrace__c)) {
+        String stackTrace = log.petriv__Stacktrace__c;
+        if(String.isBlank(log.petriv__Stacktrace__c)) {
             stackTrace = TritonHelper.getCurrentStackTrace();
             builder.stackTrace(stackTrace);
         }
 
         //set the operation based on the class name and method name
-        if(String.isBlank(builder.build().pharos__Apex_Name__c)) {
+        if(String.isBlank(builder.build().petriv__Apex_Name__c)) {
             builder.operation(TritonHelper.getOperation(stackTrace));
         }
 
@@ -790,22 +790,22 @@ global with sharing class Triton {
 
     /**
     * Checks if a log should be persisted based on the current log level
-    * @param log -- Pharos log record to be saved
+    * @param log -- petriv log record to be saved
     * @return -- true if current log's level is below the level set in the settings, false otherwise
     */
-    public static Boolean isLogAllowedForLogLevel(pharos__Log__c log) {
+    public static Boolean isLogAllowedForLogLevel(petriv__Log__c log) {
         if (String.isBlank(log.Log_Level__c) || LOG_LEVELS.isEmpty()) return true;
 
         //a set of possible mapping permutations
         //these will be checked in the same order as this list
         String[] permutations = new String[] {
-                TritonHelper.buildLogLevelKey(log.pharos__Category__c, log.pharos__Type__c, log.pharos__Area__c),
-                TritonHelper.buildLogLevelKey(log.pharos__Category__c, log.pharos__Type__c, null),
-                TritonHelper.buildLogLevelKey(log.pharos__Category__c, null, log.pharos__Area__c),
-                TritonHelper.buildLogLevelKey(null, log.pharos__Type__c, log.pharos__Area__c),
-                TritonHelper.buildLogLevelKey(null, null, log.pharos__Area__c),
-                TritonHelper.buildLogLevelKey(null, log.pharos__Type__c, null),
-                TritonHelper.buildLogLevelKey(log.pharos__Category__c, null, null),
+                TritonHelper.buildLogLevelKey(log.petriv__Category__c, log.petriv__Type__c, log.petriv__Area__c),
+                TritonHelper.buildLogLevelKey(log.petriv__Category__c, log.petriv__Type__c, null),
+                TritonHelper.buildLogLevelKey(log.petriv__Category__c, null, log.petriv__Area__c),
+                TritonHelper.buildLogLevelKey(null, log.petriv__Type__c, log.petriv__Area__c),
+                TritonHelper.buildLogLevelKey(null, null, log.petriv__Area__c),
+                TritonHelper.buildLogLevelKey(null, log.petriv__Type__c, null),
+                TritonHelper.buildLogLevelKey(log.petriv__Category__c, null, null),
                 TritonHelper.buildLogLevelKey(null, null, null)
         };
 

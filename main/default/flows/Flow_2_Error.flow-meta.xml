@@ -1,28 +1,149 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
-    <apiVersion>53.0</apiVersion>
+    <apiVersion>65.0</apiVersion>
     <assignments>
-        <name>Assignment_Account</name>
-        <label>Assignment Account</label>
-        <locationX>176</locationX>
-        <locationY>158</locationY>
+        <name>Assignment_After_Loop</name>
+        <label>After Loop Completed</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <assignmentItems>
-            <assignToReference>account.Fax</assignToReference>
-            <operator>Assign</operator>
+            <assignToReference>varAccumulatedDescription</assignToReference>
+            <operator>Add</operator>
+            <value>
+                <stringValue>LOOP_COMPLETED_NORMALLY | </stringValue>
+            </value>
         </assignmentItems>
         <assignmentItems>
-            <assignToReference>account.Phone</assignToReference>
+            <assignToReference>varShouldForceError</assignToReference>
             <operator>Assign</operator>
             <value>
-                <stringValue>123</stringValue>
+                <booleanValue>true</booleanValue>
             </value>
         </assignmentItems>
         <connector>
-            <targetReference>Create_Account</targetReference>
+            <targetReference>Decision_Force_Error</targetReference>
         </connector>
     </assignments>
+    <assignments>
+        <name>Assignment_Increment_Counter</name>
+        <label>Increment Counter</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignmentItems>
+            <assignToReference>varLoopCounter</assignToReference>
+            <operator>Add</operator>
+            <value>
+                <numberValue>1.0</numberValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>varAccumulatedDescription</assignToReference>
+            <operator>Add</operator>
+            <value>
+                <elementReference>varCurrentLoopItem.Name</elementReference>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>varAccumulatedDescription</assignToReference>
+            <operator>Add</operator>
+            <value>
+                <stringValue> | </stringValue>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Loop_Through_Records</targetReference>
+        </connector>
+    </assignments>
+    <assignments>
+        <name>Assignment_Safe_Path</name>
+        <label>Safe Path Assignment</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignmentItems>
+            <assignToReference>TritonErrorDataRecord.Description__c</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Safe Path - No Error</stringValue>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Create_Safe_Record</targetReference>
+        </connector>
+    </assignments>
+    <decisions>
+        <name>Decision_Force_Error</name>
+        <label>Force Error?</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <defaultConnector>
+            <targetReference>Assignment_Safe_Path</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Safe Path</defaultConnectorLabel>
+        <rules>
+            <name>outcome_Force_Error</name>
+            <conditionLogic>or</conditionLogic>
+            <conditions>
+                <leftValueReference>varShouldForceError</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>varLoopCounter</leftValueReference>
+                <operator>GreaterThan</operator>
+                <rightValue>
+                    <numberValue>0.0</numberValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Create_new_record</targetReference>
+            </connector>
+            <label>Force Error Condition</label>
+        </rules>
+    </decisions>
+    <decisions>
+        <name>Decision_Has_Records</name>
+        <label>Has Existing Records?</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <defaultConnector>
+            <targetReference>Create_new_record</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>No Records Found</defaultConnectorLabel>
+        <rules>
+            <name>outcome_Has_Records</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>varExistingRecords</leftValueReference>
+                <operator>IsNull</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Loop_Through_Records</targetReference>
+            </connector>
+            <label>Records Exist</label>
+        </rules>
+    </decisions>
     <interviewLabel>Flow #2 Error {!$Flow.CurrentDateTime}</interviewLabel>
     <label>Flow #2 Error</label>
+    <loops>
+        <name>Loop_Through_Records</name>
+        <label>Loop Through Records</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignNextValueToReference>varCurrentLoopItem</assignNextValueToReference>
+        <collectionReference>varExistingRecords</collectionReference>
+        <iterationOrder>Asc</iterationOrder>
+        <nextValueConnector>
+            <targetReference>Assignment_Increment_Counter</targetReference>
+        </nextValueConnector>
+        <noMoreValuesConnector>
+            <targetReference>Assignment_After_Loop</targetReference>
+        </noMoreValuesConnector>
+    </loops>
     <processMetadataValues>
         <name>BuilderType</name>
         <value>
@@ -43,26 +164,105 @@
     </processMetadataValues>
     <processType>AutoLaunchedFlow</processType>
     <recordCreates>
-        <name>Create_Account</name>
-        <label>Create Account</label>
-        <locationX>176</locationX>
-        <locationY>278</locationY>
-        <inputReference>account</inputReference>
+        <name>Create_Safe_Record</name>
+        <label>Create Safe Record</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <inputReference>TritonErrorDataRecord</inputReference>
     </recordCreates>
+    <recordLookups>
+        <name>Get_Existing_Records</name>
+        <label>Get Existing Records</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignNullValuesIfNoRecordsFound>true</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Decision_Has_Records</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>CreatedDate</field>
+            <operator>EqualTo</operator>
+            <value>
+                <dateTimeValue>1900-01-01T00:00:00.000Z</dateTimeValue>
+            </value>
+        </filters>
+        <object>Triton_Error_Data__c</object>
+        <outputReference>varExistingRecords</outputReference>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>Name</queriedFields>
+        <queriedFields>Description__c</queriedFields>
+        <sortField>CreatedDate</sortField>
+        <sortOrder>Desc</sortOrder>
+    </recordLookups>
     <start>
-        <locationX>50</locationX>
+        <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Assignment_Account</targetReference>
+            <targetReference>Get_Existing_Records</targetReference>
         </connector>
     </start>
     <status>Active</status>
+    <subflows>
+        <name>Create_new_record</name>
+        <label>Create new record</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <flowName>Flow_1_Error</flowName>
+    </subflows>
     <variables>
-        <name>account</name>
+        <name>TritonErrorDataRecord</name>
         <dataType>SObject</dataType>
         <isCollection>false</isCollection>
         <isInput>true</isInput>
         <isOutput>false</isOutput>
-        <objectType>Account</objectType>
+        <objectType>Triton_Error_Data__c</objectType>
+    </variables>
+    <variables>
+        <name>varAccumulatedDescription</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <value>
+            <stringValue>Flow_2_Error: </stringValue>
+        </value>
+    </variables>
+    <variables>
+        <name>varCurrentLoopItem</name>
+        <dataType>SObject</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <objectType>Triton_Error_Data__c</objectType>
+    </variables>
+    <variables>
+        <name>varExistingRecords</name>
+        <dataType>SObject</dataType>
+        <isCollection>true</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <objectType>Triton_Error_Data__c</objectType>
+    </variables>
+    <variables>
+        <name>varLoopCounter</name>
+        <dataType>Number</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <scale>0</scale>
+        <value>
+            <numberValue>0.0</numberValue>
+        </value>
+    </variables>
+    <variables>
+        <name>varShouldForceError</name>
+        <dataType>Boolean</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <value>
+            <booleanValue>false</booleanValue>
+        </value>
     </variables>
 </Flow>

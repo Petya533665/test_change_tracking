@@ -1,39 +1,39 @@
 /**
- * Copyright (C) 2024 Pharos AI, Inc.
+ * Copyright (C) 2024 petriv AI, Inc.
  *
- * This file is part of Pharos Triton.
+ * This file is part of petriv Triton.
  *
- * Pharos Triton is free software: you can redistribute it and/or modify
+ * petriv Triton is free software: you can redistribute it and/or modify
  * it under the terms of the MIT License.
- * See LICENSE file or go to https://github.com/Pharos-AI/triton/blob/main/LICENSE.
+ * See LICENSE file or go to https://github.com/petriv-AI/triton/blob/main/LICENSE.
  */
 
 @IsTest
 private class TritonTest {
 
     private static void assertCreatedLog(TritonTypes.Category logCategory) {
-        List<pharos__Log__c> logs = [SELECT Id, pharos__Category__c, pharos__Hash__c FROM pharos__Log__c];
+        List<petriv__Log__c> logs = [SELECT Id, petriv__Category__c, petriv__Hash__c FROM petriv__Log__c];
         System.assertEquals(1, logs.size());
-        System.assertNotEquals(null, logs.get(0).pharos__Hash__c);
+        System.assertNotEquals(null, logs.get(0).petriv__Hash__c);
     }
 
     private static void assertCreatedIntegrationLog() {
-        List<pharos__Log__c> logs = [SELECT Id, pharos__Category__c, pharos__Hash__c FROM pharos__Log__c];
+        List<petriv__Log__c> logs = [SELECT Id, petriv__Category__c, petriv__Hash__c FROM petriv__Log__c];
         System.assertNotEquals(1, logs.size());
-        System.assertEquals(TritonTypes.Category.Integration.name(), logs.get(0).pharos__Category__c);
-        System.assertEquals(TritonTypes.Category.Integration.name(), logs.get(1).pharos__Category__c);
-        System.assertNotEquals(null, logs.get(0).pharos__Hash__c);
-        System.assertNotEquals(null, logs.get(1).pharos__Hash__c);
+        System.assertEquals(TritonTypes.Category.Integration.name(), logs.get(0).petriv__Category__c);
+        System.assertEquals(TritonTypes.Category.Integration.name(), logs.get(1).petriv__Category__c);
+        System.assertNotEquals(null, logs.get(0).petriv__Hash__c);
+        System.assertNotEquals(null, logs.get(1).petriv__Hash__c);
     }
 
     private static void assertBefore() {
-        Integer countBefore = [SELECT COUNT() FROM pharos__Log__c];
+        Integer countBefore = [SELECT COUNT() FROM petriv__Log__c];
         System.assertEquals(0, countBefore);
     }
 
     @TestSetup
     private static void testSetup() {
-        pharos.Test_Logger.initSettings();
+        petriv.Test_Logger.initSettings();
         // Clear out any existing log level metadata to ensure clean test environment
         Triton.LOG_LEVELS_MDT = new Log_Level__mdt[]{};
         Triton.LOG_LEVELS = null;
@@ -79,7 +79,7 @@ private class TritonTest {
         Triton.instance.event(TritonTypes.Level.FINE, TritonTypes.Type.Backend, TritonTypes.Area.Community, 'some event', 'error details');
         Test.stopTest();
 
-        System.assertEquals(0, [SELECT count() FROM pharos__Log__c where pharos__Category__c=:TritonTypes.Category.Event.name()]);
+        System.assertEquals(0, [SELECT count() FROM petriv__Log__c where petriv__Category__c=:TritonTypes.Category.Event.name()]);
     }
 
     private static void setupLogLevelsMap() {
@@ -128,7 +128,7 @@ private class TritonTest {
         Triton.instance.event(TritonTypes.Level.FINEST, TritonTypes.Type.Backend, TritonTypes.Area.OpportunityManagement, 'some event', 'error details');
         Test.stopTest();
 
-        System.assertEquals(0, [SELECT COUNT() FROM pharos__Log__c WHERE pharos__Category__c = :TritonTypes.Category.Event.name()]);
+        System.assertEquals(0, [SELECT COUNT() FROM petriv__Log__c WHERE petriv__Category__c = :TritonTypes.Category.Event.name()]);
     }
 
     @IsTest
@@ -222,10 +222,10 @@ private class TritonTest {
         Triton.instance.integrationError(TritonTypes.Type.Backend, TritonTypes.Area.Community, 'test summary', 'test details', req, res);
         Test.stopTest();
 
-        List<pharos__Log__c> logs = [SELECT Id, pharos__Summary__c, pharos__Hash__c FROM pharos__Log__c];
+        List<petriv__Log__c> logs = [SELECT Id, petriv__Summary__c, petriv__Hash__c FROM petriv__Log__c];
         System.assertEquals(1, logs.size());
-        System.assertEquals('test summary', logs.get(0).pharos__Summary__c);
-        System.assertNotEquals(null, logs.get(0).pharos__Hash__c);
+        System.assertEquals('test summary', logs.get(0).petriv__Summary__c);
+        System.assertNotEquals(null, logs.get(0).petriv__Hash__c);
     }
 
     @IsTest
@@ -253,12 +253,12 @@ private class TritonTest {
         TritonLwc.saveComponentLogs(componentLogs);
         Test.stopTest();
 
-        List<pharos__Log__c> logs = [SELECT Id, pharos__Do_Not_Create_Issue__c, pharos__Transaction_Id_External__c, pharos__Summary__c, pharos__Hash__c FROM pharos__Log__c];
+        List<petriv__Log__c> logs = [SELECT Id, petriv__Do_Not_Create_Issue__c, petriv__Transaction_Id_External__c, petriv__Summary__c, petriv__Hash__c FROM petriv__Log__c];
         System.assertEquals(1, logs.size());
-        System.assertEquals(componentLog.transactionId, logs.get(0).pharos__Transaction_Id_External__c);
-        System.assertEquals(false, logs.get(0).pharos__Do_Not_Create_Issue__c);
-        System.assertEquals('test summary', logs.get(0).pharos__Summary__c);
-        System.assertNotEquals(null, logs.get(0).pharos__Hash__c);
+        System.assertEquals(componentLog.transactionId, logs.get(0).petriv__Transaction_Id_External__c);
+        System.assertEquals(false, logs.get(0).petriv__Do_Not_Create_Issue__c);
+        System.assertEquals('test summary', logs.get(0).petriv__Summary__c);
+        System.assertNotEquals(null, logs.get(0).petriv__Hash__c);
     }
 
     @IsTest
@@ -319,29 +319,29 @@ private class TritonTest {
         Test.stopTest();
         
         // Verify the log was created with runtime info
-        List<pharos__Log__c> logs = [
+        List<petriv__Log__c> logs = [
             SELECT Id, 
-                   pharos__Category__c,
-                   pharos__Type__c,
-                   pharos__Area__c,
-                   pharos__Details__c,
-                   pharos__Summary__c,
-                   pharos__Apex_Name__c
-            FROM pharos__Log__c
+                   petriv__Category__c,
+                   petriv__Type__c,
+                   petriv__Area__c,
+                   petriv__Details__c,
+                   petriv__Summary__c,
+                   petriv__Apex_Name__c
+            FROM petriv__Log__c
         ];
         
         System.assertEquals(1, logs.size(), 'One log should be created');
-        pharos__Log__c log = logs[0];
+        petriv__Log__c log = logs[0];
         
         // Verify log properties
-        System.assertEquals(TritonTypes.Category.LWC.name(), log.pharos__Category__c);
-        System.assertEquals('test type', log.pharos__Type__c);
-        System.assertEquals(TritonTypes.Area.LWC.name(), log.pharos__Area__c);
-        System.assertEquals('Runtime Info Test', log.pharos__Summary__c);
-        System.assertEquals('TestComponent.testFunction', log.pharos__Apex_Name__c);
+        System.assertEquals(TritonTypes.Category.LWC.name(), log.petriv__Category__c);
+        System.assertEquals('test type', log.petriv__Type__c);
+        System.assertEquals(TritonTypes.Area.LWC.name(), log.petriv__Area__c);
+        System.assertEquals('Runtime Info Test', log.petriv__Summary__c);
+        System.assertEquals('TestComponent.testFunction', log.petriv__Apex_Name__c);
         
         // Verify runtime info in details
-        String details = log.pharos__Details__c;
+        String details = log.petriv__Details__c;
         System.assert(details.contains('Initial details'), 'Original details should be preserved');
         System.assert(details.contains('Runtime Info:'), 'Runtime info header should be present');
         
@@ -418,30 +418,30 @@ private class TritonTest {
         TritonLwc.saveComponentLogs(componentLogs);
         Test.stopTest();
 
-        List<pharos__Log__c> logs = [SELECT Id, 
-                                       pharos__Category__c,
-                                       pharos__Type__c,
-                                       pharos__Area__c,
+        List<petriv__Log__c> logs = [SELECT Id, 
+                                       petriv__Category__c,
+                                       petriv__Type__c,
+                                       petriv__Area__c,
                                        Log_Level__c,
-                                       pharos__Details__c,
-                                       pharos__Summary__c,
-                                       pharos__User_Id__c,
-                                       pharos__Related_Objects__c,
-                                       pharos__Apex_Name__c
-                                FROM pharos__Log__c];
+                                       petriv__Details__c,
+                                       petriv__Summary__c,
+                                       petriv__User_Id__c,
+                                       petriv__Related_Objects__c,
+                                       petriv__Apex_Name__c
+                                FROM petriv__Log__c];
         
         System.assertEquals(1, logs.size(), 'One log should be created');
-        pharos__Log__c log = logs[0];
+        petriv__Log__c log = logs[0];
         
         // Verify default/fallback values are used
-        System.assertEquals(TritonTypes.Category.LWC.name(), log.pharos__Category__c, 'Should fall back to LWC category');
-        System.assertEquals(TritonTypes.Area.LWC.name(), log.pharos__Area__c, 'Should fall back to LWC area');
+        System.assertEquals(TritonTypes.Category.LWC.name(), log.petriv__Category__c, 'Should fall back to LWC category');
+        System.assertEquals(TritonTypes.Area.LWC.name(), log.petriv__Area__c, 'Should fall back to LWC area');
         System.assertEquals(TritonTypes.Level.INFO.name(), log.Log_Level__c, 'Should fall back to INFO level');
-        System.assertEquals('Error type', log.pharos__Type__c, 'Should use error type');
-        System.assertEquals('TestComponent.testFunction', log.pharos__Apex_Name__c, 'Should combine component name and function');
-        System.assertEquals(error.message, log.pharos__Summary__c, 'Should use error message as summary');
+        System.assertEquals('Error type', log.petriv__Type__c, 'Should use error type');
+        System.assertEquals('TestComponent.testFunction', log.petriv__Apex_Name__c, 'Should combine component name and function');
+        System.assertEquals(error.message, log.petriv__Summary__c, 'Should use error message as summary');
         // Verify error messages in details
-        String details = log.pharos__Details__c;
+        String details = log.petriv__Details__c;
         System.assert(details.contains('Invalid User Id'), 'Should contain user ID error message');
         System.assert(details.contains('Invalid Record Id'), 'Should contain record ID error message');
         System.assert(details.contains('Invalid Log Category'), 'Should contain category error message');
@@ -449,10 +449,10 @@ private class TritonTest {
         System.assert(details.contains('Invalid Log Level'), 'Should contain level error message');
         
         // Verify null values for invalid IDs
-        System.assertEquals(UserInfo.getUserId(), log.pharos__User_Id__c, 'User ID should be current user for invalid');
+        System.assertEquals(UserInfo.getUserId(), log.petriv__User_Id__c, 'User ID should be current user for invalid');
         System.assertEquals(
             JSON.serialize(new List<String>{UserInfo.getUserId()}), 
-            log.pharos__Related_Objects__c, 
+            log.petriv__Related_Objects__c, 
             'Related objects should only contain the valid ID'
         );
     }
@@ -471,7 +471,7 @@ private class TritonTest {
         flowLog.area = 'area';
         flowLog.summary = 'test';
         flowLog.details = 'test';
-        flowLog.additionalFields = '{"pharos__Summary__c":"test summary","pharos__Details__c":"test Details"}';
+        flowLog.additionalFields = '{"petriv__Summary__c":"test summary","petriv__Details__c":"test Details"}';
         flowLogs.add(flowLog);
         
         // Test 2: Flow log with invalid category
@@ -506,33 +506,33 @@ private class TritonTest {
         Test.stopTest();
 
         // Verify logs were created with correct properties
-        List<pharos__Log__c> logs = [
+        List<petriv__Log__c> logs = [
             SELECT Id, 
-                   pharos__Category__c, 
-                   pharos__Summary__c, 
-                   pharos__Details__c,
-                   pharos__Transaction_Id_External__c,
-                   pharos__Hash__c 
-            FROM pharos__Log__c 
+                   petriv__Category__c, 
+                   petriv__Summary__c, 
+                   petriv__Details__c,
+                   petriv__Transaction_Id_External__c,
+                   petriv__Hash__c 
+            FROM petriv__Log__c 
             ORDER BY CreatedDate
         ];
         
         System.assertEquals(4, logs.size(), 'Should have created 4 logs');
         
         // Verify first log (valid category)
-        System.assertEquals(TritonTypes.Category.Flow.name(), logs[0].pharos__Category__c);
-        System.assertEquals('test summary', logs[0].pharos__Summary__c);
+        System.assertEquals(TritonTypes.Category.Flow.name(), logs[0].petriv__Category__c);
+        System.assertEquals('test summary', logs[0].petriv__Summary__c);
         
         // Verify second log (invalid category)
-        System.assertEquals(TritonTypes.Category.Flow.name(), logs[1].pharos__Category__c);
-        System.assert(logs[1].pharos__Details__c.contains('Unable to locate category: InvalidCategory'));
+        System.assertEquals(TritonTypes.Category.Flow.name(), logs[1].petriv__Category__c);
+        System.assert(logs[1].petriv__Details__c.contains('Unable to locate category: InvalidCategory'));
         
         // Verify third log (with transaction ID)
-        System.assertEquals('test-transaction-id', logs[2].pharos__Transaction_Id_External__c);
+        System.assertEquals('test-transaction-id', logs[2].petriv__Transaction_Id_External__c);
         
         // Verify fourth log (empty category)
-        System.assertEquals(TritonTypes.Category.Flow.name(), logs[3].pharos__Category__c);
-        System.assert(!logs[3].pharos__Details__c.contains('Unable to locate category'));
+        System.assertEquals(TritonTypes.Category.Flow.name(), logs[3].petriv__Category__c);
+        System.assert(!logs[3].petriv__Details__c.contains('Unable to locate category'));
         
     }
 
@@ -549,7 +549,7 @@ private class TritonTest {
         flowLog.summary = 'test';
         flowLog.details = 'test';
         flowLog.stacktrace = 'test stacktrace';
-        flowLog.additionalFields = '{"pharos__Summary__c":"test summary","pharos__Details__c":"test Details"}';
+        flowLog.additionalFields = '{"petriv__Summary__c":"test summary","petriv__Details__c":"test Details"}';
         flowLogs.add(flowLog);
         List<TritonFlow.FlowLogOutput> results = TritonFlow.log(flowLogs);
         Test.stopTest();
@@ -557,10 +557,10 @@ private class TritonTest {
         System.assertEquals(1, results.size());
         System.assertEquals('test stacktrace', results.get(0).fullStacktrace);
 
-        List<pharos__Log__c> logs = [SELECT Id, pharos__Summary__c, pharos__Hash__c FROM pharos__Log__c];
+        List<petriv__Log__c> logs = [SELECT Id, petriv__Summary__c, petriv__Hash__c FROM petriv__Log__c];
         System.assertEquals(1, logs.size());
-        System.assertEquals('test summary', logs.get(0).pharos__Summary__c);
-        System.assertNotEquals(null, logs.get(0).pharos__Hash__c);
+        System.assertEquals('test summary', logs.get(0).petriv__Summary__c);
+        System.assertNotEquals(null, logs.get(0).petriv__Hash__c);
     }
 
     @IsTest
@@ -576,7 +576,7 @@ private class TritonTest {
         flowLog1.summary = 'test';
         flowLog1.details = 'test';
         flowLog1.stacktrace = 'teststacktrace1';
-        flowLog1.additionalFields = '{"pharos__Summary__c":"test summary","pharos__Details__c":"test Details"}';
+        flowLog1.additionalFields = '{"petriv__Summary__c":"test summary","petriv__Details__c":"test Details"}';
         flowLogs.add(flowLog1);
         TritonFlow.FlowLog flowLog2 = new TritonFlow.FlowLog();
         flowLog2.category = TritonTypes.Category.Flow.name();
@@ -586,7 +586,7 @@ private class TritonTest {
         flowLog2.details = 'test';
         flowLog2.fullStacktrace = flowLog1.stacktrace;
         flowLog2.stacktrace = 'teststacktrace2';
-        flowLog2.additionalFields = '{"pharos__Summary__c":"test summary 2","pharos__Details__c":"test Details 2"}';
+        flowLog2.additionalFields = '{"petriv__Summary__c":"test summary 2","petriv__Details__c":"test Details 2"}';
         flowLogs.add(flowLog2);
         List<TritonFlow.FlowLogOutput> results = TritonFlow.log(flowLogs);
         Test.stopTest();
@@ -595,14 +595,14 @@ private class TritonTest {
         System.assertEquals('teststacktrace1', results.get(0).fullStacktrace);
         System.assertEquals('teststacktrace1teststacktrace2', results.get(1).fullStacktrace);
 
-        List<pharos__Log__c> logs = [SELECT Id, pharos__Summary__c, pharos__Hash__c, pharos__Stacktrace__c FROM pharos__Log__c];
+        List<petriv__Log__c> logs = [SELECT Id, petriv__Summary__c, petriv__Hash__c, petriv__Stacktrace__c FROM petriv__Log__c];
         System.assertEquals(2, logs.size());
-        System.assertEquals('test summary', logs.get(0).pharos__Summary__c);
-        System.assertEquals('test summary 2', logs.get(1).pharos__Summary__c);
-        System.assertNotEquals(null, logs.get(0).pharos__Hash__c);
-        System.assertNotEquals(null, logs.get(1).pharos__Hash__c);
-        System.assertEquals('teststacktrace1', logs.get(0).pharos__Stacktrace__c);
-        System.assertEquals('teststacktrace1teststacktrace2', logs.get(1).pharos__Stacktrace__c);
+        System.assertEquals('test summary', logs.get(0).petriv__Summary__c);
+        System.assertEquals('test summary 2', logs.get(1).petriv__Summary__c);
+        System.assertNotEquals(null, logs.get(0).petriv__Hash__c);
+        System.assertNotEquals(null, logs.get(1).petriv__Hash__c);
+        System.assertEquals('teststacktrace1', logs.get(0).petriv__Stacktrace__c);
+        System.assertEquals('teststacktrace1teststacktrace2', logs.get(1).petriv__Stacktrace__c);
     }
 
     @IsTest
@@ -617,14 +617,14 @@ private class TritonTest {
         flowLog.area = 'area';
         flowLog.summary = 'test';
         flowLog.details = 'test';
-        flowLog.additionalFields = '{"pharos__Summary__c":"test summary","pharos__Details__c":"test Details"}';
+        flowLog.additionalFields = '{"petriv__Summary__c":"test summary","petriv__Details__c":"test Details"}';
         flowLogs.add(flowLog);
         TritonFlow.log(flowLogs);
         Test.stopTest();
 
-        List<pharos__Log__c> logs = [SELECT Id, pharos__Category__c, pharos__Hash__c FROM pharos__Log__c];
+        List<petriv__Log__c> logs = [SELECT Id, petriv__Category__c, petriv__Hash__c FROM petriv__Log__c];
         System.assertEquals(1, logs.size());
-        System.assertEquals(TritonTypes.Category.Flow.name(), logs.get(0).pharos__Category__c);
+        System.assertEquals(TritonTypes.Category.Flow.name(), logs.get(0).petriv__Category__c);
     }
 
     @IsTest
@@ -639,11 +639,11 @@ private class TritonTest {
         flowLog.summary = 'test';
         flowLog.details = 'test';
         flowLog.level = 'ERROR';
-        flowLog.additionalFields = '{"pharos__Summary__c":"test summary","pharos__Details__c":"test Details"}';
+        flowLog.additionalFields = '{"petriv__Summary__c":"test summary","petriv__Details__c":"test Details"}';
         TritonFlow.processFlowLog(flowLog);
         Test.stopTest();
         System.assertEquals(1, Triton.instance.logs.size());
-        System.assertEquals(false, Triton.instance.logs.get(0).pharos__Do_Not_Create_Issue__c);
+        System.assertEquals(false, Triton.instance.logs.get(0).petriv__Do_Not_Create_Issue__c);
     }    
 
     @IsTest
@@ -664,16 +664,16 @@ private class TritonTest {
         TritonFlow.log(flowLogs);
         Test.stopTest();
 
-        List<pharos__Log__c> logs = [SELECT Id, 
-                                       pharos__Details__c, 
-                                       pharos__Summary__c, 
-                                       pharos__Hash__c 
-                                FROM pharos__Log__c];
-        pharos__Log__c log = logs.get(0);
+        List<petriv__Log__c> logs = [SELECT Id, 
+                                       petriv__Details__c, 
+                                       petriv__Summary__c, 
+                                       petriv__Hash__c 
+                                FROM petriv__Log__c];
+        petriv__Log__c log = logs.get(0);
         System.assertEquals(1, logs.size());
-        System.assertEquals('test summary', log.pharos__Summary__c);
-        System.assert(log.pharos__Details__c.contains('Unable to locate log level'), 'Log level error should be present');
-        System.assert(log.pharos__Details__c.contains('failed to parse json input'), 'Additional fields parse error should be present');
+        System.assertEquals('test summary', log.petriv__Summary__c);
+        System.assert(log.petriv__Details__c.contains('Unable to locate log level'), 'Log level error should be present');
+        System.assert(log.petriv__Details__c.contains('failed to parse json input'), 'Additional fields parse error should be present');
     }
 
     @IsTest
@@ -684,77 +684,77 @@ private class TritonTest {
         Triton.instance.event(TritonTypes.Level.INFO, TritonTypes.Type.Backend, TritonTypes.Area.Community, 'some event', 'error details');
         Test.stopTest();
 
-        pharos__Log__c log = [select Id from pharos__Log__c limit 1];
+        petriv__Log__c log = [select Id from petriv__Log__c limit 1];
         TritonBuilder builder = new TritonBuilder();
         
         builder.category(TritonTypes.Category.Apex);
-        System.assertEquals(TritonTypes.Category.Apex.name(), builder.build().pharos__Category__c);
+        System.assertEquals(TritonTypes.Category.Apex.name(), builder.build().petriv__Category__c);
 
         builder.type(TritonTypes.Type.Backend);
-        System.assertEquals(TritonTypes.Type.Backend.name(), builder.build().pharos__Type__c);
+        System.assertEquals(TritonTypes.Type.Backend.name(), builder.build().petriv__Type__c);
 
         builder.area(TritonTypes.Area.Community);
-        System.assertEquals(TritonTypes.Area.Community.name(), builder.build().pharos__Area__c);
+        System.assertEquals(TritonTypes.Area.Community.name(), builder.build().petriv__Area__c);
 
         builder.level(TritonTypes.Level.FINE);
         System.assertEquals(TritonTypes.Level.FINE.name(), builder.build().Log_Level__c);
 
         builder.operation('Operation');
-        System.assertEquals('Operation', builder.build().pharos__Apex_Name__c);
+        System.assertEquals('Operation', builder.build().petriv__Apex_Name__c);
 
         builder.userId(UserInfo.getUserId());
-        System.assertEquals(UserInfo.getUserId(), builder.build().pharos__User_Id__c);
+        System.assertEquals(UserInfo.getUserId(), builder.build().petriv__User_Id__c);
 
         builder.relatedObject(log.Id);
-        System.assertEquals(JSON.serialize(new String[]{log.Id}), builder.build().pharos__Related_Objects__c);
+        System.assertEquals(JSON.serialize(new String[]{log.Id}), builder.build().petriv__Related_Objects__c);
 
         builder.duration(1);
-        System.assertEquals(1, builder.build().pharos__Duration__c);
+        System.assertEquals(1, builder.build().petriv__Duration__c);
 
         builder.summary('Test Summary');
-        System.assertEquals('Test Summary', builder.build().pharos__Summary__c);
+        System.assertEquals('Test Summary', builder.build().petriv__Summary__c);
 
         builder.details('Test Details');
-        System.assertEquals('Test Details', builder.build().pharos__Details__c);
+        System.assertEquals('Test Details', builder.build().petriv__Details__c);
 
         builder.stackTrace('Test Stack Trace');
-        System.assertEquals('Test Stack Trace', builder.build().pharos__Stacktrace__c);
+        System.assertEquals('Test Stack Trace', builder.build().petriv__Stacktrace__c);
 
         builder.transactionId('test-transaction-id');
-        System.assertEquals('test-transaction-id', builder.build().pharos__Transaction_Id_External__c);
+        System.assertEquals('test-transaction-id', builder.build().petriv__Transaction_Id_External__c);
 
         builder.createIssue();
-        System.assertEquals(false, builder.build().pharos__Do_Not_Create_Issue__c);
+        System.assertEquals(false, builder.build().petriv__Do_Not_Create_Issue__c);
 
         builder.type('CustomType');
-        System.assertEquals('CustomType', builder.build().pharos__Type__c);
+        System.assertEquals('CustomType', builder.build().petriv__Type__c);
 
         builder.area('CustomArea');
-        System.assertEquals('CustomArea', builder.build().pharos__Area__c);
+        System.assertEquals('CustomArea', builder.build().petriv__Area__c);
 
         Set<Id> relatedIds = new Set<Id>{log.Id};
         builder.relatedObjects(relatedIds);
-        System.assertEquals(JSON.serialize(relatedIds), builder.build().pharos__Related_Objects__c);
+        System.assertEquals(JSON.serialize(relatedIds), builder.build().petriv__Related_Objects__c);
 
         builder.relatedObjects(new List<Id>{log.Id});
-        System.assertEquals(JSON.serialize(relatedIds), builder.build().pharos__Related_Objects__c);
+        System.assertEquals(JSON.serialize(relatedIds), builder.build().petriv__Related_Objects__c);
 
         Set<String> relatedStringIds = new Set<String>{log.Id};
         builder.relatedObjects(relatedStringIds);
-        System.assertEquals(JSON.serialize(relatedIds), builder.build().pharos__Related_Objects__c);
+        System.assertEquals(JSON.serialize(relatedIds), builder.build().petriv__Related_Objects__c);
 
         builder.relatedObject(log.Id.toString());
-        System.assertEquals(JSON.serialize(new String[]{log.Id}), builder.build().pharos__Related_Objects__c);
+        System.assertEquals(JSON.serialize(new String[]{log.Id}), builder.build().petriv__Related_Objects__c);
 
         Double timestamp = System.now().getTime();
         builder.createdTimestamp(timestamp);
-        System.assertEquals(timestamp, builder.build().pharos__Created_Timestamp__c);
+        System.assertEquals(timestamp, builder.build().petriv__Created_Timestamp__c);
 
         builder.interviewGuid('test-guid');
-        System.assertEquals('test-guid', builder.build().pharos__Interview_GUID_External__c);
+        System.assertEquals('test-guid', builder.build().petriv__Interview_GUID_External__c);
 
         builder.flowApiName('Test_Flow');
-        System.assertEquals('Test_Flow', builder.build().pharos__Flow_API_Name__c);
+        System.assertEquals('Test_Flow', builder.build().petriv__Flow_API_Name__c);
 
         builder.attribute(TritonBuilder.LOG_LEVEL, 'Custom Value');
         System.assertEquals('Custom Value', builder.build().get(TritonBuilder.LOG_LEVEL));
@@ -765,13 +765,13 @@ private class TritonTest {
         restReq.httpMethod = 'GET';
 
         builder.integrationPayload(restReq, restRes);
-        System.assertEquals(TritonHelper.toJson(restReq, restRes), builder.build().pharos__Stacktrace_Parse_Result__c);
+        System.assertEquals(TritonHelper.toJson(restReq, restRes), builder.build().petriv__Stacktrace_Parse_Result__c);
 
         HttpRequest httpReq = new HttpRequest();
         HttpResponse httpRes = new HttpResponse();
 
         builder.integrationPayload(httpReq, httpRes);
-        System.assertEquals(TritonHelper.toJson(httpReq, httpRes), builder.build().pharos__Stacktrace_Parse_Result__c);
+        System.assertEquals(TritonHelper.toJson(httpReq, httpRes), builder.build().petriv__Stacktrace_Parse_Result__c);
     }
 
     @IsTest
@@ -789,24 +789,24 @@ private class TritonTest {
                                 .summary('some event')
                                 .details('error details'));
         Test.stopTest();
-        pharos__Log__c[] logs = [SELECT Id, 
-                                        pharos__Category__c, 
-                                        pharos__Type__c, 
-                                        pharos__Area__c, 
+        petriv__Log__c[] logs = [SELECT Id, 
+                                        petriv__Category__c, 
+                                        petriv__Type__c, 
+                                        petriv__Area__c, 
                                         Log_Level__c, 
-                                        pharos__Details__c, 
-                                        pharos__Summary__c,
-                                        pharos__Stacktrace__c 
-                                        FROM pharos__Log__c];
-        pharos__Log__c log = logs.get(0);
+                                        petriv__Details__c, 
+                                        petriv__Summary__c,
+                                        petriv__Stacktrace__c 
+                                        FROM petriv__Log__c];
+        petriv__Log__c log = logs.get(0);
         System.assertEquals(1, logs.size());
-        System.assertEquals(TritonTypes.Category.Apex.name(), log.pharos__Category__c);
-        System.assertEquals(TritonTypes.Type.Backend.name(), log.pharos__Type__c);
-        System.assertEquals(TritonTypes.Area.Community.name(), log.pharos__Area__c);
+        System.assertEquals(TritonTypes.Category.Apex.name(), log.petriv__Category__c);
+        System.assertEquals(TritonTypes.Type.Backend.name(), log.petriv__Type__c);
+        System.assertEquals(TritonTypes.Area.Community.name(), log.petriv__Area__c);
         System.assertEquals(TritonTypes.Level.INFO.name(), log.Log_Level__c);
-        System.assert(!String.isBlank(log.pharos__Stacktrace__c));
-        System.assertEquals('some event', log.pharos__Summary__c);
-        System.assertEquals('error details', log.pharos__Details__c);
+        System.assert(!String.isBlank(log.petriv__Stacktrace__c));
+        System.assertEquals('some event', log.petriv__Summary__c);
+        System.assertEquals('error details', log.petriv__Details__c);
     }
 
 
@@ -944,12 +944,12 @@ private class TritonTest {
         Test.stopTest();
         
         // Verify logs were created
-        List<pharos__Log__c> logs = [
-            SELECT Id, pharos__Category__c, pharos__Type__c, pharos__Area__c, 
-                   pharos__Summary__c, pharos__Details__c, Log_Level__c,
-                   pharos__Apex_Name__c
-            FROM pharos__Log__c
-            WHERE pharos__Type__c = :TritonTypes.Type.DMLResult.name()
+        List<petriv__Log__c> logs = [
+            SELECT Id, petriv__Category__c, petriv__Type__c, petriv__Area__c, 
+                   petriv__Summary__c, petriv__Details__c, Log_Level__c,
+                   petriv__Apex_Name__c
+            FROM petriv__Log__c
+            WHERE petriv__Type__c = :TritonTypes.Type.DMLResult.name()
             ORDER BY CreatedDate
         ];
                 
@@ -959,17 +959,17 @@ private class TritonTest {
         Set<String> foundOperations = new Set<String>();
         
         // Find the Contact error log
-        pharos__Log__c contactErrorLog = null;
-        for(pharos__Log__c log : logs) {
-            System.assertEquals(TritonTypes.Type.DMLResult.name(), log.pharos__Type__c);
+        petriv__Log__c contactErrorLog = null;
+        for(petriv__Log__c log : logs) {
+            System.assertEquals(TritonTypes.Type.DMLResult.name(), log.petriv__Type__c);
             System.assertEquals(TritonTypes.Level.ERROR.name(), log.Log_Level__c);
-            System.assert(log.pharos__Summary__c.contains('DML Operation'));
+            System.assert(log.petriv__Summary__c.contains('DML Operation'));
             
             // Store the operation type
-            foundOperations.add(log.pharos__Apex_Name__c);
+            foundOperations.add(log.petriv__Apex_Name__c);
             
             // Find the Contact error log
-            if(log.pharos__Area__c == TritonTypes.Area.Community.name()) {
+            if(log.petriv__Area__c == TritonTypes.Area.Community.name()) {
                 contactErrorLog = log;
             }
         }
@@ -979,11 +979,11 @@ private class TritonTest {
         
         // Verify field-level error information is included in the Contact error log
         System.assertNotEquals(null, contactErrorLog, 'Contact error log should be created');
-        System.assert(contactErrorLog.pharos__Details__c.contains('Fields:'), 
+        System.assert(contactErrorLog.petriv__Details__c.contains('Fields:'), 
             'Contact error log should include field information');
-        System.assert(contactErrorLog.pharos__Details__c.contains('LastName'), 
+        System.assert(contactErrorLog.petriv__Details__c.contains('LastName'), 
             'Contact error log should mention LastName field');
-        System.assert(contactErrorLog.pharos__Details__c.contains('Status Code:'), 
+        System.assert(contactErrorLog.petriv__Details__c.contains('Status Code:'), 
             'Contact error log should include status code');
     }
 
@@ -1020,10 +1020,10 @@ private class TritonTest {
         Test.stopTest();
         
         // Verify no logs were created since operations were successful
-        List<pharos__Log__c> logs = [
-            SELECT Id, pharos__Apex_Name__c, pharos__Summary__c, pharos__Details__c
-            FROM pharos__Log__c 
-            WHERE pharos__Type__c = :TritonTypes.Type.DMLResult.name()
+        List<petriv__Log__c> logs = [
+            SELECT Id, petriv__Apex_Name__c, petriv__Summary__c, petriv__Details__c
+            FROM petriv__Log__c 
+            WHERE petriv__Type__c = :TritonTypes.Type.DMLResult.name()
         ];
                 
         System.assertEquals(0, logs.size(), 'No logs should be created for successful DML operations');
@@ -1035,25 +1035,25 @@ private class TritonTest {
         
         // Test invalid Id for relatedObject(String)
         builder.relatedObject('invalid-id');
-        System.assertEquals(null, builder.build().pharos__Related_Objects__c);
+        System.assertEquals(null, builder.build().petriv__Related_Objects__c);
         
         // Test invalid Ids in relatedObjects(Set<String>)
         Set<String> invalidIds = new Set<String>{'invalid-id-1', 'invalid-id-2'};
         builder.relatedObjects(invalidIds);
-        System.assertEquals(null, builder.build().pharos__Related_Objects__c);
+        System.assertEquals(null, builder.build().petriv__Related_Objects__c);
         
         // Test null and empty sets for relatedObjects
         builder.relatedObjects((Set<String>)null);
-        System.assertEquals(null, builder.build().pharos__Related_Objects__c);
+        System.assertEquals(null, builder.build().petriv__Related_Objects__c);
         
         builder.relatedObjects(new Set<String>());
-        System.assertEquals(null, builder.build().pharos__Related_Objects__c);
+        System.assertEquals(null, builder.build().petriv__Related_Objects__c);
         
         // Test mixed valid and invalid Ids
         Id validId = UserInfo.getUserId();
         Set<String> mixedIds = new Set<String>{validId, 'invalid-id'};
         builder.relatedObjects(mixedIds);
-        System.assertEquals(JSON.serialize(new Set<Id>{validId}), builder.build().pharos__Related_Objects__c);
+        System.assertEquals(JSON.serialize(new Set<Id>{validId}), builder.build().petriv__Related_Objects__c);
     }
 
     @IsTest
@@ -1087,13 +1087,13 @@ private class TritonTest {
         Test.stopTest();
         
         // Verify only last log was persisted
-        List<pharos__Log__c> logs = [
-            SELECT Id, pharos__Summary__c 
-            FROM pharos__Log__c 
+        List<petriv__Log__c> logs = [
+            SELECT Id, petriv__Summary__c 
+            FROM petriv__Log__c 
             ORDER BY CreatedDate ASC
         ];
         System.assertEquals(1, logs.size(), 'Only one log should be persisted');
-        System.assertEquals('third error', logs[0].pharos__Summary__c, 'Last added log should be persisted');
+        System.assertEquals('third error', logs[0].petriv__Summary__c, 'Last added log should be persisted');
         System.assertEquals(2, Triton.instance.logs.size(), 'Should have two logs remaining in buffer');
     }
 
@@ -1118,13 +1118,13 @@ private class TritonTest {
         );
         Test.stopTest();
         
-        List<pharos__Log__c> logs = [
-            SELECT Id, pharos__Summary__c 
-            FROM pharos__Log__c 
+        List<petriv__Log__c> logs = [
+            SELECT Id, petriv__Summary__c 
+            FROM petriv__Log__c 
             ORDER BY CreatedDate ASC
         ];
         System.assertEquals(1, logs.size(), 'Should have one log persisted');
-        System.assertEquals('immediate error', logs[0].pharos__Summary__c, 'Immediate error should be persisted');
+        System.assertEquals('immediate error', logs[0].petriv__Summary__c, 'Immediate error should be persisted');
         System.assertEquals(1, Triton.instance.logs.size(), 'Should have one log remaining in buffer');
     }
 
@@ -1136,7 +1136,7 @@ private class TritonTest {
         Triton.instance.flushTop();
         Test.stopTest();
         
-        List<pharos__Log__c> logs = [SELECT Id FROM pharos__Log__c];
+        List<petriv__Log__c> logs = [SELECT Id FROM petriv__Log__c];
         System.assertEquals(0, logs.size(), 'No logs should be created with empty buffer');
     }
 
@@ -1178,7 +1178,7 @@ private class TritonTest {
         
         Test.stopTest();
         
-        List<pharos__Log__c> logs = [
+        List<petriv__Log__c> logs = [
             SELECT Id, 
                    SOQL_Queries__c,
                    SOQL_Queries_Limit__c,
@@ -1208,14 +1208,14 @@ private class TritonTest {
                    Batch_Jobs_Limit__c,
                    Publish_Immediate_DML__c,
                    Publish_Immediate_DML_Limit__c
-            FROM pharos__Log__c 
+            FROM petriv__Log__c 
             ORDER BY CreatedDate
         ];
         
         System.assertEquals(2, logs.size(), 'Should have created two logs');
         
         // Verify limits were captured for both logs
-        for(pharos__Log__c log : logs) {
+        for(petriv__Log__c log : logs) {
             // SOQL Queries
             System.assert(log.SOQL_Queries__c >= 5, 'Should have recorded SOQL queries');
             System.assertEquals(System.Limits.getLimitQueries(), log.SOQL_Queries_Limit__c, 'Should match SOQL queries limit');
@@ -1368,7 +1368,7 @@ private class TritonTest {
         
         // Verify logs are in buffer but not persisted
         System.assertEquals(3, Triton.instance.logs.size(), 'Should have 3 logs in buffer');
-        System.assertEquals(0, [SELECT COUNT() FROM pharos__Log__c], 'No logs should be persisted yet');
+        System.assertEquals(0, [SELECT COUNT() FROM petriv__Log__c], 'No logs should be persisted yet');
         
         // Test flush - should persist all logs
         Triton.instance.flush();
@@ -1376,9 +1376,9 @@ private class TritonTest {
         // Wait for async operations to complete
         Test.stopTest();
         
-        List<pharos__Log__c> persistedLogs = [
-            SELECT pharos__Summary__c 
-            FROM pharos__Log__c 
+        List<petriv__Log__c> persistedLogs = [
+            SELECT petriv__Summary__c 
+            FROM petriv__Log__c 
             ORDER BY CreatedDate
         ];
         System.assertEquals(3, persistedLogs.size(), 'All logs should be persisted');
@@ -1386,8 +1386,8 @@ private class TritonTest {
         // Verify log summaries
         Set<String> expectedSummaries = new Set<String>{'Error 0', 'Error 1', 'Error 2'};
         Set<String> actualSummaries = new Set<String>();
-        for(pharos__Log__c log : persistedLogs) {
-            actualSummaries.add(log.pharos__Summary__c);
+        for(petriv__Log__c log : persistedLogs) {
+            actualSummaries.add(log.petriv__Summary__c);
         }
         System.assertEquals(expectedSummaries, actualSummaries, 'All expected logs should be persisted');
     }
@@ -1413,12 +1413,12 @@ private class TritonTest {
         }
         
         // Verify template properties are applied
-        for(pharos__Log__c log : Triton.instance.logs) {
-            System.assertEquals(TritonTypes.Category.Debug.name(), log.pharos__Category__c, 
+        for(petriv__Log__c log : Triton.instance.logs) {
+            System.assertEquals(TritonTypes.Category.Debug.name(), log.petriv__Category__c, 
                 'Template category should be applied');
-            System.assertEquals(TritonTypes.Type.Backend.name(), log.pharos__Type__c, 
+            System.assertEquals(TritonTypes.Type.Backend.name(), log.petriv__Type__c, 
                 'Template type should be applied');
-            System.assertEquals(TritonTypes.Area.Community.name(), log.pharos__Area__c, 
+            System.assertEquals(TritonTypes.Area.Community.name(), log.petriv__Area__c, 
                 'Template area should be applied');
         }
         
@@ -1475,25 +1475,25 @@ private class TritonTest {
         
         Test.stopTest();
         
-        List<pharos__Log__c> logs = [
+        List<petriv__Log__c> logs = [
             SELECT Id, 
-                   pharos__Category__c,
+                   petriv__Category__c,
                    Log_Level__c,
-                   pharos__Duration__c,
-                   pharos__Summary__c
-            FROM pharos__Log__c 
+                   petriv__Duration__c,
+                   petriv__Summary__c
+            FROM petriv__Log__c 
             ORDER BY CreatedDate
         ];
         
         System.assertEquals(2, logs.size(), 'Should have created warning and debug logs');
         
         // Verify warning log
-        System.assertEquals(TritonTypes.Category.Warning.name(), logs[0].pharos__Category__c);
+        System.assertEquals(TritonTypes.Category.Warning.name(), logs[0].petriv__Category__c);
         System.assertEquals(TritonTypes.Level.WARNING.name(), logs[0].Log_Level__c);
         
         // Verify debug log with duration
-        System.assertEquals(TritonTypes.Category.Debug.name(), logs[1].pharos__Category__c);
-        System.assertEquals(100, logs[1].pharos__Duration__c);
+        System.assertEquals(TritonTypes.Category.Debug.name(), logs[1].petriv__Category__c);
+        System.assertEquals(100, logs[1].petriv__Duration__c);
     }
 
     @IsTest
@@ -1546,21 +1546,21 @@ private class TritonTest {
         
         Test.stopTest();
         
-        List<pharos__Log__c> logs = [
+        List<petriv__Log__c> logs = [
             SELECT Id, 
-                   pharos__Category__c,
-                   pharos__Type__c,
-                   pharos__Stacktrace_Parse_Result__c
-            FROM pharos__Log__c 
+                   petriv__Category__c,
+                   petriv__Type__c,
+                   petriv__Stacktrace_Parse_Result__c
+            FROM petriv__Log__c 
             ORDER BY CreatedDate
         ];
         
         System.assertEquals(3, logs.size(), 'Should have created event and integration error logs');
         
         // Verify integration logs have parsed request/response data
-        for(pharos__Log__c log : logs) {
-            if(log.pharos__Category__c == TritonTypes.Category.Integration.name()) {
-                System.assertNotEquals(null, log.pharos__Stacktrace_Parse_Result__c, 
+        for(petriv__Log__c log : logs) {
+            if(log.petriv__Category__c == TritonTypes.Category.Integration.name()) {
+                System.assertNotEquals(null, log.petriv__Stacktrace_Parse_Result__c, 
                     'Integration log should have parsed request/response data');
             }
         }
@@ -1583,34 +1583,34 @@ private class TritonTest {
         
         // Verify log is in buffer but not persisted yet
         System.assertEquals(1, Triton.instance.logs.size(), 'Should have one log in buffer');
-        System.assertEquals(0, [SELECT COUNT() FROM pharos__Log__c], 'No logs should be persisted yet');
+        System.assertEquals(0, [SELECT COUNT() FROM petriv__Log__c], 'No logs should be persisted yet');
         
         // Flush and verify log
         Triton.instance.flush();
         
         Test.stopTest();
         
-        List<pharos__Log__c> logs = [
+        List<petriv__Log__c> logs = [
             SELECT Id, 
-                   pharos__Category__c,
-                   pharos__Type__c,
-                   pharos__Area__c,
-                   pharos__Summary__c,
-                   pharos__Details__c,
-                   pharos__Stacktrace__c,
+                   petriv__Category__c,
+                   petriv__Type__c,
+                   petriv__Area__c,
+                   petriv__Summary__c,
+                   petriv__Details__c,
+                   petriv__Stacktrace__c,
                    Log_Level__c
-            FROM pharos__Log__c
+            FROM petriv__Log__c
         ];
         
         System.assertEquals(1, logs.size(), 'Should have created one log');
-        pharos__Log__c log = logs[0];
+        petriv__Log__c log = logs[0];
         
         // Verify log properties
-        System.assertEquals(TritonTypes.Category.Apex.name(), log.pharos__Category__c);
-        System.assertEquals(TritonTypes.Area.Community.name(), log.pharos__Area__c);
+        System.assertEquals(TritonTypes.Category.Apex.name(), log.petriv__Category__c);
+        System.assertEquals(TritonTypes.Area.Community.name(), log.petriv__Area__c);
         System.assertEquals(TritonTypes.Level.ERROR.name(), log.Log_Level__c);
-        System.assert(log.pharos__Summary__c.contains(msg), 'Summary should contain exception message');
-        System.assertNotEquals(null, log.pharos__Stacktrace__c, 'Stack trace should be captured');
+        System.assert(log.petriv__Summary__c.contains(msg), 'Summary should contain exception message');
+        System.assertNotEquals(null, log.petriv__Stacktrace__c, 'Stack trace should be captured');
     }
 
     @IsTest
@@ -1629,36 +1629,36 @@ private class TritonTest {
         
         // Verify log is in buffer but not persisted yet
         System.assertEquals(1, Triton.instance.logs.size(), 'Should have one log in buffer');
-        System.assertEquals(0, [SELECT COUNT() FROM pharos__Log__c], 'No logs should be persisted yet');
+        System.assertEquals(0, [SELECT COUNT() FROM petriv__Log__c], 'No logs should be persisted yet');
         
         // Flush and verify log
         Triton.instance.flush();
         
         Test.stopTest();
         
-        List<pharos__Log__c> logs = [
+        List<petriv__Log__c> logs = [
             SELECT Id, 
-                   pharos__Category__c,
-                   pharos__Type__c,
-                   pharos__Area__c,
-                   pharos__Summary__c,
-                   pharos__Details__c,
+                   petriv__Category__c,
+                   petriv__Type__c,
+                   petriv__Area__c,
+                   petriv__Summary__c,
+                   petriv__Details__c,
                    Log_Level__c,
-                   pharos__Stacktrace__c
-            FROM pharos__Log__c
+                   petriv__Stacktrace__c
+            FROM petriv__Log__c
         ];
         
         System.assertEquals(1, logs.size(), 'Should have created one log');
-        pharos__Log__c log = logs[0];
+        petriv__Log__c log = logs[0];
         
         // Verify log properties
-        System.assertEquals(TritonTypes.Category.Event.name(), log.pharos__Category__c);
-        System.assertEquals(TritonTypes.Type.Backend.name(), log.pharos__Type__c);
-        System.assertEquals(TritonTypes.Area.Community.name(), log.pharos__Area__c);
+        System.assertEquals(TritonTypes.Category.Event.name(), log.petriv__Category__c);
+        System.assertEquals(TritonTypes.Type.Backend.name(), log.petriv__Type__c);
+        System.assertEquals(TritonTypes.Area.Community.name(), log.petriv__Area__c);
         System.assertEquals(TritonTypes.Level.INFO.name(), log.Log_Level__c);
-        System.assertEquals('Test Event Summary', log.pharos__Summary__c);
-        System.assertEquals('Test Event Details', log.pharos__Details__c);
-        System.assertNotEquals(null, log.pharos__Stacktrace__c, 'Stack trace should be captured');
+        System.assertEquals('Test Event Summary', log.petriv__Summary__c);
+        System.assertEquals('Test Event Details', log.petriv__Details__c);
+        System.assertNotEquals(null, log.petriv__Stacktrace__c, 'Stack trace should be captured');
     }
 
     @IsTest
@@ -1736,11 +1736,11 @@ private class TritonTest {
         System.assertEquals(1, triton.logs.size(), 'One log should be in the buffer');
         
         // Verify log properties
-        pharos__Log__c log = triton.logs[0];
-        System.assertEquals('Test Summary', log.pharos__Summary__c, 'Summary should match');
-        System.assertEquals('Test Details', log.pharos__Details__c, 'Details should match');
-        System.assertEquals('Backend', log.pharos__Type__c, 'Type should match');
-        System.assertEquals('Accounts', log.pharos__Area__c, 'Area should match');
+        petriv__Log__c log = triton.logs[0];
+        System.assertEquals('Test Summary', log.petriv__Summary__c, 'Summary should match');
+        System.assertEquals('Test Details', log.petriv__Details__c, 'Details should match');
+        System.assertEquals('Backend', log.petriv__Type__c, 'Type should match');
+        System.assertEquals('Accounts', log.petriv__Area__c, 'Area should match');
         System.assertEquals('DEBUG', log.Log_Level__c, 'Level should be DEBUG');
     }
 
@@ -1848,18 +1848,18 @@ private class TritonTest {
         Triton.instance.dmlResult(TritonTypes.Area.Accounts, srList);
         Test.stopTest();
         // Retrieve the log to verify error formatting
-        pharos__Log__c log = [
-            SELECT pharos__Details__c
-            FROM pharos__Log__c
-            WHERE pharos__Area__c = :TritonTypes.Area.Accounts.name()
+        petriv__Log__c log = [
+            SELECT petriv__Details__c
+            FROM petriv__Log__c
+            WHERE petriv__Area__c = :TritonTypes.Area.Accounts.name()
             LIMIT 1
         ];
         
         // Verify details contain field information
         System.assertNotEquals(null, log, 'A log should be created');
-        System.assert(log.pharos__Details__c.contains('Fields: LastName'), 
+        System.assert(log.petriv__Details__c.contains('Fields: LastName'), 
             'Log details should include the field name');
-        System.assert(log.pharos__Details__c.contains('Status Code:'), 
+        System.assert(log.petriv__Details__c.contains('Status Code:'), 
             'Log details should include status code');
         
     }
@@ -1903,19 +1903,19 @@ private class TritonTest {
         Test.stopTest();
         
         // Verify logs capture different error types appropriately
-        List<pharos__Log__c> logs = [
-            SELECT pharos__Details__c, pharos__Type__c, pharos__Summary__c, pharos__Apex_Name__c
-            FROM pharos__Log__c
+        List<petriv__Log__c> logs = [
+            SELECT petriv__Details__c, petriv__Type__c, petriv__Summary__c, petriv__Apex_Name__c
+            FROM petriv__Log__c
             ORDER BY CreatedDate DESC
         ];
         
         System.assert(logs.size() > 0, 'Logs should be created');
         
         // Find the delete error log
-        pharos__Log__c deleteErrorLog = null;
-        for (pharos__Log__c log : logs) {
-            if (log.pharos__Type__c == TritonTypes.Type.DMLResult.name() && 
-                log.pharos__Apex_Name__c == 'Delete') {
+        petriv__Log__c deleteErrorLog = null;
+        for (petriv__Log__c log : logs) {
+            if (log.petriv__Type__c == TritonTypes.Type.DMLResult.name() && 
+                log.petriv__Apex_Name__c == 'Delete') {
                 deleteErrorLog = log;
                 break;
             }
@@ -1955,14 +1955,14 @@ private class TritonTest {
         Test.stopTest();
         
         // Get the log and verify its runtime properties
-        pharos__Log__c log = [
-            SELECT pharos__Created_Timestamp__c, CPU_Time__c, Heap_Size__c
-            FROM pharos__Log__c
+        petriv__Log__c log = [
+            SELECT petriv__Created_Timestamp__c, CPU_Time__c, Heap_Size__c
+            FROM petriv__Log__c
             LIMIT 1
         ];
         
         // Verify the template's runtime properties are NOT used
-        System.assertNotEquals(templateTimestamp, log.pharos__Created_Timestamp__c,
+        System.assertNotEquals(templateTimestamp, log.petriv__Created_Timestamp__c,
             'Template timestamp should not be copied to logs created with fromTemplate()');
                     
         System.assertNotEquals(1000, log.CPU_Time__c,

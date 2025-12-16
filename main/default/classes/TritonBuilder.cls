@@ -1,34 +1,34 @@
 /**
- * Copyright (C) 2024 Pharos AI, Inc.
+ * Copyright (C) 2024 petriv AI, Inc.
  *
- * This file is part of Pharos Triton.
+ * This file is part of petriv Triton.
  *
- * Pharos Triton is free software: you can redistribute it and/or modify
+ * petriv Triton is free software: you can redistribute it and/or modify
  * it under the terms of the MIT License.
- * See LICENSE file or go to https://github.com/Pharos-AI/triton/blob/main/LICENSE.
+ * See LICENSE file or go to https://github.com/petriv-AI/triton/blob/main/LICENSE.
  */
 
 /**x
- * Builder class for creating and configuring Pharos log records.
+ * Builder class for creating and configuring petriv log records.
  * Provides a fluent interface to set various attributes like category, type, area,
  * related objects, and other metadata for logging purposes. This class wraps the core
- * pharos.LogBuilder to provide a more user-friendly API for log creation.
+ * petriv.LogBuilder to provide a more user-friendly API for log creation.
  */
 public with sharing class TritonBuilder {
 
     /** key field names for setting attributes on log records */
-    public static final String APEX_NAME = 'pharos__Apex_Name__c';
-    public static final String CREATED_TIMESTAMP = 'pharos__Created_Timestamp__c';
-    public static final String DURATION = 'pharos__Duration__c';
-    public static final String INTERVIEW_GUID = 'pharos__Interview_GUID_External__c';
+    public static final String APEX_NAME = 'petriv__Apex_Name__c';
+    public static final String CREATED_TIMESTAMP = 'petriv__Created_Timestamp__c';
+    public static final String DURATION = 'petriv__Duration__c';
+    public static final String INTERVIEW_GUID = 'petriv__Interview_GUID_External__c';
     public static final String LOG_LEVEL = 'Log_Level__c';
-    public static final String RELATED_ID = 'pharos__Related_Id__c';
-    public static final String RELATED_OBJECTS = 'pharos__Related_Objects__c';
-    public static final String STACKTRACE_PARSE_RESULT = 'pharos__Stacktrace_Parse_Result__c';
-    public static final String USER_ID = 'pharos__User_Id__c';
-    public static final String FLOW_API_NAME = 'pharos__Flow_API_Name__c';
-    public static final String DO_NOT_CREATE_ISSUE = 'pharos__Do_Not_Create_Issue__c';
-    public static final String REQUEST_ID = 'pharos__Request_Id_External__c';
+    public static final String RELATED_ID = 'petriv__Related_Id__c';
+    public static final String RELATED_OBJECTS = 'petriv__Related_Objects__c';
+    public static final String STACKTRACE_PARSE_RESULT = 'petriv__Stacktrace_Parse_Result__c';
+    public static final String USER_ID = 'petriv__User_Id__c';
+    public static final String FLOW_API_NAME = 'petriv__Flow_API_Name__c';
+    public static final String DO_NOT_CREATE_ISSUE = 'petriv__Do_Not_Create_Issue__c';
+    public static final String REQUEST_ID = 'petriv__Request_Id_External__c';
 
     /** transaction limit field names */
     @TestVisible
@@ -92,14 +92,14 @@ public with sharing class TritonBuilder {
     @TestVisible
     private static final String PUBLISH_IMMEDIATE_DML_LIMIT = 'Publish_Immediate_DML_Limit__c';
 
-    private static final Set<String> LOG_FIELDS = Schema.SObjectType.pharos__Log__c.fields.getMap().keySet();
+    private static final Set<String> LOG_FIELDS = Schema.SObjectType.petriv__Log__c.fields.getMap().keySet();
 
-    private pharos.LogBuilder builder;
+    private petriv.LogBuilder builder;
 
     public TritonBuilder cloneBuilder() {
         TritonBuilder cloned = new TritonBuilder();
         // Copy all attributes from the original log to the new one
-        pharos__Log__c originalLog = this.builder.build();
+        petriv__Log__c originalLog = this.builder.build();
         for (String field : LOG_FIELDS) {
             Object value = originalLog.get(field);
             if (value != null) {
@@ -111,7 +111,7 @@ public with sharing class TritonBuilder {
     }
 
     public TritonBuilder() {
-        this.builder = pharos.LogBuilder.getInstance();
+        this.builder = petriv.LogBuilder.getInstance();
         initBuilder();
     }
 
@@ -469,9 +469,9 @@ public with sharing class TritonBuilder {
 
     /**
     * Build and return the log record
-    * @return pharos__Log__c instance
+    * @return petriv__Log__c instance
     */
-    public pharos__Log__c build() {
+    public petriv__Log__c build() {
 		return this.builder.build();
 	}
 }
