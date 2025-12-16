@@ -216,15 +216,14 @@ public with sharing class TestDataGenerator {
 	public class TestDataGeneratorException extends Exception {}
 	public static final String ERROR_EMAIL_SERVICE_FUNCTION_NOT_EXIST = 'ERROR_EMAIL_SERVICE_FUNCTION_NOT_EXIST';
 	public static final String ERROR_SEND_TEST_EMAIL = 'ERROR_SEND_TEST_EMAIL:';
-	public static final String TEST_EMAIL_HASH1 = 'scMlAnyYyfwCAufe0WUj+47enHaVZ3mZjpfJefGij0Y=';
-	public static final String TEST_EMAIL_SUBJECT = 'Developer script exception from '+CURRENT_CONNECTED_ORG_NAME+' : \'pharos.LogServiceBatchTest\' for job id \'7076g00000ScE4F\' : Attempt to de-reference a null object';
+	public static final String TEST_EMAIL_HASH1 = 'jfeUfLLgJRDSrKTTCAw4myV40EQpN2u48jXPo+7U8T4=';
+	public static final String TEST_EMAIL_SUBJECT = 'Developer script exception from '+CURRENT_CONNECTED_ORG_NAME+' : \'pharos.TestBatchClass\' : Too many SOQL queries: 101';
 	public static final String TEST_EMAIL_BODY = 'Apex script unhandled exception by user/organization: '+CURRENT_USER_ID_15.left(15)+'/'+CURRENT_CONNECTED_ORG_ID_15+'\n' +
 		'\n' +
-		'Failed to process batch for class \'pharos.LogServiceBatchTest\' for job id \'7076g00000ScE4F\'\n' +
+		'caused by: System.LimitException: Too many SOQL queries: 101\n' +
 		'\n' +
-		'caused by: System.NullPointerException: Attempt to de-reference a null object\n' +
-		'\n' +
-		'Class.pharos.LogServiceBatchTest.execute: line 14, column 1';
+		'Class.pharos.TestBatchClass.execute: line 42, column 1\n' +
+		'Class.pharos.TestBatchClass.start: line 15, column 1';
 
 
 	public static final String TEST_PLATFORM_EVENT_LOG_HASH1 = '7woH3kUlYkezkkEt3c1eQ8fLj9jXCcmhcCft5AX+3nI=';

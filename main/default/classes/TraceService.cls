@@ -954,11 +954,24 @@ public without sharing class TraceService extends DatabaseUtils.PharosBatchImpl 
                 DateTime dt;
                 if(lastProcessedLogTime != null) {
                     dt = lastProcessedLogTime;
-                }
-                else {
+                } else {
                     dt = (!flags.isEmpty()) ? flags.get(0)?.Last_Processed_Log__c : null;
                 }
-                dt = (dt == null) ? DateTime.now().addDays(-1) : dt;
+                if (dt == null) {
+                    List<Trace_Request__c> activeTraceRequests = [
+                        SELECT Start_Date__c
+                        FROM Trace_Request__c
+                        WHERE Status__c IN (:TRACE_REQUEST_STATUS_NEW, :TRACE_REQUEST_STATUS_IN_PROGRESS)
+                        AND End_Date__c > :DateTime.now()
+                        ORDER BY Start_Date__c DESC
+                        LIMIT 1
+                    ];
+                    if (!activeTraceRequests.isEmpty() && activeTraceRequests[0].Start_Date__c != null) {
+                        dt = activeTraceRequests[0].Start_Date__c;
+                    }
+                }
+
+                dt = (dt == null) ? DateTime.now().addHours(-1) : dt;
                 String settingsId = (!flags.isEmpty()) ? flags.get(0)?.Id : null;
                 DebugLogServiceRequest request = new DebugLogServiceRequest(dt, corg, settingsId, filterByLogLength);
                 String b = HttpUtils.post(

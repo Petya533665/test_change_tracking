@@ -818,7 +818,7 @@ public with sharing class MonitoringUtil {
             if(startBatch && freeSlotBatch) {
                 String actionType = sendlist.get(0).Action_Type__c != null ? sendlist.get(0).Action_Type__c : sendlist.get(0).Type__c;
                 switch on RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(actionType) {
-                    when EMAIL, SLACK, PAGERDUTY, JIRA, TEAMS {
+                    when EMAIL, SLACK, PAGERDUTY, JIRA, TEAMS, WEBHOOK {
                         NotificationBatch.getInstance().startBatch();
                     }
                     when REMOVAL, ARCHIVAL_TO_BIG_OBJECT {

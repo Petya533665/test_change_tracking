@@ -106,7 +106,7 @@ private class RuleUtilTest {
 		AdminController.remoteActionHandler(JSON.serialize(input));
 		Test.startTest();
 		Integer limitRules = 1;
-		setMaxNotificationTicketingRules(0, limitRules);
+		setMaxNotificationTicketingRules(1, limitRules);
 		String result = (String)AdminController.remoteActionHandler(JSON.serialize(input));
 		Test.stopTest();
 		Map<String, Object> objMap = (Map<String, Object>)JSON.deserializeUntyped(result);
