@@ -165,14 +165,20 @@ public with sharing class ConnectedOrgService {
         bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_ID, ConfigUtil.CONNECTED_ORGS_SETTINGS.Client_Key__c);
         bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_SECRET, ConfigUtil.CONNECTED_ORGS_SETTINGS.Client_Secret__c);
         bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_REDIRECT_URI, redirectUrl);
-        String b = HttpUtils.post(
+        String tempName = 'Pharos_ai_Temp_Login_URL';
+        AdminService.upsertRemoteSiteSetting(tempName, state.loginUrl, 'Temporary login URL for OAuth');
+        AuthTokenResponse resp;
+        try {
+            String b = HttpUtils.post(
                 endpoint,
                 bodyParams.toStringParameters(),
                 ConfigUtil.OAUTH_HEADERS_MAP,
                 200
-        );
-
-        AuthTokenResponse resp = (AuthTokenResponse)JSON.deserialize(b, AuthTokenResponse.class);
+            );
+            resp = (AuthTokenResponse)JSON.deserialize(b, AuthTokenResponse.class);
+        } finally {
+            MetadataServiceUtil.deleteRemoteSiteSettingsMetadata(new List<String>{ConfigUtil.prefixCurrentOrgNamespace(tempName)});
+        }
 
         String organizationId = resp.id.split('/')[4];
         String organizationId15 = organizationId.left(15);
