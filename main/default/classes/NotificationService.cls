@@ -1034,16 +1034,16 @@ public with sharing class NotificationService {
         public final NotificationContext notificationContext;
         public final Boolean useADFFormat;
 
-        public MergeFieldSettings(){
+        public MergeFieldSettings() {
             this.useADFFormat = false;
         }
 
-        public MergeFieldSettings(String actionType){
+        public MergeFieldSettings(String actionType) {
             notificationContext = MAP_NOTIFICATION_CONTEXTS_BY_ACTION_TYPE.get(actionType);
-            this.useADFFormat = (notificationContext == NotificationService.NotificationContext.JIRA);
+            this.useADFFormat = (notificationContext == NotificationService.NotificationContext.JIRA && JiraService.isCloudJiraInstance());
         }
         
-        public MergeFieldSettings(String actionType, Boolean useADFFormat){
+        public MergeFieldSettings(String actionType, Boolean useADFFormat) {
             notificationContext = MAP_NOTIFICATION_CONTEXTS_BY_ACTION_TYPE.get(actionType);
             this.useADFFormat = useADFFormat;
         }
@@ -1102,7 +1102,12 @@ public with sharing class NotificationService {
                 for (SObject obj : Database.query(query)) {
                     String objId = (String)obj.get('Id');
                     List<String> contents = contentsMap.get(objId);
-	                String context = this.mergeFieldSettingsMap?.containsKey(objId) ? this.mergeFieldSettingsMap.get(objId).notificationContext.name() : null;
+	                String context;
+	                Boolean useADFFormat = false;
+	                if (this.mergeFieldSettingsMap?.containsKey(objId)) {
+		                context = this.mergeFieldSettingsMap.get(objId).notificationContext.name();
+		                useADFFormat = this.mergeFieldSettingsMap.get(objId).useADFFormat;
+	                }
                     Map<String, String> tempMap = new Map<String, String>();
                     for (String field : allFields) {
                         if (field == 'Link') {
@@ -1110,7 +1115,7 @@ public with sharing class NotificationService {
                         } else if (field.endsWith('.Link')) {
                             tempMap.put(field, formatLinkField(String.valueOf(getFieldValue(obj, field.removeEnd('.Link')))));
                         } else if (field == 'Analysis' && analysis != null && String.isNotBlank(context)) {
-	                        if (context == 'JIRA' && JiraService.isCloudJiraInstance()) {
+	                        if (useADFFormat) {
 		                        tempMap.put(field, analysis.getFormattedDataADF(objId, 'JIRA_ADF'));
 	                        } else {
 		                        tempMap.put(field, analysis.getFormattedData(objId, context));
@@ -1121,14 +1126,16 @@ public with sharing class NotificationService {
                     }
                     List<String> contentList = new List<String>();
 
-	                if (!contents.isEmpty() && contents.size() > 0) {
-		                contentList.add(matchContent(contents[0], tempMap, objectAPIName));
-	                }
-	                if (!contents.isEmpty() && contents.size() > 1) {
-		                if (context == 'JIRA' && JiraService.isCloudJiraInstance()) {
+	                if (useADFFormat) {
+		                if (!contents.isEmpty() && contents.size() > 0) {
+			                contentList.add(matchContent(contents[0], tempMap, objectAPIName));
+		                }
+		                if (!contents.isEmpty() && contents.size() > 1) {
 			                contentList.add(matchContentADF(contents[1], tempMap, objectAPIName));
-		                } else {
-			                contentList.add(matchContent(contents[1], tempMap, objectAPIName));
+		                }
+	                } else {
+		                for (String content : contents) {
+			                contentList.add(matchContent(content, tempMap, objectAPIName));
 		                }
 	                }
                     result.put(objId, contentList);

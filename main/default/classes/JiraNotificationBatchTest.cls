@@ -1377,6 +1377,80 @@ public class JiraNotificationBatchTest {
 	}
 
 	@IsTest
+	private static void test_issue_notifications_ticketing_adf() {
+		// Update existing Jira settings to use cloud URL for the test
+		Jira_Settings__c jiraSettings = Jira_Settings__c.getOrgDefaults();
+		jiraSettings.Jira_Base_Url__c = JIRA_CLOUD_MOCK_REST_ENDPOINT;
+		jiraSettings.Jira_API_Url__c = JIRA_CLOUD_MOCK_REST_ENDPOINT;
+		jiraSettings.Jira_Username__c = JiraService.JIRA_CLOUD_OAUTH_USERNAME;
+		upsert jiraSettings;
+
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.putAll(createJiraMocks());
+
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		String mergeField = '{!' + ConfigUtil.nameSpacePrefix + 'Log__c.' + ConfigUtil.nameSpacePrefix + 'Is_New__c}';
+		String customType = 'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes';
+
+		JiraCustomFieldWrapper fieldInfo = new JiraCustomFieldWrapper(mergeField, customType, false);
+
+		Map<String, Object> metadata = new Map<String, Object>{
+				'customfield_10200' => fieldInfo
+		};
+
+		String additionalMetadata = JSON.serialize(metadata);
+
+		createTicketingWithAdditionalMetadata(true, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME, additionalMetadata);
+
+		Test.startTest();
+
+		enableAzureDevOpsNotifications();
+		TestDataFactory.enableMaxJiraRules();
+		TestDataFactory.enableIssueTracking();
+		PermissionsUtil.IssueNotificationsEnabled = true;
+		PermissionsUtil.JiraIntegrationEnabled = true;
+
+		Log__c log = IssueTriggerHandlerTest.createPharosLog('hash1', 'hash2', 'hash3');
+		insert log;
+
+		Test.stopTest();
+
+		String newTicketCommentEndpoint = JiraService.getService().getCreateIssueEndpoint();
+		HttpRequest postRequest = multiCalloutMock.getRequest(newTicketCommentEndpoint);
+
+		Map<String, Object> body = (Map<String, Object>) JSON.deserializeUntyped(postRequest.getBody());
+		Map<String, Object> fields = (Map<String, Object>) body.get('fields');
+		System.assert(fields.containsKey('customfield_10200'));
+
+		List<Object> customFields = (List<Object>) fields.get('customfield_10200');
+		Map<String, Object> customField = (Map<String, Object>) customFields[0];
+		System.assert(customField.containsKey('id'));
+
+		assertNoInternalLogs();
+	}
+
+	public class JiraCustomFieldWrapper {
+		public String value;
+		public JiraFieldSchema schema;
+		public Boolean required;
+
+		public JiraCustomFieldWrapper(String val, String customType, Boolean req) {
+			this.value = val;
+			this.schema = new JiraFieldSchema(customType);
+			this.required = req;
+		}
+	}
+
+	public class JiraFieldSchema {
+		public String custom;
+		public JiraFieldSchema(String customType) {
+			this.custom = customType;
+		}
+	}
+
+	@IsTest
 	private static void test_issue_ticketing_do_not_create_ticket_on_issue_update() {
 
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
@@ -1761,6 +1835,27 @@ public class JiraNotificationBatchTest {
 		return mr1;
 	}
 
+	private static Rule__c createTicketingWithAdditionalMetadata(Boolean isJira, String sobjectType, String additionalMetadata) {
+		Rule__c mr1 = new Rule__c();
+		mr1.Active__c = true;
+		mr1.Type__c = isJira ? Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE : Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS;
+		mr1.Index__c = 1;
+		mr1.SobjectType__c = sobjectType;
+		insert mr1;
+
+		Action__c rn1 = getTicketingAction(isJira, sobjectType);
+		rn1.Additional_Metadata__c = additionalMetadata;
+		update rn1;
+
+		RuleAction__c en1 = new RuleAction__c();
+		en1.Action__c = rn1.Id;
+		en1.Rule__c = mr1.Id;
+		insert en1;
+
+		return mr1;
+	}
+
+	public static final String JIRA_CLOUD_MOCK_REST_ENDPOINT = 'https://test.atlassian.net';
 	public static final String JIRA_MOCK_REST_ENDPOINT = 'http://test.jira.com';
 	public static final String JIRA_MOCK_REST_API = JIRA_MOCK_REST_ENDPOINT +'/rest/api/';
 	public static final String JIRA_MOCK_NEW_TICKET_ID = 'test';
@@ -1851,12 +1946,24 @@ public class JiraNotificationBatchTest {
 	private static SingleRequestMock getProjectIssueFieldsMock() {
 		JiraService.JiraProjectIssueTypeFieldsWrapper result = new JiraService.JiraProjectIssueTypeFieldsWrapper();
 
+		List<JiraService.JiraProjectIssueField> jiraFields = new List<JiraService.JiraProjectIssueField>();
 		JiraService.JiraProjectIssueField jiraField = new JiraService.JiraProjectIssueField();
 		jiraField.required = false;
 		jiraField.name = JIRA_MOCK_EPICK_NAME;
 		jiraField.key = JIRA_MOCK_EPICK_ID;
+		jiraFields.add(jiraField);
 
-		result.values = new List<JiraService.JiraProjectIssueField>{jiraField};
+		JiraService.JiraProjectIssueField jiraField1 = new JiraService.JiraProjectIssueField();
+		jiraField1.required = false;
+		jiraField1.name = 'CheckboxField1';
+		jiraField1.fieldId = 'customfield_10200';
+		jiraField1.operations = new List<String>{'add', 'set', 'remove'};
+		jiraField1.schema = new JiraService.JiraProjectIssueFieldSchema();
+		jiraField1.schema.type = 'array';
+		jiraField1.schema.custom = 'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes';
+		jiraFields.add(jiraField1);
+
+		result.values = jiraFields;
 
 		SingleRequestMock getProjectsRespMock = new SingleRequestMock(
 			200,
@@ -1905,6 +2012,16 @@ public class JiraNotificationBatchTest {
 		customField1.schema.type = 'any';
 		customField1.schema.custom = 'com.pyxis.greenhopper.jira:gh-epic-link';
 		fields.add(customField1);
+
+		JiraService.JiraProjectIssueField customField2 = new JiraService.JiraProjectIssueField();
+		customField2.fieldId = 'customfield_10200';
+		customField2.name = 'CheckboxField1';
+		customField2.required = false;
+		customField2.operations = new List<String>{'add', 'set', 'remove'};
+		customField2.schema = new JiraService.JiraProjectIssueFieldSchema();
+		customField2.schema.type = 'array';
+		customField2.schema.custom = 'com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes';
+		fields.add(customField2);
 
 		return fields;
 	}
@@ -11653,11 +11770,15 @@ public class JiraNotificationBatchTest {
 	
     @IsTest
     static void testADFMergeFieldSettings() {
-        NotificationService.MergeFieldSettings jiraSettings = new NotificationService.MergeFieldSettings(Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION);
-        System.assertEquals(true, jiraSettings.useADFFormat);
-        
-        NotificationService.MergeFieldSettings emailSettings = new NotificationService.MergeFieldSettings(Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION);
-        System.assertEquals(false, emailSettings.useADFFormat);
+	    Jira_Settings__c jiraSettings = [SELECT Id FROM Jira_Settings__c LIMIT 1];
+	    jiraSettings.Jira_Base_Url__c = 'https://test.atlassian.net';
+	    update jiraSettings;
+
+	    NotificationService.MergeFieldSettings mergeFieldEmailSettings = new NotificationService.MergeFieldSettings(Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION);
+	    System.assertEquals(false, mergeFieldEmailSettings.useADFFormat);
+
+	    NotificationService.MergeFieldSettings mergeFieldJiraSettings = new NotificationService.MergeFieldSettings(Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION);
+	    System.assertEquals(true, mergeFieldJiraSettings.useADFFormat);
     }
 	
 	@IsTest
@@ -12121,6 +12242,5 @@ public class JiraNotificationBatchTest {
 		// Verify the URL was updated
 		System.assertEquals('https://test.atlassian.net', jiraSettings.Jira_Base_Url__c);
 	}
-
 
 }

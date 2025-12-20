@@ -353,15 +353,6 @@ public with sharing class DatabaseUtils {
         ];
     }
 
-    public static Integer getSumTotalJobItems() {
-        return Integer.valueOf([
-            SELECT SUM(TotalJobItems) sumTotalJobItems
-            FROM AsyncApexJob
-            WHERE JobType = 'BatchApex'
-            AND Status IN :Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUSES
-        ][0].get('sumTotalJobItems'));
-    }
-
 	public static Boolean TEST_MODE = false;
 	public static Set<String> startJobs = new Set<String>();
 
@@ -383,9 +374,7 @@ public with sharing class DatabaseUtils {
 		if (!getCurrentJobs(jobNames).isEmpty()) return false;
 
 		// check AsyncApexExecutions limits
-		Integer sumTotalJobItems = getSumTotalJobItems();
-		Integer availableQuantityAsyncApexExecutionsOnOrg = Integer.valueOf(LimitsService.getAvailableQuantityAsyncApexExecutions() * percentAsyncApexJobsFreeOnOrg);
-		Integer availableQuantityAsyncApexExecutions = availableQuantityAsyncApexExecutionsOnOrg - (sumTotalJobItems != null ? sumTotalJobItems : 0);
+		Integer availableQuantityAsyncApexExecutions = LimitsService.getAvailableAsyncApexExecutionsWithReservation(percentAsyncApexJobsFreeOnOrg);
 
 		Integer batchIterations = Integer.valueOf(Math.ceil(pharosBatch.getIterationsCount() / Decimal.valueOf(pharosBatch.BATCH_SCOPE)));
 		// "-2" - Decreasing count by 2 to reserve slots for batch start and finish in async apex executions.

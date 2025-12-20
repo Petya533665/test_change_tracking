@@ -30,6 +30,7 @@ private class Test_LoggerSettings {
         String loginUrl = isSandbox ? 'https://test.salesforce.com' : 'https://login.salesforce.com';
         Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
         endpoint2TestResp.put(loginUrl + '/services/oauth2/token', generateTokenMock());
+        endpoint2TestResp.put(ConfigUtil.TOOLING_QUERY_ENDPOINT + ConfigUtil.REST_REMOTE_SITE_SETTINGS_QUERY, generateRemoteSiteSettingsMock());
         HttpCalloutMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
         Test.setMock(HttpCalloutMock.class, multiCalloutMock);
         Test.setMock(WebServiceMock.class, new TestDataFactory.WebServiceMockImpl());
@@ -58,6 +59,15 @@ private class Test_LoggerSettings {
                 200,
                 'OK',
                 JSON.serialize(authTokenResponse)
+        );
+        return singleRequestMock;
+    }
+
+    private static TestDataFactory.SingleRequestMock generateRemoteSiteSettingsMock() {
+        TestDataFactory.SingleRequestMock singleRequestMock = new TestDataFactory.SingleRequestMock(
+                200,
+                'OK',
+                '{"records": []}'
         );
         return singleRequestMock;
     }

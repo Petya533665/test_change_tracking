@@ -165,7 +165,7 @@ public with sharing class ConnectedOrgService {
         bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_ID, ConfigUtil.CONNECTED_ORGS_SETTINGS.Client_Key__c);
         bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_CLIENT_SECRET, ConfigUtil.CONNECTED_ORGS_SETTINGS.Client_Secret__c);
         bodyParams.addEncodedParameter(HttpUtils.HTTP_URL_PARAM_REDIRECT_URI, redirectUrl);
-        String tempName = 'Pharos_ai_Temp_Login_URL';
+        String tempName = 'Pharos_ai_Temp_Login_URL_' + String.valueOf(DateTime.now().getTime());
         AdminService.upsertRemoteSiteSetting(tempName, state.loginUrl, 'Temporary login URL for OAuth');
         AuthTokenResponse resp;
         try {

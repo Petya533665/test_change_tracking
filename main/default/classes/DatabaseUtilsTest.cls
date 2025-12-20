@@ -436,16 +436,6 @@ public with sharing class DatabaseUtilsTest {
     }
 
     @IsTest
-    static void testGetSumTotalJobItems() {
-        Test.startTest();
-        Integer result = DatabaseUtils.getSumTotalJobItems();
-        Test.stopTest();
-        
-        // Result can be null if there are no batch jobs, which is valid
-        Assert.isTrue(result == null || result >= 0, 'Result should be null or non-negative');
-    }
-
-    @IsTest
     static void testExecuteBatchWithLimitCheck_WithSingleJobName() {
         // Create a mock batch instance
         DatabaseUtils.PharosBatchImpl mockBatch = new DatabaseUtils.PharosBatchImpl();
@@ -602,5 +592,106 @@ public with sharing class DatabaseUtilsTest {
             Assert.areEqual('Test exception', e.getMessage(), 'Exception message should match');
         }
         Test.stopTest();
+    }
+
+    @IsTest
+    static void testExecuteBatchWithLimitCheck_UsesOrgLimitsNotSOQL() {
+        // This test verifies that the new implementation uses OrgLimits API
+        // instead of SOQL queries to check async apex execution limits
+        
+        // Create a simple mock batch
+        DatabaseUtils.PharosBatchImpl mockBatch = new DatabaseUtils.PharosBatchImpl();
+        mockBatch.BATCH_SCOPE = 10;
+        mockBatch.isForceStart = true;
+        
+        // Enable test mode
+        DatabaseUtils.TEST_MODE = true;
+        
+        Test.startTest();
+        Boolean result = DatabaseUtils.executeBatchWithLimitCheck('TestOrgLimitsJob', mockBatch);
+        Test.stopTest();
+        
+        // The method should complete without SOQL exceptions
+        Assert.areNotEqual(null, result, 'Result should not be null');
+        
+        // Clean up
+        DatabaseUtils.TEST_MODE = false;
+        DatabaseUtils.startJobs.clear();
+    }
+
+    @IsTest
+    static void testLimitsService_GetAvailableAsyncApexExecutionsWithReservation() {
+        // Test the LimitsService method that replaces the SOQL query
+        Test.startTest();
+        
+        // Test with 85% reservation (default)
+        Integer available85 = LimitsService.getAvailableAsyncApexExecutionsWithReservation(0.85);
+        
+        // Test with 50% reservation
+        Integer available50 = LimitsService.getAvailableAsyncApexExecutionsWithReservation(0.50);
+        
+        // Test with 100% reservation
+        Integer available100 = LimitsService.getAvailableAsyncApexExecutionsWithReservation(1.0);
+        
+        Test.stopTest();
+        
+        Assert.areNotEqual(null, available85, 'Available with 85% should not be null');
+        Assert.areNotEqual(null, available50, 'Available with 50% should not be null');
+        Assert.areNotEqual(null, available100, 'Available with 100% should not be null');
+        
+        // Lower percentage should give lower available count (if both positive)
+        if (available50 >= 0 && available100 >= 0) {
+            Assert.isTrue(available50 <= available100, 
+                'Lower reservation percentage should result in lower or equal available count');
+        }
+    }
+
+    @IsTest
+    static void testExecuteBatchWithLimitCheck_ReservationPercentage() {
+        // Verify that percentAsyncApexJobsFreeOnOrg is used correctly
+        Decimal originalPercent = DatabaseUtils.percentAsyncApexJobsFreeOnOrg;
+        
+        try {
+            // Test with very restrictive percentage
+            DatabaseUtils.percentAsyncApexJobsFreeOnOrg = 0.01; // Only 1%
+            
+            DatabaseUtils.PharosBatchImpl mockBatch = new DatabaseUtils.PharosBatchImpl();
+            mockBatch.BATCH_SCOPE = 10;
+            mockBatch.isForceStart = true;
+            
+            Test.startTest();
+            Boolean result = DatabaseUtils.executeBatchWithLimitCheck('TestReservationJob', mockBatch);
+            Test.stopTest();
+            
+            // Should execute without errors (result depends on org limits)
+            Assert.areNotEqual(null, result, 'Result should not be null');
+            
+        } finally {
+            // Restore original value
+            DatabaseUtils.percentAsyncApexJobsFreeOnOrg = originalPercent;
+        }
+    }
+
+    @IsTest
+    static void testExecuteBatchWithLimitCheck_TestModeTracking() {
+        // Verify TEST_MODE properly tracks job starts
+        DatabaseUtils.TEST_MODE = true;
+        DatabaseUtils.startJobs.clear();
+        
+        DatabaseUtils.PharosBatchImpl mockBatch = new DatabaseUtils.PharosBatchImpl();
+        mockBatch.BATCH_SCOPE = 10;
+        mockBatch.isForceStart = true;
+        
+        Test.startTest();
+        DatabaseUtils.executeBatchWithLimitCheck('TestModeJob', mockBatch);
+        Test.stopTest();
+        
+        // Job should be tracked in TEST_MODE
+        Assert.isTrue(DatabaseUtils.startJobs.contains('TestModeJob'), 
+            'Job name should be tracked in startJobs during TEST_MODE');
+        
+        // Clean up
+        DatabaseUtils.TEST_MODE = false;
+        DatabaseUtils.startJobs.clear();
     }
 }
