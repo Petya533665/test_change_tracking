@@ -731,6 +731,7 @@ public with sharing class RuleUtil {
 		String query = new QBuilder(RuleAction__c.SObjectType)
 				.selectFields(new Set<String>(RULE_ACTION_FIELDS))
 				.add(QBuilder.condition('Action__r.Action_Type__c').isIn(actionTypes))
+				.add(QBuilder.condition('Rule__r.Type__c').equalsTo(ruleType))
 				.add(String.isNotBlank(subtype) ? QBuilder.condition('Action__r.Subtype__c').equalsTo(subtype) : null)
 				.add(String.isBlank(subtype) ? QBuilder.condition('Action__r.Subtype__c').notEqualsTo(Constants.ACTION_SOBJECT.SUBTYPE_NOTIFICATION) : null)
 				.add(QBuilder.orderBy('CreatedDate').descending())

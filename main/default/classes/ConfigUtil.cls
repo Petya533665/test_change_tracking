@@ -792,6 +792,8 @@ public with sharing class ConfigUtil {
 	public static final String PAGER_DUTY_SERVICE_NAME = 'PagerDuty';
     public static final String TEAMS_SERVICE_NAME = 'Teams';
     public static final String WEBHOOK_SERVICE_NAME = 'Webhook';
+    public static final String JIRA_SERVICE_NAME = 'Jira';
+    public static final String AZURE_DEV_OPS_SERVICE_NAME = 'Azure';
 
     public static final String LOG_CATEGORIES_KEY_CATEGORIES = 'categories';
     public static final String LOG_CATEGORIES_KEY_RECORDTYPES = 'recordtypes';
