@@ -1133,12 +1133,10 @@ public with sharing class TicketingService {
 
         public TicketingTaskInfo(EventAction__c eventAction) {
             // Use ADF-aware merge field settings for JIRA actions
-            Boolean isJiraAction = eventAction.Action__r.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION || 
-                                   eventAction.Action__r.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT;
             List<String> renderMessages = NotificationService.renderMergeFields(
                 eventAction.Event__c,
                 new List<String>{eventAction.Action__r.Subject__c, eventAction.Action__r.Body__c},
-                new NotificationService.MergeFieldSettings(eventAction.Action__r.Action_Type__c, isJiraAction));
+                new NotificationService.MergeFieldSettings(eventAction.Action__r.Action_Type__c));
 
             AutoChart.AutoChartFieldsResult autoChartFieldsResult = AutoChart.getChartFieldsAndClear(renderMessages);
             renderMessages = autoChartFieldsResult.cleanedMessages;
@@ -1156,19 +1154,17 @@ public with sharing class TicketingService {
             this.issueTypeId = eventAction.Action__r.JIRAIssueType__c;
             this.componentIds = String.isNotBlank(eventAction.Action__r.JIRAComponents__c) ? eventAction.Action__r.JIRAComponents__c.split(',') : new List<String>();
             if (String.isNotBlank(eventAction.Action__r.Additional_Metadata__c)) {
-                NotificationService.MergeFieldSettings settings = new NotificationService.MergeFieldSettings(eventAction.Action__r.Action_Type__c, isJiraAction);
+                NotificationService.MergeFieldSettings settings = new NotificationService.MergeFieldSettings(eventAction.Action__r.Action_Type__c, false);
                 this.additionalMetadata = getAdditionalMetadata(eventAction.Action__c, eventAction.Event__c, eventAction.Action__r.Additional_Metadata__c, settings);
             }
         }
 
         public TicketingTaskInfo(Action__c jiraAction, TicketingSObjectWrapper sObjectWrapper) {
             // Use ADF-aware merge field settings for JIRA actions
-            Boolean isJiraAction = jiraAction.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION || 
-                                   jiraAction.Action_Type__c == Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_TICKET_COMMENT;
             List<String> renderMessages = NotificationService.renderMergeFields(
                 sObjectWrapper.id,
                 new List<String>{jiraAction.Subject__c, jiraAction.Body__c},
-                new NotificationService.MergeFieldSettings(jiraAction.Action_Type__c, isJiraAction));
+                new NotificationService.MergeFieldSettings(jiraAction.Action_Type__c));
 
             AutoChart.AutoChartFieldsResult autoChartFieldsResult = AutoChart.getChartFieldsAndClear(renderMessages);
             renderMessages = autoChartFieldsResult.cleanedMessages;
@@ -1197,7 +1193,7 @@ public with sharing class TicketingService {
             this.issueTypeId = jiraAction.JIRAIssueType__c;
             this.componentIds = String.isNotBlank(jiraAction.JIRAComponents__c) ? jiraAction.JIRAComponents__c.split(',') : new List<String>();
             if (String.isNotBlank(jiraAction.Additional_Metadata__c)) {
-                NotificationService.MergeFieldSettings settings = new NotificationService.MergeFieldSettings(jiraAction.Action_Type__c, isJiraAction);
+                NotificationService.MergeFieldSettings settings = new NotificationService.MergeFieldSettings(jiraAction.Action_Type__c, false);
                 this.additionalMetadata = getAdditionalMetadata(UserInfo.getUserId(), sObjectWrapper.id, jiraAction.Additional_Metadata__c, settings);
             }
         }

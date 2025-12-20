@@ -914,7 +914,7 @@ public with sharing class AIAnalysisService {
 		public ContextFormatterInterface formatter;
 		public virtual void setContext(String context) {
 			this.context = context;
-			this.formatter = FORMATTERS.get(this.context);
+			this.formatter = FORMATTERS.containsKey(this.context) ? FORMATTERS.get(this.context) : FORMATTERS.get('LWC');
 		}
 		
 		public virtual String getFormattedData() {

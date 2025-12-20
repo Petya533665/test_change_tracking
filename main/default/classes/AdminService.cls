@@ -1119,9 +1119,8 @@ public without sharing class AdminService {
     public static void checkEmailToCaseErrorTrackingSettings() {
         // check limits
         // SOAP Fault: REQUEST_LIMIT_EXCEEDED: TotalRequests Limit exceeded. faultcode=sf:REQUEST_LIMIT_EXCEEDED faultactor=
-        Integer sumTotalJobItems = DatabaseUtils.getSumTotalJobItems();
-        Integer availableQuantityAsyncApexExecutions = LimitsService.getAvailableQuantityAsyncApexExecutions() - (sumTotalJobItems != null ? (sumTotalJobItems - 1) : 1);
-
+        Integer availableQuantityAsyncApexExecutions = LimitsService.getAvailableAsyncApexExecutionsWithReservation(DatabaseUtils.percentAsyncApexJobsFreeOnOrg);
+        
         if(availableQuantityAsyncApexExecutions > 0 && ConfigUtil.SETTINGS.Enable_Email_To_Case_Error_Tracking__c == Constants.LOGGER_SETTINGS_SOBJECT.ENABLE_EMAIL_TO_CASE_ERROR_TRACKING_STATUS_ENABLED) {
             boolean emailToCaseErrorTracking = getEmailToCaseErrorTracking();
             if(!emailToCaseErrorTracking) {

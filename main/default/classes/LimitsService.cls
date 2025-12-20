@@ -84,6 +84,13 @@ public with sharing class LimitsService {
 		return asyncLimit.getLimit() - asyncLimit.getValue();
 	}
 
+	public static Integer getAvailableAsyncApexExecutionsWithReservation(Decimal percentToUse) {
+		Map<String, System.OrgLimit> mapOrgLimits = OrgLimits.getMap();
+		System.OrgLimit asyncLimit = mapOrgLimits.get(DAILY_ASYNC_APEX_EXECUTIONS_LIMIT);
+		Integer maxAllowedUsage = Integer.valueOf(asyncLimit.getLimit() * percentToUse);
+		return maxAllowedUsage - asyncLimit.getValue();
+	}
+
     public static final Integer MAX_COUNT_HOLDING_BATCH_APEX_JOBS = 100;
 
 	public static Boolean isFlexQueueSlotAvailable() {
