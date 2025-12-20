@@ -2250,12 +2250,11 @@ public without sharing class AdminService {
 
     public static Map<String, Object> getServicesEnable() {
         return new Map<String, Object>{
-            ConfigUtil.SLACK_SERVICE_NAME => PermissionsUtil.SlackIntegrationEnabled && ConfigUtil.SLACK_SETTINGS.Slack_Enabled__c,
-            ConfigUtil.PAGER_DUTY_SERVICE_NAME => PermissionsUtil.PagerDutyIntegrationEnabled && ConfigUtil.PAGER_DUTY_SETTINGS.PagerDuty_Enabled__c,
-            ConfigUtil.TEAMS_SERVICE_NAME => PermissionsUtil.TeamsIntegrationEnabled && ConfigUtil.GRAPH_API_SETTINGS.Enabled__c,
-            ConfigUtil.WEBHOOK_SERVICE_NAME => PermissionsUtil.WebhookIntegrationEnabled,
-            ConfigUtil.JIRA_SERVICE_NAME => PermissionsUtil.JiraIntegrationEnabled && String.isNotBlank(JiraService.JIRA_OAUTH_TOKEN),
-            ConfigUtil.AZURE_DEV_OPS_SERVICE_NAME => PermissionsUtil.AzureDevOpsIntegrationEnabled && String.isNotBlank(AzureService.OAUTH_API_TOKEN)
+            //'Jira' => ConfigUtil.SETTINGS.Auto_Jira_Task__c,
+            ConfigUtil.SLACK_SERVICE_NAME => ConfigUtil.SLACK_SETTINGS.Slack_Enabled__c,
+            ConfigUtil.PAGER_DUTY_SERVICE_NAME => ConfigUtil.PAGER_DUTY_SETTINGS.PagerDuty_Enabled__c,
+            ConfigUtil.TEAMS_SERVICE_NAME => ConfigUtil.GRAPH_API_SETTINGS.Enabled__c,
+            ConfigUtil.WEBHOOK_SERVICE_NAME => PermissionsUtil.WebhookIntegrationEnabled
         };
     }
     //log-categories
