@@ -129,6 +129,8 @@ public with sharing class Constants {
         public final String NOTIFICATION_INTEGRATION_STATUS_COMPLETED = 'Completed';
 
         public final String JIRA_INTEGRATION_STATUS_PENDING = 'Ticket Pending';
+        
+        public final String CHARTS_NOT_AVAILABLE_MESSAGE = '*Note: Charts are not available due to missing data.*';
 
         public final Map<String, String> RFC2822_MONTHS = new Map<String, String> {
             'Jan' => '01',

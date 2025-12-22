@@ -795,10 +795,25 @@ public with sharing class NotificationService {
                 if (String.isNotBlank(cachedChartData)) {
                     // Use cached data from batchContext
                     chartToChartData = (Map<ChartService.Chart, Map<ReportService.SystemReport, String>>) JSON.deserialize(cachedChartData, Map<ChartService.Chart, Map<ReportService.SystemReport, String>>.class);
+                    
+                    // Check if cached data is empty
+                    if (chartToChartData == null || chartToChartData.isEmpty()) {
+                        String messageWithoutCharts = message + Constants.GLOBAL_VARIABLE.NEWLINE_CHARACTERS + Constants.GLOBAL_VARIABLE.NEWLINE_CHARACTERS + Constants.GLOBAL_VARIABLE.CHARTS_NOT_AVAILABLE_MESSAGE;
+                        SlackService.sendMessageToSlack(messageWithoutCharts, action.SlackChannels__c);
+                        return;
+                    }
                 } else {
                     // Generate new chart data
                     Map<String, Object> parameters = ReportService.parametersBySObjectRecord(record);
                     chartToChartData = ReportService.getReportDataByChart(chartsTypeForPrepare, parameters);
+                    
+                    // Check if chart data is empty before calling Lambda
+                    if (chartToChartData == null || chartToChartData.isEmpty()) {
+                        // If no chart data available, send message without charts
+                        String messageWithoutCharts = message + Constants.GLOBAL_VARIABLE.NEWLINE_CHARACTERS + Constants.GLOBAL_VARIABLE.NEWLINE_CHARACTERS + Constants.GLOBAL_VARIABLE.CHARTS_NOT_AVAILABLE_MESSAGE;
+                        SlackService.sendMessageToSlack(messageWithoutCharts, action.SlackChannels__c);
+                        return;
+                    }
                     
                     // Store in batchContext for future use
                     storeChartData(recordId, JSON.serialize(chartToChartData), batchContext);

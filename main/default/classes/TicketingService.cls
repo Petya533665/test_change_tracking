@@ -623,21 +623,56 @@ public with sharing class TicketingService {
                         String comment = jiraServiceInterface.addCommentToIssueWithAttachments(comments, issueKey, chartGeneratorImageLambdaClient);
 
                         if (JiraService.isCloudJiraInstance()) {
-                            // For Jira Cloud, comment is already in ADF format (JSON string)
-                            jiraServiceInterface.createNewTicketComment(comment, issueKey);
+                            if (isJsonString(comment)) {
+                                Map<String, Object> parsedComment = (Map<String, Object>)JSON.deserializeUntyped(comment);
+                                if (parsedComment.containsKey(ADFBuilder.ATTR_BODY)) {
+                                    this.bodyRequest = parsedComment;
+                                } else {
+                                    // Check if it's already an ADF document (has 'type'='doc' and 'version')
+                                    if (parsedComment.containsKey(ADFBuilder.ATTR_TYPE) && parsedComment.get(ADFBuilder.ATTR_TYPE) == ADFBuilder.TYPE_DOC && parsedComment.containsKey(ADFBuilder.ATTR_VERSION)) {
+                                        // It's already an ADF document, wrap it in body
+                                        this.bodyRequest = new Map<String, Object>{
+                                            ADFBuilder.ATTR_BODY => parsedComment
+                                        };
+                                    } else {
+                                        // It's JSON but not ADF format, treat as plain text and convert to ADF
+                                        Map<String, Object> adfContent = (Map<String, Object>) TicketingService.textToAtlassianDocumentFormatContent(comment, true);
+                                        this.bodyRequest = new Map<String, Object>{
+                                            ADFBuilder.ATTR_BODY => adfContent
+                                        };
+                                    }
+                                }
+                            } else {
+                                // comment is plain text, convert to ADF format
+                                Map<String, Object> adfContent = (Map<String, Object>) TicketingService.textToAtlassianDocumentFormatContent(comment, true);
+                                this.bodyRequest = new Map<String, Object>{
+                                    ADFBuilder.ATTR_BODY => adfContent
+                                };
+                            }
+                            String finalComment = JSON.serialize(this.bodyRequest);
+                            jiraServiceInterface.createNewTicketComment(finalComment, issueKey);
+
                         } else {
-                            // For Jira Server, wrap in body object
                             this.bodyRequest = new Map<String, Object>{
-                                'body' => comment
+                                ADFBuilder.ATTR_BODY => comment
                             };
                             jiraServiceInterface.createNewTicketComment(JSON.serialize(this.bodyRequest), issueKey);
                         }
                     }
                 } else {
-	                this.bodyRequest = new Map<String, Object>{
-			                'body' => JiraService.isCloudJiraInstance() ? (Object)JSON.deserializeUntyped(comments) : comments
-	                };
-	                jiraServiceInterface.createNewTicketComment(JSON.serialize(this.bodyRequest), issueKey);
+                    if (JiraService.isCloudJiraInstance()) {
+                        // For Jira Cloud, convert plain text to ADF format
+                        Map<String, Object> adfContent = (Map<String, Object>) TicketingService.textToAtlassianDocumentFormatContent(comments, true);
+                        this.bodyRequest = new Map<String, Object>{
+                            ADFBuilder.ATTR_BODY => adfContent
+                        };
+                    } else {
+                        // For Jira Server, use plain text
+                        this.bodyRequest = new Map<String, Object>{
+                            ADFBuilder.ATTR_BODY => comments
+                        };
+                    }
+                    jiraServiceInterface.createNewTicketComment(JSON.serialize(this.bodyRequest), issueKey);
                 }
             }
         }
@@ -1211,10 +1246,7 @@ public with sharing class TicketingService {
             Integer index = 0;
 
             for (String key : additionalMetadata.keySet()) {
-                List<String> results = renderResult.get(whatId);
-                        AutoChart.AutoChartFieldsResult autoChartFieldsResult = AutoChart.getChartFieldsAndClear(results);
-                results = autoChartFieldsResult.cleanedMessages;
-                additionalMetadata.put(key, results.get(index++));
+                additionalMetadata.put(key, renderResult.get(whatId).get(index++));
             }
             return JSON.serialize(additionalMetadata);
         }
@@ -1319,6 +1351,19 @@ public with sharing class TicketingService {
         return someOpenLogsByHash1;
     }
 
+    // Check if string is valid JSON
+    private static Boolean isJsonString(String str) {
+        if (String.isBlank(str)) {
+            return false;
+        }
+        try {
+            JSON.deserializeUntyped(str);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
     // Convert text to Atlassian document format content
     public static Object textToAtlassianDocumentFormatContent(String content) {
         return textToAtlassianDocumentFormatContent(content, false);
@@ -1328,10 +1373,31 @@ public with sharing class TicketingService {
     public static Object textToAtlassianDocumentFormatContent(String content, Boolean supportLinks) {
         if (String.isBlank(content)) {
             return new Map<String, Object>{
-                'type' => 'doc',
-                'version' => 1,
-                'content' => new List<Object>()
+                ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_DOC,
+                ADFBuilder.ATTR_VERSION => 1,
+                ADFBuilder.ATTR_CONTENT => new List<Object>()
             };
+        }
+        
+        // Check if content is already an ADF document JSON string
+        // If so, deserialize it instead of treating it as plain text
+        if (isJsonString(content)) {
+            try {
+                Map<String, Object> parsedContent = (Map<String, Object>)JSON.deserializeUntyped(content);
+                // Check if it's an ADF document structure
+                if (parsedContent.containsKey(ADFBuilder.ATTR_TYPE) && parsedContent.get(ADFBuilder.ATTR_TYPE) == ADFBuilder.TYPE_DOC && parsedContent.containsKey(ADFBuilder.ATTR_VERSION)) {
+                    // It's already an ADF document, return it as-is
+                    return parsedContent;
+                }
+            } catch (Exception e) {
+                // If deserialization fails (invalid JSON or other error), continue with normal processing
+                // This is expected when content is not valid JSON, so we treat it as plain text
+                // Log unexpected errors (non-JSON parsing errors) for debugging purposes
+                String errorType = e.getTypeName();
+                if (errorType != null && !errorType.contains('JSON') && !errorType.contains('Parse')) {
+                    Logger.getInstance().addInternalError(e, TicketingService.class.getName(), 'textToAtlassianDocumentFormatContent');
+                }
+            }
         }
         
         List<Object> paragraphContent;
@@ -1340,19 +1406,19 @@ public with sharing class TicketingService {
         } else {
             paragraphContent = new List<Object>{
                 new Map<String, Object>{
-                    'type' => 'text',
-                    'text' => content
+                    ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_TEXT,
+                    ADFBuilder.ATTR_TEXT => content
                 }
             };
         }
         
         return new Map<String, Object>{
-            'type' => 'doc',
-            'version' => 1,
-            'content' => new List<Object>{
+            ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_DOC,
+            ADFBuilder.ATTR_VERSION => 1,
+            ADFBuilder.ATTR_CONTENT => new List<Object>{
                 new Map<String, Object>{
-                    'type' => 'paragraph',
-                    'content' => paragraphContent
+                    ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_PARAGRAPH,
+                    ADFBuilder.ATTR_CONTENT => paragraphContent
                 }
             }
         };
@@ -1405,21 +1471,21 @@ public with sharing class TicketingService {
     // Create ADF text node
     private static Map<String, Object> createTextNode(String text) {
         return new Map<String, Object>{
-            'type' => 'text',
-            'text' => text
+            ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_TEXT,
+            ADFBuilder.ATTR_TEXT => text
         };
     }
     
     // Create ADF link node
     private static Map<String, Object> createLinkNode(String url, String displayText) {
         return new Map<String, Object>{
-            'type' => 'text',
-            'text' => displayText,
-            'marks' => new List<Object>{
+            ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_TEXT,
+            ADFBuilder.ATTR_TEXT => displayText,
+            ADFBuilder.ATTR_MARKS => new List<Object>{
                 new Map<String, Object>{
-                    'type' => 'link',
-                    'attrs' => new Map<String, Object>{
-                        'href' => url
+                    ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_LINK,
+                    ADFBuilder.ATTR_ATTRS => new Map<String, Object>{
+                        ADFBuilder.ATTR_HREF => url
                     }
                 }
             }
@@ -1431,24 +1497,24 @@ public with sharing class TicketingService {
         List<Object> paragraphContent = new List<Object>();
         
         for (Map<String, String> part : contentParts) {
-            String type = part.get('type');
-            String text = part.get('text');
+            String type = part.get(ADFBuilder.ATTR_TYPE);
+            String text = part.get(ADFBuilder.ATTR_TEXT);
             String url = part.get('url');
             
-            if (type == 'link' && String.isNotBlank(url)) {
+            if (type == ADFBuilder.TYPE_LINK && String.isNotBlank(url)) {
                 paragraphContent.add(createLinkNode(url, String.isNotBlank(text) ? text : url));
-            } else if (type == 'text' && String.isNotBlank(text)) {
+            } else if (type == ADFBuilder.TYPE_TEXT && String.isNotBlank(text)) {
                 paragraphContent.add(createTextNode(text));
             }
         }
         
         return new Map<String, Object>{
-            'type' => 'doc',
-            'version' => 1,
-            'content' => new List<Object>{
+            ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_DOC,
+            ADFBuilder.ATTR_VERSION => 1,
+            ADFBuilder.ATTR_CONTENT => new List<Object>{
                 new Map<String, Object>{
-                    'type' => 'paragraph',
-                    'content' => paragraphContent
+                    ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_PARAGRAPH,
+                    ADFBuilder.ATTR_CONTENT => paragraphContent
                 }
             }
         };
