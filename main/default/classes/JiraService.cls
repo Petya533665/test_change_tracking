@@ -114,12 +114,15 @@ public without sharing class JiraService {
     }
 
     public static final String URL_PATH_SLASH = '/';
+    private static final Pattern UUID_PATTERN = Pattern.compile('/file/([a-f0-9-]+)/');
+    private static final Pattern NON_ALPHANUMERIC_PATTERN = Pattern.compile('[^a-zA-Z0-9]');
 
     // Inner class to hold attachment result data
     public class AttachmentResult {
         public String fileName;
         public String attachmentId;
         public String mediaServicesId;
+        public String contentUrl; // URL to access the attachment content
     }
 
     public static JIRA_SERVICE_AUTH_TYPE getJIRAServiceAuthType() {
@@ -373,7 +376,15 @@ public without sharing class JiraService {
                         }
                     }
                 }
-                catch(Exception e){}
+                catch(Exception e) {
+                    // If query fails (e.g., metadata not configured), continue with empty headers
+                    // This is expected when custom headers are not set up, so we treat it as normal flow
+                    // Log unexpected errors (non-query errors) for debugging purposes
+                    String errorType = e.getTypeName();
+                    if (errorType != null && !errorType.contains('Query') && !errorType.contains('SObject')) {
+                        Logger.getInstance().addInternalError(e, JiraService.class.getName(), 'ADDITIONAL_JIRA_HEADERS');
+                    }
+                }
             }
             return ADDITIONAL_JIRA_HEADERS;
         }
@@ -844,45 +855,49 @@ public without sharing class JiraService {
         }
 
         public virtual String addCommentToIssueWithAttachments(String message, String issueKey, ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient) {
-            if (chartGeneratorImageLambdaClient != null && chartGeneratorImageLambdaClient.hasCharts()) {
-                if (JiraService.isCloudJiraInstance()) {
-                    // For Jira Cloud, collect Media Services IDs for ADF format
-                    List<AttachmentResult> attachmentResults = new List<AttachmentResult>();
-                    
+            if (JiraService.isCloudJiraInstance()) {
+                // For Jira Cloud, always use ADF format
+                List<AttachmentResult> attachmentResults = new List<AttachmentResult>();
+                
+                if (chartGeneratorImageLambdaClient != null && chartGeneratorImageLambdaClient.hasCharts()) {
                     for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
                         if (chart != null && String.isNotBlank(chart)) {
                             ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
 
                             if (chartEnum != null) {
                                 Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
-                                String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
-                                AttachmentResult result = addAttachmentWithMediaId(chartBlob, fileName, issueKey);
-                                attachmentResults.add(result);
-                            }
-                        }
-                    }
-                    
-                    // Return ADF format with media nodes
-                    return createADFCommentWithAttachments(message, attachmentResults);
-                } else {
-                    // For Jira Server, use the old format
-                    for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
-                        if (chart != null && String.isNotBlank(chart)) {
-                            ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
-
-                            if (chartEnum != null) {
-                                Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
-                                String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
-                                addAttachment(chartBlob, fileName, issueKey);
-                                message += '\n!' + fileName + '!';
-                            } else {
-                                // Chart type not found in enum
+                                if (chartBlob != null) {
+                                    String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                    AttachmentResult result = addAttachmentWithMediaId(chartBlob, fileName, issueKey);
+                                    attachmentResults.add(result);
+                                }
                             }
                         }
                     }
                 }
+                
+                // Return ADF format with media nodes (even if no attachments)
+                return createADFCommentWithAttachments(message, attachmentResults);
+            } else {
+                // For Jira Server, use the old format
+                if (chartGeneratorImageLambdaClient != null && chartGeneratorImageLambdaClient.hasCharts()) {
+                    for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
+                        if (chart != null && String.isNotBlank(chart)) {
+                            ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
+
+                            if (chartEnum != null) {
+                                Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
+                                if (chartBlob != null) {
+                                    String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                    addAttachment(chartBlob, fileName, issueKey);
+                                    message += '\n!' + fileName + '!';
+                                }
+                            }
+                        }
+                    }
+                }
+                return message;
             }
-            return message;
         }
 
         // Helper method to create ADF format comment with attachments
@@ -891,35 +906,85 @@ public without sharing class JiraService {
             Map<String, Object> adfContent = (Map<String, Object>) TicketingService.textToAtlassianDocumentFormatContent(message, true);
             
             // Get the content array from the ADF document
-            List<Object> content = (List<Object>) adfContent.get('content');
+            List<Object> content = (List<Object>) adfContent.get(ADFBuilder.ATTR_CONTENT);
+            
+            // Ensure content is not null
+            if (content == null) {
+                content = new List<Object>();
+                adfContent.put(ADFBuilder.ATTR_CONTENT, content);
+            }
             
             // Add media groups for each attachment
             if (attachmentResults != null && !attachmentResults.isEmpty()) {
                 for (AttachmentResult attachment : attachmentResults) {
+                    // Only add media nodes if we have a valid mediaServicesId
+                    // Attachment ID cannot be used as mediaServicesId - it requires Media API
                     if (String.isNotBlank(attachment.mediaServicesId)) {
-                        // Add a media group with the attachment
-                        Map<String, Object> mediaGroup = new Map<String, Object>{
-                            'type' => 'mediaGroup',
-                            'content' => new List<Object>{
+                        // Add a media single node with the attachment
+                        // ADF format for mediaSingle: wraps a single media node
+                        // According to ADF spec: mediaSingle requires attrs.layout (required)
+                        // Layout options: "wrap-left", "center", "wrap-right", "wide", "full-width", "align-start", "align-end"
+                        // Using "center" for centered display of chart images
+                        // Media node requires: id, type, collection (even if empty), width, height (for proper rendering)
+                        // Also adding alt text for accessibility
+                        Map<String, Object> mediaSingle = new Map<String, Object>{
+                            ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_MEDIA_SINGLE,
+                            ADFBuilder.ATTR_ATTRS => new Map<String, Object>{
+                                'layout' => 'center'
+                            },
+                            ADFBuilder.ATTR_CONTENT => new List<Object>{
                                 new Map<String, Object>{
-                                    'type' => 'media',
-                                    'attrs' => new Map<String, Object>{
-                                        'type' => 'file',
-                                        'id' => attachment.mediaServicesId
+                                    ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_MEDIA,
+                                    ADFBuilder.ATTR_ATTRS => new Map<String, Object>{
+                                        ADFBuilder.ATTR_ID => attachment.mediaServicesId,
+                                        ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_FILE,
+                                        ADFBuilder.ATTR_COLLECTION => '',
+                                        'width' => 800,
+                                        'height' => 400,
+                                        ADFBuilder.ATTR_ALT => attachment.fileName != null ? attachment.fileName : 'Chart image'
                                     }
                                 }
                             }
                         };
-                        content.add(mediaGroup);
+                        content.add(mediaSingle);
+                    } else {
+                        // If no mediaServicesId, add a link to the attachment in the text
+                        if (String.isNotBlank(attachment.contentUrl)) {
+                            // Add a paragraph with a link to the attachment
+                            Map<String, Object> linkParagraph = new Map<String, Object>{
+                                ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_PARAGRAPH,
+                                ADFBuilder.ATTR_CONTENT => new List<Object>{
+                                    new Map<String, Object>{
+                                        ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_TEXT,
+                                        ADFBuilder.ATTR_TEXT => 'Chart: ' + attachment.fileName + ' ',
+                                        ADFBuilder.ATTR_MARKS => new List<Object>()
+                                    },
+                                    new Map<String, Object>{
+                                        ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_TEXT,
+                                        ADFBuilder.ATTR_TEXT => '[View Chart]',
+                                        ADFBuilder.ATTR_MARKS => new List<Object>{
+                                            new Map<String, Object>{
+                                                ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_LINK,
+                                                ADFBuilder.ATTR_ATTRS => new Map<String, Object>{
+                                                    ADFBuilder.ATTR_HREF => attachment.contentUrl
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            };
+                            content.add(linkParagraph);
+                        }
                     }
                 }
             }
             
             // Return the complete body structure for Jira API
             Map<String, Object> bodyStructure = new Map<String, Object>{
-                'body' => adfContent
+                ADFBuilder.ATTR_BODY => adfContent
             };
-            return JSON.serialize(bodyStructure);
+            String result = JSON.serialize(bodyStructure);
+            return result;
         }
 
 
@@ -949,6 +1014,7 @@ public without sharing class JiraService {
 
         // New method to add attachment and return Media Services ID for ADF
         public virtual AttachmentResult addAttachmentWithMediaId(Blob fileBlob, String fileName, String issueKey) {
+
             String boundary = '----WebKitFormBoundary' + System.currentTimeMillis();
 
             Map<String, String> headers = new Map<String, String>(JiraService.JIRA_HEADERS);
@@ -959,7 +1025,6 @@ public without sharing class JiraService {
             String endpoint = JiraService.getService().getCreateIssueAttachmentEndpoint(issueKey);
 
             Blob bodyBlob = HttpUtils.getMultipartFormData(boundary, fileBlob, fileName);
-
             String response = HttpUtils.postputBlobBody(
                 endpoint,
                 bodyBlob,
@@ -975,14 +1040,105 @@ public without sharing class JiraService {
                 List<Object> attachments = (List<Object>) JSON.deserializeUntyped(response);
                 if (attachments != null && !attachments.isEmpty()) {
                     Map<String, Object> attachment = (Map<String, Object>) attachments[0];
-                    Map<String, Object> mediaServices = (Map<String, Object>) attachment.get('mediaServices');
-                    if (mediaServices != null) {
-                        result.mediaServicesId = (String) mediaServices.get('id');
+                    
+                    // Try different possible field names for mediaServicesId
+                    if (attachment.containsKey('mediaServices')) {
+                        Map<String, Object> mediaServices = (Map<String, Object>) attachment.get('mediaServices');
+                        if (mediaServices != null) {
+                            result.mediaServicesId = (String) mediaServices.get('id');
+                        }
+                    } else if (attachment.containsKey('mediaServiceId')) {
+                        result.mediaServicesId = (String) attachment.get('mediaServiceId');
+                    } else if (attachment.containsKey('mediaId')) {
+                        result.mediaServicesId = (String) attachment.get('mediaId');
                     }
+                    
                     result.attachmentId = (String) attachment.get('id');
+                    // Store content URL for potential use in links
+                    if (attachment.containsKey('content')) {
+                        result.contentUrl = (String) attachment.get('content');
+                    }
+                    
+                    // If mediaServicesId is still null, try to get it from attachment content redirect
+                    // GET /rest/api/3/attachment/content/{attachmentId} returns 3xx redirect with Location header
+                    // Location header contains URL like: https://api.media.atlassian.com/file/<UUID>/binary?...
+                    // Extract the UUID (mediaId) from the Location header
+                    if (String.isBlank(result.mediaServicesId) && String.isNotBlank(result.attachmentId)) {
+                        try {
+                            String attachmentContentEndpoint = API_REST_BASE + '/attachment/content/' + result.attachmentId;
+                            
+                            // Use GET request to get redirect
+                            // Note: Apex Http class automatically follows redirects, so we'll get the final response
+                            // But we can try to extract mediaId from the final URL or response
+                            // Alternative: Try to get mediaId from the attachment content URL pattern
+                            HttpRequest req = new HttpRequest();
+                            req.setEndpoint(attachmentContentEndpoint);
+                            req.setMethod('GET');
+                            req.setTimeout(120000);
+                            
+                            // Add headers
+                            if (JIRA_HEADERS != null) {
+                                for (String key : JIRA_HEADERS.keySet()) {
+                                    req.setHeader(key, JIRA_HEADERS.get(key));
+                                }
+                            }
+                            
+                            Http h = new Http();
+                            HttpResponse redirectResponse = h.send(req);
+                            
+                            // In Apex, Http automatically follows redirects, so we get the final response
+                            // Unfortunately, we can't get the Location header from the redirect response
+                            // But we can try to make a request to contentUrl and check the response
+                            // Or try to extract mediaId from response headers if available
+                            
+                            // Check all headers for any that might contain the mediaId
+                            for (String headerKey : redirectResponse.getHeaderKeys()) {
+                                String headerValue = redirectResponse.getHeader(headerKey);
+                                
+                                // Try to extract UUID from any header that might contain it
+                                if (String.isNotBlank(headerValue) && headerValue.toLowerCase().contains('/file/')) {
+                                    Matcher matcher = UUID_PATTERN.matcher(headerValue.toLowerCase());
+                                    if (matcher.find()) {
+                                        result.mediaServicesId = matcher.group(1);
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // If still not found, try making a request to contentUrl to get the redirect
+                            if (String.isBlank(result.mediaServicesId) && String.isNotBlank(result.contentUrl)) {
+                                HttpRequest contentReq = new HttpRequest();
+                                contentReq.setEndpoint(result.contentUrl);
+                                contentReq.setMethod('GET');
+                                contentReq.setTimeout(120000);
+                                
+                                if (JIRA_HEADERS != null) {
+                                    for (String key : JIRA_HEADERS.keySet()) {
+                                        contentReq.setHeader(key, JIRA_HEADERS.get(key));
+                                    }
+                                }
+                                
+                                HttpResponse contentResponse = h.send(contentReq);
+                                
+                                // Check all headers for mediaId
+                                for (String headerKey : contentResponse.getHeaderKeys()) {
+                                    String headerValue = contentResponse.getHeader(headerKey);
+                                    if (String.isNotBlank(headerValue) && headerValue.toLowerCase().contains('/file/')) {
+                                        Matcher matcher = UUID_PATTERN.matcher(headerValue.toLowerCase());
+                                        if (matcher.find()) {
+                                            result.mediaServicesId = matcher.group(1);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (Exception e2) {
+                            // Error fetching attachment content redirect - continue without mediaServicesId
+                        }
+                    }
                 }
             } catch (Exception e) {
-                // If parsing fails, we'll still have the filename
+                // Error parsing attachment response - continue without mediaServicesId
             }
 
             return result;
@@ -1642,8 +1798,7 @@ public without sharing class JiraService {
     }
 
     public static String getAlphanumericString(String input) {
-        Pattern nonAlphanumeric = Pattern.compile('[^a-zA-Z0-9]');
-        Matcher matcher = nonAlphanumeric.matcher(input);
+        Matcher matcher = NON_ALPHANUMERIC_PATTERN.matcher(input);
         String result = matcher.replaceAll('');
         return result;
     }
@@ -1818,12 +1973,28 @@ public without sharing class JiraService {
                         String header = EncodingUtil.base64Decode(parts.get(0)).toString();
                         this.header = (JWTHeader)JSON.deserialize(header, JWTHeader.class);
                     }
-                    catch(Exception e){}
+                    catch(Exception e) {
+                        // If deserialization fails (invalid JWT token format), continue without header
+                        // This is expected when token is malformed or not a valid JWT, so we treat it as normal flow
+                        // Log unexpected errors (non-JSON parsing errors) for debugging purposes
+                        String errorType = e.getTypeName();
+                        if (errorType != null && !errorType.contains('JSON') && !errorType.contains('Parse')) {
+                            Logger.getInstance().addInternalError(e, JiraService.class.getName(), 'JWTParser.<init>');
+                        }
+                    }
                     try {
                         String payload = EncodingUtil.base64Decode(parts.get(1)).toString();
                         this.payload = (JWTPayload)JSON.deserialize(payload, JWTPayload.class);
                     }
-                    catch(Exception e){}
+                    catch(Exception e) {
+                        // If deserialization fails (invalid JWT token format), continue without payload
+                        // This is expected when token is malformed or not a valid JWT, so we treat it as normal flow
+                        // Log unexpected errors (non-JSON parsing errors) for debugging purposes
+                        String errorType = e.getTypeName();
+                        if (errorType != null && !errorType.contains('JSON') && !errorType.contains('Parse')) {
+                            Logger.getInstance().addInternalError(e, JiraService.class.getName(), 'JWTParser.<init>');
+                        }
+                    }
                 }
             }
         }

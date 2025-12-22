@@ -196,8 +196,8 @@ public with sharing class GraphAPIService {
 								'contentType' => 'image/png',
 								'@microsoft.graph.temporaryId' => filename
 							});
-							this.body.content += String.format('<br>{0}Chart:<br> <img height="297" src="../hostedContents/{1}/$value" width="297">', 
-								new List<String>{chartEnum.name(), filename});
+							this.body.content += String.format('<br> {0} Chart:<br> <img height="297" src="../hostedContents/{1}/$value" width="297">', 
+								new List<String>{ChartService.getChartStringByChartName(chart), filename});
 
 						} else {
 							// Chart type not found in enum

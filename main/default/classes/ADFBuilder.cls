@@ -1,35 +1,37 @@
 public with sharing class ADFBuilder {
 
-	private static final String TYPE_TEXT = 'text';
-	private static final String TYPE_LINK = 'link';
-	private static final String TYPE_MEDIA = 'media';
-	private static final String TYPE_FILE = 'file';
-	private static final String TYPE_HARD_BREAK = 'hardBreak';
-	private static final String TYPE_CODE_BLOCK = 'codeBlock';
-	private static final String TYPE_HEADING = 'heading';
-	private static final String TYPE_BULLET_LIST = 'bulletList';
-	private static final String TYPE_ORDERED_LIST = 'orderedList';
-	private static final String TYPE_PARAGRAPH = 'paragraph';
-	private static final String TYPE_LIST_ITEM = 'listItem';
-	private static final String TYPE_TABLE = 'table';
-	private static final String TYPE_TABLE_HEADER = 'tableHeader';
-	private static final String TYPE_TABLE_CELL = 'tableCell';
-	private static final String TYPE_TABLE_ROW = 'tableRow';
-	private static final String TYPE_DOC = 'doc';
+	public static final String TYPE_TEXT = 'text';
+	public static final String TYPE_LINK = 'link';
+	public static final String TYPE_MEDIA = 'media';
+	public static final String TYPE_FILE = 'file';
+	public static final String TYPE_HARD_BREAK = 'hardBreak';
+	public static final String TYPE_CODE_BLOCK = 'codeBlock';
+	public static final String TYPE_HEADING = 'heading';
+	public static final String TYPE_BULLET_LIST = 'bulletList';
+	public static final String TYPE_ORDERED_LIST = 'orderedList';
+	public static final String TYPE_PARAGRAPH = 'paragraph';
+	public static final String TYPE_LIST_ITEM = 'listItem';
+	public static final String TYPE_TABLE = 'table';
+	public static final String TYPE_TABLE_HEADER = 'tableHeader';
+	public static final String TYPE_TABLE_CELL = 'tableCell';
+	public static final String TYPE_TABLE_ROW = 'tableRow';
+	public static final String TYPE_DOC = 'doc';
+	public static final String TYPE_MEDIA_SINGLE = 'mediaSingle';
 
 
-	private static final String ATTR_TYPE = 'type';
-	private static final String ATTR_TEXT = 'text';
-	private static final String ATTR_MARKS = 'marks';
-	private static final String ATTR_ATTRS = 'attrs';
-	private static final String ATTR_HREF = 'href';
-	private static final String ATTR_ID = 'id';
-	private static final String ATTR_COLLECTION = 'collection';
-	private static final String ATTR_ALT = 'alt';
-	private static final String ATTR_CONTENT = 'content';
-	private static final String ATTR_LANGUAGE = 'language';
-	private static final String ATTR_LEVEL = 'level';
-	private static final String ATTR_VERSION = 'version';
+	public static final String ATTR_TYPE = 'type';
+	public static final String ATTR_TEXT = 'text';
+	public static final String ATTR_MARKS = 'marks';
+	public static final String ATTR_ATTRS = 'attrs';
+	public static final String ATTR_HREF = 'href';
+	public static final String ATTR_ID = 'id';
+	public static final String ATTR_COLLECTION = 'collection';
+	public static final String ATTR_ALT = 'alt';
+	public static final String ATTR_CONTENT = 'content';
+	public static final String ATTR_LANGUAGE = 'language';
+	public static final String ATTR_LEVEL = 'level';
+	public static final String ATTR_VERSION = 'version';
+	public static final String ATTR_BODY = 'body';
 
 	private static final Pattern REGEX_URL_PATTERN = Pattern.compile('(https?://[^\\s]+)');
 

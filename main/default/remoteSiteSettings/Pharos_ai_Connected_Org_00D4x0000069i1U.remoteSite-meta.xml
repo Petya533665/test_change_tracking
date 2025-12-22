@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <RemoteSiteSetting xmlns="http://soap.sforce.com/2006/04/metadata">
-    <description>Pharos.ai login URL for connected org petriv old (00D4x0000069i1U)</description>
+    <description>Pharos.ai login URL for connected org petro.dev.pharos - production (00D4x0000069i1U)</description>
     <disableProtocolSecurity>false</disableProtocolSecurity>
     <isActive>true</isActive>
     <url>https://goldenratiosystems-dev-ed.my.salesforce.com</url>

@@ -401,20 +401,27 @@ public with sharing class ReportService {
                 }
                 List<Map<String, Object>> reportFilter;
 
-                DateTime currentDate = DateTime.now();
+                // Get current date in GMT timezone (System.now() returns DateTime in GMT)
+                DateTime currentDateTimeGMT = System.now();
+                // Extract GMT date components and create Date object
+                Date currentDateGMT = Date.newInstance(
+                    currentDateTimeGMT.yearGmt(), 
+                    currentDateTimeGMT.monthGmt(), 
+                    currentDateTimeGMT.dayGmt()
+                );
                 DateTime startDateTime;
-                DateTime endDateTime = DateTime.newInstanceGmt(currentDate.date(), Time.newInstance(23, 59, 59, 0)); // Today 23:59:59
+                DateTime endDateTime = DateTime.newInstanceGmt(currentDateGMT, Time.newInstance(23, 59, 59, 0)); // Today 23:59:59 GMT
 
                 if (chart == ChartService.Chart.OCCURRENCE_LAST_7_DAYS ||
                     chart == ChartService.Chart.OCCURRENCE_LOGS_LAST_7_DAYS ||
                     chart == ChartService.Chart.USER_IMPACT_LAST_7_DAYS_DETAILS) {
-                    startDateTime = DateTime.newInstanceGmt(currentDate.addDays(-6).date(), Time.newInstance(0, 0, 0, 0));
+                    startDateTime = DateTime.newInstanceGmt(currentDateGMT.addDays(-6), Time.newInstance(0, 0, 0, 0));
                 } else if (chart == ChartService.Chart.OCCURRENCE_LAST_30_DAYS ||
                     chart == ChartService.Chart.OCCURRENCE_LOGS_LAST_30_DAYS ||
                     chart == ChartService.Chart.USER_IMPACT_LAST_30_DAYS_DETAILS) {
-                    startDateTime = DateTime.newInstanceGmt(currentDate.addDays(-29).date(), Time.newInstance(0, 0, 0, 0));
+                    startDateTime = DateTime.newInstanceGmt(currentDateGMT.addDays(-29), Time.newInstance(0, 0, 0, 0));
                 } else {
-                    startDateTime = DateTime.newInstanceGmt(currentDate.date(), Time.newInstance(0, 0, 0, 0));
+                    startDateTime = DateTime.newInstanceGmt(currentDateGMT, Time.newInstance(0, 0, 0, 0));
                 }
 
                 if (systemReport != null) {
@@ -601,7 +608,7 @@ public with sharing class ReportService {
             // Generate dates from startDateTime to endDateTime (ascending order)
             DateTime current = this.startDateTime;
             while (current <= this.endDateTime) {
-                String dateLabel = current.format('yyyy-MM-dd');
+                String dateLabel = current.formatGmt('yyyy-MM-dd'); // Use formatGmt to ensure GMT date formatting
 
                 // Find matching data from report if available
                 Integer rowCount = 0;
@@ -680,7 +687,7 @@ public with sharing class ReportService {
             // Generate dates from startDateTime to endDateTime (ascending order)
             DateTime current = this.startDateTime;
             while (current <= this.endDateTime) {
-                String dateLabel = current.format('yyyy-MM-dd');
+                String dateLabel = current.formatGmt('yyyy-MM-dd'); // Use formatGmt to ensure GMT date formatting
 
                 // Find matching date in groupingsAcross
                 Integer dateIndex = -1;
