@@ -189,7 +189,20 @@ global with sharing class Logger {
     }
 
     public void internalError(Exception e, String relatedObjectId, Boolean directInsert, String area, String apexName) {
-        Log__c log = getInternalError(e, relatedObjectId, area, apexName);
+        internalError(e, relatedObjectId, directInsert, area, apexName, false);
+    }
+
+    /**
+     * Create and persist an internal Pharos error log with optional notification error origin flag.
+     * @param e - Exception to log
+     * @param relatedObjectId - Related object ID
+     * @param directInsert - If true, inserts directly; if false, uses platform events
+     * @param area - Area where error occurred
+     * @param apexName - Apex class/method name
+     * @param isFromNotificationError - If true, marks log with ORIGINATED_FROM_NOTIFICATION_ERROR to prevent recursive rule execution
+     */
+    public void internalError(Exception e, String relatedObjectId, Boolean directInsert, String area, String apexName, Boolean isFromNotificationError) {
+        Log__c log = getInternalError(e, relatedObjectId, area, apexName, isFromNotificationError);
         if (!directInsert) {
             DatabaseUtils.publishLogEvent(new List<Log__c>{log});
         } else {
@@ -270,6 +283,19 @@ global with sharing class Logger {
     }
 
     public Log__c getInternalError(Exception e, String relatedObjectId, String area, String apexName) {
+        return getInternalError(e, relatedObjectId, area, apexName, false);
+    }
+
+    /**
+     * Create an internal Pharos error log with optional notification error origin flag.
+     * @param e - Exception to log
+     * @param relatedObjectId - Related object ID
+     * @param area - Area where error occurred
+     * @param apexName - Apex class/method name
+     * @param isFromNotificationError - If true, marks log with ORIGINATED_FROM_NOTIFICATION_ERROR to prevent recursive rule execution
+     * @return Log__c record ready to be added to queue
+     */
+    public Log__c getInternalError(Exception e, String relatedObjectId, String area, String apexName, Boolean isFromNotificationError) {
         String details = String.valueOf(e) + Constants.GLOBAL_VARIABLE.NEWLINE_CHARACTERS + e.getStackTraceString();
         details = (HttpUtils.enableHttpDebug)
            ? details + Constants.GLOBAL_VARIABLE.NEWLINE_CHARACTERS + HttpUtils.getHttpDebugInfo()
@@ -287,6 +313,10 @@ global with sharing class Logger {
                 .build();
         if (String.isNotBlank(relatedObjectId) && Schema.SObjectType.Log__c.getKeyPrefix() == relatedObjectId.substring(0, 3)) {
             PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Related_Object_Type__c, Schema.SObjectType.Log__c.getLabel());
+        }
+        // Mark logs from notification errors to prevent recursive rule execution
+        if (isFromNotificationError) {
+            PermissionsUtil.putSObjectField(log, Schema.SObjectType.Log__c.fields.Originated_From__c, ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR);
         }
         return log;
     }

@@ -114,7 +114,8 @@ public with sharing class NotificationServiceLogImpl extends NotificationService
         Datetime timestamp = (Test.isRunningTest()) ? null : NotificationService.getNotificationTimeStamp();
         Database.QueryLocator queryLocator = (timestamp != null)
             ? Database.getQueryLocator([
-                SELECT Id, Jira_Integration_Status__c, Notification_Integration_Status__c, Executable_Rules__c, Organization_Id__c
+                SELECT Id, Jira_Integration_Status__c, Notification_Integration_Status__c, Executable_Rules__c, Organization_Id__c, 
+                       Category__c, Area__c, Originated_From__c
                 FROM Log__c
                 WHERE CreatedDate < :timestamp
                 AND (Jira_Integration_Status__c = :Constants.GLOBAL_VARIABLE.JIRA_INTEGRATION_STATUS_PENDING
@@ -123,7 +124,8 @@ public with sharing class NotificationServiceLogImpl extends NotificationService
                 LIMIT :QUERY_LIMIT
             ])
             : Database.getQueryLocator([
-                SELECT Id, Jira_Integration_Status__c, Notification_Integration_Status__c, Executable_Rules__c, Organization_Id__c
+                SELECT Id, Jira_Integration_Status__c, Notification_Integration_Status__c, Executable_Rules__c, Organization_Id__c,
+                       Category__c, Area__c, Originated_From__c
                 FROM Log__c
                 WHERE Jira_Integration_Status__c = :Constants.GLOBAL_VARIABLE.JIRA_INTEGRATION_STATUS_PENDING
                 OR Notification_Integration_Status__c = :Constants.GLOBAL_VARIABLE.NOTIFICATION_INTEGRATION_STATUS_PENDING
@@ -167,6 +169,10 @@ public with sharing class NotificationServiceLogImpl extends NotificationService
                 result.add(fm.logField);
             }
         }
+        // Add fields needed for recursion prevention check
+        result.add('Category__c');
+        result.add('Area__c');
+        result.add('Originated_From__c');
         return result;
     }
 
@@ -185,6 +191,9 @@ public with sharing class NotificationServiceLogImpl extends NotificationService
 
             // skip started notifications
             if(isRunningNotifications(log, oldLog)) continue;
+
+            // Skip logs originated from notification errors to prevent recursive rule execution
+            if(log.Originated_From__c == ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR) continue;
 
             if(!NotificationService.transactionIds.contains(log.Id)
                 && (
@@ -208,6 +217,9 @@ public with sharing class NotificationServiceLogImpl extends NotificationService
 
             // skip started notifications
             if(isRunningTicketing(log, oldLog)) continue;
+
+            // Skip logs originated from notification errors to prevent recursive rule execution
+            if(log.Originated_From__c == ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR) continue;
 
             if((String.isBlank(log.Jira_Integration_Status__c)
                 || (String.isNotBlank(log.Jira_Integration_Status__c)

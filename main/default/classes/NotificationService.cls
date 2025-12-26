@@ -460,6 +460,43 @@ public with sharing class NotificationService {
         return batchContext != null ? batchContext.getChartImages(recordId) : null;
     }
 
+    /**
+     * Helper method to check if the parent record being processed is already a Pharos error 
+     * from notification processing. If yes, we should mark new errors to prevent recursion.
+     * 
+     * @param record - The SObject record being processed by notification batch
+     * @return Boolean - true if parent is a Pharos error (mark new errors), false otherwise (allow one attempt)
+     */
+    public static Boolean isParentLogFromNotificationError(SObject record) {
+        // Only check for Log__c objects (Issues and Trace Results don't have this problem)
+        if (record.getSObjectType() != Schema.SObjectType.Log__c.SObjectType) {
+            return false;
+        }
+        
+        Log__c log = (Log__c)record;
+        
+        // Check if this log is a Pharos error
+        Boolean isPharosError = log.Category__c == Logger.CATEGORY_PHAROS_ERROR 
+                             && log.Area__c == Logger.AREA_PHAROS_ERROR;
+        
+        if (!isPharosError) {
+            return false; // Not a Pharos error, allow processing
+        }
+        
+        // Check if this Pharos error already originated from a notification error
+        // If yes, any new errors should be marked to prevent further recursion
+        Boolean alreadyFromNotificationError = log.Originated_From__c == ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR;
+        
+        if (alreadyFromNotificationError) {
+            return true; // Already from notification error - mark new errors to stop recursion
+        }
+        
+        // This is a Pharos error but NOT from notification processing yet
+        // This is the FIRST attempt to process it - return true to mark any errors
+        // that occur during THIS processing attempt
+        return true;
+    }
+
     public class ErrorsHelper {
 
         public Map<Id, List<System.Exception>> emailExceptions = new Map<Id, List<System.Exception>>();
@@ -542,6 +579,11 @@ public with sharing class NotificationService {
             config.clearRunningIds();
             PermissionsUtil.putSObjectField(failedRecord, dfrExecutableRules, config.toJSON());
 
+            // Check if the parent record is already a Pharos error from notification processing
+            // If yes, we should mark new errors to prevent recursion
+            // If no, allow ONE attempt to process the error (don't mark)
+            Boolean shouldMarkForRecursionPrevention = isParentLogFromNotificationError(record);
+
             List<System.Exception> emailExceptionsList = emailExceptions.get(recordId);
             List<System.Exception> slackExceptionsList = slackExceptions.get(recordId);
             List<System.Exception> pagerDutyExceptionsList = pagerDutyExceptions.get(recordId);
@@ -557,7 +599,8 @@ public with sharing class NotificationService {
                          e.getMessage().toUpperCase().contains('SINGLE_EMAIL_LIMIT'))) {
                         continue; // Skip creating internal error log to prevent recursive loop
                     }
-                    logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'emailExceptions'));
+                    // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
+                    logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'emailExceptions', shouldMarkForRecursionPrevention));
                 }
             }
             if(slackExceptionsList != null && !slackExceptionsList.isEmpty()) {
@@ -566,22 +609,26 @@ public with sharing class NotificationService {
                     if(e.getMessage().contains('rate limit')) {
                         continue;
                     }
-                    logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'slackExceptions'));
+                    // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
+                    logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'slackExceptions', shouldMarkForRecursionPrevention));
                 }
             }
             if(pagerDutyExceptionsList != null && !pagerDutyExceptionsList.isEmpty()) {
                 for(System.Exception e : pagerDutyExceptionsList) {
-                    logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'pagerDutyExceptions'));
+                    // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
+                    logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'pagerDutyExceptions', shouldMarkForRecursionPrevention));
                 }
             }
             if(teamsExceptionsList != null && !teamsExceptionsList.isEmpty()) {
                 for(System.Exception e : teamsExceptionsList) {
-                    logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'teamsExceptions'));
+                    // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
+                    logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'teamsExceptions', shouldMarkForRecursionPrevention));
                 }
             }
             if(webhookExceptionsList != null && !webhookExceptionsList.isEmpty()) {
                 for(System.Exception e : webhookExceptionsList) {
-                    logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'webhookExceptions'));
+                    // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
+                    logger?.add(logger.getInternalError(e, recordId, NotificationService.class.getName(), 'webhookExceptions', shouldMarkForRecursionPrevention));
                 }
             }
 

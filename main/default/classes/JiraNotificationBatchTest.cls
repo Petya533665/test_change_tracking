@@ -12552,5 +12552,184 @@ public class JiraNotificationBatchTest {
 		System.assertEquals(attachment.contentUrl, linkAttrs.get('href'), 'Should have correct href');
 	}
 
+	// ==========================================
+	// RECURSION PREVENTION TESTS
+	// ==========================================
+
+	/**
+	 * Helper method to verify a log is marked correctly and excluded from rules
+	 */
+	private static void verifyLogMarkedForRecursionPrevention(Log__c log) {
+		// Verify the log is marked with ORIGINATED_FROM_NOTIFICATION_ERROR
+		System.assertEquals(
+			ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR,
+			log.Originated_From__c,
+			'Log should be marked with ORIGINATED_FROM_NOTIFICATION_ERROR. ' +
+			'Category: ' + log.Category__c + ', Summary: ' + log.Summary__c
+		);
+
+		// Verify it's excluded from notification rules
+		NotificationServiceBase service = (NotificationServiceBase)NotificationService.getInstance(
+			NotificationService.NOTIFICATION_SERVICE_TYPE.LOG,
+			null
+		).strategy;
+
+		List<SObject> filteredForNotification = service.filterRecordsForRunNotificationRules(
+			new List<SObject>{log},
+			null
+		);
+
+		System.assertEquals(
+			0,
+			filteredForNotification.size(),
+			'Log should be excluded from notification rules. Summary: ' + log.Summary__c
+		);
+
+		// Verify it's excluded from ticketing rules too
+		List<SObject> filteredForTicketing = service.filterRecordsForRunTicketingRules(
+			new List<SObject>{log},
+			null
+		);
+
+		System.assertEquals(
+			0,
+			filteredForTicketing.size(),
+			'Log should be excluded from ticketing rules. Summary: ' + log.Summary__c
+		);
+	}
+
+	/**
+	 * SCENARIO 1: Regular log → notification fails → Pharos error (NOT marked)
+	 * This is the FIRST attempt, error should NOT be marked to allow ONE processing attempt
+	 */
+	@IsTest
+	static void testRecursionPrevention_RegularLogCreatesUnmarkedPharosError() {
+		// Create a regular log (not a Pharos error)
+		Log__c regularLog = new Log__c(
+			Category__c = 'Application',
+			Area__c = 'SomeClass',
+			Summary__c = 'Regular application error',
+			Type__c = 'Error',
+			Details__c = 'Some error details',
+			Post_Processing_Status__c = 'Completed'
+		);
+		insert regularLog;
+
+		Test.startTest();
+		
+		// Simulate notification processing of regular log that fails
+		// When processing a regular log (not Pharos error), shouldMarkForRecursionPrevention = false
+		Exception testException = new System.EmailException();
+		testException.setMessage('Email send failed for regular log');
+		
+		Logger logger = Logger.getInstance();
+		// For regular log, pass false - should NOT mark the Pharos error
+		logger.add(logger.getInternalError(testException, regularLog.Id, 'NotificationService', 'emailExceptions', false));
+		logger.flush();
+		
+		Test.stopTest();
+
+		// Query the created Pharos error
+		List<Log__c> pharosLogs = [
+			SELECT Id, Category__c, Area__c, Originated_From__c, Summary__c
+			FROM Log__c
+			WHERE Category__c = 'Pharos Error'
+			AND Summary__c = 'Email send failed for regular log'
+			LIMIT 1
+		];
+
+		System.assertEquals(1, pharosLogs.size(), 'Should have created one Pharos error log');
+		
+		Log__c pharosError = pharosLogs[0];
+		// This is the FIRST Pharos error from notification failure - should NOT be marked
+		System.assertNotEquals(
+			ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR,
+			pharosError.Originated_From__c,
+			'First Pharos error from notification failure should NOT be marked - allows ONE attempt to process it'
+		);
+	}
+
+	/**
+	 * SCENARIO 2: Pharos error → notification fails → new Pharos error (MARKED)
+	 * This is the SECOND level error, should be MARKED to prevent recursion
+	 */
+	@IsTest
+	static void testRecursionPrevention_PharosErrorCreatesMarkedError() {
+		// Create a Pharos error (simulating the first error from scenario 1)
+		Log__c pharosError = new Log__c(
+			Category__c = Logger.CATEGORY_PHAROS_ERROR,
+			Area__c = Logger.AREA_PHAROS_ERROR,
+			Summary__c = 'First level Pharos error',
+			Type__c = 'Exception',
+			Details__c = 'Original notification failure',
+			Post_Processing_Status__c = 'Completed'
+			// NOT marked with ORIGINATED_FROM_NOTIFICATION_ERROR (this is first attempt)
+		);
+		insert pharosError;
+
+		Test.startTest();
+		
+		// Simulate notification processing of Pharos error that fails
+		// When processing a Pharos error, shouldMarkForRecursionPrevention = true
+		Exception testException = new System.EmailException();
+		testException.setMessage('Email send failed for Pharos error');
+		
+		Logger logger = Logger.getInstance();
+		// For Pharos error, pass true - should MARK the new error
+		logger.add(logger.getInternalError(testException, pharosError.Id, 'NotificationService', 'emailExceptions', true));
+		logger.flush();
+		
+		Test.stopTest();
+
+		// Query the created second-level Pharos error
+		List<Log__c> secondLevelErrors = [
+			SELECT Id, Category__c, Area__c, Originated_From__c, Summary__c,
+				   Notification_Integration_Status__c, Jira_Integration_Status__c, Type__c,
+				   Post_Processing_Status__c
+			FROM Log__c
+			WHERE Category__c = 'Pharos Error'
+			AND Summary__c = 'Email send failed for Pharos error'
+			LIMIT 1
+		];
+
+		System.assertEquals(1, secondLevelErrors.size(), 'Should have created one second-level error');
+		
+		Log__c secondLevelError = secondLevelErrors[0];
+		// This is the SECOND level error - should be MARKED to prevent recursion
+		verifyLogMarkedForRecursionPrevention(secondLevelError);
+	}
+
+	/**
+	 * SCENARIO 3: Already marked Pharos error → filtered out by rules
+	 */
+	@IsTest
+	static void testRecursionPrevention_AlreadyMarkedPharosErrorIsFiltered() {
+		// Create a Pharos error that's already marked
+		Log__c markedPharosError = new Log__c(
+			Category__c = Logger.CATEGORY_PHAROS_ERROR,
+			Area__c = Logger.AREA_PHAROS_ERROR,
+			Summary__c = 'Already marked Pharos error',
+			Type__c = 'Exception',
+			Details__c = 'This error is already marked',
+			Originated_From__c = ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR, // Already marked
+			Post_Processing_Status__c = 'Completed'
+		);
+		insert markedPharosError;
+
+		Test.startTest();
+		
+		// Query the log
+		Log__c log = [
+			SELECT Id, Category__c, Area__c, Originated_From__c, Summary__c, Type__c,
+				   Post_Processing_Status__c, Notification_Integration_Status__c, Jira_Integration_Status__c
+			FROM Log__c
+			WHERE Id = :markedPharosError.Id
+		];
+		
+		Test.stopTest();
+
+		// Verify it's excluded from notification rules
+		verifyLogMarkedForRecursionPrevention(log);
+	}
 
 }
