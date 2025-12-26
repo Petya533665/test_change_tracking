@@ -326,7 +326,7 @@ public with sharing class RuleUtil {
 	};
 
 	public final static List<String> RULE_ACTION_FIELDS = new List<String>{
-			'Id', 'Rule__r.Type__c', 'Rule__r.Name__c', 'Rule__r.Description__c', 'Action__r.Id', 'Action__r.Name', 'Action__r.Name__c', 'Action__r.CreatedDate', 'Action__r.Body__c', 'Action__r.Description__c', 'Action__r.EmailBody__c', 'Action__r.EmailCC__c', 'Action__r.EmailTemplateId__c', 'Action__r.EmailTo__c',
+			'Id', 'Rule__r.Type__c', 'Rule__r.Name__c', 'Rule__r.Description__c', 'Rule__r.Is_Update__c', 'Action__r.Id', 'Action__r.Name', 'Action__r.Name__c', 'Action__r.CreatedDate', 'Action__r.Body__c', 'Action__r.Description__c', 'Action__r.EmailBody__c', 'Action__r.EmailCC__c', 'Action__r.EmailTemplateId__c', 'Action__r.EmailTo__c',
 			'Action__r.JIRAAssignee__c','Action__r.JIRAAssignee_Id__c', 'Action__r.JIRAComponents__c', 'Action__r.JIRAEpic__c', 'Action__r.JIRAIssueType__c', 'Action__r.JIRALabels__c', 'Action__r.JIRAPriority__c', 'Action__r.JIRAProject__c',
 			'Action__r.SlackChannels__c', 'Action__r.Subject__c', 'Action__r.Action_Type__c', 'Action__r.Subtype__c', 'Action__r.PagerDuty_Type__c', 'Action__r.Contact__c', 'Action__r.Contact__r.Name', 'Action__r.CreatedBy.Name', 'Action__r.RecordTypeId', 'Action__r.Type__c',
 			'Action__r.Team_Id__c', 'Action__r.Channel_Id__c', 'Action__r.SlackChannels__c', 'Action__r.SObjectType__c', 'Action__r.Additional_Metadata__c', 'Action__r.Iteration__c', 'Action__r.Is_Update__c',
@@ -2339,6 +2339,7 @@ public with sharing class RuleUtil {
 		public String ruleName;
 		public String ruleType;
 		public String ruleDescription;
+		public Boolean ruleIsUpdate;
 		public String actionName;
 		public String actionType;
 		public String actionSubject;
@@ -2353,6 +2354,7 @@ public with sharing class RuleUtil {
 			ruleName = ruleAction.Rule__r.Name__c;
 			ruleType = ruleAction.Rule__r.Type__c;
 			ruleDescription = ruleAction.Rule__r.Description__c;
+			ruleIsUpdate = ruleAction.Rule__r.Is_Update__c;
 			actionName = ruleAction.Action__r.Name;
 			actionType = ruleAction.Action__r.Action_Type__c;
 			actionSubject = ruleAction.Action__r.Subject__c;
