@@ -2559,7 +2559,7 @@ public without sharing class AdminService {
             if (deleteResult.isSuccess()) RuleUtil.reIndexRules(rules[0].Type__c);
             output.put(RuleUtil.KEY_SUCCESS, deleteResult.isSuccess());
             output.put(RuleUtil.KEY_MESSAGE, deleteResult.getErrors());
-            output.put(RuleUtil.KEY_RULES, RuleUtil.getRuleWrappers(rules[0].Type__c));
+            output.put(RuleUtil.KEY_RULES, RuleUtil.getRuleWrappers(null, RuleUtil.addAllTicketingRuleTypes(rules[0].Type__c)));
         } else {
             output.put(RuleUtil.KEY_SUCCESS, false);
             output.put(RuleUtil.KEY_MESSAGE, RuleUtil.KEY_MESSAGE_PARAMS_RULE_ID_NOT_FOUND);
