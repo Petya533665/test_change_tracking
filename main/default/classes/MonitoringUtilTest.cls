@@ -5539,9 +5539,9 @@ public class MonitoringUtilTest {
         );
         insert webhookAction;
 
-        // Save webhook token (required for webhook service)
+        // Save webhook token (required for webhook service) using action ID
         Logger logger = Logger.getInstance();
-        WebhookService.putWebhookTokenToSettings('https://webhook.site/test-monitoring', '', true, logger);
+        WebhookService.putWebhookTokenToSettings(webhookAction.Id, '', true, logger);
         GraphAPIService.saveListTokenRecordSettings(true, logger);
 
         // 2. Create Monitoring Rule
@@ -5691,9 +5691,9 @@ public class MonitoringUtilTest {
         );
         insert webhookAction;
 
-        // Save webhook token
+        // Save webhook token using action ID
         Logger logger = Logger.getInstance();
-        WebhookService.putWebhookTokenToSettings('https://webhook.site/test-limits-spike', '', true, logger);
+        WebhookService.putWebhookTokenToSettings(webhookAction.Id, '', true, logger);
         GraphAPIService.saveListTokenRecordSettings(true, logger);
 
         // 2. Create Limits Spike Rule (50% spike detection)
@@ -5845,9 +5845,9 @@ public class MonitoringUtilTest {
         );
         insert webhookAction;
 
-        // Save webhook token
+        // Save webhook token using action ID
         Logger logger = Logger.getInstance();
-        WebhookService.putWebhookTokenToSettings('https://webhook.site/test-limits-threshold', '', true, logger);
+        WebhookService.putWebhookTokenToSettings(webhookAction.Id, '', true, logger);
         GraphAPIService.saveListTokenRecordSettings(true, logger);
 
         // 2. Create Limits Threshold Rule (80% threshold)

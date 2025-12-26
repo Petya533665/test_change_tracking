@@ -70,17 +70,25 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
     }
 
     public void execute(Database.BatchableContext BC, List<AsyncApexJob> scope) {
-        // Hybrid approach: Try Hash_1__c first, then Async_Job_Id__c as fallback
-        // This handles both simple logs and logs already updated by EventLogProcessingBatch
-        Set<String> hash1Values = new Set<String>();
+        // NEW APPROACH: Use Log_Index__c lookup chain to find logs
+        // Simple hash index -> Correct hash index -> Logs
+        Set<String> simpleHash1Values = new Set<String>();
         Set<String> asyncJobIds = new Set<String>();
         for (AsyncApexJob asyncApexJob : scope) {
-            hash1Values.add(getHash1(asyncApexJob));
+            simpleHash1Values.add(getHash1(asyncApexJob));
             asyncJobIds.add(asyncApexJob.Id.to15());
         }
         
-        // Get existing logs by both Hash_1__c and Async_Job_Id__c
-        List<Log__c> existLogsByHash1 = getLogsByHash1(hash1Values);
+        // Query Log_Index__c records by simple hash, following lookup chain
+        Map<String, String> simpleHashToCorrectHash = getCorrectHashesFromIndexes(simpleHash1Values);
+        
+        // Build set of ALL hashes to query (simple + correct)
+        Set<String> allHash1Values = new Set<String>();
+        allHash1Values.addAll(simpleHash1Values);
+        allHash1Values.addAll(simpleHashToCorrectHash.values());
+        
+        // Get existing logs by Hash_1__c (now includes both simple and correct hashes)
+        List<Log__c> existLogsByHash1 = getLogsByHash1(allHash1Values);
         List<Log__c> existLogsByAsyncJobId = getLogsByAsyncJobId(asyncJobIds);
         
         // Build lookup maps
@@ -101,22 +109,32 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
         for (AsyncApexJob asyncApexJob : scope) {
             Log__c log;
             Boolean isInternalError = isInternalError(asyncApexJob);
-            String hash1 = getHash1(asyncApexJob);
+            String simpleHash1 = getHash1(asyncApexJob);
             String asyncJobId = asyncApexJob.Id.to15();
             
-            // First try to find by Hash_1__c (simple log not yet updated by EventLogProcessingBatch)
-            Log__c existLog = existLogsByHash1Map.get(hash1);
-            if (existLog != null) {
-                if ((asyncApexJob.CompletedDate != null
-                        && existLog.Created_At__c.dateGmt() == asyncApexJob.CompletedDate.dateGmt())
-                        || existLog.Created_At__c.dateGmt() == asyncApexJob.CreatedDate.dateGmt()) {
-                    log = existLog;
+            // Try to find log using simple hash OR correct hash (from lookup chain)
+            String correctHash = simpleHashToCorrectHash.get(simpleHash1);
+            Set<String> hashesToCheck = new Set<String>{ simpleHash1 };
+            if (String.isNotBlank(correctHash)) {
+                hashesToCheck.add(correctHash);
+            }
+            
+            // Check all possible hashes
+            for (String hashToCheck : hashesToCheck) {
+                Log__c existLog = existLogsByHash1Map.get(hashToCheck);
+                if (existLog != null) {
+                    if ((asyncApexJob.CompletedDate != null
+                            && existLog.Created_At__c.dateGmt() == asyncApexJob.CompletedDate.dateGmt())
+                            || existLog.Created_At__c.dateGmt() == asyncApexJob.CreatedDate.dateGmt()) {
+                        log = existLog;
+                        break;
+                    }
                 }
             }
             
-            // If not found by Hash_1__c, try Async_Job_Id__c (log already updated by EventLogProcessingBatch)
+            // Fallback: try Async_Job_Id__c
             if (log == null) {
-                existLog = existLogsByAsyncJobIdMap.get(asyncJobId);
+                Log__c existLog = existLogsByAsyncJobIdMap.get(asyncJobId);
                 if (existLog != null) {
                     if ((asyncApexJob.CompletedDate != null
                             && existLog.Created_At__c.dateGmt() == asyncApexJob.CompletedDate.dateGmt())
@@ -127,7 +145,7 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
             }
             
             if (isInternalError) {
-                String hashByDate = hash1 + String.valueOfGmt(asyncApexJob.CompletedDate != null ? asyncApexJob.CompletedDate.dateGmt() : asyncApexJob.CreatedDate.dateGmt());
+                String hashByDate = simpleHash1 + String.valueOfGmt(asyncApexJob.CompletedDate != null ? asyncApexJob.CompletedDate.dateGmt() : asyncApexJob.CreatedDate.dateGmt());
                 if (!internalLogByHash.containsKey(hashByDate)) {
                     internalLogByHash.put(hashByDate, log != null ? log : createLog(asyncApexJob, corg));
                 }
@@ -149,6 +167,52 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
             upsertLogs(logs, loggerInstance);
         }
         loggerInstance?.flush();
+    }
+
+    /**
+     * Query Log_Index__c records by simple hashes and follow Correct_Hash_Index__c lookup
+     * to get the correct stacktrace-based hashes
+     * Supports passthrough mode to query from target org
+     * @param simpleHash1Values Set of simple hash values calculated from AsyncApexJob
+     * @return Map of simple hash -> correct hash (if lookup exists)
+     */
+    private static Map<String, String> getCorrectHashesFromIndexes(Set<String> simpleHash1Values) {
+        Map<String, String> simpleHashToCorrectHash = new Map<String, String>();
+        
+        if (simpleHash1Values.isEmpty()) {
+            return simpleHashToCorrectHash;
+        }
+        
+        String query = new QBuilder(Log_Index__c.SObjectType)
+            .selectFields(new Set<String>{'Id', 'Hash__c', 'Correct_Hash_Index__c', 'Correct_Hash_Index__r.Hash__c'})
+            .add(QBuilder.condition('Hash__c').isIn(new List<String>(simpleHash1Values)))
+            .add(QBuilder.condition('Correct_Hash_Index__c').isNotNull())
+            .addLimit(Constants.QUERY_LIMITS.SMALL_DATA_QUERY_LIMIT)
+            .build();
+        
+        List<Log_Index__c> indexes;
+        if (isPassthroughMode()) {
+            // Query from target org via REST API
+            indexes = (List<Log_Index__c>)JSON.deserialize(JSON.serialize(
+                    runQueryAll(ConnectedOrgService.getPassthroughConnectedOrg(), 
+                               ConfigUtil.QUERY_ALL_REST_API_PATH + EncodingUtil.urlEncode(query, 'UTF-8'), 
+                               new List<Object>())
+            ), List<Log_Index__c>.class);
+        } else {
+            // Query from local org
+            indexes = Database.query(query);
+        }
+        
+        // Build map of simple hash -> correct hash
+        for (Log_Index__c idx : indexes) {
+            if (String.isNotBlank(idx.Hash__c) 
+                && idx.Correct_Hash_Index__c != null 
+                && String.isNotBlank(idx.Correct_Hash_Index__r.Hash__c)) {
+                simpleHashToCorrectHash.put(idx.Hash__c, idx.Correct_Hash_Index__r.Hash__c);
+            }
+        }
+        
+        return simpleHashToCorrectHash;
     }
 
     // Query logs by Hash_1__c for deduplication to properly update simple log counters
@@ -262,6 +326,16 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
         }
         Map<Id, AsyncApexJob> parentJobs = getAsyncApexJobsById(parentAsyncApexJobIds);
         
+        // DEDUPLICATION: Check for existing logs with same Async_Job_Id__c
+        // This prevents email-created logs from duplicating platform event logs
+        List<Log__c> existingLogsByAsyncJobId = getLogsByAsyncJobId(asyncApexJobIds);
+        Set<String> existingAsyncJobIds = new Set<String>();
+        for (Log__c existingLog : existingLogsByAsyncJobId) {
+            if (String.isNotBlank(existingLog.Async_Job_Id__c)) {
+                existingAsyncJobIds.add(existingLog.Async_Job_Id__c.left(15));
+            }
+        }
+        
         // Find classes that implement RaisesPlatformEvents
         Set<String> apexClassNames = new Set<String>();
         for (Log__c log : logs) {
@@ -280,6 +354,12 @@ public with sharing class JobBatch extends DatabaseUtils.PharosBatchImpl impleme
         
         for (Log__c log : logs) {
             AsyncApexJob asyncApexJob = getAsyncApexJob(log.Async_Job_Id__c, jobs, parentJobs);
+            
+            // Skip if log with same Async_Job_Id__c already exists (deduplication)
+            if (String.isNotBlank(log.Async_Job_Id__c) && existingAsyncJobIds.contains(log.Async_Job_Id__c.left(15))) {
+                continue; // Don't create duplicate
+            }
+            
             if (asyncApexJob != null) {
                 Boolean isInternalError = isInternalError(asyncApexJob);
                 // Skip if internal error or class implements RaisesPlatformEvents

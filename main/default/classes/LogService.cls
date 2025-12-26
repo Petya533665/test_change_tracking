@@ -308,6 +308,47 @@ global with sharing class LogService {
         if(!logIndexKeys.isEmpty()) {
             ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(logIndexKeys);
             
+            // Step 1: Collect all AsyncApexJobIds that need simple hash calculation
+            // CRITICAL: Only collect AsyncApexJobIds from logs that belong to current org
+            // AsyncApexJob records only exist locally, so we can't query for jobs from other orgs
+            String currentOrgId = UserInfo.getOrganizationId();
+            Set<String> asyncJobIdsNeedingHashes = new Set<String>();
+            for(Log__c log : newLogs) {
+                if(String.isBlank(log?.Hash_1__c)) continue;
+                
+                // Check if this log might need dual indexes
+                // AND that it belongs to current org (not a passthrough log from another org)
+                if (String.isNotBlank(log.Async_Job_Id__c) 
+                    && String.isNotBlank(log.Stacktrace__c)
+                    && log.Organization_Id__c == currentOrgId) {
+                    asyncJobIdsNeedingHashes.add(log.Async_Job_Id__c);
+                }
+            }
+            
+            // Step 2: Bulk calculate all simple hashes at once (ONE SOQL query)
+            Map<String, String> asyncJobIdToSimpleHash = ConfigUtil.calculateBulkSimpleHashesFromAsyncJobIds(asyncJobIdsNeedingHashes);
+            
+            // Step 3: Build logsBySimpleHash map using pre-calculated hashes
+            // Only for logs from current org (same filter as step 1)
+            Map<String, Log__c> logsBySimpleHash = new Map<String, Log__c>();
+            for(Log__c log : newLogs) {
+                if(String.isBlank(log?.Hash_1__c)) continue;
+                
+                if (String.isNotBlank(log.Async_Job_Id__c) 
+                    && String.isNotBlank(log.Stacktrace__c)
+                    && log.Organization_Id__c == currentOrgId) {
+                    String simpleHash = asyncJobIdToSimpleHash.get(log.Async_Job_Id__c);
+                    if (String.isNotBlank(simpleHash) && simpleHash != log.Hash_1__c) {
+                        logsBySimpleHash.put(simpleHash, log);
+                    }
+                }
+            }
+            
+            // Step 4: Bulkify dual index creation - create all at once (already have hashes, no more SOQL)
+            if (!logsBySimpleHash.isEmpty()) {
+                helper.createBulkDualLogIndexes(logsBySimpleHash, Logger.getInstance());
+            }
+            
             for(Log__c log : newLogs) {
                 if(String.isBlank(log?.Hash_1__c)) continue;
                 
@@ -348,7 +389,15 @@ global with sharing class LogService {
                     }
                     
                     // Create new index with calculated date
+                    // Dual indexes already created in bulk above, just create regular index if not already created
+                    String simpleHashForThisLog = asyncJobIdToSimpleHash.get(log.Async_Job_Id__c);
+                    if (!logsBySimpleHash.containsKey(simpleHashForThisLog)) {
                     index = helper.createLogIndex(log);
+                    } else {
+                        // Index was already created by bulk operation, retrieve it
+                        index = helper.getLogIndex(log);
+                    }
+                    
                     if(index != null) {
                         index.firstOccurredOn = earliestDate;
                     }
@@ -982,6 +1031,11 @@ global with sharing class LogService {
         // Remove exception type prefixes that appear before the actual message
         // Pattern: "System.ListException: " or "System.UnexpectedException: " etc
         normalized = PATTERN_SYSTEM_EXCEPTION.matcher(normalized).replaceAll('');
+        
+        // Remove hidden namespace tokens: (System Code), (namespace), (pharos), (any_managed_package)
+        // This ensures consistent hash generation regardless of namespace visibility
+        normalized = normalized.replaceAll('\\(System Code\\)([\\n|\\r\\n|\\r]|\\Z)', '');
+        normalized = normalized.replaceAll('\\([a-zA-Z_][a-zA-Z0-9_]*\\)([\\n|\\r\\n|\\r]|\\Z)', '');
         
         // Normalize multiple consecutive newlines to single newlines
         normalized = PATTERN_MULTIPLE_NEWLINES.matcher(normalized).replaceAll('\n');

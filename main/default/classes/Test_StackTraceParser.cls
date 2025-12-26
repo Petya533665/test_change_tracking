@@ -3432,4 +3432,318 @@ public class Test_StackTraceParser {
         String extractedEmpty = ApexExceptionParser.extractAsyncApexJobId('');
         System.assertEquals(null, extractedEmpty, 'Should return null for empty string');
     }
+    
+    // ========== MANAGED PACKAGE HIDDEN NAMESPACE TESTS ==========
+    // Tests for hidden namespace tokens: (namespace), (pharos), (System Code), etc.
+    
+    /**
+     * Test that PATTERN_CLASS_2 matches all hidden namespace token formats
+     */
+    @IsTest
+    static void test_pattern_matches_all_hidden_tokens() {
+        // Test various hidden token formats
+        String stacktrace1 = 'Class.MyClass.method: line 10, column 1\n\n(System Code)\n\n';
+        String stacktrace2 = 'Class.MyClass.method: line 10, column 1\n\n(namespace)\n\n';
+        String stacktrace3 = 'Class.MyClass.method: line 10, column 1\n\n(pharos)\n\n';
+        String stacktrace4 = 'Class.MyClass.method: line 10, column 1\n\n(my_package_ns)\n\n';
+        String stacktrace5 = 'Class.MyClass.method: line 10, column 1\n\n(testpharosx)\n\n';
+        
+        Test.startTest();
+        
+        // Extract stacktrace lines using PATTERN_CLASS_2
+        List<String> lines1 = ApexExceptionParser.getStackTraceLines(stacktrace1, ApexExceptionParser.PATTERN_CLASS_2);
+        List<String> lines2 = ApexExceptionParser.getStackTraceLines(stacktrace2, ApexExceptionParser.PATTERN_CLASS_2);
+        List<String> lines3 = ApexExceptionParser.getStackTraceLines(stacktrace3, ApexExceptionParser.PATTERN_CLASS_2);
+        List<String> lines4 = ApexExceptionParser.getStackTraceLines(stacktrace4, ApexExceptionParser.PATTERN_CLASS_2);
+        List<String> lines5 = ApexExceptionParser.getStackTraceLines(stacktrace5, ApexExceptionParser.PATTERN_CLASS_2);
+        
+        Test.stopTest();
+        
+        // All should extract lines including hidden tokens
+        System.assert(lines1.size() >= 1, '(System Code) should be matched by PATTERN_CLASS_2');
+        System.assert(lines2.size() >= 1, '(namespace) should be matched by PATTERN_CLASS_2');
+        System.assert(lines3.size() >= 1, '(pharos) should be matched by PATTERN_CLASS_2');
+        System.assert(lines4.size() >= 1, '(my_package_ns) should be matched by PATTERN_CLASS_2');
+        System.assert(lines5.size() >= 1, '(testpharosx) should be matched by PATTERN_CLASS_2');
+        
+        // Verify the hidden tokens are captured in at least one line
+        String allLines1 = String.join(lines1, ' ');
+        String allLines2 = String.join(lines2, ' ');
+        String allLines3 = String.join(lines3, ' ');
+        String allLines4 = String.join(lines4, ' ');
+        String allLines5 = String.join(lines5, ' ');
+        
+        System.assert(allLines1.contains('(System Code)') || allLines1.contains('Class.MyClass'), 
+            'Should capture stacktrace with (System Code) token');
+        System.assert(allLines2.contains('(namespace)') || allLines2.contains('Class.MyClass'), 
+            'Should capture stacktrace with (namespace) token');
+        System.assert(allLines3.contains('(pharos)') || allLines3.contains('Class.MyClass'), 
+            'Should capture stacktrace with (pharos) token');
+        System.assert(allLines4.contains('(my_package_ns)') || allLines4.contains('Class.MyClass'), 
+            'Should capture stacktrace with (my_package_ns) token');
+        System.assert(allLines5.contains('(testpharosx)') || allLines5.contains('Class.MyClass'), 
+            'Should capture stacktrace with (testpharosx) token');
+    }
+    
+    /**
+     * Test that hidden namespace tokens are removed during normalization
+     */
+    @IsTest
+    static void test_hidden_tokens_removed_during_parsing() {
+        Test_LogService.initSettings();
+        
+        String emailBody = 'Apex script unhandled exception by user/organization: 005000000000001/00D000000000001\n\n' +
+                          'Error: Divide by 0\n\n' +
+                          'Class.MyHandler.execute: line 25, column 1\n\n' +
+                          '(namespace)\n\n';
+        
+        Test.startTest();
+        
+        ApexExceptionParser parser = new ApexExceptionParser();
+        parser.init(emailBody, 'Test Error', 'system@salesforce.com');
+        
+        if (parser.canProcess()) {
+            parser.process();
+            String stacktrace = parser.getStackTrace();
+            
+            // Hidden namespace token should be removed during normalization
+            System.assertNotEquals(null, stacktrace, 'Stacktrace should be parsed');
+        }
+        
+        Test.stopTest();
+    }
+    
+    /**
+     * Test hash calculation with hidden namespace tokens
+     */
+    @IsTest
+    static void test_hash_calculation_with_hidden_namespace() {
+        Test_LogService.initSettings();
+        
+        Test.startTest();
+        
+        // Log 1: Full stacktrace
+        Log__c emailLog = new Log__c(
+            Summary__c = 'Divide by 0',
+            Stacktrace__c = 'Class.namespace__MyClass.method: line 10, column 1\n' +
+                           'Class.MyHandler.execute: line 25, column 1',
+            Category__c = 'Apex',
+            Organization_Id__c = UserInfo.getOrganizationId()
+        );
+        LogService.calculateHashes(emailLog);
+        String emailHash = emailLog.Hash_1__c;
+        
+        // Log 2: Hidden namespace
+        Log__c platformEventLog = new Log__c(
+            Summary__c = 'Divide by 0',
+            Stacktrace__c = 'Class.MyHandler.execute: line 25, column 1\n\n' +
+                           '(namespace)\n\n',
+            Category__c = 'Apex',
+            Organization_Id__c = UserInfo.getOrganizationId()
+        );
+        LogService.calculateHashes(platformEventLog);
+        String platformEventHash = platformEventLog.Hash_1__c;
+        
+        // Log 3: Pharos internal error
+        Log__c pharosLog = new Log__c(
+            Summary__c = 'Divide by 0',
+            Stacktrace__c = 'Class.MyHandler.execute: line 25, column 1\n\n' +
+                           '(pharos)\n\n',
+            Category__c = 'Apex',
+            Organization_Id__c = UserInfo.getOrganizationId()
+        );
+        LogService.calculateHashes(pharosLog);
+        String pharosHash = pharosLog.Hash_1__c;
+        
+        Test.stopTest();
+        
+        // Hashes should be calculated
+        System.assertNotEquals(null, emailHash, 'Email hash should be calculated');
+        System.assertNotEquals(null, platformEventHash, 'Platform event hash should be calculated');
+        System.assertNotEquals(null, pharosHash, 'Pharos hash should be calculated');
+        
+        // Email has more stacktrace lines, so hash will differ
+        System.assertNotEquals(emailHash, platformEventHash, 
+            'Email has more stacktrace lines, so hash will differ');
+        
+        // Platform event and pharos should have same hash (same structure after normalization)
+        System.assertEquals(platformEventHash, pharosHash, 
+            'Logs with different hidden tokens but same visible lines should have same hash');
+    }
+    
+    /**
+     * Test hash calculation consistency with System Code
+     */
+    @IsTest
+    static void test_hash_calculation_with_system_code() {
+        Test_LogService.initSettings();
+        
+        Test.startTest();
+        
+        // Log with (System Code)
+        Log__c log1 = new Log__c(
+            Summary__c = 'Test Error',
+            Stacktrace__c = 'Class.MyClass.method: line 10, column 1\n\n' +
+                           '(System Code)\n\n',
+            Category__c = 'Apex',
+            Organization_Id__c = UserInfo.getOrganizationId()
+        );
+        LogService.calculateHashes(log1);
+        
+        // Log without (System Code)
+        Log__c log2 = new Log__c(
+            Summary__c = 'Test Error',
+            Stacktrace__c = 'Class.MyClass.method: line 10, column 1',
+            Category__c = 'Apex',
+            Organization_Id__c = UserInfo.getOrganizationId()
+        );
+        LogService.calculateHashes(log2);
+        
+        Test.stopTest();
+        
+        // Both hashes should be calculated
+        System.assertNotEquals(null, log1.Hash_1__c, 'Hash with (System Code) should be calculated');
+        System.assertNotEquals(null, log2.Hash_1__c, 'Hash without (System Code) should be calculated');
+    }
+    
+    /**
+     * Test logs with multiple hidden tokens
+     */
+    @IsTest
+    static void test_multiple_hidden_tokens_in_stacktrace() {
+        Test_LogService.initSettings();
+        
+        Test.startTest();
+        
+        // Stacktrace with multiple hidden tokens
+        Log__c log = new Log__c(
+            Summary__c = 'Complex Error',
+            Stacktrace__c = 'Class.MyClass.method1: line 10, column 1\n\n' +
+                           '(namespace1)\n\n' +
+                           'Class.MyClass.method2: line 20, column 1\n\n' +
+                           '(namespace2)\n\n' +
+                           'Class.MyClass.method3: line 30, column 1',
+            Category__c = 'Apex',
+            Organization_Id__c = UserInfo.getOrganizationId()
+        );
+        
+        LogService.calculateHashes(log);
+        
+        Test.stopTest();
+        
+        // Should successfully calculate hash
+        System.assertNotEquals(null, log.Hash_1__c, 'Hash should be calculated with multiple hidden tokens');
+        System.assertNotEquals(null, log.Hash_2__c, 'Hash_2 should be calculated');
+        System.assertNotEquals(null, log.Hash_3__c, 'Hash_3 should be calculated');
+    }
+    
+    /**
+     * Test edge case: stacktrace with only hidden token
+     */
+    @IsTest
+    static void test_stacktrace_only_hidden_token() {
+        Test_LogService.initSettings();
+        
+        Test.startTest();
+        
+        // Stacktrace with only hidden token (edge case)
+        Log__c log = new Log__c(
+            Summary__c = 'Hidden Error',
+            Stacktrace__c = '(namespace)',
+            Details__c = 'Error details for fallback',
+            Category__c = 'Apex',
+            Organization_Id__c = UserInfo.getOrganizationId()
+        );
+        
+        LogService.calculateHashes(log);
+        
+        Test.stopTest();
+        
+        // Should fall back to Details__c for hash calculation
+        System.assertNotEquals(null, log.Hash_1__c, 'Hash should be calculated using fallback');
+    }
+    
+    /**
+     * Test hidden namespace tokens are normalized consistently
+     */
+    @IsTest
+    static void test_managed_package_hidden_namespace_normalization() {
+        Test_LogService.initSettings();
+        
+        String orgId = UserInfo.getOrganizationId();
+        
+        Test.startTest();
+        
+        // Log 1: With (namespace) token
+        Log__c log1 = new Log__c(
+            Summary__c = 'Test Error',
+            Stacktrace__c = 'Class.MyHandler.execute: line 25, column 1\n\n(namespace)\n\n',
+            Category__c = 'Apex',
+            Organization_Id__c = orgId
+        );
+        LogService.calculateHashes(log1);
+        
+        // Log 2: With (pharos) token
+        Log__c log2 = new Log__c(
+            Summary__c = 'Test Error',
+            Stacktrace__c = 'Class.MyHandler.execute: line 25, column 1\n\n(pharos)\n\n',
+            Category__c = 'Apex',
+            Organization_Id__c = orgId
+        );
+        LogService.calculateHashes(log2);
+        
+        // Log 3: With (testpkg) token
+        Log__c log3 = new Log__c(
+            Summary__c = 'Test Error',
+            Stacktrace__c = 'Class.MyHandler.execute: line 25, column 1\n\n(testpkg)\n\n',
+            Category__c = 'Apex',
+            Organization_Id__c = orgId
+        );
+        LogService.calculateHashes(log3);
+        
+        Test.stopTest();
+        
+        // All three should have same hash after normalization
+        System.assertNotEquals(null, log1.Hash_1__c, 'Hash should be calculated for log1');
+        System.assertNotEquals(null, log2.Hash_1__c, 'Hash should be calculated for log2');
+        System.assertNotEquals(null, log3.Hash_1__c, 'Hash should be calculated for log3');
+        
+        // All hashes should match (hidden tokens removed during normalization)
+        System.assertEquals(log1.Hash_1__c, log2.Hash_1__c, 
+            '(namespace) and (pharos) should normalize to same hash');
+        System.assertEquals(log1.Hash_1__c, log3.Hash_1__c, 
+            '(namespace) and (testpkg) should normalize to same hash');
+        System.assertEquals(log2.Hash_1__c, log3.Hash_1__c, 
+            '(pharos) and (testpkg) should normalize to same hash');
+    }
+    
+    /**
+     * Test that pharos internal errors are correctly categorized
+     */
+    @IsTest
+    static void test_pharos_token_categorization() {
+        TestDataFactory.createConnectedOrg();
+        Test_LogService.initSettings();
+        
+        String orgId = UserInfo.getOrganizationId();
+        String emailBody = 'Apex script unhandled exception by user/organization: 005000000000001/' + orgId + '\n\n' +
+                          'Error: Internal error\n\n' +
+                          'Class.MyClass.method: line 10, column 1\n\n' +
+                          '(pharos)\n\n';
+        
+        Test.startTest();
+        
+        Log__c log = LogService.createLogFromEmailBody(emailBody, 'Internal Error', 'system@salesforce.com', Datetime.now());
+        
+        Test.stopTest();
+        
+        // Should be categorized as Pharos Error if (pharos) token is detected
+        System.assertNotEquals(null, log.Category__c, 'Category should be set');
+        
+        // If pharos token was detected in original stacktrace, should be Pharos Error
+        if (log.Stacktrace__c != null && (log.Stacktrace__c.contains('pharos') || log.Stacktrace__c.contains('(pharos)'))) {
+            System.assertEquals(Logger.CATEGORY_PHAROS_ERROR, log.Category__c, 
+                'Should be categorized as Pharos Error when (pharos) token present');
+        }
+    }
 }

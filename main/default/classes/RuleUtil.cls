@@ -610,15 +610,34 @@ public with sharing class RuleUtil {
 		// Save webhook tokens to custom settings after DML
 		Logger logger = Logger.getInstance();
 		ruleActionIndex = 0;
+		newActionIndex = 0;
 		for (Action actionWrapper : actionWrappers) {
 			RuleAction ruleActionWrapper = ruleActionWrappers.get(ruleActionIndex++);
+			Action__c action = actionWrapper.getAction(recordTypeName);
+			
+			// Determine the action ID to use for webhook token storage
+			String actionId = null;
+			if (action.Id != null) {
+				// Existing action
+				actionId = action.Id;
+			} else if (actionWrapper.id != null) {
+				// Action wrapper has ID (from frontend)
+				actionId = actionWrapper.id;
+			} else {
+				// New action - get ID from inserted actions list
+				if (newActionIndex < newActions.size()) {
+					actionId = newActions.get(newActionIndex++).Id;
+				}
+			}
+			
 			// Save webhook token to custom settings if this is a webhook action with auth value
 			if (actionWrapper.type == Constants.ACTION_SOBJECT.ACTION_TYPE_WEBHOOK_NOTIFICATION 
 				&& String.isNotBlank(actionWrapper.webhookUrl) 
-				&& String.isNotBlank(actionWrapper.webhookAuthValue)) {
+				&& String.isNotBlank(actionWrapper.webhookAuthValue)
+				&& String.isNotBlank(actionId)) {
 				try {
 					WebhookService.putWebhookTokenToSettings(
-						actionWrapper.webhookUrl, 
+						actionId, 
 						actionWrapper.webhookAuthValue, 
 						true, 
 						logger
@@ -731,6 +750,7 @@ public with sharing class RuleUtil {
 		String query = new QBuilder(RuleAction__c.SObjectType)
 				.selectFields(new Set<String>(RULE_ACTION_FIELDS))
 				.add(QBuilder.condition('Action__r.Action_Type__c').isIn(actionTypes))
+				.add(QBuilder.condition('Rule__r.Type__c').equalsTo(ruleType))
 				.add(String.isNotBlank(subtype) ? QBuilder.condition('Action__r.Subtype__c').equalsTo(subtype) : null)
 				.add(String.isBlank(subtype) ? QBuilder.condition('Action__r.Subtype__c').notEqualsTo(Constants.ACTION_SOBJECT.SUBTYPE_NOTIFICATION) : null)
 				.add(QBuilder.orderBy('CreatedDate').descending())
@@ -2455,8 +2475,8 @@ public with sharing class RuleUtil {
 			this.webhookBodyTemplate = action.Webhook_Body_Template__c;
 			this.webhookAuthType = action.Webhook_Auth_Type__c;
 			// webhookAuthValue is retrieved from custom settings, not from Action__c field
-			this.webhookAuthValue = String.isNotBlank(action.Webhook_URL__c) 
-				? WebhookService.getWebhookTokenFromSettings(action.Webhook_URL__c) 
+			this.webhookAuthValue = String.isNotBlank(action.Id) 
+				? WebhookService.getWebhookTokenFromSettings(action.Id) 
 				: null;
 
 			this.fields = action;

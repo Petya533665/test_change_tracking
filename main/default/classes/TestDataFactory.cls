@@ -202,6 +202,36 @@ public class TestDataFactory {
         }
     }
 
+    /**
+     * Flexible mock for passthrough mode tests with dual index lookups
+     * Returns different responses based on whether query contains Log_Index__c or Log__c
+     */
+    public class FlexiblePassthroughMock implements HttpCalloutMock {
+        private String logIndexResponse;
+        private String logResponse;
+        
+        public FlexiblePassthroughMock(String logIndexResponse, String logResponse) {
+            this.logIndexResponse = logIndexResponse;
+            this.logResponse = logResponse;
+        }
+        
+        public HTTPResponse respond(HTTPRequest req) {
+            HTTPResponse res = new HTTPResponse();
+            res.setStatusCode(200);
+            res.setStatus('OK');
+            
+            // Check if query is for Log_Index__c or Log__c
+            String endpoint = req.getEndpoint();
+            if (endpoint.contains('Log_Index__c')) {
+                res.setBody(logIndexResponse);
+            } else {
+                res.setBody(logResponse);
+            }
+            
+            return res;
+        }
+    }
+
     public class WebServiceMockImpl implements WebServiceMock {
         public void doInvoke(
                 Object stub, Object request, Map<String, Object> response,

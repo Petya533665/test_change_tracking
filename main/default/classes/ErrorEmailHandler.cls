@@ -47,7 +47,10 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
         PermissionsUtil.putSObjectField(inboundEmail, Schema.sObjectType.Inbound_Email__c.fields.From__c, email.fromAddress + (String.isNotBlank(email.fromName) ? ' (' + email.fromName + ')' : ''));
 
         if (ConfigUtil.CONNECTED_ORGS_SETTINGS.Passthrought_Mode__c) {
-            PassthroughtModeService.sendInboundEmail(inboundEmail);
+            // CRITICAL: Pre-calculate simple hash from AsyncApexJob before sending to target org
+            // This enables target org to create dual indexes (simple hash -> correct hash lookup)
+            Map<String, String> asyncJobIdToSimpleHash = extractAndCalculateSimpleHashes(inboundEmail);
+            PassthroughtModeService.sendInboundEmail(inboundEmail, asyncJobIdToSimpleHash);
         }
         else {
             processEmail(new List<Inbound_Email__c>{inboundEmail}, null, createdAtDateTime, email, abbreviateResult);
@@ -92,6 +95,20 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                                     Messaging.inboundEmail email,
                                     FlowDataStructures.FlowErrorAbbreviateResult abbreviateResult,
                                     Boolean isRoutedFromPassthroughMode) {
+        processEmail(inboundEmails, incomeOrganizationId, createdAtDateTime, email, abbreviateResult, isRoutedFromPassthroughMode, null);
+    }
+    
+    /**
+     * Process email with pre-calculated simple hashes for passthrough mode
+     * @param asyncJobIdToSimpleHash Map of AsyncApexJobId -> simple hash (from source org)
+     */
+    public static void processEmail(List<Inbound_Email__c> inboundEmails,
+                                    String incomeOrganizationId,
+                                    DateTime createdAtDateTime,
+                                    Messaging.inboundEmail email,
+                                    FlowDataStructures.FlowErrorAbbreviateResult abbreviateResult,
+                                    Boolean isRoutedFromPassthroughMode,
+                                    Map<String, String> asyncJobIdToSimpleHash) {
                                        
         Inbound_Email__c inboundEmail = inboundEmails.get(0);
 
@@ -158,14 +175,26 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                         }
                     }
                 }
-                if (!logsToAsyncJob.isEmpty() && PermissionsUtil.AsyncProcessErrorTracking) {
-                    JobBatch.asyncApexJobHandler(logsToAsyncJob);
+                // CRITICAL: Skip asyncApexJobHandler in passthrough mode when simple hashes are pre-calculated
+                // In passthrough mode, AsyncApexJob records don't exist at target org, and we already have
+                // the simple hashes from source org in asyncJobIdToSimpleHash map
+                Boolean hasPreCalculatedHashes = asyncJobIdToSimpleHash != null && !asyncJobIdToSimpleHash.isEmpty();
+                
+                if (PermissionsUtil.AsyncProcessErrorTracking && !logsToAsyncJob.isEmpty()) {
+                    if (!hasPreCalculatedHashes) {
+                        JobBatch.asyncApexJobHandler(logsToAsyncJob);
+                    }
+                    // For passthrough mode with pre-calculated hashes, add logs directly to createdLogs
+                    else {
+                        createdLogs.addAll(logsToAsyncJob);
+                    }
                     // Set the lookup to the last async job log (matching behavior of createdLogs)
                     Log__c lastAsyncLog = logsToAsyncJob.get(logsToAsyncJob.size() - 1);
                     if (String.isNotBlank(lastAsyncLog?.Id)) {
                         PermissionsUtil.putSObjectField(inboundEmail, Schema.SObjectType.Inbound_Email__c.fields.Log__c, lastAsyncLog.Id);
                     }
                 }
+
                 // post processing for errors with large stacktrace
                 if(!logsToPostProcessing.isEmpty()) {
                     List<LogPostProcessingService.LogPostProcessingResult> results = LogPostProcessingService.doLogPostProcessing(logsToPostProcessing, loggerInstance, false);
@@ -232,6 +261,13 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
                     }
                     if(!mapStacktraceParseResult.isEmpty()) {
                         createStacktraceParseResultCV(mapStacktraceParseResult, loggerInstance);
+                    }
+                    
+                    // CRITICAL: Create dual indexes for passthrough mode
+                    // Target org receives pre-calculated simple hashes from source org
+                    // and creates both simple hash index and correct hash index with lookup
+                    if (isRoutedFromPassthroughMode && asyncJobIdToSimpleHash != null && !asyncJobIdToSimpleHash.isEmpty()) {
+                        createDualIndexesForPassthroughMode(createdLogs, asyncJobIdToSimpleHash, loggerInstance);
                     }
                 }
             }
@@ -414,6 +450,85 @@ global with sharing class ErrorEmailHandler implements Messaging.InboundEmailHan
             } catch(Exception e) {}
         }
         return text;
+    }
+
+    /**
+     * Create dual indexes at target org using pre-calculated simple hashes from source org
+     * This enables JobBatch at source org to find logs via simple hash -> correct hash lookup
+     * @param createdLogs Logs created at target org from passthrough email
+     * @param asyncJobIdToSimpleHash Map of AsyncApexJobId -> simple hash (from source org)
+     * @param loggerInstance Logger for error handling
+     */
+    private static void createDualIndexesForPassthroughMode(List<Log__c> createdLogs, 
+                                                            Map<String, String> asyncJobIdToSimpleHash, 
+                                                            Logger loggerInstance) {
+        try {
+            // Build map of simple hash -> log (for dual index creation)
+            Map<String, Log__c> logsBySimpleHash = new Map<String, Log__c>();
+            
+            for (Log__c log : createdLogs) {
+                // Only create dual indexes for logs with both AsyncApexJobId and stacktrace
+                // (logs with stacktrace have correct hash, logs without have simple hash)
+                if (String.isNotBlank(log.Async_Job_Id__c) 
+                    && String.isNotBlank(log.Stacktrace__c) 
+                    && String.isNotBlank(log.Hash_1__c)) {
+                    
+                    String simpleHash = asyncJobIdToSimpleHash.get(log.Async_Job_Id__c);
+                    if (String.isNotBlank(simpleHash) && simpleHash != log.Hash_1__c) {
+                        logsBySimpleHash.put(simpleHash, log);
+                    }
+                }
+            }
+            
+            // Bulk create dual indexes
+            if (!logsBySimpleHash.isEmpty()) {
+                ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(new Set<String>());
+                helper.createBulkDualLogIndexes(logsBySimpleHash, loggerInstance);
+            }
+        } catch (Exception e) {
+            // Log error but don't block email processing
+            loggerInstance?.add(loggerInstance?.getInternalError(e, null, ErrorEmailHandler.class.getName(), 'Error creating dual indexes for passthrough mode'));
+        }
+    }
+
+    /**
+     * Extract AsyncApexJobIds from email body and calculate simple hashes
+     * This is critical for passthrough mode: source org pre-calculates simple hashes
+     * so target org can create dual indexes (simple hash -> correct hash lookup)
+     * @param inboundEmail The email to extract AsyncApexJobIds from
+     * @return Map of AsyncApexJobId -> simple hash (for target org to create dual indexes)
+     */
+    private static Map<String, String> extractAndCalculateSimpleHashes(Inbound_Email__c inboundEmail) {
+        Map<String, String> asyncJobIdToSimpleHash = new Map<String, String>();
+        
+        try {
+            // Extract AsyncApexJobId from email body
+            String body = getEmailBody(inboundEmail);
+            if (String.isBlank(body)) {
+                return asyncJobIdToSimpleHash;
+            }
+            
+            // Use ApexExceptionParser.extractAsyncApexJobId() to extract job ID
+            Set<String> asyncJobIds = new Set<String>();
+            String extractedJobId = ApexExceptionParser.extractAsyncApexJobId(body);
+            if (String.isNotBlank(extractedJobId)) {
+                asyncJobIds.add(extractedJobId.left(15));
+            }
+            
+            if (asyncJobIds.isEmpty()) {
+                return asyncJobIdToSimpleHash;
+            }
+            
+            // Calculate simple hashes using ConfigUtil (same as LogService does)
+            // CRITICAL: Only query AsyncApexJobs from current org (not from other orgs)
+            asyncJobIdToSimpleHash = ConfigUtil.calculateBulkSimpleHashesFromAsyncJobIds(asyncJobIds);
+            
+        } catch (Exception e) {
+            // If extraction fails, log error but don't block passthrough
+            Logger.getInstance().addInternalError(e, ErrorEmailHandler.class.getName(), '.extractAndCalculateSimpleHashes');
+        }
+        
+        return asyncJobIdToSimpleHash;
     }
 
     public class ErrorEmailHandlerException extends Exception {}

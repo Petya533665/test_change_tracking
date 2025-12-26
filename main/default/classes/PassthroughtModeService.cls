@@ -12,11 +12,17 @@ public with sharing class PassthroughtModeService {
         return corg;
     }
 
-    public static void sendInboundEmail(Inbound_Email__c inboundEmail) {
+    /**
+     * Send inbound email to target org with pre-calculated simple hashes
+     * @param inboundEmail The email to send
+     * @param asyncJobIdToSimpleHash Map of AsyncApexJobId -> simple hash (for dual index creation at target org)
+     */
+    public static void sendInboundEmail(Inbound_Email__c inboundEmail, Map<String, String> asyncJobIdToSimpleHash) {
         Connected_Org__c corg = getPassthroughConnectedOrg();
         String body = JSON.serialize(new Map<String, Object>{
             'inboundEmail' => inboundEmail,
-            'organizationId' => UserInfo.getOrganizationId()
+            'organizationId' => UserInfo.getOrganizationId(),
+            'asyncJobIdToSimpleHash' => asyncJobIdToSimpleHash
         });
         sendPassthroughData(corg, body);
     }
@@ -87,7 +93,8 @@ public with sharing class PassthroughtModeService {
             // to avoid System.CalloutException: Callout loop not allowed in ErrorEmailHandler
             // Salesforce A  ----Callout----> Salesforce B  ----Callout----> Webservice (Error happened here)
             // Post processing logic will be executed in regular async job (LogPostProcessingBatch).
-            ErrorEmailHandler.processEmail(new List<Inbound_Email__c>{data.inboundEmail}, data.organizationId, null, null, null, true);
+            // Pass asyncJobIdToSimpleHash from source org to enable dual index creation
+            ErrorEmailHandler.processEmail(new List<Inbound_Email__c>{data.inboundEmail}, data.organizationId, null, null, null, true, data.asyncJobIdToSimpleHash);
         }
         else if (data.contentVersionWrapper != null) {
             ContentVersion contentVersion = data.contentVersionWrapper.contentVersion;
@@ -102,9 +109,13 @@ public with sharing class PassthroughtModeService {
         public Inbound_Email__c inboundEmail;
         public BulkAPIJobBatchService.ContentVersionWrapper contentVersionWrapper;
         public String organizationId;
+        // Map of AsyncApexJobId -> simple hash (pre-calculated at source org)
+        // Used at target org to create dual indexes (simple hash -> correct hash lookup)
+        public Map<String, String> asyncJobIdToSimpleHash;
 
         public IncomingLogData() {
             this.logs = new List<Log__c>();
+            this.asyncJobIdToSimpleHash = new Map<String, String>();
         }
 
     }

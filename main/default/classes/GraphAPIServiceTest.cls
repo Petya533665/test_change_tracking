@@ -157,54 +157,76 @@ private class GraphAPIServiceTest {
 
 	@IsTest
 	static void test_webhookTokenSaveAndRetrieve() {
-		final String testWebhookUrl = 'https://webhook.example.com/api/endpoint';
+		// Create test action to get a valid action ID
+		Action__c testAction = new Action__c(
+			Action_Type__c = 'Webhook Notification',
+			Webhook_URL__c = 'https://webhook.example.com/api/endpoint'
+		);
+		insert testAction;
+		
 		final String testToken;
 
 		Test.startTest();
 		testToken = generateRandomString(255*2 + 100);
 		Logger logger = Logger.getInstance();
-		WebhookService.putWebhookTokenToSettings(testWebhookUrl, testToken, true, logger);
+		WebhookService.putWebhookTokenToSettings(testAction.Id, testToken, true, logger);
 		GraphAPIService.saveListTokenRecordSettings(true, logger);
 		Test.stopTest();
 		
 		GraphAPIService.GRAPH_API_LIST_RECORDS = null;
-		String result = WebhookService.getWebhookTokenFromSettings(testWebhookUrl);
+		String result = WebhookService.getWebhookTokenFromSettings(testAction.Id);
 		System.assertEquals(testToken, result, 'Retrieved token should match saved token');
 	}
 
 	@IsTest
-	static void test_webhookTokenUniquePerUrl() {
-		final String testWebhookUrl1 = 'https://webhook.example.com/api/endpoint1';
-		final String testWebhookUrl2 = 'https://webhook.example.com/api/endpoint2';
+	static void test_webhookTokenUniquePerAction() {
+		// Create two test actions with different URLs (now tokens are stored per action, not per URL)
+		Action__c testAction1 = new Action__c(
+			Action_Type__c = 'Webhook Notification',
+			Webhook_URL__c = 'https://webhook.example.com/api/endpoint1'
+		);
+		Action__c testAction2 = new Action__c(
+			Action_Type__c = 'Webhook Notification',
+			Webhook_URL__c = 'https://webhook.example.com/api/endpoint2'
+		);
+		insert new List<Action__c>{testAction1, testAction2};
+		
 		final String testToken1 = 'token1';
 		final String testToken2 = 'token2';
 
 		Test.startTest();
 		Logger logger = Logger.getInstance();
-		WebhookService.putWebhookTokenToSettings(testWebhookUrl1, testToken1, true, logger);
-		WebhookService.putWebhookTokenToSettings(testWebhookUrl2, testToken2, true, logger);
+		WebhookService.putWebhookTokenToSettings(testAction1.Id, testToken1, true, logger);
+		WebhookService.putWebhookTokenToSettings(testAction2.Id, testToken2, true, logger);
 		GraphAPIService.saveListTokenRecordSettings(true, logger);
 		Test.stopTest();
 		
 		GraphAPIService.GRAPH_API_LIST_RECORDS = null;
-		String result1 = WebhookService.getWebhookTokenFromSettings(testWebhookUrl1);
-		String result2 = WebhookService.getWebhookTokenFromSettings(testWebhookUrl2);
+		String result1 = WebhookService.getWebhookTokenFromSettings(testAction1.Id);
+		String result2 = WebhookService.getWebhookTokenFromSettings(testAction2.Id);
 		
-		System.assertEquals(testToken1, result1, 'First URL should return first token');
-		System.assertEquals(testToken2, result2, 'Second URL should return second token');
-		System.assertNotEquals(result1, result2, 'Different URLs should have different tokens');
+		System.assertEquals(testToken1, result1, 'First action should return first token');
+		System.assertEquals(testToken2, result2, 'Second action should return second token');
+		System.assertNotEquals(result1, result2, 'Different actions should have different tokens');
 	}
 
 	@IsTest
 	static void test_webhookTokenTypeGeneration() {
-		final String testWebhookUrl1 = 'https://webhook.example.com/api/endpoint1';
-		final String testWebhookUrl2 = 'https://webhook.example.com/api/endpoint2';
-		final String testWebhookUrl3 = 'https://webhook.example.com/api/endpoint1'; // Same as URL1
+		// Create test actions to get valid action IDs
+		Action__c testAction1 = new Action__c(
+			Action_Type__c = 'Webhook Notification',
+			Webhook_URL__c = 'https://webhook.example.com/api/endpoint1'
+		);
+		Action__c testAction2 = new Action__c(
+			Action_Type__c = 'Webhook Notification',
+			Webhook_URL__c = 'https://webhook.example.com/api/endpoint2'
+		);
+		insert new List<Action__c>{testAction1, testAction2};
 
 		Test.startTest();
-		String tokenType1 = WebhookService.generateWebhookTokenType(testWebhookUrl1);
-		String tokenType2 = WebhookService.generateWebhookTokenType(testWebhookUrl2);
-		String tokenType3 = WebhookService.generateWebhookTokenType(testWebhookUrl3);
+		String tokenType1 = WebhookService.generateWebhookTokenType(testAction1.Id);
+		String tokenType2 = WebhookService.generateWebhookTokenType(testAction2.Id);
+		String tokenType3 = WebhookService.generateWebhookTokenType(testAction1.Id); // Same action ID as action1
 		Test.stopTest();
 		
 		System.assertNotEquals(null, tokenType1, 'Token type should be generated');
@@ -213,44 +235,55 @@ private class GraphAPIServiceTest {
 		System.assert(tokenType1.startsWith('webhook_'), 'Token type should start with webhook_');
 		System.assert(tokenType2.startsWith('webhook_'), 'Token type should start with webhook_');
 		System.assert(tokenType3.startsWith('webhook_'), 'Token type should start with webhook_');
-		System.assertEquals(tokenType1, tokenType3, 'Same URL should generate same token type');
-		System.assertNotEquals(tokenType1, tokenType2, 'Different URLs should generate different token types');
-		System.assert(tokenType1.length() <= 37, 'Token type length should be <= 37 (webhook_ + 29 char hash)');
+		System.assertEquals(tokenType1, tokenType3, 'Same action ID should generate same token type');
+		System.assertNotEquals(tokenType1, tokenType2, 'Different action IDs should generate different token types');
+		System.assert(tokenType1.length() <= 26, 'Token type length should be <= 26 (webhook_ + 18 char ID)');
 	}
 
 	@IsTest
 	static void test_webhookTokenSplitAcrossMultipleRecords() {
-		final String testWebhookUrl = 'https://webhook.example.com/api/long-token-endpoint';
+		// Create test action to get a valid action ID
+		Action__c testAction = new Action__c(
+			Action_Type__c = 'Webhook Notification',
+			Webhook_URL__c = 'https://webhook.example.com/api/long-token-endpoint'
+		);
+		insert testAction;
+		
 		final String testToken;
 
 		Test.startTest();
 		// Create a token that spans multiple records (255 chars per record)
 		testToken = generateRandomString(255*3 + 230);
 		Logger logger = Logger.getInstance();
-		WebhookService.putWebhookTokenToSettings(testWebhookUrl, testToken, true, logger);
+		WebhookService.putWebhookTokenToSettings(testAction.Id, testToken, true, logger);
 		GraphAPIService.saveListTokenRecordSettings(true, logger);
 		Test.stopTest();
 		
 		GraphAPIService.GRAPH_API_LIST_RECORDS = null;
-		String result = WebhookService.getWebhookTokenFromSettings(testWebhookUrl);
+		String result = WebhookService.getWebhookTokenFromSettings(testAction.Id);
 		System.assertEquals(testToken, result, 'Long token should be correctly split and reassembled');
 	}
 
 	@IsTest
-	static void test_webhookTokenWithHashContainingNumbers() {
-		// Test that token types with numbers in hash work correctly with getGraphApiTokenListRecordsByType
-		final String testWebhookUrl = 'https://webhook123.example456.com/api/endpoint789';
+	static void test_webhookTokenWithActionId() {
+		// Test that token types with action IDs work correctly with getGraphApiTokenListRecordsByType
+		Action__c testAction = new Action__c(
+			Action_Type__c = 'Webhook Notification',
+			Webhook_URL__c = 'https://webhook123.example456.com/api/endpoint789'
+		);
+		insert testAction;
+		
 		final String testToken = 'test-token-value';
 
 		Test.startTest();
 		Logger logger = Logger.getInstance();
-		WebhookService.putWebhookTokenToSettings(testWebhookUrl, testToken, true, logger);
+		WebhookService.putWebhookTokenToSettings(testAction.Id, testToken, true, logger);
 		GraphAPIService.saveListTokenRecordSettings(true, logger);
 		Test.stopTest();
 		
 		GraphAPIService.GRAPH_API_LIST_RECORDS = null;
-		String result = WebhookService.getWebhookTokenFromSettings(testWebhookUrl);
-		System.assertEquals(testToken, result, 'Token with numbers in URL hash should work correctly');
+		String result = WebhookService.getWebhookTokenFromSettings(testAction.Id);
+		System.assertEquals(testToken, result, 'Token with action ID should work correctly');
 	}
 
 	private static final String TEST_GRAPH_API_TEAM_ID = 'someTestGraphTeamId';

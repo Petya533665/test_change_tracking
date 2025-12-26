@@ -3982,18 +3982,18 @@ private class EventLogProcessorsTest {
         );
         
         Test.startTest();
-        Map<Id, Log__c> result = EventLogProcessors.findAndUpdateSimpleLogs(
+        EventLogProcessors.SimpleLogUpdateResult result = EventLogProcessors.findAndUpdateSimpleLogs(
             new List<Log__c>{eventLog}, 
             Logger.getInstance()
         );
         Test.stopTest();
 
         // Verify simple log was found
-        System.assertEquals(1, result.size(), 'Should find 1 simple log to update');
-        System.assert(result.containsKey(simpleLog.Id), 'Should find the simple log by Id');
+        System.assertEquals(1, result.logsToUpdate.size(), 'Should find 1 simple log to update');
+        System.assert(result.logsToUpdate.containsKey(simpleLog.Id), 'Should find the simple log by Id');
         
         // Verify the simple log was updated with stacktrace
-        Log__c updatedSimpleLog = result.get(simpleLog.Id);
+        Log__c updatedSimpleLog = result.logsToUpdate.get(simpleLog.Id);
         System.assertEquals('Class.TestBatchTwo.execute: line 8, column 1', updatedSimpleLog.Stacktrace__c,
             'Stacktrace should be copied from event log');
         System.assertEquals('REQ-12345', updatedSimpleLog.Request_Id_External__c,
@@ -4033,14 +4033,14 @@ private class EventLogProcessorsTest {
         );
         
         Test.startTest();
-        Map<Id, Log__c> result = EventLogProcessors.findAndUpdateSimpleLogs(
+        EventLogProcessors.SimpleLogUpdateResult result = EventLogProcessors.findAndUpdateSimpleLogs(
             new List<Log__c>{eventLog}, 
             Logger.getInstance()
         );
         Test.stopTest();
         
         // Verify log with stacktrace was NOT matched
-        System.assertEquals(0, result.size(), 
+        System.assertEquals(0, result.logsToUpdate.size(), 
             'Should not find logs that already have stacktrace');
     }
 
@@ -4061,14 +4061,14 @@ private class EventLogProcessorsTest {
         );
         
         Test.startTest();
-        Map<Id, Log__c> result = EventLogProcessors.findAndUpdateSimpleLogs(
+        EventLogProcessors.SimpleLogUpdateResult result = EventLogProcessors.findAndUpdateSimpleLogs(
             new List<Log__c>{eventLog}, 
             Logger.getInstance()
         );
         Test.stopTest();
         
         // Verify no matches found
-        System.assertEquals(0, result.size(), 
+        System.assertEquals(0, result.logsToUpdate.size(), 
             'Should return empty map when no matching simple logs exist');
     }
 
@@ -4101,14 +4101,14 @@ private class EventLogProcessorsTest {
         );
         
         Test.startTest();
-        Map<Id, Log__c> result = EventLogProcessors.findAndUpdateSimpleLogs(
+        EventLogProcessors.SimpleLogUpdateResult result = EventLogProcessors.findAndUpdateSimpleLogs(
             new List<Log__c>{eventLog}, 
             Logger.getInstance()
         );
         Test.stopTest();
         
         // Verify log without Async_Job_Id was NOT matched
-        System.assertEquals(0, result.size(), 
+        System.assertEquals(0, result.logsToUpdate.size(), 
             'Should not match logs without Async_Job_Id');
     }
 

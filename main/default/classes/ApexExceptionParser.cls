@@ -4,8 +4,8 @@ global with sharing virtual class ApexExceptionParser implements IErrorParser {
     public static final Pattern PATTERN_WITH_ID = Pattern.compile('with id ([\\s\\S]{18});');
     public static final Pattern PATTERN_FAILED_TO = Pattern.compile('Failed to .* class \'?([^\' ]*?)\'? for job (id|ID) \'?(\\w*)\'?');
     public static final Pattern PATTERN_SCHEDULED_JOB = Pattern.compile('Scheduled job \'([^\']+)\' threw unhandled exception');
-    public static final Pattern PATTERN_CLASS = Pattern.compile('(?=[\\n|\\r\\n|\\r]{2}((Class\\.|Trigger\\.|\\(System Code|External entry point)[\\S\\s]+?)([\\n|\\r\\n|\\r]{2}|\\Z))');
-    public static final Pattern PATTERN_CLASS_2 = Pattern.compile('(?=((Class\\.|Trigger\\.|\\(System Code|External entry point)[\\S\\s]+?)([\\n|\\r\\n|\\r]{2}|\\Z))');
+    public static final Pattern PATTERN_CLASS = Pattern.compile('(?=[\\n|\\r\\n|\\r]{2}((Class\\.|Trigger\\.|\\([^)]+\\)|External entry point)[\\S\\s]+?)([\\n|\\r\\n|\\r]{2}|\\Z))');
+    public static final Pattern PATTERN_CLASS_2 = Pattern.compile('(?=((Class\\.|Trigger\\.|\\([^)]+\\)|External entry point)[\\S\\s]+?)([\\n|\\r\\n|\\r]{2}|\\Z))');
     public static final Pattern PATTERN_CAUSED_BY = Pattern.compile('(?=[\\n|\\r\\n|\\r]{2}(caused by:[\\S\\s]+?)([\\n|\\r\\n|\\r]{2}|\\Z))');
     public static final Pattern PATTERN_CLASS_NAME = Pattern.compile('Class ([\\s\\S]+?) : ');
     public static final Pattern PATTERN_CAUSED_BY_NAME = Pattern.compile('caused by: ([\\s\\S]+?):');
@@ -20,6 +20,9 @@ global with sharing virtual class ApexExceptionParser implements IErrorParser {
     public static final String REGEX_VISUALFORCE_PAGE = 'Visualforce Page: [\\s\\S]+?[\\n|\\r\\n|\\r]{2}';
     public static final String REGEX_EMAIL_PARTS = '[\\n|\\r\\n|\\r]{2}';
     public static final String REGEX_SYSTEM_CODE = '\\(System Code\\)([\\n|\\r\\n|\\r]|\\Z)';
+    // Regex to match hidden namespace tokens: (namespace), (pharos), (any_managed_package), etc.
+    // Used to normalize stacktraces for consistent hash generation across different error sources
+    public static final String REGEX_HIDDEN_NAMESPACE = '\\([a-zA-Z_][a-zA-Z0-9_]*\\)([\\n|\\r\\n|\\r]|\\Z)';
     public static final String PARSER_TOKEN = 'Apex script unhandled';
     public static final String STACKTRACE_ENTRY_POINT = 'External entry point';
     public static final String STACKTRACE_CLASS = 'Class.';
@@ -291,6 +294,10 @@ global with sharing virtual class ApexExceptionParser implements IErrorParser {
 
             // fix "(System Code)" issue in stacktrace
             this.stacktrace  = this.stacktrace.replaceAll(REGEX_SYSTEM_CODE, '');
+            
+            // Remove hidden namespace tokens: (namespace), (pharos), (any_managed_package)
+            // This ensures consistent hash generation regardless of namespace visibility
+            this.stacktrace = this.stacktrace.replaceAll(REGEX_HIDDEN_NAMESPACE, '');
 
             if (String.isNotBlank(this.stacktrace ) &&
                 !this.stacktrace.startsWith(STACKTRACE_ENTRY_POINT) &&
