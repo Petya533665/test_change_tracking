@@ -10,7 +10,7 @@ public with sharing class EventLogProcessors {
 
     // Exception class
     public class EventProcessingException extends Exception {}
-
+    
     // Event data interface
     public interface IBaseEventData {
         Object getValue(String metric);
@@ -8547,14 +8547,14 @@ public with sharing class EventLogProcessors {
             // Before creating new logs, check for simple logs (from JobBatch) to update
             // Simple logs have: no stacktrace, have Async_Job_Id__c, created by JobBatch
             if (!logsToCreate.isEmpty()) {
-                Map<Id, Log__c> simpleLogsToUpdateMap = findAndUpdateSimpleLogs(logsToCreate, logger);
+                SimpleLogUpdateResult updateResult = findAndUpdateSimpleLogs(logsToCreate, logger);
                 
                 // Remove logs that will update existing simple logs from logsToCreate
-                if (!simpleLogsToUpdateMap.isEmpty()) {
+                if (!updateResult.isEmpty()) {
                     List<Log__c> remainingLogsToCreate = new List<Log__c>();
                     Set<String> updatedSummaries = new Set<String>();
                     
-                    for (Log__c simpleLog : simpleLogsToUpdateMap.values()) {
+                    for (Log__c simpleLog : updateResult.logsToUpdate.values()) {
                         updatedSummaries.add(simpleLog.Summary__c);
                     }
                     
@@ -8567,12 +8567,13 @@ public with sharing class EventLogProcessors {
                     logsToCreate = remainingLogsToCreate;
                     
                     // Update the simple logs with full data
-                    List<Log__c> simpleLogsToUpdate = simpleLogsToUpdateMap.values();
+                    List<Log__c> simpleLogsToUpdate = updateResult.logsToUpdate.values();
                     DatabaseUtils.getInstance().performUpdateDML(simpleLogsToUpdate, Schema.SObjectType.Log__c)
                         .handleError(EventLogProcessors.class.getName(), '.processEventLogsWithEmailAwareness.simpleLogUpdate', logger);
                     
                     // Update Log_Index__c records to reflect new Hash_1__c values
-                    updateLogIndexesForUpdatedHashes(simpleLogsToUpdate, logger);
+                    // Pass old hashes map instead of reading from Hash__c field
+                    updateLogIndexesForUpdatedHashes(simpleLogsToUpdate, updateResult.oldHashesByLogId, logger);
                 }
             }
             
@@ -8590,18 +8591,36 @@ public with sharing class EventLogProcessors {
     }
 
     /**
+     * Wrapper class to hold both updated logs and their old hashes
+     * Used to avoid temporarily storing old hash in Hash__c field
+     */
+    public class SimpleLogUpdateResult {
+        public Map<Id, Log__c> logsToUpdate { get; set; }
+        public Map<Id, String> oldHashesByLogId { get; set; }
+        
+        public SimpleLogUpdateResult() {
+            this.logsToUpdate = new Map<Id, Log__c>();
+            this.oldHashesByLogId = new Map<Id, String>();
+        }
+        
+        public Boolean isEmpty() {
+            return logsToUpdate.isEmpty();
+        }
+    }
+    
+    /**
      * Find simple logs from JobBatch and update them with full data from EventLog
      * Simple logs are created by JobBatch without stacktrace (ExtendedStatus never has stacktrace)
      * They have Async_Job_Id__c but different Hash_1 formula (className + error + jobType)
      * @param eventLogsToCreate List of event logs that would be created (no Hash_1 match found)
      * @param logger Logger instance for error handling
-     * @return Map of simple logs to update (Id -> updated Log__c)
+     * @return SimpleLogUpdateResult containing logs to update and their old hashes
      */
-    public static Map<Id, Log__c> findAndUpdateSimpleLogs(List<Log__c> eventLogsToCreate, Logger logger) {
-        Map<Id, Log__c> simpleLogsToUpdate = new Map<Id, Log__c>();
+    public static SimpleLogUpdateResult findAndUpdateSimpleLogs(List<Log__c> eventLogsToCreate, Logger logger) {
+        SimpleLogUpdateResult result = new SimpleLogUpdateResult();
         
         if (eventLogsToCreate.isEmpty()) {
-            return simpleLogsToUpdate;
+            return result;
         }
         
         // Collect summaries and timestamps from event logs
@@ -8627,13 +8646,13 @@ public with sharing class EventLogProcessors {
         }
         
         if (summaries.isEmpty() || earliestTime == null) {
-            return simpleLogsToUpdate;
+            return result;
         }
         
-        // Expand time window to account for delays between JobBatch and EventLogProcessingBatch
-        // JobBatch runs ~1h after error, EventLog available ~3h after error
-        DateTime windowStart = earliestTime.addHours(-4);
-        DateTime windowEnd = (latestTime != null ? latestTime : earliestTime).addHours(1);
+        // Time window for finding simple logs that match event logs
+        // Extended window to handle delays between JobBatch and EventLogProcessingBatch
+        DateTime windowStart = earliestTime.addHours(-6);
+        DateTime windowEnd = (latestTime != null ? latestTime : earliestTime).addHours(2);
         
         // Query for candidate logs (with Async_Job_Id) with matching Summary
         // These are logs created by JobBatch that should be updated with full EventLog data
@@ -8642,7 +8661,7 @@ public with sharing class EventLogProcessors {
             List<Log__c> candidateLogs = [
                 SELECT Id, Summary__c, Stacktrace__c, Details__c, Hash__c, Hash_1__c, Hash_2__c, Hash_3__c, 
                        Async_Job_Id__c, Created_At__c, Request_Id_External__c, Organization_Id__c,
-                       Post_Processing_Status__c
+                       Post_Processing_Status__c, Category__c, Area__c, Resolved_On__c, Bug_Tracker__c
                 FROM Log__c
                 WHERE Summary__c IN :summaries
                 AND Async_Job_Id__c != null
@@ -8660,8 +8679,8 @@ public with sharing class EventLogProcessors {
                 
                 Log__c eventLog = eventLogBySummary.get(candidateLog.Summary__c);
                 
-                if (eventLog != null && !simpleLogsToUpdate.containsKey(candidateLog.Id)) {
-                    // Store old Hash_1__c for Log_Index update tracking
+                if (eventLog != null && !result.logsToUpdate.containsKey(candidateLog.Id)) {
+                    // Store old Hash_1__c in separate map (cleaner than using Hash__c field)
                     String oldHash1 = candidateLog.Hash_1__c;
                     
                     // Update simple log with full data from event log
@@ -8678,13 +8697,12 @@ public with sharing class EventLogProcessors {
                     // Recalculate hashes using correct formula (with stacktrace)
                     LogService.calculateHashes(candidateLog);
                     
-                    // Store old Hash_1__c in Hash__c temporarily for Log_Index cleanup
-                    candidateLog.Hash__c = oldHash1;
-                    
                     // Mark for post-processing (stacktrace parsing, etc.)
                     candidateLog.Post_Processing_Status__c = LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED;
                     
-                    simpleLogsToUpdate.put(candidateLog.Id, candidateLog);
+                    // Store log and its old hash in result
+                    result.logsToUpdate.put(candidateLog.Id, candidateLog);
+                    result.oldHashesByLogId.put(candidateLog.Id, oldHash1);
                     
                     // Remove from eventLogBySummary to prevent multiple matches
                     eventLogBySummary.remove(candidateLog.Summary__c);
@@ -8694,62 +8712,47 @@ public with sharing class EventLogProcessors {
             logger?.add(logger?.getInternalError(e, null, EventLogProcessors.class.getName(), 'Error finding simple logs for update'));
         }
         
-        return simpleLogsToUpdate;
+        return result;
     }
     
     /**
-     * Update Log_Index__c records when simple logs' Hash_1__c values change
-     * Updates existing index records to use the new stacktrace-based hash, preserving all metadata
-     * @param updatedLogs List of logs that had their Hash_1__c updated (Hash__c contains old Hash_1__c value)
+     * Update Log_Index__c records when simple logs are enriched with stacktraces
+     * Uses ConfigUtil.createBulkDualLogIndexes() to handle all index creation/merging logic in bulk
+     * @param updatedLogs List of logs that had their Hash_1__c updated
+     * @param oldHashesByLogId Map of log ID to old Hash_1__c value (before enrichment)
      * @param logger Logger instance
      */
-    private static void updateLogIndexesForUpdatedHashes(List<Log__c> updatedLogs, Logger logger) {
+    @TestVisible
+    private static void updateLogIndexesForUpdatedHashes(List<Log__c> updatedLogs, Map<Id, String> oldHashesByLogId, Logger logger) {
         try {
-            // Build mapping of old keys to new hash values
-            Map<String, String> oldKeyToNewHash = new Map<String, String>();
-            Map<String, String> oldKeyToOrgId = new Map<String, String>();
+            // Use ConfigUtil's bulk dual index creation logic to avoid SOQL in loop
+            // This method already handles:
+            // - Querying for existing indexes (ONE SOQL query for all)
+            // - Merging duplicate indexes  
+            // - Setting up Correct_Hash_Index__c lookup
+            // - Preserving First_Occurred_On__c, Bug_Tracker__c, etc.
             
+            ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(new Set<String>());
+            
+            // Collect all logs that need dual indexes (bulkify to avoid SOQL in loop)
+            Map<String, Log__c> logsBySimpleHash = new Map<String, Log__c>();
             for (Log__c log : updatedLogs) {
-                // Old Hash_1__c was stored in Hash__c field temporarily
-                String oldHash1 = log.Hash__c;
-                String newHash1 = log.Hash_1__c;
+                // Get old hash from the passed-in map (cleaner than reading from Hash__c field)
+                String oldSimpleHash = oldHashesByLogId.get(log.Id);
+                String newCorrectHash = log.Hash_1__c;
                 
-                if (String.isNotBlank(oldHash1) && String.isNotBlank(newHash1) 
-                    && String.isNotBlank(log.Organization_Id__c) 
-                    && oldHash1 != newHash1) {
-                    String oldKey = ConfigUtil.getLogIndexKey(oldHash1, log.Organization_Id__c);
-                    oldKeyToNewHash.put(oldKey, newHash1);
-                    oldKeyToOrgId.put(oldKey, log.Organization_Id__c);
+                if (String.isNotBlank(oldSimpleHash) 
+                    && String.isNotBlank(newCorrectHash) 
+                    && oldSimpleHash != newCorrectHash
+                    && String.isNotBlank(log.Async_Job_Id__c)) {
+                    
+                    logsBySimpleHash.put(oldSimpleHash, log);
                 }
             }
             
-            if (!oldKeyToNewHash.isEmpty()) {
-                // Query existing Log_Index__c records with old keys
-                List<Log_Index__c> indexesToUpdate = [
-                    SELECT Id, Key__c, Hash__c, Organization_Id__c, 
-                           First_Occurred_On__c, Resolved_On__c, Bug_Tracker__c, Internal__c
-                    FROM Log_Index__c 
-                    WHERE Key__c IN :oldKeyToNewHash.keySet()
-                ];
-                
-                if (!indexesToUpdate.isEmpty()) {
-                    // Update each index with new hash and key
-                    for (Log_Index__c indexToUpdate : indexesToUpdate) {
-                        String newHash = oldKeyToNewHash.get(indexToUpdate.Key__c);
-                        String orgId = oldKeyToOrgId.get(indexToUpdate.Key__c);
-                        
-                        if (String.isNotBlank(newHash)) {
-                            // Update hash and recalculate key
-                            indexToUpdate.Hash__c = newHash;
-                            indexToUpdate.Key__c = ConfigUtil.getLogIndexKey(newHash, orgId);
-                            // Keep all other fields: First_Occurred_On__c, Resolved_On__c, Bug_Tracker__c, Internal__c
-                        }
-                    }
-                    
-                    // Perform bulk update
-                    DatabaseUtils.getInstance().performUpdateDML(indexesToUpdate, Schema.SObjectType.Log_Index__c)
-                        .handleError(EventLogProcessors.class.getName(), '.updateLogIndexesForUpdatedHashes', logger);
-                }
+            // Bulk create all dual indexes at once (ONE SOQL query, TWO DML operations)
+            if (!logsBySimpleHash.isEmpty()) {
+                helper.createBulkDualLogIndexes(logsBySimpleHash, logger);
             }
         } catch (Exception e) {
             logger?.add(logger?.getInternalError(e, null, EventLogProcessors.class.getName(), 'Error updating log indexes for changed hashes'));

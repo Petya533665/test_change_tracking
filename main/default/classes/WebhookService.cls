@@ -31,7 +31,6 @@ public with sharing class WebhookService {
     
     // Token Generation
     private static final String WEBHOOK_TOKEN_PREFIX = 'webhook_';
-    private static final Integer WEBHOOK_HASH_LENGTH = 29;
     private static final String DELIMITER_COLON = ':';
     private static final Integer SPLIT_LIMIT_TWO = 2;
     
@@ -203,8 +202,8 @@ public with sharing class WebhookService {
         
         // Parse authentication config
         if (String.isNotBlank(action.Webhook_Auth_Type__c)) {
-            // Retrieve token from custom settings
-            String authValue = getWebhookTokenFromSettings(action.Webhook_URL__c);
+            // Retrieve token from custom settings using action ID
+            String authValue = getWebhookTokenFromSettings(action.Id);
             
             config.authConfig = new WebhookAuthConfig(
                 action.Webhook_Auth_Type__c,
@@ -412,46 +411,33 @@ public with sharing class WebhookService {
     }
     
     /**
-     * Generate a safe token type name from full webhook URL
-     * Uses full URL to ensure uniqueness per endpoint
-     * @param webhookUrl The full webhook URL
-     * @return Safe alphanumeric string for use as token type (hash-based for uniqueness)
+     * Generate a safe token type name from action ID
+     * Uses action ID to ensure uniqueness per action
+     * @param actionId The action record ID
+     * @return Safe alphanumeric string for use as token type (action ID based for uniqueness)
      */
-    public static String generateWebhookTokenType(String webhookUrl) {
-        if (String.isBlank(webhookUrl)) {
+    public static String generateWebhookTokenType(String actionId) {
+        if (String.isBlank(actionId)) {
             return null;
         }
         
-        // Use full URL to ensure uniqueness per endpoint
-        // Hash the URL to create a fixed-length, safe identifier
-        // This ensures each unique URL gets its own token storage
-        Blob urlBlob = Blob.valueOf(webhookUrl.toLowerCase().trim());
-        Blob hash = Crypto.generateDigest('SHA-256', urlBlob);
-        String hashString = EncodingUtil.base64Encode(hash);
-        
-        // Remove non-alphanumeric characters and limit length
-        // Base64 can contain +, /, = which we need to replace
-        Matcher matcher = Constants.GLOBAL_VARIABLE.PATTERN_NON_ALPHANUMERIC.matcher(hashString);
-        String safeHash = matcher.replaceAll('');
-        
-        // Use first 29 characters of hash to leave room for index suffix in Name field
-        // Name format: "webhook_<29charhash><index>" where index can be 0-99 (up to 2 digits)
-        // Total: 8 (webhook_) + 29 (hash) + 2 (index) = 39 chars max (within 40 char limit)
-        // Prefix with webhook_ to make it identifiable
-        String hashPrefix = safeHash.length() > WEBHOOK_HASH_LENGTH ? safeHash.substring(0, WEBHOOK_HASH_LENGTH) : safeHash;
-        return WEBHOOK_TOKEN_PREFIX + hashPrefix.toLowerCase();
+        // Use action ID to ensure uniqueness per action
+        // This ensures each action gets its own token storage, even if they share the same URL
+        // Format: "webhook_<actionId>" where actionId is 15 or 18 characters
+        // Total: 8 (webhook_) + 18 (actionId) = 26 chars max (well within 40 char limit)
+        return WEBHOOK_TOKEN_PREFIX + actionId;
     }
     
     /**
      * Save webhook auth token to custom settings
-     * @param webhookUrl The webhook URL (used to generate unique token type)
+     * @param actionId The action record ID (used to generate unique token type)
      * @param token The token value to save
      * @param withDML Whether to perform DML immediately
      * @param logger Logger instance for error logging
      */
-    public static void putWebhookTokenToSettings(String webhookUrl, String token, Boolean withDML, Logger logger) {
-        if (String.isNotBlank(webhookUrl) && String.isNotBlank(token)) {
-            String tokenType = generateWebhookTokenType(webhookUrl);
+    public static void putWebhookTokenToSettings(String actionId, String token, Boolean withDML, Logger logger) {
+        if (String.isNotBlank(actionId) && String.isNotBlank(token)) {
+            String tokenType = generateWebhookTokenType(actionId);
             if (String.isNotBlank(tokenType)) {
                 GraphAPIService.upsertGraphAPITokenRecords(tokenType, token, withDML, logger);
             }
@@ -460,20 +446,50 @@ public with sharing class WebhookService {
     
     /**
      * Retrieve webhook auth token from custom settings
-     * @param webhookUrl The webhook URL (used to generate unique token type)
+     * @param actionId The action record ID (used to generate unique token type)
      * @return The token value, or null if not found
      */
-    public static String getWebhookTokenFromSettings(String webhookUrl) {
-        if (String.isBlank(webhookUrl)) {
+    public static String getWebhookTokenFromSettings(String actionId) {
+        if (String.isBlank(actionId)) {
             return null;
         }
         
-        String tokenType = generateWebhookTokenType(webhookUrl);
+        String tokenType = generateWebhookTokenType(actionId);
         if (String.isNotBlank(tokenType)) {
             return GraphAPIService.getApiTokenValueFromSettings(tokenType);
         }
         
         return null;
+    }
+    
+    /**
+     * Delete webhook auth token from custom settings
+     * @param actionIds Set of action record IDs to delete tokens for
+     * @param withDML Whether to perform DML immediately
+     * @param logger Logger instance for error logging
+     */
+    public static void deleteWebhookTokensFromSettings(Set<Id> actionIds, Boolean withDML, Logger logger) {
+        if (actionIds == null || actionIds.isEmpty()) {
+            return;
+        }
+        
+        for (Id actionId : actionIds) {
+            if (String.isNotBlank(actionId)) {
+                String tokenType = generateWebhookTokenType(actionId);
+                if (String.isNotBlank(tokenType)) {
+                    // Get all token records for this action and mark them for deletion
+                    List<Graph_API_Token__c> tokenRecords = GraphAPIService.getGraphApiTokenListRecordsByType(tokenType);
+                    if (!tokenRecords.isEmpty()) {
+                        GraphAPIService.GRAPH_API_LIST_RECORDS_DELETE.addAll(tokenRecords);
+                    }
+                }
+            }
+        }
+        
+        // Only save immediately if withDML is true
+        if (withDML) {
+            GraphAPIService.saveListTokenRecordSettings(withDML, logger);
+        }
     }
     
     /**

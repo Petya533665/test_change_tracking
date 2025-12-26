@@ -3681,4 +3681,249 @@ private class EventLogProcessingBatchTest {
         System.assertEquals(0, [SELECT COUNT() FROM Log_Index__c WHERE Key__c = :newKey], 
             'No new index created by update operation');
     }
+
+    // ==========================================
+    // INTEGRATION TESTS: Simple Log Updates and Deduplication
+    // ==========================================
+
+    /**
+     * INTEGRATION TEST: Simple logs updated with stacktrace and correct hash
+     * Scenario: JobBatch creates simple log → EventLogProcessingBatch finds and updates it
+     * Expected: Simple log updated with stacktrace, Hash_1__c recalculated, dual indexes created
+     */
+    @IsTest
+    static void test_eventLogProcessingBatch_updates_simple_log_with_stacktrace() {
+        Test_LogService.initSettings();
+        String orgId = UserInfo.getOrganizationId();
+        DateTime errorTime = DateTime.now().addHours(-2);
+        
+        // STEP 1: JobBatch creates simple log (no stacktrace, simple hash)
+        Log__c simpleLog = new Log__c(
+            Summary__c = 'System.NullPointerException: Attempt to de-reference a null object',
+            Details__c = 'Error in batch processing',
+            Stacktrace__c = null,  // NO stacktrace (simple log from JobBatch)
+            Async_Job_Id__c = '707XX00000XXX01',
+            Category__c = 'Apex',
+            Organization_Id__c = orgId,
+            Created_At__c = errorTime
+        );
+        LogService.calculateHashes(simpleLog);
+        insert simpleLog;
+        
+        String oldHash1 = simpleLog.Hash_1__c;
+        String oldKey = ConfigUtil.getLogIndexKey(oldHash1, orgId);
+        
+        // Verify simple Log_Index__c created
+        System.assertEquals(1, [SELECT COUNT() FROM Log_Index__c WHERE Key__c = :oldKey], 
+            'Simple Log_Index__c should be created');
+        
+        // STEP 2: Create event log that would trigger update
+        Log__c eventLog = new Log__c(
+            Summary__c = simpleLog.Summary__c,
+            Stacktrace__c = 'Class.TestBatch.execute: line 10, column 1\nClass.Database.executeBatch: line 5',
+            Details__c = 'Full error details with stacktrace',
+            Category__c = 'Apex',
+            Organization_Id__c = orgId,
+            Created_At__c = errorTime
+        );
+        
+        Test.startTest();
+        
+        // Use PRODUCTION METHOD: findAndUpdateSimpleLogs
+        EventLogProcessors.SimpleLogUpdateResult updateResult = EventLogProcessors.findAndUpdateSimpleLogs(
+            new List<Log__c>{eventLog}, 
+            Logger.getInstance()
+        );
+        
+        System.assertEquals(1, updateResult.logsToUpdate.size(), 'Should find and update 1 simple log');
+        System.assertEquals(simpleLog.Id, new List<Id>(updateResult.logsToUpdate.keySet())[0], 
+            'Should update the correct log');
+        
+        // Update the logs (production does this)
+        List<Log__c> updatedLogs = updateResult.logsToUpdate.values();
+        update updatedLogs;
+        
+        // Use PRODUCTION METHOD: createBulkDualLogIndexes directly
+        // (updateLogIndexesForUpdatedHashes calls this internally, but calling directly for test clarity)
+        ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(new Set<String>());
+        Map<String, Log__c> logsBySimpleHash = new Map<String, Log__c>();
+        for (Log__c log : updatedLogs) {
+            // Get old hash from the update result (cleaner than reading from Hash__c field)
+            String oldHash = updateResult.oldHashesByLogId.get(log.Id);
+            if (String.isNotBlank(oldHash) && oldHash != log.Hash_1__c) {
+                logsBySimpleHash.put(oldHash, log);
+            }
+        }
+        helper.createBulkDualLogIndexes(logsBySimpleHash, Logger.getInstance());
+        
+        Test.stopTest();
+        
+        // Verify log updated correctly
+        Log__c updatedLog = [
+            SELECT Id, Hash_1__c, Hash_2__c, Hash_3__c, Stacktrace__c, Hash__c
+            FROM Log__c
+            WHERE Id = :simpleLog.Id
+        ];
+        
+        String newHash1 = updatedLog.Hash_1__c;
+        System.assertNotEquals(oldHash1, newHash1, 'Hash_1__c should change after adding stacktrace');
+        System.assertNotEquals(null, updatedLog.Stacktrace__c, 'Stacktrace should be populated');
+        System.assertNotEquals(null, updatedLog.Hash_2__c, 'Hash_2__c should be calculated');
+        System.assertNotEquals(null, updatedLog.Hash_3__c, 'Hash_3__c should be calculated');
+        // Note: We no longer store old hash in Hash__c field - it's passed via SimpleLogUpdateResult instead
+        
+        // Verify dual indexes created: simple index + correct index
+        String newKey = ConfigUtil.getLogIndexKey(newHash1, orgId);
+        String simpleKey = oldKey;  // Old key becomes the simple hash key
+        
+        // Check correct hash index exists
+        List<Log_Index__c> correctIndexes = [
+            SELECT Id, Hash__c, First_Occurred_On__c
+            FROM Log_Index__c
+            WHERE Key__c = :newKey
+        ];
+        System.assertEquals(1, correctIndexes.size(), 'Correct hash index should exist');
+        System.assertEquals(newHash1, correctIndexes[0].Hash__c, 'Correct hash should be set');
+        
+        // Check simple hash index has lookup to correct index
+        List<Log_Index__c> simpleIndexes = [
+            SELECT Id, Hash__c, Correct_Hash_Index__c, Correct_Hash_Index__r.Hash__c
+            FROM Log_Index__c
+            WHERE Key__c = :simpleKey
+        ];
+        System.assertEquals(1, simpleIndexes.size(), 'Simple hash index should exist');
+        System.assertNotEquals(null, simpleIndexes[0].Correct_Hash_Index__c,
+            'Simple index should have lookup to correct index');
+        System.assertEquals(newHash1, simpleIndexes[0].Correct_Hash_Index__r.Hash__c,
+            'Lookup should point to correct hash');
+    }
+
+    /**
+     * INTEGRATION TEST: Dual index creation with merge scenario
+     * Scenario: Email creates correct hash index → JobBatch creates simple log → 
+     *           EventLogProcessingBatch updates simple log → createDualLogIndexes merges
+     * Expected: Dual indexes created with lookup, metadata preserved, no duplicate key error
+     */
+    @IsTest
+    static void test_eventLogProcessingBatch_creates_dual_indexes_with_merge() {
+        Test_LogService.initSettings();
+        String orgId = UserInfo.getOrganizationId();
+        DateTime emailTime = DateTime.now().addHours(-3);
+        DateTime jobBatchTime = DateTime.now().addHours(-2);
+        
+        // STEP 1: Email creates log with correct hash (has stacktrace)
+        Log__c emailLog = new Log__c(
+            Summary__c = 'System.QueryException: List has no rows for assignment',
+            Details__c = 'Error from email',
+            Stacktrace__c = 'Class.EmailTest.method: line 20, column 1',
+            Async_Job_Id__c = '707YY00000YYY01',
+            Category__c = 'Apex',
+            Organization_Id__c = orgId,
+            Created_At__c = emailTime
+        );
+        LogService.calculateHashes(emailLog);
+        insert emailLog;
+        
+        String correctHash1 = emailLog.Hash_1__c;
+        String correctKey = ConfigUtil.getLogIndexKey(correctHash1, orgId);
+        
+        // Verify email Log_Index__c created
+        List<Log_Index__c> emailIndexes = [
+            SELECT Id, Key__c, Hash__c, First_Occurred_On__c
+            FROM Log_Index__c
+            WHERE Key__c = :correctKey
+        ];
+        System.assertEquals(1, emailIndexes.size(), 'Email should create Log_Index__c');
+        
+        // Add metadata (simulating ticket creation)
+        emailIndexes[0].Bug_Tracker__c = 'JIRA-123';
+        update emailIndexes[0];
+        
+        // STEP 2: JobBatch creates simple log (no stacktrace, simple hash)
+        Log__c simpleLog = new Log__c(
+            Summary__c = 'System.QueryException: List has no rows for assignment',
+            Details__c = 'Error from JobBatch',
+            Stacktrace__c = null,
+            Async_Job_Id__c = '707YY00000YYY02',
+            Category__c = 'Apex',
+            Organization_Id__c = orgId,
+            Created_At__c = jobBatchTime
+        );
+        LogService.calculateHashes(simpleLog);
+        insert simpleLog;
+        
+        String simpleHash1 = simpleLog.Hash_1__c;
+        System.assertNotEquals(correctHash1, simpleHash1, 'Simple hash should differ');
+        System.assertEquals(2, [SELECT COUNT() FROM Log_Index__c], 'Should have 2 indexes before merge');
+        
+        // STEP 3: Create event log to trigger update
+        Log__c eventLog = new Log__c(
+            Summary__c = simpleLog.Summary__c,
+            Stacktrace__c = emailLog.Stacktrace__c,  // Same stacktrace
+            Details__c = 'Event log details',
+            Category__c = 'Apex',
+            Organization_Id__c = orgId,
+            Created_At__c = jobBatchTime
+        );
+        
+        Test.startTest();
+        
+        // Use PRODUCTION METHOD: findAndUpdateSimpleLogs
+        EventLogProcessors.SimpleLogUpdateResult updateResult = EventLogProcessors.findAndUpdateSimpleLogs(
+            new List<Log__c>{eventLog},
+            Logger.getInstance()
+        );
+        
+        System.assertEquals(1, updateResult.logsToUpdate.size(), 'Should find simple log');
+        System.assertEquals(simpleLog.Id, new List<Id>(updateResult.logsToUpdate.keySet())[0],
+            'Should update the correct log');
+        
+        // Update the logs (production does this)
+        List<Log__c> updatedLogs = updateResult.logsToUpdate.values();
+        update updatedLogs;
+        
+        // Use PRODUCTION METHOD: createBulkDualLogIndexes directly
+        // (updateLogIndexesForUpdatedHashes calls this internally, but calling directly for test clarity)
+        ConfigUtil.LogIndexHelper helper = new ConfigUtil.LogIndexHelper(new Set<String>());
+        Map<String, Log__c> logsBySimpleHash = new Map<String, Log__c>();
+        for (Log__c log : updatedLogs) {
+            // Get old hash from the update result (cleaner than reading from Hash__c field)
+            String oldHash = updateResult.oldHashesByLogId.get(log.Id);
+            if (String.isNotBlank(oldHash) && oldHash != log.Hash_1__c) {
+                logsBySimpleHash.put(oldHash, log);
+            }
+        }
+        helper.createBulkDualLogIndexes(logsBySimpleHash, Logger.getInstance());
+        
+        Test.stopTest();
+        
+        // Verify dual indexes created with lookup
+        String simpleKey = ConfigUtil.getLogIndexKey(simpleHash1, orgId);
+        
+        // Check simple index has lookup to correct index
+        List<Log_Index__c> simpleIndexes = [
+            SELECT Id, Hash__c, Correct_Hash_Index__c, Correct_Hash_Index__r.Hash__c,
+                   First_Occurred_On__c
+            FROM Log_Index__c
+            WHERE Key__c = :simpleKey
+        ];
+        System.assertEquals(1, simpleIndexes.size(), 'Simple index should exist');
+        System.assertNotEquals(null, simpleIndexes[0].Correct_Hash_Index__c,
+            'Simple index should have lookup');
+        System.assertEquals(correctHash1, simpleIndexes[0].Correct_Hash_Index__r.Hash__c,
+            'Lookup should point to correct hash index');
+        
+        // Check correct index preserved metadata
+        List<Log_Index__c> correctIndexes = [
+            SELECT Id, Hash__c, First_Occurred_On__c, Bug_Tracker__c
+            FROM Log_Index__c
+            WHERE Key__c = :correctKey
+        ];
+        System.assertEquals(1, correctIndexes.size(), 'Correct index should exist');
+        System.assertEquals(correctHash1, correctIndexes[0].Hash__c);
+        System.assertEquals('JIRA-123', correctIndexes[0].Bug_Tracker__c,
+            'Bug_Tracker__c should be preserved');
+        System.assertEquals(emailTime, correctIndexes[0].First_Occurred_On__c,
+            'Earliest time should be preserved');
+    }
 }

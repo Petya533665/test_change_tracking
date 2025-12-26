@@ -876,6 +876,20 @@ public without sharing class AdminService {
                 );
             }
         }
+        
+        // Delete webhook auth tokens for the actions being deleted
+        if (actionIdsToExclude != null && !actionIdsToExclude.isEmpty()) {
+            try {
+                Logger logger = Logger.getInstance();
+                WebhookService.deleteWebhookTokensFromSettings(actionIdsToExclude, true, logger);
+            } catch (Exception e) {
+                Logger.getInstance()?.addInternalError(
+                    e,
+                    AdminService.class.getName(),
+                    'deleteWebhookRemoteSiteSettings - Token deletion'
+                );
+            }
+        }
     }
 
     public static Boolean checkRemoteSiteSettings() {
@@ -2250,11 +2264,12 @@ public without sharing class AdminService {
 
     public static Map<String, Object> getServicesEnable() {
         return new Map<String, Object>{
-            //'Jira' => ConfigUtil.SETTINGS.Auto_Jira_Task__c,
-            ConfigUtil.SLACK_SERVICE_NAME => ConfigUtil.SLACK_SETTINGS.Slack_Enabled__c,
-            ConfigUtil.PAGER_DUTY_SERVICE_NAME => ConfigUtil.PAGER_DUTY_SETTINGS.PagerDuty_Enabled__c,
-            ConfigUtil.TEAMS_SERVICE_NAME => ConfigUtil.GRAPH_API_SETTINGS.Enabled__c,
-            ConfigUtil.WEBHOOK_SERVICE_NAME => PermissionsUtil.WebhookIntegrationEnabled
+            ConfigUtil.SLACK_SERVICE_NAME => PermissionsUtil.SlackIntegrationEnabled && ConfigUtil.SLACK_SETTINGS.Slack_Enabled__c,
+            ConfigUtil.PAGER_DUTY_SERVICE_NAME => PermissionsUtil.PagerDutyIntegrationEnabled && ConfigUtil.PAGER_DUTY_SETTINGS.PagerDuty_Enabled__c,
+            ConfigUtil.TEAMS_SERVICE_NAME => PermissionsUtil.TeamsIntegrationEnabled && ConfigUtil.GRAPH_API_SETTINGS.Enabled__c,
+            ConfigUtil.WEBHOOK_SERVICE_NAME => PermissionsUtil.WebhookIntegrationEnabled,
+            ConfigUtil.JIRA_SERVICE_NAME => PermissionsUtil.JiraIntegrationEnabled && String.isNotBlank(JiraService.JIRA_OAUTH_TOKEN),
+            ConfigUtil.AZURE_DEV_OPS_SERVICE_NAME => PermissionsUtil.AzureDevOpsIntegrationEnabled && String.isNotBlank(AzureService.OAUTH_API_TOKEN)
         };
     }
     //log-categories
@@ -2733,24 +2748,30 @@ public without sharing class AdminService {
             RuleUtil.RuleType ruleType = RuleUtil.MAP_RULE_TYPE.get(type);
             Integer limitRules = 100;
 
+            Set<String> ruleTypes = new Set<String>();
             switch on ruleType {
                 when MONITORING {
                     limitRules = LimitsService.getMaxMonitoringRules();
+                    ruleTypes.add(type);
                 }
                 when ARCHIVAL {
                     limitRules = LimitsService.getMaxArchivalRules();
+                    ruleTypes.add(type);
                 }
                 when JIRA_UPDATE, AZURE_DEV_OPS {
                     limitRules = LimitsService.getMaxJiraRules();
+                    ruleTypes.add(Constants.RULE_SOBJECT.TYPE_JIRA_UPDATE);
+                    ruleTypes.add(Constants.RULE_SOBJECT.TYPE_AZURE_DEV_OPS);
                 }
                 when NOTIFICATION {
                     limitRules = LimitsService.getMaxNotificationRules();
+                    ruleTypes.add(type);
                 }
             }
             
             // If limitRules is null, it means unlimited - skip validation
             if (limitRules != null) {
-                Integer rulesCount = [SELECT COUNT() FROM Rule__c WHERE Type__c = :type AND Active__c = TRUE];
+                Integer rulesCount = [SELECT COUNT() FROM Rule__c WHERE Type__c IN :ruleTypes AND Active__c = TRUE];
                 Boolean oldActvieValue = String.isNotBlank(ruleId) 
                     ? [SELECT Active__c FROM Rule__c WHERE Id = :ruleId LIMIT 1].Active__c
                     : false;

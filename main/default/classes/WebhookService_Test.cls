@@ -49,10 +49,11 @@ private class WebhookService_Test {
             Webhook_Body_Template__c = '{"message": "{!Log__c.Summary__c}"}',
             Webhook_Auth_Type__c = 'Bearer'
         );
+        insert action;
         
-        // Save token to custom settings
+        // Save token to custom settings using action ID
         Logger logger = Logger.getInstance();
-        WebhookService.putWebhookTokenToSettings('https://api.example.com/webhook', 'test-token', true, logger);
+        WebhookService.putWebhookTokenToSettings(action.Id, 'test-token', true, logger);
         GraphAPIService.saveListTokenRecordSettings(true, logger);
         
         Test.startTest();
@@ -65,6 +66,7 @@ private class WebhookService_Test {
         System.assert(config.headers.containsKey('X-Custom-Header'), 'Should have custom header');
         System.assertEquals('test-value', config.headers.get('X-Custom-Header'), 'Header value should match');
         System.assertNotEquals(null, config.authConfig, 'Auth config should be set');
+        System.assertEquals('test-token', config.authConfig.authValue, 'Auth token should match');
     }
     
     @isTest

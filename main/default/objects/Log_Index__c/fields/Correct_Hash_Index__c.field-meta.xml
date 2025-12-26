@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Correct_Hash_Index__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>Points from simple hash index (used by JobBatch) to correct stacktrace-based hash index. Enables deduplication when JobBatch runs after email/platform event has already created a log with correct hash.</description>
+    <externalId>false</externalId>
+    <label>Correct Hash Index</label>
+    <referenceTo>Log_Index__c</referenceTo>
+    <relationshipLabel>Simple Hash Indexes</relationshipLabel>
+    <relationshipName>Simple_Hash_Indexes</relationshipName>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+</CustomField>

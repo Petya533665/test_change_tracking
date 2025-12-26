@@ -792,6 +792,8 @@ public with sharing class ConfigUtil {
 	public static final String PAGER_DUTY_SERVICE_NAME = 'PagerDuty';
     public static final String TEAMS_SERVICE_NAME = 'Teams';
     public static final String WEBHOOK_SERVICE_NAME = 'Webhook';
+    public static final String JIRA_SERVICE_NAME = 'Jira';
+    public static final String AZURE_DEV_OPS_SERVICE_NAME = 'Azure';
 
     public static final String LOG_CATEGORIES_KEY_CATEGORIES = 'categories';
     public static final String LOG_CATEGORIES_KEY_RECORDTYPES = 'recordtypes';
@@ -1196,6 +1198,56 @@ public with sharing class ConfigUtil {
         return key;
     }
     
+    /**
+     * Bulkified version: Calculate simple hashes for multiple AsyncApexJobIds
+     * @param asyncApexJobIds Set of AsyncApexJob IDs
+     * @return Map of AsyncApexJobId to simple hash
+     */
+    public static Map<String, String> calculateBulkSimpleHashesFromAsyncJobIds(Set<String> asyncApexJobIds) {
+        Map<String, String> jobIdToSimpleHash = new Map<String, String>();
+        
+        if (asyncApexJobIds == null || asyncApexJobIds.isEmpty()) {
+            return jobIdToSimpleHash;
+        }
+        // Single SOQL query for all AsyncApexJobs
+        for (AsyncApexJob job : [
+            SELECT Id, JobType, ExtendedStatus, ApexClass.Name, ApexClass.NamespacePrefix
+            FROM AsyncApexJob
+            WHERE Id IN :asyncApexJobIds
+        ]) {
+            // Reuse existing methods from JobBatch to avoid code duplication
+            String className = JobBatch.getJobApexClassName(job);
+            String extendedStatus = JobBatch.getJobExtendedStatus(job.ExtendedStatus);
+            
+            // Use same formula as JobBatch.getHash1()
+            String simpleHash = LogService.generateHash_1(className + extendedStatus + job.JobType);
+            // CRITICAL: Store with 15-char ID to match Log__c.Async_Job_Id__c (which uses .to15())
+            jobIdToSimpleHash.put(job.Id.to15(), simpleHash);
+        }
+        return jobIdToSimpleHash;
+    }
+    
+    /**
+     * Calculate simple hash from AsyncApexJob (for dual index creation)
+     * Matches the formula used in JobBatch.getHash1()
+     * NOTE: This method does SOQL - prefer calculateBulkSimpleHashesFromAsyncJobIds() for bulk operations
+     * @param asyncApexJobId The AsyncApexJob ID
+     * @return Simple hash or null if unable to calculate
+     */
+    public static String calculateSimpleHashFromAsyncJobId(String asyncApexJobId) {
+        if (String.isBlank(asyncApexJobId)) {
+            return null;
+        }
+        
+        // Use bulk method for single ID to avoid code duplication
+        Map<String, String> result = calculateBulkSimpleHashesFromAsyncJobIds(new Set<String>{asyncApexJobId});
+        return result.get(asyncApexJobId);
+    }
+
+    public static Boolean isPharosInternalError(Log__c log) {
+        return log?.Category__c == Logger.CATEGORY_PHAROS_ERROR || log.Area__c == Logger.AREA_PHAROS_ERROR;
+    }
+    
     public with sharing class LogIndexHelper {
         
         private Boolean uniqueByOrg = ConfigUtil.JIRA_SETTINGS.Create_Unique_Tickets_by_Org__c;
@@ -1229,9 +1281,7 @@ public with sharing class ConfigUtil {
                 if(String.isNotBlank(log?.Bug_Tracker__c)) {
                     newIndex.bugTracker = log?.Bug_Tracker__c;
                 }
-                if(log?.Category__c == Logger.CATEGORY_PHAROS_ERROR || log.Area__c == Logger.AREA_PHAROS_ERROR) {
-                    newIndex.internal = true;
-                }
+                newIndex.internal = ConfigUtil.isPharosInternalError(log);
                 this.logIndexes.put(newIndex.key, newIndex.toSObject());
                 this.mapIndexes.put(newIndex.key, newIndex);
             }
@@ -1253,6 +1303,165 @@ public with sharing class ConfigUtil {
             DatabaseUtils.getInstance().performUpsertDML(new List<Log_Index__c>{logIndex.toSObject()}, Schema.SObjectType.Log_Index__c, Log_Index__c.Key__c, false)
                 .filterUpsertResultsDuplicateValue(Schema.SObjectType.Log_Index__c.fields.Key__c.getName())
                 .handleError(ConfigUtil.class.getName(), '.saveLogIndex', logger);
+        }
+        
+        /**
+         * Bulkified version: Create dual Log_Index__c records for multiple logs at once
+         * Avoids SOQL in loop by querying all needed indexes upfront
+         * @param logsBySimpleHash Map of simple hash to Log__c record
+         * @param logger Logger instance for error handling
+         */
+        public void createBulkDualLogIndexes(Map<String, Log__c> logsBySimpleHash, Logger logger) {
+            if (logsBySimpleHash == null || logsBySimpleHash.isEmpty()) {
+                return;
+            }
+            
+            // Collect all keys we need to query
+            Set<String> allKeys = new Set<String>();
+            for (String simpleHash : logsBySimpleHash.keySet()) {
+                Log__c log = logsBySimpleHash.get(simpleHash);
+                String correctHash = log.Hash_1__c;
+                String orgId = log.Organization_Id__c;
+                
+                if (String.isNotBlank(correctHash) && correctHash != simpleHash) {
+                    allKeys.add(getLogIndexKey(correctHash, orgId));
+                    allKeys.add(getLogIndexKey(simpleHash, orgId));
+                }
+            }
+            
+            // Single SOQL query for all indexes
+            Map<String, Log_Index__c> existingIndexesByKey = new Map<String, Log_Index__c>();
+            for (Log_Index__c idx : [
+                SELECT Id, Key__c, Hash__c, Organization_Id__c, First_Occurred_On__c, 
+                       Bug_Tracker__c, Resolved_On__c, Internal__c, Correct_Hash_Index__c
+                FROM Log_Index__c
+                WHERE Key__c IN :allKeys
+            ]) {
+                existingIndexesByKey.put(idx.Key__c, idx);
+            }
+            
+            // Process each log and create dual indexes
+            List<Log_Index__c> correctIndexesToUpsert = new List<Log_Index__c>();
+            List<Log_Index__c> simpleIndexesToUpsert = new List<Log_Index__c>();
+            Map<String, String> simpleKeyToCorrectKey = new Map<String, String>();
+            
+            for (String simpleHash : logsBySimpleHash.keySet()) {
+                Log__c log = logsBySimpleHash.get(simpleHash);
+                String correctHash = log.Hash_1__c;
+                String orgId = log.Organization_Id__c;
+                
+                if (String.isBlank(correctHash) || correctHash == simpleHash) {
+                    continue;
+                }
+                
+                String correctKey = getLogIndexKey(correctHash, orgId);
+                String simpleKey = getLogIndexKey(simpleHash, orgId);
+                simpleKeyToCorrectKey.put(simpleKey, correctKey);
+                
+                // Create or update correct hash index
+                Log_Index__c correctIndex = existingIndexesByKey.get(correctKey);
+                if (correctIndex == null) {
+                    correctIndex = new Log_Index__c(
+                        Key__c = correctKey,
+                        Hash__c = correctHash,
+                        Organization_Id__c = orgId,
+                        First_Occurred_On__c = log.Created_At__c,
+                        Type__c = LOG_INDEX_TYPE_HASH1,
+                        Internal__c = ConfigUtil.isPharosInternalError(log)
+                    );
+                    if (log.Resolved_On__c != null) {
+                        correctIndex.Resolved_On__c = log.Resolved_On__c;
+                    }
+                    if (String.isNotBlank(log.Bug_Tracker__c)) {
+                        correctIndex.Bug_Tracker__c = log.Bug_Tracker__c;
+                    }
+                } else {
+                    // Update First_Occurred_On if log is earlier
+                    if (log.Created_At__c != null 
+                        && (correctIndex.First_Occurred_On__c == null 
+                            || log.Created_At__c < correctIndex.First_Occurred_On__c)) {
+                        correctIndex.First_Occurred_On__c = log.Created_At__c;
+                    }
+                }
+                correctIndexesToUpsert.add(correctIndex);
+            }
+            
+            // Upsert all correct indexes first
+            if (!correctIndexesToUpsert.isEmpty()) {
+                DatabaseUtils.getInstance().performUpsertDML(
+                    correctIndexesToUpsert, 
+                    Schema.SObjectType.Log_Index__c, 
+                    Log_Index__c.Key__c, 
+                    false
+                )
+                .filterUpsertResultsDuplicateValue(Schema.SObjectType.Log_Index__c.fields.Key__c.getName())
+                .handleError(ConfigUtil.class.getName(), '.createBulkDualLogIndexes.correctIndexes', logger);
+            }
+            
+            // Query to get IDs for newly inserted correct indexes
+            Map<String, Id> correctKeyToId = new Map<String, Id>();
+            for (Log_Index__c idx : [
+                SELECT Id, Key__c FROM Log_Index__c WHERE Key__c IN :simpleKeyToCorrectKey.values()
+            ]) {
+                correctKeyToId.put(idx.Key__c, idx.Id);
+            }
+            
+            // Create or update simple hash indexes with lookups
+            for (String simpleHash : logsBySimpleHash.keySet()) {
+                Log__c log = logsBySimpleHash.get(simpleHash);
+                String correctHash = log.Hash_1__c;
+                String orgId = log.Organization_Id__c;
+                
+                if (String.isBlank(correctHash) || correctHash == simpleHash) {
+                    continue;
+                }
+                
+                String correctKey = getLogIndexKey(correctHash, orgId);
+                String simpleKey = getLogIndexKey(simpleHash, orgId);
+                Id correctIndexId = correctKeyToId.get(correctKey);
+                
+                if (correctIndexId == null) {
+                    continue; // Skip if we couldn't get correct index ID
+                }
+                
+                Log_Index__c simpleIndex = existingIndexesByKey.get(simpleKey);
+                if (simpleIndex == null) {
+                    simpleIndex = new Log_Index__c(
+                        Key__c = simpleKey,
+                        Hash__c = simpleHash,
+                        Organization_Id__c = orgId,
+                        First_Occurred_On__c = log.Created_At__c,
+                        Type__c = LOG_INDEX_TYPE_HASH1,
+                        Internal__c = ConfigUtil.isPharosInternalError(log),
+                        Correct_Hash_Index__c = correctIndexId
+                    );
+                } else {
+                    // Update existing simple index
+                    simpleIndex.Correct_Hash_Index__c = correctIndexId;
+                    if (log.Created_At__c != null 
+                        && (simpleIndex.First_Occurred_On__c == null 
+                            || log.Created_At__c < simpleIndex.First_Occurred_On__c)) {
+                        simpleIndex.First_Occurred_On__c = log.Created_At__c;
+                    }
+                }
+                simpleIndexesToUpsert.add(simpleIndex);
+                
+                // Add to cache
+                LogIndex correctLogIndex = new LogIndex(correctHash, orgId, log.Created_At__c);
+                this.mapIndexes.put(correctLogIndex.key, correctLogIndex);
+            }
+            
+            // Upsert all simple indexes
+            if (!simpleIndexesToUpsert.isEmpty()) {
+                DatabaseUtils.getInstance().performUpsertDML(
+                    simpleIndexesToUpsert, 
+                    Schema.SObjectType.Log_Index__c, 
+                    Log_Index__c.Key__c, 
+                    false
+                )
+                .filterUpsertResultsDuplicateValue(Schema.SObjectType.Log_Index__c.fields.Key__c.getName())
+                .handleError(ConfigUtil.class.getName(), '.createBulkDualLogIndexes.simpleIndexes', logger);
+            }
         }
         
         public void getMapLogIndexes(Set<String> keys) {
