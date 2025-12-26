@@ -129,7 +129,7 @@ public with sharing class Constants {
         public final String NOTIFICATION_INTEGRATION_STATUS_COMPLETED = 'Completed';
 
         public final String JIRA_INTEGRATION_STATUS_PENDING = 'Ticket Pending';
-        
+
         public final String CHARTS_NOT_AVAILABLE_MESSAGE = '*Note: Charts are not available due to missing data.*';
 
         public final Map<String, String> RFC2822_MONTHS = new Map<String, String> {
@@ -674,6 +674,7 @@ public with sharing class Constants {
         public final String CATEGORY;
         public final String AREA;
         public final String OPERATION;
+        public final String ORIGINATED_FROM;
 
         private LogSObject() {
             this.objectType = Log__c.SObjectType;
@@ -682,6 +683,7 @@ public with sharing class Constants {
             this.AREA = Schema.SObjectType.Log__c.fields.Area__c.getName();
             this.LIMITS = Schema.SObjectType.Log__c.fields.Limits__c.getName();
             this.OPERATION = Schema.SObjectType.Log__c.fields.Apex_Name__c.getName();
+            this.ORIGINATED_FROM = Schema.SObjectType.Log__c.fields.Originated_From__c.getName();
         }
     }
 
@@ -910,6 +912,7 @@ public with sharing class Constants {
         // Used for safe check for aggregate result query
         public final Integer MAX_COUNT_FOR_SAFE_AGGREGATE_RESULT_QUERY = 49000;
 
+        // Used for all rules query limit
         public final Integer MAX_RULES_RECORDS_QUERY_LIMIT = 255;
     }
     

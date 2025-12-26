@@ -2817,4 +2817,91 @@ public class NotificationServiceBaseTest {
         System.assertEquals(false, NotificationService.isRunningTicketing(log, null));
     }
 
+    /**
+     * Test that logs originated from notification errors are excluded from rule execution
+     * to prevent infinite recursion loops
+     */
+    @isTest
+    static void testNotificationErrorLogsExcludedFromRules() {
+        // Create a Pharos error log that would normally trigger rules
+        Log__c pharosErrorLog = new Log__c(
+            Category__c = Logger.CATEGORY_PHAROS_ERROR,
+            Area__c = Logger.AREA_PHAROS_ERROR,
+            Summary__c = 'Test notification error',
+            Type__c = 'Exception',
+            Details__c = 'Notification failed',
+            Post_Processing_Status__c = 'Completed',
+            Originated_From__c = ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR
+        );
+        insert pharosErrorLog;
+
+        // Create a normal Pharos error log for comparison
+        Log__c normalPharosLog = new Log__c(
+            Category__c = Logger.CATEGORY_PHAROS_ERROR,
+            Area__c = Logger.AREA_PHAROS_ERROR,
+            Summary__c = 'Normal Pharos error',
+            Type__c = 'Exception',
+            Details__c = 'Normal error',
+            Post_Processing_Status__c = 'Completed'
+        );
+        insert normalPharosLog;
+
+        // Initialize notification service and get the strategy
+        NotificationService notificationService = NotificationService.getInstance(NotificationService.NOTIFICATION_SERVICE_TYPE.LOG, null);
+        NotificationServiceBase service = (NotificationServiceBase)notificationService.strategy;
+        List<SObject> newList = new List<SObject>{pharosErrorLog, normalPharosLog};
+        Map<Id, SObject> oldMap = null;
+
+        Test.startTest();
+        // Test notification rules filtering
+        List<SObject> notificationFiltered = service.filterRecordsForRunNotificationRules(newList, oldMap);
+        // Verify that notification-error log is excluded
+        Boolean containsNotificationErrorLog = false;
+        for (SObject obj : notificationFiltered) {
+            Log__c log = (Log__c)obj;
+            if (log.Id == pharosErrorLog.Id) {
+                containsNotificationErrorLog = true;
+            }
+        }
+        System.assertEquals(false, containsNotificationErrorLog, 
+            'Logs with ORIGINATED_FROM_NOTIFICATION_ERROR should be excluded from notification rules to prevent recursion');
+
+        // Test ticketing rules filtering
+        List<SObject> ticketingFiltered = service.filterRecordsForRunTicketingRules(newList, oldMap);
+        // Verify that notification-error log is excluded
+        Boolean containsNotificationErrorLogInTicketing = false;
+        for (SObject obj : ticketingFiltered) {
+            Log__c log = (Log__c)obj;
+            if (log.Id == pharosErrorLog.Id) {
+                containsNotificationErrorLogInTicketing = true;
+            }
+        }
+        System.assertEquals(false, containsNotificationErrorLogInTicketing, 
+            'Logs with ORIGINATED_FROM_NOTIFICATION_ERROR should be excluded from ticketing rules to prevent recursion');
+        
+        Test.stopTest();
+    }
+
+    /**
+     * Test that internal error logs created from notification failures are marked with ORIGINATED_FROM_NOTIFICATION_ERROR
+     */
+    @isTest
+    static void testInternalErrorLogsMarkedWithNotificationErrorOrigin() {
+        // Create an internal error log using the new parameter
+        Exception testException = new System.NullPointerException();
+        testException.setMessage('Test notification failure');
+        
+        Logger logger = Logger.getInstance();
+        Log__c internalErrorLog = logger.getInternalError(testException, null, 'NotificationService', 'testMethod', true);
+        
+        // Verify the log is marked with ORIGINATED_FROM_NOTIFICATION_ERROR
+        System.assertEquals(ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR, internalErrorLog.Originated_From__c,
+            'Internal error logs from notifications should be marked with ORIGINATED_FROM_NOTIFICATION_ERROR');
+        
+        // Test without the flag
+        Log__c normalInternalLog = logger.getInternalError(testException, null, 'SomeService', 'testMethod', false);
+        System.assertNotEquals(ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR, normalInternalLog.Originated_From__c,
+            'Normal internal error logs should not be marked with ORIGINATED_FROM_NOTIFICATION_ERROR');
+    }
+
 }

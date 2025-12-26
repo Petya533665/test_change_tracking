@@ -3,6 +3,7 @@ public with sharing class TicketingService {
     public ENUM TICKETING_SERVICE_TYPE {JIRA, AZURE_DEV_OPS}
     private Logger logger;
     private TicketingServiceInterface strategy;
+    private Boolean shouldMarkForRecursionPrevention = false;
     public static final String AZURE_DEV_OPS_ERROR_CREATE_TAGS = 'TF401289:';
 
     private static final Map<TICKETING_SERVICE_TYPE, TicketingServiceInterface> TYPE_TO_SERVICE = new Map<TICKETING_SERVICE_TYPE, TicketingServiceInterface>{
@@ -21,18 +22,24 @@ public with sharing class TicketingService {
         this.strategy = ACTION_TYPE_TO_SERVICE.get(actionType);
     }
 
+    public TicketingService(RuleUtil.ActionType actionType, Logger logger, Boolean shouldMarkForRecursionPrevention) {
+        this.logger = logger;
+        this.strategy = ACTION_TYPE_TO_SERVICE.get(actionType);
+        this.shouldMarkForRecursionPrevention = shouldMarkForRecursionPrevention;
+    }
+
     public TicketingService(TICKETING_SERVICE_TYPE serviceType, Logger logger) {
         this.logger = logger;
         this.strategy = TYPE_TO_SERVICE.get(serviceType);
     }
 
     public TicketCreateResult createTicket(TicketingServiceInputData data) {
-        this.strategy.init(data, this.logger);
+        this.strategy.init(data, this.logger, this.shouldMarkForRecursionPrevention);
         return this.strategy.createTicket();
     }
 
     public void createTicketComment(TicketingServiceInputData data) {
-        this.strategy.init(data, this.logger);
+        this.strategy.init(data, this.logger, this.shouldMarkForRecursionPrevention);
         this.strategy.createTicketComment();
     }
 
@@ -53,7 +60,7 @@ public with sharing class TicketingService {
     }
 
     public interface TicketingServiceInterface {
-        void init(TicketingServiceInputData data, Logger logger);
+        void init(TicketingServiceInputData data, Logger logger, Boolean shouldMarkForRecursionPrevention);
         void linkExistingTickets();
         void handleCreateTicketError(Exception e);
         TicketCreateResult createTicket();
@@ -102,10 +109,12 @@ public with sharing class TicketingService {
         private TicketingSObjectWrapper sobjectWrapper;
         private TicketingTaskInfo taskInfo;
         private Logger logger;
+        private Boolean shouldMarkForRecursionPrevention = false;
         public TicketingServiceSettings settings;
 
-        public virtual void init(TicketingServiceInputData data, Logger logger) {
+        public virtual void init(TicketingServiceInputData data, Logger logger, Boolean shouldMarkForRecursionPrevention) {
             this.logger = logger;
+            this.shouldMarkForRecursionPrevention = shouldMarkForRecursionPrevention;
             if(String.isNotBlank(data.recordId)) {
                 this.sobjectWrapper = new TicketingSobjectWrapper(data.recordId);
                 this.taskInfo = new TicketingTaskInfo(data.action, this.sobjectWrapper);
@@ -156,7 +165,8 @@ public with sharing class TicketingService {
                 }
             }
             catch(Exception e) {
-                this.logger?.add(logger.getInternalError(e, null, TicketingService.class.getName(), 'createTicketComment'));
+                // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
+                this.logger?.add(logger.getInternalError(e, null, TicketingService.class.getName(), 'createTicketComment', this.shouldMarkForRecursionPrevention));
             }
         }
 
@@ -213,7 +223,8 @@ public with sharing class TicketingService {
         }
 
         public virtual void handleCreateTicketError(Exception e) {
-            this.logger?.add(logger.getInternalError(e, null, TicketingService.class.getName(), 'createTicket'));
+            // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
+            this.logger?.add(logger.getInternalError(e, null, TicketingService.class.getName(), 'createTicket', this.shouldMarkForRecursionPrevention));
 
             // Only update SObject if we have a wrapper (not for event actions)
             if (this.sObjectWrapper != null) {
@@ -346,8 +357,8 @@ public with sharing class TicketingService {
             return 'done';
         }
         
-        public override void init(TicketingServiceInputData data, Logger logger) {
-            super.init(data, logger);
+        public override void init(TicketingServiceInputData data, Logger logger, Boolean shouldMarkForRecursionPrevention) {
+            super.init(data, logger, shouldMarkForRecursionPrevention);
             this.settings = new TicketingServiceSettings(ConfigUtil.JIRA_SETTINGS);
         }
 
@@ -401,7 +412,8 @@ public with sharing class TicketingService {
                 }
             }
             catch (Exception e) {
-                this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'customFields'));
+                // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
+                this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'customFields', this.shouldMarkForRecursionPrevention));
             }
             if(this.taskInfo.customFields != null) {
                 for (String key : this.taskInfo.customFields.keySet()) {
@@ -532,7 +544,8 @@ public with sharing class TicketingService {
                     JiraService.getService(this.logger).linkIssuesAsRelates(issueKey, relatedRegressedTicketKey);
                 }
                 catch(Exception e) {
-                    this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'linkIssuesAsRelates'));
+                    // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
+                    this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'linkIssuesAsRelates', this.shouldMarkForRecursionPrevention));
                 }
             }
             if(this.sObjectWrapper.sObjectRecord.getSObjectType() == Log__c.SObjectType) {
@@ -549,7 +562,8 @@ public with sharing class TicketingService {
                     }
                 }
                 catch(Exception e) {
-                    this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'linkIssuesAsRelates'));
+                    // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
+                    this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'linkIssuesAsRelates', this.shouldMarkForRecursionPrevention));
                 }
 
                 try {
@@ -583,7 +597,8 @@ public with sharing class TicketingService {
                     }
                 }
                 catch(Exception e) {
-                    this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'linkExistingJiraTasks'));
+                    // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
+                    this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'linkExistingJiraTasks', this.shouldMarkForRecursionPrevention));
                 }
             }
         }
@@ -711,8 +726,8 @@ public with sharing class TicketingService {
             return 'Done';
         }
 
-        public override void init(TicketingServiceInputData data, Logger logger) {
-            super.init(data, logger);
+        public override void init(TicketingServiceInputData data, Logger logger, Boolean shouldMarkForRecursionPrevention) {
+            super.init(data, logger, shouldMarkForRecursionPrevention);
             this.settings = new TicketingServiceSettings(ConfigUtil.AZURE_DEV_OPS_API_SETTINGS);
         }
 

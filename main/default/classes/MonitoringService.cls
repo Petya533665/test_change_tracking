@@ -85,6 +85,10 @@ public with sharing class MonitoringService {
         qb.add(QBuilder.condition(Constants.LOG_SOBJECT.CREATED_AT).isGreaterOrEquals(':lastProcessedDatetime'));
         parser.addOperand();
         
+        // Always exclude logs originated from notification errors to prevent recursive rule execution
+        qb.add(QBuilder.condition(Constants.LOG_SOBJECT.ORIGINATED_FROM).notEqualsTo(ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR));
+        parser.addOperand();
+        
         if(!PermissionsUtil.NotificationForPharosErrors) {
             qb.add(QBuilder.condition(Constants.LOG_SOBJECT.CATEGORY).notEqualsTo(Constants.LOG_SOBJECT.PHAROS_CATEGORY));
             qb.add(QBuilder.condition(Constants.LOG_SOBJECT.AREA).notEqualsTo(Constants.LOG_SOBJECT.PHAROS_AREA));

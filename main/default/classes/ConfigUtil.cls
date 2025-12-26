@@ -361,6 +361,7 @@ public with sharing class ConfigUtil {
     public static String TYPE_BROADCAST = 'broadcast';
     public static String ORIGINATED_FROM_BROADCAST = 'Broadcast';
     public static String ORIGINATED_FROM_PASSTHROUGH = 'Passthrough';
+    public static String ORIGINATED_FROM_NOTIFICATION_ERROR = 'NotificationError';
     public static String PHAROS_REST_SERVICE_ENDPOINT = '/services/apexrest/' + ConfigUtil.NS + '/logs';
 
     // Configs

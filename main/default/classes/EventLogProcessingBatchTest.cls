@@ -3681,7 +3681,7 @@ private class EventLogProcessingBatchTest {
         System.assertEquals(0, [SELECT COUNT() FROM Log_Index__c WHERE Key__c = :newKey], 
             'No new index created by update operation');
     }
-
+    
     // ==========================================
     // INTEGRATION TESTS: Simple Log Updates and Deduplication
     // ==========================================
