@@ -242,10 +242,6 @@ public with sharing class ReportService {
         DateTime endDateTime,
         ReportService.SystemReport systemReport
     ) {
-        if (!validateRequiredParameters(parameters, REQUIRED_HASH_PARAMETERS)) {
-            return new List<Map<String, Object>>();
-        }
-
         List<Map<String, Object>> filters = new List<Map<String, Object>>();
 
         filters.addAll(createBaseLogsFilters(parameters, startDateTime, endDateTime));
@@ -334,16 +330,6 @@ public with sharing class ReportService {
         return filters;
     }
 
-
-    private static Boolean validateRequiredParameters(Map<String, Object> parameters, List<String> requiredFields) {
-        for (String field : requiredFields) {
-            if (String.isBlank((String) parameters.get(field))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     /**
      * @description Retrieves report data for a list of chart types and a given set of parameters.
      * This method iterates through the provided chart types, retrieves their corresponding
@@ -355,12 +341,10 @@ public with sharing class ReportService {
      */
     public static Map<ChartService.Chart, Map<ReportService.SystemReport, String>> getReportDataByChart(List<String> chartsTypeForPrepare, Map<String, Object> parameters) {
         Map<ChartService.Chart, Map<ReportService.SystemReport, String>> chartToChartData = new Map<ChartService.Chart, Map<ReportService.SystemReport, String>>();
-
         for (String chartString : chartsTypeForPrepare) {
             ChartService.Chart chart = ChartService.getChartEnumByChartName(chartString);
 
             Map<String, ReportService.SystemReport> chartToSystemReport = ChartService.CHART_TO_SYSTEM_REPORTS.get(chart);
-
             Map<ReportService.SystemReport, String> systemReportTotData = ReportService.getReportDataBySystemReports(chart, chartToSystemReport, parameters);
 
             if (!systemReportTotData?.isEmpty()) {
@@ -433,7 +417,6 @@ public with sharing class ReportService {
                         endDateTime
                     );
                 }
-
                 if (reportFilter != null && !reportFilter.isEmpty()) {
                     try {
                         String response = ReportService.executeReport(reportId, reportFilter);

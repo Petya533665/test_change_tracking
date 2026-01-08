@@ -496,4 +496,203 @@ private class BatchApexErrorEventTriggerHandlerTest {
 		}
 	}
 
+	/**
+	 * TEST: Verify dual indexes created correctly with 15-char Organization_Id__c
+	 * 
+	 * BUG FIX: Organization_Id__c stores 15-char IDs, but UserInfo.getOrganizationId() returns 18-char.
+	 * LogService.copyLogFlagsFields() must normalize both to 15-char before comparison.
+	 * 
+	 * Without fix: Comparison fails → dual indexes not created → logs marked as "new" incorrectly
+	 * With fix: Comparison succeeds → dual indexes created → proper deduplication
+	 * 
+	 * This test verifies the fix by:
+	 * 1. Creating log with 15-char Organization_Id__c (typical production scenario)
+	 * 2. Log has Async_Job_Id__c + Stacktrace__c (triggers dual index creation)
+	 * 3. Verifying BOTH simple and correct hash indexes are created
+	 * 4. Verifying simple index has Correct_Hash_Index__c lookup to correct index
+	 */
+	@IsTest
+	private static void test_dual_indexes_created_with_15_char_org_id() {
+		PermissionsUtil.AsyncProcessErrorTracking = true;
+
+		// Create AsyncApexJob to calculate simple hash from
+		// In real scenario, this would be an actual batch/queueable job
+		Log__c logToProcess = new Log__c(
+			Hash_1__c = 'trigger_test_job',
+			Organization_Id__c = UserInfo.getOrganizationId().left(15), // 15-char format
+			Post_Processing_Status__c = LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED
+		);
+		insert logToProcess;
+
+		// Fire batch to create AsyncApexJob
+		try {
+			Test.startTest();
+			LogPostProcessingBatch.testThrowUnhandledException = true;
+			LogPostProcessingBatch.getInstance().startBatch();
+			Test.stopTest();
+		}
+		catch (Exception e) {
+			// Expected exception
+		}
+		
+		Test.getEventBus().deliver();
+
+		// Query the AsyncApexJob created by batch
+		List<AsyncApexJob> batchJobs = [
+			SELECT Id, JobType, ExtendedStatus, ApexClass.Name, ApexClass.NamespacePrefix, Status
+			FROM AsyncApexJob
+			WHERE ApexClass.Name = 'LogPostProcessingBatch'
+			AND CreatedDate = TODAY
+			ORDER BY CreatedDate DESC
+			LIMIT 1
+		];
+		
+		System.assertNotEquals(0, batchJobs.size(), 'Must create AsyncApexJob');
+		
+		AsyncApexJob batchJob = batchJobs[0];
+		String asyncJobId = batchJob.Id.to15();
+		
+		// Calculate simple hash (what LogService does internally)
+		Map<String, String> simpleHashes = ConfigUtil.calculateBulkSimpleHashesFromAsyncJobIds(
+			new Set<String>{asyncJobId}
+		);
+		String simpleHash = simpleHashes.get(asyncJobId);
+		System.assertNotEquals(null, simpleHash, 'Must calculate simple hash from AsyncApexJob');
+		
+		// Create test log with BOTH Async_Job_Id__c AND Stacktrace__c
+		// CRITICAL: Organization_Id__c is 15-char (typical production scenario)
+		// This tests the fix: LogService must normalize to 15-char before comparing with UserInfo.getOrganizationId()
+		String orgId15Char = UserInfo.getOrganizationId().left(15);
+		
+		Log__c testLog = new Log__c(
+			Summary__c = 'Test error for dual index',
+			Category__c = 'Apex',
+			Type__c = 'TestException',
+			Async_Job_Id__c = asyncJobId, // Has AsyncApexJob ID
+			Stacktrace__c = 'Class.TestClass.method: line 1, column 1\nClass.TestClass.execute: line 5, column 1', // Has stacktrace
+			Organization_Id__c = orgId15Char, // 15-char format (typical production)
+			Created_At__c = DateTime.now()
+		);
+		
+		// Calculate hash (includes stacktrace, so will be "correct hash")
+		LogService.calculateHashes(testLog);
+		String correctHash = testLog.Hash_1__c;
+		
+		// Hashes must be different (stacktrace vs no stacktrace)
+		System.assertNotEquals(simpleHash, correctHash, 
+			'Simple hash (no stacktrace) must differ from correct hash (with stacktrace)');
+		
+		// Insert log - should trigger dual index creation
+		insert testLog;
+		
+		// VERIFY: Both indexes created
+		String currentOrg15 = UserInfo.getOrganizationId().left(15);
+		String correctIndexKey = ConfigUtil.getLogIndexKey(correctHash, currentOrg15);
+		String simpleIndexKey = ConfigUtil.getLogIndexKey(simpleHash, currentOrg15);
+		
+		// 1. Verify correct hash index exists (no lookup)
+		List<Log_Index__c> correctIndexes = [
+			SELECT Id, Hash__c, Correct_Hash_Index__c, Organization_Id__c
+			FROM Log_Index__c
+			WHERE Key__c = :correctIndexKey
+		];
+		
+		System.assertEquals(1, correctIndexes.size(), 
+			'Must create correct hash index (fix: 15-char org ID comparison worked)');
+		System.assertEquals(correctHash, correctIndexes[0].Hash__c, 
+			'Correct index must have correct hash');
+		System.assertEquals(null, correctIndexes[0].Correct_Hash_Index__c, 
+			'Correct index must NOT have lookup (it IS the correct hash)');
+		System.assertEquals(orgId15Char, correctIndexes[0].Organization_Id__c, 
+			'Correct index must store 15-char Organization ID');
+		
+		// 2. Verify simple hash index exists WITH lookup to correct hash
+		List<Log_Index__c> simpleIndexes = [
+			SELECT Id, Hash__c, Correct_Hash_Index__c, Correct_Hash_Index__r.Hash__c, Organization_Id__c
+			FROM Log_Index__c
+			WHERE Key__c = :simpleIndexKey
+		];
+		
+		System.assertEquals(1, simpleIndexes.size(), 
+			'Must create simple hash index (fix: 15-char org ID comparison worked)');
+		System.assertEquals(simpleHash, simpleIndexes[0].Hash__c, 
+			'Simple index must have simple hash');
+		System.assertNotEquals(null, simpleIndexes[0].Correct_Hash_Index__c, 
+			'Simple index MUST have lookup to correct hash index (this is the dual index linkage)');
+		System.assertEquals(orgId15Char, simpleIndexes[0].Organization_Id__c, 
+			'Simple index must store 15-char Organization ID');
+		
+		// 3. Verify lookup relationship is correct
+		System.assertEquals(correctIndexes[0].Id, simpleIndexes[0].Correct_Hash_Index__c, 
+			'Simple index lookup must point to correct index record');
+		System.assertEquals(correctHash, simpleIndexes[0].Correct_Hash_Index__r.Hash__c, 
+			'Simple index lookup must resolve to correct hash');
+	}
+
+	/**
+	 * TEST: Verify dual indexes NOT created when Organization_Id__c differs from current org
+	 * 
+	 * Passthrough mode: Logs from other orgs should NOT trigger dual index creation
+	 * because AsyncApexJob doesn't exist in current org (exists in source org only)
+	 * 
+	 * This test verifies:
+	 * 1. Log with different org ID skips dual index creation
+	 * 2. Only correct hash index created (from log itself)
+	 * 3. No simple hash index created (no AsyncApexJob in current org)
+	 */
+	@IsTest
+	private static void test_dual_indexes_not_created_for_different_org() {
+		PermissionsUtil.AsyncProcessErrorTracking = true;
+
+		// Simulate passthrough log from different org
+		// Organization_Id__c is from source org, current org is different
+		String differentOrgId = '00D000000000001'; // Different org (15-char)
+		String currentOrgId = UserInfo.getOrganizationId().left(15);
+		
+		System.assertNotEquals(differentOrgId, currentOrgId, 
+			'Test requires different org ID');
+		
+		Log__c passthroughLog = new Log__c(
+			Summary__c = 'Error from passthrough org',
+			Category__c = 'Apex',
+			Type__c = 'PassthroughException',
+			Async_Job_Id__c = '707XX0000000XXX', // From source org
+			Stacktrace__c = 'Class.Test.method: line 1', // Has stacktrace
+			Organization_Id__c = differentOrgId, // Different org!
+			Created_At__c = DateTime.now()
+		);
+		
+		LogService.calculateHashes(passthroughLog);
+		String correctHash = passthroughLog.Hash_1__c;
+		
+		insert passthroughLog;
+		
+		// Verify: Only correct hash index created (no simple index)
+		String correctIndexKey = ConfigUtil.getLogIndexKey(correctHash, differentOrgId);
+		
+		List<Log_Index__c> correctIndexes = [
+			SELECT Id, Hash__c, Correct_Hash_Index__c, Organization_Id__c
+			FROM Log_Index__c
+			WHERE Key__c = :correctIndexKey
+		];
+		
+		System.assertEquals(1, correctIndexes.size(), 
+			'Must create correct hash index for passthrough log');
+		System.assertEquals(differentOrgId, correctIndexes[0].Organization_Id__c, 
+			'Index must use source org ID');
+		System.assertEquals(null, correctIndexes[0].Correct_Hash_Index__c, 
+			'Correct index has no lookup');
+		
+		// Verify: No simple hash index created
+		// (Can't query for simple hash since we can't calculate it without AsyncApexJob in current org)
+		List<Log_Index__c> allIndexes = [
+			SELECT Id, Hash__c, Correct_Hash_Index__c
+			FROM Log_Index__c
+			WHERE Organization_Id__c = :differentOrgId
+		];
+		
+		System.assertEquals(1, allIndexes.size(), 
+			'Should only create 1 index for passthrough log (no dual index)');
+	}
+
 }

@@ -312,15 +312,18 @@ global with sharing class LogService {
             // CRITICAL: Only collect AsyncApexJobIds from logs that belong to current org
             // AsyncApexJob records only exist locally, so we can't query for jobs from other orgs
             String currentOrgId = UserInfo.getOrganizationId();
+            String currentOrgId15 = currentOrgId.left(15); // Normalize to 15-char for comparison
             Set<String> asyncJobIdsNeedingHashes = new Set<String>();
             for(Log__c log : newLogs) {
                 if(String.isBlank(log?.Hash_1__c)) continue;
                 
                 // Check if this log might need dual indexes
                 // AND that it belongs to current org (not a passthrough log from another org)
+                // IMPORTANT: Compare 15-char org IDs since Organization_Id__c field stores 15-char format
+                String logOrgId15 = String.isNotBlank(log.Organization_Id__c) ? log.Organization_Id__c.left(15) : null;
                 if (String.isNotBlank(log.Async_Job_Id__c) 
                     && String.isNotBlank(log.Stacktrace__c)
-                    && log.Organization_Id__c == currentOrgId) {
+                    && logOrgId15 == currentOrgId15) {
                     asyncJobIdsNeedingHashes.add(log.Async_Job_Id__c);
                 }
             }
@@ -334,9 +337,11 @@ global with sharing class LogService {
             for(Log__c log : newLogs) {
                 if(String.isBlank(log?.Hash_1__c)) continue;
                 
+                // IMPORTANT: Compare 15-char org IDs since Organization_Id__c field stores 15-char format
+                String logOrgId15 = String.isNotBlank(log.Organization_Id__c) ? log.Organization_Id__c.left(15) : null;
                 if (String.isNotBlank(log.Async_Job_Id__c) 
                     && String.isNotBlank(log.Stacktrace__c)
-                    && log.Organization_Id__c == currentOrgId) {
+                    && logOrgId15 == currentOrgId15) {
                     String simpleHash = asyncJobIdToSimpleHash.get(log.Async_Job_Id__c);
                     if (String.isNotBlank(simpleHash) && simpleHash != log.Hash_1__c) {
                         logsBySimpleHash.put(simpleHash, log);

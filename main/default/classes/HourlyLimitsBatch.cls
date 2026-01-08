@@ -75,10 +75,15 @@ public with sharing class HourlyLimitsBatch extends DatabaseUtils.PharosBatchImp
         
         // Get the configured frequency in hours (default to 1 hour if not set or invalid)
         Integer frequencyHours = getFrequencyHours();
-        Integer freqTolerance = 5;
+        
+        // Dynamic tolerance: 5% of frequency (minimum 10 minutes, maximum 30 minutes)
+        // For 1h frequency: 3 min tolerance (use min 10)
+        // For 5h frequency: 15 min tolerance
+        // For 23h frequency: 69 min tolerance (use max 30)
+        Integer toleranceMinutes = Math.max(10, Math.min(30, (frequencyHours * 60 * 5) / 100));
         
         // Run if no previous run or if the configured frequency period has passed
-        return lastRun == null || lastRun.addHours(frequencyHours).addMinutes(-freqTolerance) <= now;
+        return lastRun == null || lastRun.addHours(frequencyHours).addMinutes(-toleranceMinutes) <= now;
     }
 
     public static Integer getFrequencyHours() {

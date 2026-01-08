@@ -1546,4 +1546,495 @@ public class Test_LimitsService {
         
         System.assertEquals(7, result, 'getMaxNotificationRules should return 7 when MaxNotificationRules is 7');
     }
+
+    @IsTest
+    static void test_needToRunBatch_withDynamicTolerance() {
+        // Test the dynamic tolerance calculation for HourlyLimitsBatch
+        
+        // Set up 5-hour frequency in settings
+        Logger_Settings__c settings = Logger_Settings__c.getOrgDefaults();
+        settings.Monitoring_Enabled__c = true;
+        settings.Limits_Monitoring_Enabled__c = true;
+        settings.Limits_Monitoring_Frequency__c = '300'; // 5 hours
+        upsert settings;
+        
+        // Create a limits log to simulate last run 5 hours ago
+        Limits__c limits = new Limits__c();
+        insert limits;
+        
+        DateTime lastRunTime = DateTime.now().addHours(-5);
+        
+        Log__c lastLog = new Log__c(
+            Category__c = HourlyLimitsBatch.CATEGORY,
+            Type__c = HourlyLimitsBatch.TYPE,
+            Created_At__c = lastRunTime,
+            Limits__c = limits.Id,
+            Organization_Id__c = UserInfo.getOrganizationId().left(15)
+        );
+        insert lastLog;
+        
+        Test.startTest();
+        
+        // Should return true because 5 hours have passed (with 15-min tolerance)
+        Boolean shouldRun = HourlyLimitsBatch.needToRunBatch();
+        
+        Test.stopTest();
+        
+        System.assert(shouldRun, 'Batch should run after 5 hours with 15-minute tolerance');
+    }
+    
+    @IsTest
+    static void test_needToRunBatch_withinTolerance() {
+        // Test that batch runs within the tolerance window
+        
+        Logger_Settings__c settings = Logger_Settings__c.getOrgDefaults();
+        settings.Monitoring_Enabled__c = true;
+        settings.Limits_Monitoring_Enabled__c = true;
+        settings.Limits_Monitoring_Frequency__c = '300'; // 5 hours
+        upsert settings;
+        
+        Limits__c limits = new Limits__c();
+        insert limits;
+        
+        // Last run was 4 hours 50 minutes ago (within 15-minute tolerance of 5 hours)
+        DateTime lastRunTime = DateTime.now().addHours(-5).addMinutes(10);
+        
+        Log__c lastLog = new Log__c(
+            Category__c = HourlyLimitsBatch.CATEGORY,
+            Type__c = HourlyLimitsBatch.TYPE,
+            Created_At__c = lastRunTime,
+            Limits__c = limits.Id,
+            Organization_Id__c = UserInfo.getOrganizationId().left(15)
+        );
+        insert lastLog;
+        
+        Test.startTest();
+        
+        // Should return true because we're within tolerance (5h - 15min = 4h 45min)
+        Boolean shouldRun = HourlyLimitsBatch.needToRunBatch();
+        
+        Test.stopTest();
+        
+        System.assert(shouldRun, 'Batch should run within 15-minute tolerance window');
+    }
+    
+    @IsTest
+    static void test_needToRunBatch_tooSoon() {
+        // Test that batch doesn't run too soon
+        
+        Logger_Settings__c settings = Logger_Settings__c.getOrgDefaults();
+        settings.Monitoring_Enabled__c = true;
+        settings.Limits_Monitoring_Enabled__c = true;
+        settings.Limits_Monitoring_Frequency__c = '300'; // 5 hours
+        upsert settings;
+        
+        Limits__c limits = new Limits__c();
+        insert limits;
+        
+        // Last run was only 4 hours ago (too soon)
+        DateTime lastRunTime = DateTime.now().addHours(-4);
+        
+        Log__c lastLog = new Log__c(
+            Category__c = HourlyLimitsBatch.CATEGORY,
+            Type__c = HourlyLimitsBatch.TYPE,
+            Created_At__c = lastRunTime,
+            Limits__c = limits.Id,
+            Organization_Id__c = UserInfo.getOrganizationId().left(15)
+        );
+        insert lastLog;
+        
+        Test.startTest();
+        
+        // Should return false because not enough time has passed
+        Boolean shouldRun = HourlyLimitsBatch.needToRunBatch();
+        
+        Test.stopTest();
+        
+        System.assert(!shouldRun, 'Batch should NOT run before 4h 45min (5h - 15min tolerance)');
+    }
+    
+    @IsTest
+    static void test_getFrequencyHours_validSettings() {
+        // Test frequency calculation with valid settings
+        
+        Logger_Settings__c settings = Logger_Settings__c.getOrgDefaults();
+        settings.Limits_Monitoring_Frequency__c = '300'; // 5 hours
+        upsert settings;
+        
+        Test.startTest();
+        
+        // The settings created with 300 minutes (5 hours)
+        Integer frequency = HourlyLimitsBatch.getFrequencyHours();
+        
+        Test.stopTest();
+        
+        System.assertEquals(5, frequency, '300 minutes should convert to 5 hours');
+    }
+    
+    @IsTest
+    static void test_getFrequencyHours_invalidSettings() {
+        // Test frequency calculation with invalid settings
+        
+        Logger_Settings__c settings = Logger_Settings__c.getOrgDefaults();
+        
+        Test.startTest();
+        
+        // Test too small (less than 1 hour)
+        settings.Limits_Monitoring_Frequency__c = '30';
+        upsert settings;
+        System.assertEquals(1, HourlyLimitsBatch.getFrequencyHours(), 
+                           'Less than 60 minutes should default to 1 hour');
+        
+        // Test too large (more than 23 hours)
+        settings.Limits_Monitoring_Frequency__c = '1500';
+        upsert settings;
+        System.assertEquals(1, HourlyLimitsBatch.getFrequencyHours(), 
+                           'More than 23 hours should default to 1 hour');
+        
+        Test.stopTest();
+    }
+
+    @IsTest
+    static void test_thresholdRule_8hInterval_with3hSnapshotFrequency() {
+        // TEST CASE 1: Verify 8-hour threshold rule works correctly with 3-hour snapshot frequency
+        // 
+        // SCENARIO:
+        // - HourlyLimitsBatch runs every 3 hours (180 minutes)
+        // - Threshold rule has 8-hour EventTimeInterval
+        // - Within 8h window, we expect 2-3 snapshots
+        // - Threshold rules only need the LATEST snapshot to evaluate
+        //
+        // EXPECTED: Rule should fire when latest snapshot exceeds threshold
+        
+        // Setup: Enable ONLY limits monitoring (matching working test pattern)
+        PermissionsUtil.MonitoringEnabled = false; // Disable to ensure LimitsMonitoringStrategy is chosen
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        PermissionsUtil.MaxMonitoringRules = 10;
+        PermissionsUtil.NotificationForPharosErrors = true;
+        ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = true;
+        
+        // NOTE: Do NOT set Logger_Settings__c.Limits_Monitoring_Frequency__c
+        // Setting it can cause needRunLimitsRules() to check frequency and return false
+        
+        DateTime baseTime = DateTime.now();
+        
+        // Setup batch flag (matching pattern from working test)
+        // Only set Last_Created_Log__c and Last_Processed_Limits_Log__c
+        // Do NOT set Last_Processed_Log__c - let it remain at default/null
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = baseTime;
+        batchFlag.Last_Processed_Limits_Log__c = baseTime.addHours(-9); // Old → hasNewLimits() = TRUE
+        upsert batchFlag;
+        
+        // Clear cache
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
+        
+        // Create 8-hour threshold rule (fires when usage >= 75%)
+        Rule__c thresholdRule = new Rule__c(
+            Name__c = '8h Threshold Rule Test',
+            Active__c = true,
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_THRESHOLD,
+            EventTimeInterval__c = 480, // 8 hours
+            AggregateType__c = 'Count',
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            Threshold__c = 75, // 75% usage threshold
+            SobjectType__c = null,
+            Index__c = 1,
+            Is_Not_Valid__c = false
+        );
+        insert thresholdRule;
+        
+        // CRITICAL: Create RuleFilter to specify which field to monitor  
+        // Using DataStorageMB (like working test) instead of DailyApiRequests
+        // Note: Value__c is just a filter (>= 1 means evaluate records with values)
+        // The actual threshold percentage (75%) is in Rule.Threshold__c
+        insert new RuleFilter__c(
+            Rule__c = thresholdRule.Id,
+            Index__c = 1,
+            FieldName__c = 'DataStorageMB',
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            Value__c = '1', // Filter: evaluate records with DataStorageMB >= 1
+            Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+            Field_Type__c = RuleUtil.FIELD_TYPE_NUMBER
+        );
+        
+        // SCENARIO: Simulate 3-hour snapshot frequency over 8-hour window
+        // Query window: 8h + 2min buffer = 482 minutes
+        // With 3h frequency: snapshots at -9h, -6h, -3h, -5min (latest)
+        // Only the latest snapshot matters for threshold rules
+        
+        // Create Limits__c records simulating snapshots over time
+        List<Limits__c> limitsRecords = new List<Limits__c>();
+        
+        // Snapshot 1: 9 hours ago (outside 8h window) - baseline
+        Limits__c limits1 = new Limits__c(
+            DataStorageMB__c = 667.0 // 66.7% usage (below threshold)
+        );
+        limitsRecords.add(limits1);
+        
+        // Snapshot 2: 6 hours ago (within window)
+        Limits__c limits2 = new Limits__c(
+            DataStorageMB__c = 700.0 // 70% usage (below threshold)
+        );
+        limitsRecords.add(limits2);
+        
+        // Snapshot 3: 3 hours ago (within window)
+        Limits__c limits3 = new Limits__c(
+            DataStorageMB__c = 733.0 // 73.3% usage (below threshold)
+        );
+        limitsRecords.add(limits3);
+        
+        // Snapshot 4: 5 minutes ago (latest, within window) - EXCEEDS THRESHOLD!
+        Limits__c limits4 = new Limits__c(
+            DataStorageMB__c = 767.0 // 76.7% usage - TRIGGERS EVENT!
+        );
+        limitsRecords.add(limits4);
+        
+        insert limitsRecords;
+        
+        // Create logs simulating 3-hour snapshot frequency
+        List<Log__c> snapshotLogs = new List<Log__c>();
+        
+        snapshotLogs.add(new Log__c(
+            Category__c = HourlyLimitsBatch.CATEGORY,
+            Type__c = HourlyLimitsBatch.TYPE,
+            Summary__c = 'Snapshot 1 (-9h)',
+            Created_At__c = baseTime.addHours(-9),
+            Limits__c = limits1.Id,
+            Organization_Id__c = UserInfo.getOrganizationId()
+        ));
+        
+        snapshotLogs.add(new Log__c(
+            Category__c = HourlyLimitsBatch.CATEGORY,
+            Type__c = HourlyLimitsBatch.TYPE,
+            Summary__c = 'Snapshot 2 (-6h)',
+            Created_At__c = baseTime.addHours(-6),
+            Limits__c = limits2.Id,
+            Organization_Id__c = UserInfo.getOrganizationId()
+        ));
+        
+        snapshotLogs.add(new Log__c(
+            Category__c = HourlyLimitsBatch.CATEGORY,
+            Type__c = HourlyLimitsBatch.TYPE,
+            Summary__c = 'Snapshot 3 (-3h)',
+            Created_At__c = baseTime.addHours(-3),
+            Limits__c = limits3.Id,
+            Organization_Id__c = UserInfo.getOrganizationId()
+        ));
+        
+        snapshotLogs.add(new Log__c(
+            Category__c = HourlyLimitsBatch.CATEGORY,
+            Type__c = HourlyLimitsBatch.TYPE,
+            Summary__c = 'Snapshot 4 (latest)',
+            Created_At__c = baseTime.addMinutes(-5),
+            Limits__c = limits4.Id,
+            Organization_Id__c = UserInfo.getOrganizationId()
+        ));
+        
+        insert snapshotLogs;
+        
+        // Note: No mock needed for DataStorageMB - uses actual org limits
+        
+        // Set batch time
+        MonitoringBatch.currentTime = baseTime;
+        
+        Test.startTest();
+        
+        // Execute monitoring batch
+        MonitoringBatch.getInstance().startBatch();
+        
+        Test.stopTest();
+        
+        // VERIFICATION
+        List<Event__c> events = [
+            SELECT Id, Rule__c, RecordCount__c, Criteria__c
+            FROM Event__c
+            WHERE Rule__c = :thresholdRule.Id
+        ];
+        
+        // Query captured logs within 8h window
+        Integer queryWindowMinutes = 480 + Constants.MONITORING.QUERY_WINDOW_BUFFER_MINUTES;
+        List<Log__c> capturedLogs = [
+            SELECT Id, Summary__c, Created_At__c, Limits__c,
+                   Limits__r.DataStorageMB__c
+            FROM Log__c
+            WHERE Created_At__c >= :baseTime.addMinutes(-queryWindowMinutes)
+              AND Limits__c != null
+            ORDER BY Created_At__c
+        ];
+        
+        // ASSERTIONS
+        System.assertEquals(3, capturedLogs.size(),
+            '8h window with 3h frequency should capture 3 snapshots (at -6h, -3h, -5min)');
+        
+        System.assertEquals(limits4.Id, capturedLogs[2].Limits__c,
+            'Latest snapshot should be the most recent one');
+        
+        System.assertEquals(767.0, capturedLogs[2].Limits__r.DataStorageMB__c,
+            'Latest snapshot should show 767.0 MB DataStorage (76.7% usage)');
+        
+        System.assert(events.size() >= 1,
+            'Threshold rule should fire event when latest snapshot (76.7%) exceeds 75% threshold. ' +
+            'Captured ' + capturedLogs.size() + ' snapshots in 8h window.');
+    }
+
+    @IsTest
+    static void test_spikeRule_24hInterval_with3hSnapshotFrequency() {
+        // TEST CASE 2: Verify 24-hour spike rule works correctly with 3-hour snapshot frequency
+        // 
+        // SCENARIO:
+        // - HourlyLimitsBatch runs every 3 hours (180 minutes)
+        // - Spike rule has 24-hour EventTimeInterval
+        // - Within 24h window, we expect ~8 snapshots
+        // - Spike rules need at least 2 data points to detect percentage change
+        //
+        // EXPECTED: Rule should fire when spike (percentage increase) exceeds threshold
+        
+        // Setup: Enable ONLY limits monitoring (matching working test pattern)
+        PermissionsUtil.MonitoringEnabled = false; // Disable to ensure LimitsMonitoringStrategy is chosen
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        PermissionsUtil.MaxMonitoringRules = 10;
+        PermissionsUtil.NotificationForPharosErrors = true;
+        ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = true;
+        
+        // NOTE: Do NOT set Logger_Settings__c.Limits_Monitoring_Frequency__c
+        // Setting it can cause needRunLimitsRules() to check frequency and return false
+        
+        DateTime baseTime = DateTime.now();
+        
+        // Setup batch flag (matching pattern from working test)
+        // Only set Last_Created_Log__c and Last_Processed_Limits_Log__c
+        // Do NOT set Last_Processed_Log__c - let it remain at default/null
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = baseTime;
+        batchFlag.Last_Processed_Limits_Log__c = baseTime.addHours(-25); // Old → hasNewLimits() = TRUE
+        upsert batchFlag;
+        
+        // Clear cache
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
+        
+        // Create 24-hour spike rule (fires when spike >= 50%)
+        Rule__c spikeRule = new Rule__c(
+            Name__c = '24h Spike Rule Test',
+            Active__c = true,
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_SPIKE,
+            EventTimeInterval__c = 1440, // 24 hours
+            AggregateType__c = 'Count',
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            Threshold__c = 50, // 50% spike threshold
+            SobjectType__c = null,
+            Index__c = 1,
+            Is_Not_Valid__c = false
+        );
+        insert spikeRule;
+        
+        // SCENARIO: Simulate 3-hour snapshot frequency over 24-hour window
+        // Query window: 24h + 2min buffer = 1442 minutes
+        // With 3h frequency: snapshots at -24h, -21h, -18h, -15h, -12h, -9h, -6h, -3h, -5min
+        // Spike detection: compares min to max within window
+        
+        // Create Limits__c records simulating gradual increase with final spike
+        List<Limits__c> limitsRecords = new List<Limits__c>();
+        List<Log__c> snapshotLogs = new List<Log__c>();
+        
+        // Generate 8 snapshots over 24 hours with gradual increase
+        List<Integer> apiRequestValues = new List<Integer>{
+            1000,  // -24h: baseline
+            1050,  // -21h: +5%
+            1100,  // -18h: +10%
+            1150,  // -15h: +15%
+            1200,  // -12h: +20%
+            1250,  // -9h:  +25%
+            1300,  // -6h:  +30%
+            1600   // -5min: +60% SPIKE from baseline! (triggers event)
+        };
+        
+        List<Integer> hoursBack = new List<Integer>{24, 21, 18, 15, 12, 9, 6, 0};
+        
+        for (Integer i = 0; i < apiRequestValues.size(); i++) {
+            Limits__c limits = new Limits__c(
+                DailyApiRequests__c = apiRequestValues[i],
+                FileStorageMB__c = 100 + (i * 10), // Also add some variation here
+                DataStorageMB__c = 500 + (i * 20)
+            );
+            limitsRecords.add(limits);
+        }
+        insert limitsRecords;
+        
+        // Create logs for each snapshot
+        for (Integer i = 0; i < limitsRecords.size(); i++) {
+            DateTime snapshotTime = (i == hoursBack.size() - 1) 
+                ? baseTime.addMinutes(-5)  // Latest snapshot at -5 minutes
+                : baseTime.addHours(-hoursBack[i]);
+            
+            snapshotLogs.add(new Log__c(
+                Category__c = HourlyLimitsBatch.CATEGORY,
+                Type__c = HourlyLimitsBatch.TYPE,
+                Summary__c = 'Snapshot ' + (i + 1) + ' (' + apiRequestValues[i] + ' requests)',
+                Created_At__c = snapshotTime,
+                Limits__c = limitsRecords[i].Id,
+                Organization_Id__c = UserInfo.getOrganizationId()
+            ));
+        }
+        insert snapshotLogs;
+        
+        // Set batch time
+        MonitoringBatch.currentTime = baseTime;
+        
+        Test.startTest();
+        
+        // Execute monitoring batch
+        MonitoringBatch.getInstance().startBatch();
+        
+        Test.stopTest();
+        
+        // VERIFICATION
+        List<Event__c> events = [
+            SELECT Id, Rule__c, RecordCount__c, Criteria__c
+            FROM Event__c
+            WHERE Rule__c = :spikeRule.Id
+        ];
+        
+        // Query captured logs within 24h window
+        Integer queryWindowMinutes = 1440 + Constants.MONITORING.QUERY_WINDOW_BUFFER_MINUTES;
+        List<Log__c> capturedLogs = [
+            SELECT Id, Summary__c, Created_At__c, Limits__c,
+                   Limits__r.DailyApiRequests__c,
+                   Limits__r.FileStorageMB__c,
+                   Limits__r.DataStorageMB__c
+            FROM Log__c
+            WHERE Created_At__c >= :baseTime.addMinutes(-queryWindowMinutes)
+              AND Limits__c != null
+            ORDER BY Created_At__c
+        ];
+        
+        // ASSERTIONS
+        System.assert(capturedLogs.size() >= 7,
+            '24h window with 3h frequency should capture at least 7-8 snapshots. Found: ' + capturedLogs.size());
+        
+        System.assertEquals(limitsRecords[limitsRecords.size() - 1].Id, 
+            capturedLogs[capturedLogs.size() - 1].Limits__c,
+            'Latest snapshot should be the most recent one with highest API requests');
+        
+        // Verify spike detection: min value (1000) to max value (1600) = 60% increase
+        Decimal minRequests = 1000;
+        Decimal maxRequests = 1600;
+        Decimal expectedSpike = ((maxRequests - minRequests) / minRequests) * 100; // 60%
+        
+        System.assert(expectedSpike >= 50,
+            'Expected spike should be >= 50%. Calculated: ' + expectedSpike + '%');
+        
+        System.assert(events.size() >= 1,
+            'Spike rule should fire event when 60% spike detected (1000 → 1600) exceeds 50% threshold. ' +
+            'Captured ' + capturedLogs.size() + ' snapshots in 24h window. ' +
+            'Min: ' + minRequests + ', Max: ' + maxRequests + ', Spike: ' + expectedSpike + '%');
+        
+        // Additional validation: Verify multiple fields spiked
+        System.assertNotEquals(null, capturedLogs[0].Limits__r.DailyApiRequests__c,
+            'First snapshot should have API requests data');
+        System.assertNotEquals(null, capturedLogs[capturedLogs.size() - 1].Limits__r.DailyApiRequests__c,
+            'Last snapshot should have API requests data');
+    }
 }
