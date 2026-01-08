@@ -326,8 +326,17 @@ public with sharing class MonitoringUtil {
             Decimal minValue = getMinValue(values);
             Decimal maxValue = getMaxValue(values);
             
-            if(minValue != null && minValue > 0 && maxValue != null) {
-                Decimal percentageChange = ((maxValue - minValue) / minValue) * 100;
+            if(minValue != null && maxValue != null) {
+                Decimal percentageChange;
+                
+                // Handle zero baseline: any increase from 0 is treated as infinite spike
+                if(minValue == 0) {
+                    // Use a very large number to represent infinite percentage change
+                    // This ensures any non-zero value triggers when baseline is 0
+                    percentageChange = (maxValue > 0) ? 999999 : 0;
+                } else {
+                    percentageChange = ((maxValue - minValue) / minValue) * 100;
+                }
                 
                 // 4. Check against threshold (absolute value for bidirectional detection)
                 if(Math.abs(percentageChange) >= rule.threshold) {
@@ -504,6 +513,11 @@ public with sharing class MonitoringUtil {
             Boolean ruleResult = false;
 
             if(!rule.groupFieldNames.isEmpty() || rule.aggregateInterval != null || rule.subtype.equals(Constants.RULE_SOBJECT.SUB_TYPE_FREQUENCY) || rule.type.equals(Constants.RULE_SOBJECT.TYPE_LIMITS)) {
+                
+                // Skip if groupValues is null or empty (no values to evaluate)
+                if(rule.groupValues == null || rule.groupValues.isEmpty()) {
+                    continue;
+                }
                 
                 for(Integer interval : rule.groupValues.keySet()) {
                     Boolean intervalGroupResult = false;

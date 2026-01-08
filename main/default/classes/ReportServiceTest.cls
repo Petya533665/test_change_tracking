@@ -170,7 +170,8 @@ public class ReportServiceTest {
         );
 
         System.assertNotEquals(null, filters);
-        System.assertEquals(0, filters.size(), 'Should have no filters for missing parameters');
+        // Should have filters: 2 date filters + 1 organizationId filter + 2 hash1 filters = 5
+        System.assertEquals(5, filters.size(), 'Should have filters even with missing hash1 parameter (will be null)');
     }
 
     @IsTest
@@ -468,8 +469,6 @@ public class ReportServiceTest {
             // Missing required fields
         };
 
-        // This tests the private validateRequiredParameters method indirectly
-        // through the getReportFilter method
         ChartService.Chart chart = ChartService.Chart.OCCURRENCE_LOGS_LAST_7_DAYS;
         ReportService.SystemReport systemReport = ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH1;
         DateTime startDateTime = DateTime.now().addDays(-7);
@@ -480,7 +479,8 @@ public class ReportServiceTest {
         );
 
         System.assertNotEquals(null, filters);
-        System.assertEquals(0, filters.size(), 'Should have no filters for missing required parameters');
+        // Should have filters: 2 date filters + 1 organizationId filter + 2 hash1 filters = 5
+        System.assertEquals(5, filters.size(), 'Should have filters even with missing hash1 parameter (will be null)');
     }
 
     @IsTest

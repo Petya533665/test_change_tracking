@@ -166,7 +166,10 @@ public with sharing class TicketingService {
             }
             catch(Exception e) {
                 // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
-                this.logger?.add(logger.getInternalError(e, null, TicketingService.class.getName(), 'createTicketComment', this.shouldMarkForRecursionPrevention));
+                if (this.logger != null) {
+                    Log__c errorLog = this.logger.getInternalError(e, (String)null, TicketingService.class.getName(), 'createTicketComment', this.shouldMarkForRecursionPrevention);
+                    this.logger.add(errorLog);
+                }
             }
         }
 
@@ -224,7 +227,10 @@ public with sharing class TicketingService {
 
         public virtual void handleCreateTicketError(Exception e) {
             // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
-            this.logger?.add(logger.getInternalError(e, null, TicketingService.class.getName(), 'createTicket', this.shouldMarkForRecursionPrevention));
+            if (this.logger != null) {
+                Log__c errorLog = this.logger.getInternalError(e, (String)null, TicketingService.class.getName(), 'createTicket', this.shouldMarkForRecursionPrevention);
+                this.logger.add(errorLog);
+            }
 
             // Only update SObject if we have a wrapper (not for event actions)
             if (this.sObjectWrapper != null) {
@@ -413,14 +419,17 @@ public with sharing class TicketingService {
             }
             catch (Exception e) {
                 // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
-                this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'customFields', this.shouldMarkForRecursionPrevention));
+                if (this.logger != null) {
+                    Log__c errorLog = this.logger.getInternalError(e, (String)null, JiraService.class.getName(), 'customFields', this.shouldMarkForRecursionPrevention);
+                    this.logger.add(errorLog);
+                }
             }
             if(this.taskInfo.customFields != null) {
                 for (String key : this.taskInfo.customFields.keySet()) {
                     String rawValue = this.taskInfo.customFields.get(key);
                     JiraService.JiraProjectIssueField field = allProjectCustomFields.get(key);
                     Object transformedValue = JiraService.getService(this.logger).transformCustomFieldValue(rawValue, field, this.logger);
-                    ((Map<String, Object>)(this.bodyRequest.get('fields'))).put(key, transformedValue);
+                    ((Map<String, Object>)(this.bodyRequest.get(ADFBuilder.ATTR_FIELDS))).put(key, transformedValue);
                 }
             }
         }
@@ -435,15 +444,15 @@ public with sharing class TicketingService {
             Integer detailsFieldLength = Integer.valueOf(ConfigUtil.JIRA_SETTINGS.Jira_Details_Field_Length__c > 0 ? ConfigUtil.JIRA_SETTINGS.Jira_Details_Field_Length__c : 30000);
             this.taskInfo.details = this.taskInfo.details.abbreviate(detailsFieldLength);
 	        this.bodyRequest = new Map<String, Object>{
-                'fields' => new Map<String, Object>{
-                    'project' => new Map<String, Object>{
+                ADFBuilder.ATTR_FIELDS => new Map<String, Object>{
+                    ADFBuilder.ATTR_PROJECT => new Map<String, Object>{
                         'id' => this.taskInfo.projectId
                     },
-                    'issuetype' => new Map<String, Object>{
+                    ADFBuilder.ATTR_ISSUE_TYPE => new Map<String, Object>{
                         'id' => this.taskInfo.issueTypeId
                     },
-                    'summary' => this.taskInfo.summary,
-                    'description' => JiraService.isCloudJiraInstance() ? (Object)JSON.deserializeUntyped(this.taskInfo.details) : this.taskInfo.details
+                    ADFBuilder.ATTR_SUMMARY => this.taskInfo.summary,
+                    ADFBuilder.ATTR_DESCRIPTION => JiraService.isCloudJiraInstance() ? (this.taskInfo.details != null && this.taskInfo.details.trim().startsWith('{') ? (Object)JSON.deserializeUntyped(this.taskInfo.details) : TicketingService.textToAtlassianDocumentFormatContent(this.taskInfo.details, true)) : this.taskInfo.details
                 }
             };
         }
@@ -545,7 +554,10 @@ public with sharing class TicketingService {
                 }
                 catch(Exception e) {
                     // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
-                    this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'linkIssuesAsRelates', this.shouldMarkForRecursionPrevention));
+                    if (this.logger != null) {
+                        Log__c errorLog = this.logger.getInternalError(e, (String)null, JiraService.class.getName(), 'linkIssuesAsRelates', this.shouldMarkForRecursionPrevention);
+                        this.logger.add(errorLog);
+                    }
                 }
             }
             if(this.sObjectWrapper.sObjectRecord.getSObjectType() == Log__c.SObjectType) {
@@ -563,7 +575,10 @@ public with sharing class TicketingService {
                 }
                 catch(Exception e) {
                     // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
-                    this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'linkIssuesAsRelates', this.shouldMarkForRecursionPrevention));
+                    if (this.logger != null) {
+                        Log__c errorLog = this.logger.getInternalError(e, (String)null, JiraService.class.getName(), 'linkIssuesAsRelates', this.shouldMarkForRecursionPrevention);
+                        this.logger.add(errorLog);
+                    }
                 }
 
                 try {
@@ -598,7 +613,10 @@ public with sharing class TicketingService {
                 }
                 catch(Exception e) {
                     // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
-                    this.logger?.add(logger.getInternalError(e, null, JiraService.class.getName(), 'linkExistingJiraTasks', this.shouldMarkForRecursionPrevention));
+                    if (this.logger != null) {
+                        Log__c errorLog = this.logger.getInternalError(e, (String)null, JiraService.class.getName(), 'linkExistingJiraTasks', this.shouldMarkForRecursionPrevention);
+                        this.logger.add(errorLog);
+                    }
                 }
             }
         }
@@ -713,7 +731,156 @@ public with sharing class TicketingService {
                 201
             );
             JiraService.NewTaskCreatedResponse newTaskCreatedResponse = (JiraService.NewTaskCreatedResponse)JSON.deserialize(b, JiraService.NewTaskCreatedResponse.class);
-            return new TicketCreateResult(newTaskCreatedResponse.key, ConfigUtil.JIRA_TASK_URL + newTaskCreatedResponse.key);
+            String issueKey = newTaskCreatedResponse.key;
+            
+            // Handle chart attachments for new tickets
+            List<String> chartsTypeForPrepare = this.taskInfo?.chartsTypeForPrepare;
+            if (chartsTypeForPrepare != null && chartsTypeForPrepare.size() > 0) {
+                if (this.sobjectWrapper != null && this.sobjectWrapper.sObjectRecord != null) {
+                    Map<String, Object> parameters = ReportService.parametersBySObjectRecord(this.sobjectWrapper.sObjectRecord);
+
+                    Map<ChartService.Chart, Map<ReportService.SystemReport, String>> chartToChartData = ReportService.getReportDataByChart(
+                        chartsTypeForPrepare,
+                        parameters
+                    );
+
+                    // Set metadata for error tracking
+                    Map<String, String> metadata = new Map<String, String>();
+                    if (this.sobjectWrapper.sObjectRecord != null && String.isNotBlank(this.sobjectWrapper.sObjectRecord.Id)) {
+                        metadata.put('recordId', this.sobjectWrapper.sObjectRecord.Id);
+                    }
+                    if (String.isNotBlank(issueKey)) {
+                        metadata.put('issueId', issueKey);
+                    }
+
+                    ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
+                        .setMetadata(metadata)
+                        .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
+
+                    // Attach charts and update description
+                    updateIssueDescriptionWithCharts(issueKey, this.taskInfo.details, chartGeneratorImageLambdaClient);
+                }
+            }
+            
+            return new TicketCreateResult(issueKey, ConfigUtil.JIRA_TASK_URL + issueKey);
+        }
+        
+        private void updateIssueDescriptionWithCharts(String issueKey, String originalDescription, ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient) {
+            try {
+                JiraService.JiraServiceInterface jiraServiceInterface = JiraService.getService(this.logger);
+                
+                if (JiraService.isCloudJiraInstance()) {
+                    // For Jira Cloud, use ADF format with media nodes
+                    List<JiraService.AttachmentResult> attachmentResults = new List<JiraService.AttachmentResult>();
+                    
+                    if (chartGeneratorImageLambdaClient != null && chartGeneratorImageLambdaClient.hasCharts()) {
+                        for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
+                            if (chart != null && String.isNotBlank(chart)) {
+                                ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
+                                
+                                if (chartEnum != null) {
+                                    Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
+                                    if (chartBlob != null) {
+                                        String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                        JiraService.AttachmentResult result = jiraServiceInterface.addAttachmentWithMediaId(chartBlob, fileName, issueKey);
+                                        attachmentResults.add(result);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Create ADF format description with chart attachments
+                    Map<String, Object> adfContent = (Map<String, Object>) TicketingService.textToAtlassianDocumentFormatContent(originalDescription, true);
+                    List<Object> content = (List<Object>) adfContent.get(ADFBuilder.ATTR_CONTENT);
+                    
+                    if (content == null) {
+                        content = new List<Object>();
+                        adfContent.put(ADFBuilder.ATTR_CONTENT, content);
+                    }
+                    
+                    // Add media nodes for each chart attachment
+                    if (attachmentResults != null && !attachmentResults.isEmpty()) {
+                        for (JiraService.AttachmentResult attachment : attachmentResults) {
+                            if (String.isNotBlank(attachment.mediaServicesId)) {
+                                Map<String, Object> mediaSingle = new Map<String, Object>{
+                                    ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_MEDIA_SINGLE,
+                                    ADFBuilder.ATTR_ATTRS => new Map<String, Object>{
+                                        'layout' => 'center'
+                                    },
+                                    ADFBuilder.ATTR_CONTENT => new List<Object>{
+                                        new Map<String, Object>{
+                                            ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_MEDIA,
+                                            ADFBuilder.ATTR_ATTRS => new Map<String, Object>{
+                                                ADFBuilder.ATTR_ID => attachment.mediaServicesId,
+                                                ADFBuilder.ATTR_TYPE => ADFBuilder.TYPE_FILE,
+                                                ADFBuilder.ATTR_COLLECTION => '',
+                                                'width' => 800,
+                                                'height' => 400,
+                                                ADFBuilder.ATTR_ALT => attachment.fileName != null ? attachment.fileName : 'Chart image'
+                                            }
+                                        }
+                                    }
+                                };
+                                content.add(mediaSingle);
+                            }
+                        }
+                    }
+                    
+                    // Update the issue description
+                    Map<String, Object> updateBody = new Map<String, Object>{
+                        ADFBuilder.ATTR_FIELDS => new Map<String, Object>{
+                            ADFBuilder.ATTR_DESCRIPTION => adfContent
+                        }
+                    };
+                    
+                    HttpUtils.put(
+                        jiraServiceInterface.getIssueEndpoint(issueKey),
+                        JSON.serialize(updateBody),
+                        JiraService.JIRA_HEADERS,
+                        204
+                    );
+                } else {
+                    // For Jira Server, use the old format
+                    String descriptionWithCharts = originalDescription;
+                    
+                    if (chartGeneratorImageLambdaClient != null && chartGeneratorImageLambdaClient.hasCharts()) {
+                        for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
+                            if (chart != null && String.isNotBlank(chart)) {
+                                ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
+                                
+                                if (chartEnum != null) {
+                                    Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
+                                    if (chartBlob != null) {
+                                        String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                        jiraServiceInterface.addAttachment(chartBlob, fileName, issueKey);
+                                        descriptionWithCharts += '\n!' + fileName + '!';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Update the issue description
+                    Map<String, Object> updateBody = new Map<String, Object>{
+                        ADFBuilder.ATTR_FIELDS => new Map<String, Object>{
+                            ADFBuilder.ATTR_DESCRIPTION => descriptionWithCharts
+                        }
+                    };
+                    
+                    HttpUtils.put(
+                        jiraServiceInterface.getIssueEndpoint(issueKey),
+                        JSON.serialize(updateBody),
+                        JiraService.JIRA_HEADERS,
+                        204
+                    );
+                }
+            } catch (Exception e) {
+                if (this.logger != null) {
+                    Log__c errorLog = this.logger.getInternalError(e, (String)null, TicketingService.class.getName(), 'updateIssueDescriptionWithCharts', this.shouldMarkForRecursionPrevention);
+                    this.logger.add(errorLog);
+                }
+            }
         }
 
     }
@@ -1015,8 +1182,88 @@ public with sharing class TicketingService {
                 else throw e;
             }
             AzureService.AzureDevOpsWorkItem newWorkItem = (AzureService.AzureDevOpsWorkItem)JSON.deserialize(AzureService.replaceSystemField(b), AzureService.AzureDevOpsWorkItem.class);
+            String workItemId = newWorkItem.id;
+            
+            // Handle chart attachments for new work items
+            List<String> chartsTypeForPrepare = this.taskInfo?.chartsTypeForPrepare;
+            if (chartsTypeForPrepare != null && chartsTypeForPrepare.size() > 0) {
+                if (this.sobjectWrapper != null && this.sobjectWrapper.sObjectRecord != null) {
+                    Map<String, Object> parameters = ReportService.parametersBySObjectRecord(this.sobjectWrapper.sObjectRecord);
 
-            return new TicketCreateResult(newWorkItem.id, String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{ConfigUtil.AZURE_DEV_OPS_API_SETTINGS.Organization_Id__c, this.taskInfo.projectId, newWorkItem.id}));
+                    Map<ChartService.Chart, Map<ReportService.SystemReport, String>> chartToChartData = ReportService.getReportDataByChart(
+                        chartsTypeForPrepare,
+                        parameters
+                    );
+
+                    // Set metadata for error tracking
+                    Map<String, String> metadata = new Map<String, String>();
+                    if (this.sobjectWrapper.sObjectRecord != null && String.isNotBlank(this.sobjectWrapper.sObjectRecord.Id)) {
+                        metadata.put('recordId', this.sobjectWrapper.sObjectRecord.Id);
+                    }
+                    if (String.isNotBlank(workItemId)) {
+                        metadata.put('workItemId', workItemId);
+                    }
+
+                    ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
+                        .setMetadata(metadata)
+                        .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
+
+                    // Attach charts and update description
+                    updateWorkItemDescriptionWithCharts(workItemId, this.taskInfo.details, chartGeneratorImageLambdaClient);
+                }
+            }
+
+            return new TicketCreateResult(workItemId, String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{ConfigUtil.AZURE_DEV_OPS_API_SETTINGS.Organization_Id__c, this.taskInfo.projectId, workItemId}));
+        }
+        
+        private void updateWorkItemDescriptionWithCharts(String workItemId, String originalDescription, ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient) {
+            try {
+                String organizationId = ConfigUtil.AZURE_DEV_OPS_API_SETTINGS.Organization_Id__c;
+                String projectId = this.taskInfo.projectId;
+                
+                String descriptionWithCharts = originalDescription;
+                
+                if (chartGeneratorImageLambdaClient != null && chartGeneratorImageLambdaClient.hasCharts()) {
+                    AzureApiClient client = new AzureApiClient()
+                        .setOrganization(organizationId)
+                        .setProject(projectId)
+                        .setWorkItem(workItemId);
+                    
+                    for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
+                        if (chart != null && String.isNotBlank(chart)) {
+                            ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
+                            
+                            if (chartEnum != null) {
+                                Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
+                                if (chartBlob != null) {
+                                    String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                    String imageUrl = client.addAttachment(chartBlob, fileName);
+                                    if (String.isNotBlank(imageUrl)) {
+                                        descriptionWithCharts += '<br/><img src="' + imageUrl + '?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" alt="' + fileName + '"/>';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Update the work item description
+                if (descriptionWithCharts != originalDescription) {
+                    List<AzureService.AzureDevOpsWorkItemRequestBody> updateRequest = new List<AzureService.AzureDevOpsWorkItemRequestBody>();
+                    updateRequest.add(new AzureService.AzureDevOpsWorkItemRequestBody(
+                        AzureService.WORK_ITEM_TYPE_OPERATION_REPLACE,
+                        AzureService.WOKR_ITEM_REQUEST_PATH_FIELDS + AzureService.WORK_ITEM_TYPE_FIELD_DESCRIPTION,
+                        descriptionWithCharts
+                    ));
+                    
+                    AzureService.updateProjectWorkItem(organizationId, projectId, workItemId, updateRequest);
+                }
+            } catch (Exception e) {
+                if (this.logger != null) {
+                    Log__c errorLog = this.logger.getInternalError(e, (String)null, TicketingService.class.getName(), 'updateWorkItemDescriptionWithCharts', this.shouldMarkForRecursionPrevention);
+                    this.logger.add(errorLog);
+                }
+            }
         }
 
         public override void createTicketRelations(TicketCreateResult result) {}

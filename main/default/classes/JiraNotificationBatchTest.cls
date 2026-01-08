@@ -1876,6 +1876,7 @@ public class JiraNotificationBatchTest {
 	public static final String JIRA_MOCK_HASH3 = 'hash3';
 	public static final String JIRA_MOCK_LABEL_HASH2 = 'h2_'+JIRA_MOCK_HASH2;
 	public static final String JIRA_MOCK_LABEL_HASH3 = 'h3_'+JIRA_MOCK_HASH3;
+	public static final String CHART_GENERATOR_LAMBDA_ENDPOINT = 'https://api.pharos.ai/generate-chart-v2';
 
 	public static Map<String, HttpCalloutMock> createJiraMocks() {
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
@@ -12552,6 +12553,341 @@ public class JiraNotificationBatchTest {
 		System.assertEquals(attachment.contentUrl, linkAttrs.get('href'), 'Should have correct href');
 	}
 
+	@IsTest
+	static void testJiraCreateNewTicketWithChartsCloud() {
+		// Test Jira Cloud createNewTicket with chart attachments
+		Jira_Settings__c jiraSettings = [SELECT Id FROM Jira_Settings__c LIMIT 1];
+		jiraSettings.Jira_Base_Url__c = 'https://test.atlassian.net';
+		update jiraSettings;
+		ConfigUtil.JIRA_SETTINGS = null;
+
+		// Create test log
+		Log__c testLog = new Log__c(
+			Details__c = 'Test log for chart attachment',
+			Organization_Id__c = '00D000000000000',
+			Hash_1__c = 'test-hash-1',
+			Hash_2__c = 'test-hash-2',
+			Hash_3__c = 'test-hash-3'
+		);
+		insert testLog;
+
+		// Create Action with AutoChart fields
+		// For Jira Cloud, Body__c will be converted to ADF format automatically
+		Action__c jiraAction = new Action__c(
+			Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
+			Subject__c = 'Test Ticket with Charts',
+			Body__c = 'Description: {!System_Auto_Chart.OCCURRENCE_LOGS_LAST_30_DAYS} {!System_Auto_Chart.OCCURRENCE_LOGS_LAST_7_DAYS}',
+			JIRAProject__c = JIRA_MOCK_PROJECT_ID,
+			JIRAIssueType__c = JIRA_MOCK_ISSUE_TYPE_ID,
+			SobjectType__c = 'Log__c'
+		);
+		insert jiraAction;
+
+		// For Jira Cloud, we need to ensure details is in ADF format
+		// The TicketingTaskInfo constructor will handle this, but we need to make sure
+		// the merge fields are processed correctly
+
+		// Create mocks
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.putAll(createJiraMocks());
+
+		// Add mock for chart generation
+		String chartLambdaEndpoint = CHART_GENERATOR_LAMBDA_ENDPOINT;
+		String mockChartResponse = '{"OCCURRENCE_LOGS_LAST_7_DAYS":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==","OCCURRENCE_LOGS_LAST_30_DAYS":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}';
+		endpoint2TestResp.put(chartLambdaEndpoint, new SingleRequestMock(200, 'OK', mockChartResponse));
+
+		// Add mock for attachment upload (Jira Cloud)
+		String attachmentEndpoint = JiraService.getService().getCreateIssueAttachmentEndpoint(JIRA_MOCK_NEW_TICKET_ID);
+		String mockAttachmentResponse = '[{"id":"att-123","filename":"OCCURRENCE_LOGS_LAST_7_DAYS.png","mediaServices":{"id":"media-456"}},{"id":"att-124","filename":"OCCURRENCE_LOGS_LAST_30_DAYS.png","mediaServices":{"id":"media-457"}}]';
+		endpoint2TestResp.put(attachmentEndpoint, new SingleRequestMock(200, 'OK', mockAttachmentResponse));
+
+		// Add mock for issue update
+		String issueEndpoint = JiraService.getService().getIssueEndpoint(JIRA_MOCK_NEW_TICKET_ID);
+		endpoint2TestResp.put(issueEndpoint, new SingleRequestMock(204, 'No Content', ''));
+
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		PermissionsUtil.JiraIntegrationEnabled = true;
+		TestDataFactory.enableMaxJiraRules();
+
+		Test.startTest();
+		TicketingService.TicketingSObjectWrapper wrapper = new TicketingService.TicketingSObjectWrapper(testLog);
+		TicketingService.TicketingTaskInfo taskInfo = new TicketingService.TicketingTaskInfo(jiraAction, wrapper);
+		TicketingService.TicketingServiceInputData inputData = new TicketingService.TicketingServiceInputData(testLog.Id, jiraAction);
+		inputData.taskInfo = taskInfo;
+		TicketingService.TicketingServiceJiraImpl ticketingService = new TicketingService.TicketingServiceJiraImpl();
+		ticketingService.init(inputData, null, false);
+
+		TicketingService.TicketCreateResult result = ticketingService.createNewTicket();
+		Test.stopTest();
+
+		System.assertNotEquals(null, result);
+		System.assertNotEquals(null, result.id);
+		assertNoInternalLogs();
+	}
+
+	@IsTest
+	static void testJiraCreateNewTicketWithChartsServer() {
+		// Test Jira Server createNewTicket with chart attachments
+		Jira_Settings__c jiraSettings = [SELECT Id FROM Jira_Settings__c LIMIT 1];
+		jiraSettings.Jira_Base_Url__c = 'http://test.jira.com';
+		update jiraSettings;
+		ConfigUtil.JIRA_SETTINGS = null;
+
+		// Create test log
+		Log__c testLog = new Log__c(
+			Details__c = 'Test log for chart attachment',
+			Organization_Id__c = '00D000000000000',
+			Hash_1__c = 'test-hash-1',
+			Hash_2__c = 'test-hash-2',
+			Hash_3__c = 'test-hash-3'
+		);
+		insert testLog;
+
+		// Create Action with AutoChart fields
+		Action__c jiraAction = new Action__c(
+			Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
+			Subject__c = 'Test Ticket with Charts',
+			Body__c = 'Description: {!System_Auto_Chart.OCCURRENCE_LOGS_LAST_30_DAYS}',
+			JIRAProject__c = JIRA_MOCK_PROJECT_ID,
+			JIRAIssueType__c = JIRA_MOCK_ISSUE_TYPE_ID,
+			SobjectType__c = 'Log__c'
+		);
+		insert jiraAction;
+
+		// Create mocks
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.putAll(createJiraMocks());
+
+		// Add mock for chart generation
+		String chartLambdaEndpoint = CHART_GENERATOR_LAMBDA_ENDPOINT;
+		String mockChartResponse = '{"OCCURRENCE_LOGS_LAST_30_DAYS":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}';
+		endpoint2TestResp.put(chartLambdaEndpoint, new SingleRequestMock(200, 'OK', mockChartResponse));
+
+		// Add mock for attachment upload (Jira Server)
+		String attachmentEndpoint = JiraService.getService().getCreateIssueAttachmentEndpoint(JIRA_MOCK_NEW_TICKET_ID);
+		endpoint2TestResp.put(attachmentEndpoint, new SingleRequestMock(200, 'OK', '[{"id":"att-123","filename":"OCCURRENCE_LOGS_LAST_30_DAYS.png"}]'));
+
+		// Add mock for issue update
+		String issueEndpoint = JiraService.getService().getIssueEndpoint(JIRA_MOCK_NEW_TICKET_ID);
+		endpoint2TestResp.put(issueEndpoint, new SingleRequestMock(204, 'No Content', ''));
+
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		PermissionsUtil.JiraIntegrationEnabled = true;
+		TestDataFactory.enableMaxJiraRules();
+
+		Test.startTest();
+		TicketingService.TicketingSObjectWrapper wrapper = new TicketingService.TicketingSObjectWrapper(testLog);
+		TicketingService.TicketingTaskInfo taskInfo = new TicketingService.TicketingTaskInfo(jiraAction, wrapper);
+		TicketingService.TicketingServiceInputData inputData = new TicketingService.TicketingServiceInputData(testLog.Id, jiraAction);
+		inputData.taskInfo = taskInfo;
+		TicketingService.TicketingServiceJiraImpl ticketingService = new TicketingService.TicketingServiceJiraImpl();
+		ticketingService.init(inputData, null, false);
+
+		TicketingService.TicketCreateResult result = ticketingService.createNewTicket();
+		Test.stopTest();
+
+		System.assertNotEquals(null, result);
+		System.assertNotEquals(null, result.id);
+		assertNoInternalLogs();
+	}
+
+	@IsTest
+	static void testAzureDevOpsCreateNewTicketWithCharts() {
+		// Test Azure DevOps createNewTicket with chart attachments
+		// Create test log
+		Log__c testLog = new Log__c(
+			Details__c = 'Test log for chart attachment',
+			Organization_Id__c = '00D000000000000',
+			Hash_1__c = 'test-hash-1',
+			Hash_2__c = 'test-hash-2',
+			Hash_3__c = 'test-hash-3'
+		);
+		insert testLog;
+
+		// Create Action with AutoChart fields
+		Action__c azureAction = new Action__c(
+			Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
+			Subject__c = 'Test Work Item with Charts',
+			Body__c = 'Description: {!System_Auto_Chart.OCCURRENCE_LOGS_LAST_30_DAYS} {!System_Auto_Chart.OCCURRENCE_LOGS_LAST_7_DAYS}',
+			JIRAProject__c = AZURE_DEV_OPS_MOCK_PROJECT_ID,
+			JIRAIssueType__c = AZURE_DEV_OPS_MOCK_ISSUE_TYPE_ID,
+			SobjectType__c = 'Log__c'
+		);
+		insert azureAction;
+
+		// Create mocks
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.putAll(createAzureDevOpsMocks());
+
+		// Add mock for chart generation
+		String chartLambdaEndpoint = CHART_GENERATOR_LAMBDA_ENDPOINT;
+		String mockChartResponse = '{"OCCURRENCE_LOGS_LAST_7_DAYS":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==","OCCURRENCE_LOGS_LAST_30_DAYS":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}';
+		endpoint2TestResp.put(chartLambdaEndpoint, new SingleRequestMock(200, 'OK', mockChartResponse));
+
+		// Add mock for attachment upload (Azure DevOps)
+		String attachmentEndpoint = String.format(AzureApiClient.AZURE_DEVOPS_REST_API_WORK_ATTACHMENT, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, 'OCCURRENCE_LOGS_LAST_7_DAYS.png'});
+		String mockAttachmentResponse = '{"id":"att-123","url":"https://test.visualstudio.com/attachments/att-123"}';
+		endpoint2TestResp.put(attachmentEndpoint, new SingleRequestMock(201, 'Created', mockAttachmentResponse));
+
+		String attachmentEndpoint2 = String.format(AzureApiClient.AZURE_DEVOPS_REST_API_WORK_ATTACHMENT, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, 'OCCURRENCE_LOGS_LAST_30_DAYS.png'});
+		endpoint2TestResp.put(attachmentEndpoint2, new SingleRequestMock(201, 'Created', '{"id":"att-124","url":"https://test.visualstudio.com/attachments/att-124"}'));
+
+		// Add mock for work item update
+		String workItemUpdateEndpoint = String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM_ID_EXPAND_ALL, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_NEW_WORK_ITEM_ID});
+		AzureService.AzureDevOpsWorkItem updateWorkItem = new AzureService.AzureDevOpsWorkItem();
+		updateWorkItem.id = AZURE_DEV_OPS_MOCK_NEW_WORK_ITEM_ID;
+		updateWorkItem.url = String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_NEW_WORK_ITEM_ID});
+		endpoint2TestResp.put(workItemUpdateEndpoint, new SingleRequestMock(200, 'OK', JSON.serialize(updateWorkItem)));
+
+		// Add mock for work item PATCH update
+		String workItemPatchEndpoint = String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_ISSUE_TYPE_ID});
+		endpoint2TestResp.put(workItemPatchEndpoint, new SingleRequestMock(200, 'OK', JSON.serialize(updateWorkItem)));
+
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		PermissionsUtil.AzureDevOpsIntegrationEnabled = true;
+
+		Test.startTest();
+		TicketingService.TicketingSObjectWrapper wrapper = new TicketingService.TicketingSObjectWrapper(testLog);
+		TicketingService.TicketingTaskInfo taskInfo = new TicketingService.TicketingTaskInfo(azureAction, wrapper);
+		TicketingService.TicketingServiceInputData inputData = new TicketingService.TicketingServiceInputData(testLog.Id, azureAction);
+		inputData.taskInfo = taskInfo;
+		TicketingService.TicketingServiceAzureDevOpsImpl ticketingService = new TicketingService.TicketingServiceAzureDevOpsImpl();
+		ticketingService.init(inputData, null, false);
+
+		TicketingService.TicketCreateResult result = ticketingService.createNewTicket();
+		Test.stopTest();
+
+		System.assertNotEquals(null, result);
+		System.assertNotEquals(null, result.id);
+		assertNoInternalLogs();
+	}
+
+	@IsTest
+	static void testJiraCreateNewTicketWithChartsNoCharts() {
+		// Test Jira createNewTicket without charts (null chartsTypeForPrepare)
+		Jira_Settings__c jiraSettings = [SELECT Id FROM Jira_Settings__c LIMIT 1];
+		jiraSettings.Jira_Base_Url__c = 'https://test.atlassian.net';
+		update jiraSettings;
+		ConfigUtil.JIRA_SETTINGS = null;
+
+		// Create test log
+		Log__c testLog = new Log__c(
+			Details__c = 'Test log without charts',
+			Organization_Id__c = '00D000000000000',
+			Hash_1__c = 'test-hash-1',
+			Hash_2__c = 'test-hash-2',
+			Hash_3__c = 'test-hash-3'
+		);
+		insert testLog;
+
+		// Create Action without AutoChart fields
+		Action__c jiraAction = new Action__c(
+			Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
+			Subject__c = 'Test Ticket without Charts',
+			Body__c = 'Description without charts',
+			JIRAProject__c = JIRA_MOCK_PROJECT_ID,
+			JIRAIssueType__c = JIRA_MOCK_ISSUE_TYPE_ID,
+			SobjectType__c = 'Log__c'
+		);
+		insert jiraAction;
+
+		// Create mocks
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.putAll(createJiraMocks());
+
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		PermissionsUtil.JiraIntegrationEnabled = true;
+		TestDataFactory.enableMaxJiraRules();
+
+		Test.startTest();
+		TicketingService.TicketingSObjectWrapper wrapper = new TicketingService.TicketingSObjectWrapper(testLog);
+		TicketingService.TicketingTaskInfo taskInfo = new TicketingService.TicketingTaskInfo(jiraAction, wrapper);
+		TicketingService.TicketingServiceInputData inputData = new TicketingService.TicketingServiceInputData(testLog.Id, jiraAction);
+		inputData.taskInfo = taskInfo;
+		TicketingService.TicketingServiceJiraImpl ticketingService = new TicketingService.TicketingServiceJiraImpl();
+		ticketingService.init(inputData, null, false);
+
+		TicketingService.TicketCreateResult result = ticketingService.createNewTicket();
+		Test.stopTest();
+
+		System.assertNotEquals(null, result);
+		System.assertNotEquals(null, result.id);
+		assertNoInternalLogs();
+	}
+
+	@IsTest
+	static void testJiraCreateNewTicketWithChartsExceptionHandling() {
+		// Test exception handling in updateIssueDescriptionWithCharts
+		Jira_Settings__c jiraSettings = [SELECT Id FROM Jira_Settings__c LIMIT 1];
+		jiraSettings.Jira_Base_Url__c = 'https://test.atlassian.net';
+		update jiraSettings;
+		ConfigUtil.JIRA_SETTINGS = null;
+
+		// Create test log
+		Log__c testLog = new Log__c(
+			Details__c = 'Test log for exception handling',
+			Organization_Id__c = '00D000000000000',
+			Hash_1__c = 'test-hash-1',
+			Hash_2__c = 'test-hash-2',
+			Hash_3__c = 'test-hash-3'
+		);
+		insert testLog;
+
+		// Create Action with AutoChart fields
+		Action__c jiraAction = new Action__c(
+			Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_JIRA_NOTIFICATION,
+			Subject__c = 'Test Ticket with Charts',
+			Body__c = 'Description: {!System_Auto_Chart.OCCURRENCE_LOGS_LAST_30_DAYS}',
+			JIRAProject__c = JIRA_MOCK_PROJECT_ID,
+			JIRAIssueType__c = JIRA_MOCK_ISSUE_TYPE_ID,
+			SobjectType__c = 'Log__c'
+		);
+		insert jiraAction;
+
+		// Create mocks with error for attachment
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.putAll(createJiraMocks());
+
+		// Add mock for chart generation
+		String chartLambdaEndpoint = CHART_GENERATOR_LAMBDA_ENDPOINT;
+		String mockChartResponse = '{"OCCURRENCE_LOGS_LAST_30_DAYS":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}';
+		endpoint2TestResp.put(chartLambdaEndpoint, new SingleRequestMock(200, 'OK', mockChartResponse));
+
+		// Add mock for attachment upload that will fail
+		String attachmentEndpoint = JiraService.getService().getCreateIssueAttachmentEndpoint(JIRA_MOCK_NEW_TICKET_ID);
+		endpoint2TestResp.put(attachmentEndpoint, new SingleRequestMock(500, 'Internal Server Error', '{"error":"Attachment failed"}'));
+
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		PermissionsUtil.JiraIntegrationEnabled = true;
+		TestDataFactory.enableMaxJiraRules();
+
+		Test.startTest();
+		TicketingService.TicketingSObjectWrapper wrapper = new TicketingService.TicketingSObjectWrapper(testLog);
+		TicketingService.TicketingTaskInfo taskInfo = new TicketingService.TicketingTaskInfo(jiraAction, wrapper);
+		TicketingService.TicketingServiceInputData inputData = new TicketingService.TicketingServiceInputData(testLog.Id, jiraAction);
+		inputData.taskInfo = taskInfo;
+		TicketingService.TicketingServiceJiraImpl ticketingService = new TicketingService.TicketingServiceJiraImpl();
+		ticketingService.init(inputData, null, false);
+
+		// Should not throw exception, but handle it gracefully
+		TicketingService.TicketCreateResult result = ticketingService.createNewTicket();
+		Test.stopTest();
+
+		System.assertNotEquals(null, result);
+		System.assertNotEquals(null, result.id);
+		// Exception should be logged but not thrown
+	}
+
 	// ==========================================
 	// RECURSION PREVENTION TESTS
 	// ==========================================
@@ -12616,17 +12952,17 @@ public class JiraNotificationBatchTest {
 		insert regularLog;
 
 		Test.startTest();
-		
+
 		// Simulate notification processing of regular log that fails
 		// When processing a regular log (not Pharos error), shouldMarkForRecursionPrevention = false
 		Exception testException = new System.EmailException();
 		testException.setMessage('Email send failed for regular log');
-		
+
 		Logger logger = Logger.getInstance();
 		// For regular log, pass false - should NOT mark the Pharos error
 		logger.add(logger.getInternalError(testException, regularLog.Id, 'NotificationService', 'emailExceptions', false));
 		logger.flush();
-		
+
 		Test.stopTest();
 
 		// Query the created Pharos error
@@ -12639,7 +12975,7 @@ public class JiraNotificationBatchTest {
 		];
 
 		System.assertEquals(1, pharosLogs.size(), 'Should have created one Pharos error log');
-		
+
 		Log__c pharosError = pharosLogs[0];
 		// This is the FIRST Pharos error from notification failure - should NOT be marked
 		System.assertNotEquals(
@@ -12668,17 +13004,17 @@ public class JiraNotificationBatchTest {
 		insert pharosError;
 
 		Test.startTest();
-		
+
 		// Simulate notification processing of Pharos error that fails
 		// When processing a Pharos error, shouldMarkForRecursionPrevention = true
 		Exception testException = new System.EmailException();
 		testException.setMessage('Email send failed for Pharos error');
-		
+
 		Logger logger = Logger.getInstance();
 		// For Pharos error, pass true - should MARK the new error
 		logger.add(logger.getInternalError(testException, pharosError.Id, 'NotificationService', 'emailExceptions', true));
 		logger.flush();
-		
+
 		Test.stopTest();
 
 		// Query the created second-level Pharos error
@@ -12693,7 +13029,7 @@ public class JiraNotificationBatchTest {
 		];
 
 		System.assertEquals(1, secondLevelErrors.size(), 'Should have created one second-level error');
-		
+
 		Log__c secondLevelError = secondLevelErrors[0];
 		// This is the SECOND level error - should be MARKED to prevent recursion
 		verifyLogMarkedForRecursionPrevention(secondLevelError);
@@ -12717,7 +13053,7 @@ public class JiraNotificationBatchTest {
 		insert markedPharosError;
 
 		Test.startTest();
-		
+
 		// Query the log
 		Log__c log = [
 			SELECT Id, Category__c, Area__c, Originated_From__c, Summary__c, Type__c,
@@ -12725,7 +13061,7 @@ public class JiraNotificationBatchTest {
 			FROM Log__c
 			WHERE Id = :markedPharosError.Id
 		];
-		
+
 		Test.stopTest();
 
 		// Verify it's excluded from notification rules

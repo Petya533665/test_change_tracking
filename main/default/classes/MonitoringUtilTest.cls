@@ -6038,4 +6038,747 @@ public class MonitoringUtilTest {
         
         System.assert(!jobs.isEmpty(), 'NotificationBatch job should be queued by checkStartActionsBatch');
     }
+
+    @IsTest
+    static void test_limits_spike_rule_from_zero_baseline() {
+        // Test scenario: 5 snapshots with 0 MB, then 1 snapshot with 3 MB
+        // This should trigger a spike event since going from 0 to any non-zero value is an infinite spike
+        
+        DateTime testTime = DateTime.now();
+        
+        // Create 5 Limits records with FileStorageMB__c = 0
+        List<Limits__c> limitsRecords = new List<Limits__c>();
+        for(Integer i = 0; i < 5; i++) {
+            limitsRecords.add(new Limits__c(
+                FileStorageMB__c = 0
+            ));
+        }
+        
+        // Create 1 Limits record with FileStorageMB__c = 3
+        limitsRecords.add(new Limits__c(
+            FileStorageMB__c = 3
+        ));
+        insert limitsRecords;
+        
+        // Create Log records referencing each Limits record within the time interval
+        List<Log__c> testLogs = new List<Log__c>();
+        Integer minutesOffset = 0;
+        for(Limits__c lim : limitsRecords) {
+            testLogs.add(new Log__c(
+                Created_At__c = testTime.addMinutes(-minutesOffset),
+                Limits__c = lim.Id,
+                Category__c = 'Limits',
+                Type__c = 'Snapshot',
+                Organization_Id__c = UserInfo.getOrganizationId()
+            ));
+            minutesOffset += 10; // Space logs 10 minutes apart within 1 hour
+        }
+        insert testLogs;
+        
+        // Query the logs with Limits relationship data for spike processing
+        testLogs = [
+            SELECT Id, Created_At__c, Limits__c,
+                   Limits__r.Id, Limits__r.FileStorageMB__c
+            FROM Log__c
+            WHERE Id IN :testLogs
+            ORDER BY Created_At__c DESC
+        ];
+        
+        // Create a limits rule for spike detection on FileStorageMB field
+        Rule__c limitsRule = new Rule__c(
+            Name__c = 'Test File Storage Spike Rule',
+            Active__c = true,
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_SPIKE,
+            EventTimeInterval__c = 480, // 8 hours (matches user scenario)
+            AggregateType__c = 'Count',
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            Threshold__c = 10, // Any spike >= 10% (but from 0, any increase is infinite)
+            FilterLogic__c = '1',
+            SobjectType__c = null,
+            Index__c = 1,
+            Is_Not_Valid__c = false
+        );
+        insert limitsRule;
+        
+        // Create filter to monitor FileStorageMB field
+        RuleFilter__c fileStorageFilter = new RuleFilter__c(
+            Rule__c = limitsRule.Id,
+            Index__c = 1,
+            FieldName__c = 'FileStorageMB', // Key from LimitsService.FIELD_MAP
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            Value__c = '0',
+            Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+            Field_Type__c = RuleUtil.FIELD_TYPE_NUMBER
+        );
+        insert fileStorageFilter;
+        
+        // Create action for the rule
+        Action__c action = new Action__c(
+            Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_EMAIL_NOTIFICATION,
+            EmailTo__c = 'test@example.com',
+            Subject__c = 'File Storage Spike Alert',
+            EmailBody__c = 'File storage has spiked from zero baseline'
+        );
+        insert action;
+        
+        RuleAction__c ruleAction = new RuleAction__c(
+            Rule__c = limitsRule.Id,
+            Action__c = action.Id
+        );
+        insert ruleAction;
+        
+        Test.startTest();
+        
+        // Execute limits evaluation
+        Map<Id, RuleUtil.Event> eventsMap = new Map<Id, RuleUtil.Event>();
+        MonitoringUtil.evaluateLimitsRules(
+            testLogs,
+            new List<Id>{limitsRule.Id},
+            testTime,
+            eventsMap,
+            Logger.getInstance()
+        );
+        
+        Test.stopTest();
+        
+        // Verify that an event was created in the database
+        List<Event__c> events = [
+            SELECT Id, Rule__c, RecordCount__c, Records__c, Description__c,
+                   Rule__r.Type__c, Rule__r.Subtype__c
+            FROM Event__c 
+            WHERE Rule__c = :limitsRule.Id
+        ];
+        
+        System.assertEquals(1, events.size(), 
+            'Event should be created for spike from zero baseline. ' +
+            'Going from 0 MB to 3 MB should trigger spike detection.');
+        System.assertEquals('Limits', events[0].Rule__r.Type__c, 
+            'Event should be for Limits rule type');
+        System.assertEquals('Spike', events[0].Rule__r.Subtype__c, 
+            'Event should be for Spike subtype');
+        
+        // Verify that event actions were created
+        List<EventAction__c> eventActions = [
+            SELECT Id, Event__c, Action_Type__c
+            FROM EventAction__c
+            WHERE Event__c = :events[0].Id
+        ];
+        System.assertEquals(1, eventActions.size(), 
+            'Event action should be created for the spike event');
+    }
+    
+    @IsTest
+    static void test_limits_spike_rule_with_all_zero_values() {
+        // Test scenario: All snapshots are 0 MB
+        // This should NOT trigger a spike event since there's no change
+        
+        DateTime testTime = DateTime.now();
+        
+        // Create 6 Limits records all with FileStorageMB__c = 0
+        List<Limits__c> limitsRecords = new List<Limits__c>();
+        for(Integer i = 0; i < 6; i++) {
+            limitsRecords.add(new Limits__c(
+                FileStorageMB__c = 0
+            ));
+        }
+        insert limitsRecords;
+        
+        // Create Log records
+        List<Log__c> testLogs = new List<Log__c>();
+        Integer minutesOffset = 0;
+        for(Limits__c lim : limitsRecords) {
+            testLogs.add(new Log__c(
+                Created_At__c = testTime.addMinutes(-minutesOffset),
+                Limits__c = lim.Id,
+                Category__c = 'Limits',
+                Type__c = 'Snapshot',
+                Organization_Id__c = UserInfo.getOrganizationId()
+            ));
+            minutesOffset += 10;
+        }
+        insert testLogs;
+        
+        // Query the logs with Limits relationship data
+        testLogs = [
+            SELECT Id, Created_At__c, Limits__c,
+                   Limits__r.Id, Limits__r.FileStorageMB__c
+            FROM Log__c
+            WHERE Id IN :testLogs
+            ORDER BY Created_At__c DESC
+        ];
+        
+        // Create spike rule
+        Rule__c limitsRule = new Rule__c(
+            Name__c = 'Test All Zero Rule',
+            Active__c = true,
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_SPIKE,
+            EventTimeInterval__c = 480,
+            AggregateType__c = 'Count',
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            Threshold__c = 10,
+            FilterLogic__c = '1',
+            SobjectType__c = null,
+            Index__c = 1,
+            Is_Not_Valid__c = false
+        );
+        insert limitsRule;
+        
+        RuleFilter__c fileStorageFilter = new RuleFilter__c(
+            Rule__c = limitsRule.Id,
+            Index__c = 1,
+            FieldName__c = 'FileStorageMB',
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            Value__c = '0',
+            Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+            Field_Type__c = RuleUtil.FIELD_TYPE_NUMBER
+        );
+        insert fileStorageFilter;
+        
+        Test.startTest();
+        
+        // Execute limits evaluation
+        Map<Id, RuleUtil.Event> eventsMap = new Map<Id, RuleUtil.Event>();
+        MonitoringUtil.evaluateLimitsRules(
+            testLogs,
+            new List<Id>{limitsRule.Id},
+            testTime,
+            eventsMap,
+            Logger.getInstance()
+        );
+        
+        Test.stopTest();
+        
+        // Verify no event was created in the database (all zeros, no spike)
+        List<Event__c> events = [
+            SELECT Id, Rule__c
+            FROM Event__c 
+            WHERE Rule__c = :limitsRule.Id
+        ];
+        
+        System.assertEquals(0, events.size(), 
+            'No event should be created when all values are zero (no change detected)');
+    }
+    
+    @IsTest
+    static void test_limits_spike_rule_mixed_zero_and_nonzero() {
+        // Test scenario: Mix of zero and non-zero values showing spike pattern
+        // Values: 0, 0, 2, 0, 10 (should detect spike from 2 to 10)
+        
+        DateTime testTime = DateTime.now();
+        
+        // Create Limits records with varying values
+        List<Decimal> fileStorageValues = new List<Decimal>{0, 0, 2, 0, 10};
+        List<Limits__c> limitsRecords = new List<Limits__c>();
+        
+        for(Decimal value : fileStorageValues) {
+            limitsRecords.add(new Limits__c(
+                FileStorageMB__c = value
+            ));
+        }
+        insert limitsRecords;
+        
+        // Create Log records
+        List<Log__c> testLogs = new List<Log__c>();
+        Integer minutesOffset = 0;
+        for(Limits__c lim : limitsRecords) {
+            testLogs.add(new Log__c(
+                Created_At__c = testTime.addMinutes(-minutesOffset),
+                Limits__c = lim.Id,
+                Category__c = 'Limits',
+                Type__c = 'Snapshot',
+                Organization_Id__c = UserInfo.getOrganizationId()
+            ));
+            minutesOffset += 10;
+        }
+        insert testLogs;
+        
+        // Query the logs with Limits relationship data
+        testLogs = [
+            SELECT Id, Created_At__c, Limits__c,
+                   Limits__r.Id, Limits__r.FileStorageMB__c
+            FROM Log__c
+            WHERE Id IN :testLogs
+            ORDER BY Created_At__c DESC
+        ];
+        
+        // Create spike rule with 50% threshold
+        Rule__c limitsRule = new Rule__c(
+            Name__c = 'Test Mixed Values Spike Rule',
+            Active__c = true,
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_SPIKE,
+            EventTimeInterval__c = 480,
+            AggregateType__c = 'Count',
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            Threshold__c = 50, // 50% spike threshold
+            FilterLogic__c = '1',
+            SobjectType__c = null,
+            Index__c = 1,
+            Is_Not_Valid__c = false
+        );
+        insert limitsRule;
+        
+        RuleFilter__c fileStorageFilter = new RuleFilter__c(
+            Rule__c = limitsRule.Id,
+            Index__c = 1,
+            FieldName__c = 'FileStorageMB',
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            Value__c = '0',
+            Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+            Field_Type__c = RuleUtil.FIELD_TYPE_NUMBER
+        );
+        insert fileStorageFilter;
+        
+        Test.startTest();
+        
+        // Execute limits evaluation
+        Map<Id, RuleUtil.Event> eventsMap = new Map<Id, RuleUtil.Event>();
+        MonitoringUtil.evaluateLimitsRules(
+            testLogs,
+            new List<Id>{limitsRule.Id},
+            testTime,
+            eventsMap,
+            Logger.getInstance()
+        );
+        
+        Test.stopTest();
+        
+        // Verify that spike was detected in the database
+        // Min value is 0, max value is 10, so spike from zero baseline should trigger
+        List<Event__c> events = [
+            SELECT Id, Rule__c, RecordCount__c, Rule__r.Type__c, Rule__r.Subtype__c
+            FROM Event__c 
+            WHERE Rule__c = :limitsRule.Id
+        ];
+        
+        System.assertEquals(1, events.size(), 
+            'Event should be created for spike in mixed zero/non-zero values. ' +
+            'Min=0, Max=10 represents an infinite spike from zero baseline.');
+        System.assertEquals('Limits', events[0].Rule__r.Type__c, 
+            'Event should be for Limits rule type');
+        System.assertEquals('Spike', events[0].Rule__r.Subtype__c, 
+            'Event should be for Spike subtype');
+    }
+
+    // ========================================
+    // MONITORING LOOP FIX TEST CASES
+    // Tests for dual-layer fix preventing infinite loops
+    // ========================================
+
+    /**
+     * TEST 1: Strategy Selection - Prioritizes Limits When Flag is Older
+     * Tests the production bug scenario where limits flag is stuck 7 days old
+     */
+    @IsTest
+    static void test_getActiveStrategy_prioritizesLimitsWhenFlagIsOlder() {
+        // SETUP: Simulate production bug scenario
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        
+        Rule__c monitoringRule = new Rule__c(
+            Name__c = 'Test Monitoring Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING,
+            Active__c = true,
+            EventTimeInterval__c = 60
+        );
+        insert monitoringRule;
+        
+        Rule__c limitsRule = new Rule__c(
+            Name__c = 'Test Limits Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Active__c = true,
+            EventTimeInterval__c = 180
+        );
+        insert limitsRule;
+        
+        // Setup: Limits flag is OLD (7 days), Monitoring flag is RECENT
+        DateTime now = DateTime.now();
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = now;
+        batchFlag.Last_Processed_Log__c = now.addMinutes(-5);
+        batchFlag.Last_Processed_Limits_Log__c = now.addDays(-7);
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        MonitoringService.IMonitoringStrategy strategy = 
+            MonitoringService.getActiveStrategy(Logger.getInstance(), now);
+        
+        Test.stopTest();
+        
+        System.assertNotEquals(null, strategy, 'Strategy should not be null');
+        System.assert(strategy instanceof MonitoringService.LimitsMonitoringStrategy,
+            'Should select LimitsMonitoringStrategy when limits flag is older');
+    }
+
+    /**
+     * TEST 2: Strategy Selection - Prioritizes Monitoring When Limits Flag is Recent
+     */
+    @IsTest
+    static void test_getActiveStrategy_prioritizesMonitoringWhenLimitsFlagIsRecent() {
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        
+        Rule__c monitoringRule = new Rule__c(
+            Name__c = 'Test Monitoring Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING,
+            Active__c = true,
+            EventTimeInterval__c = 60
+        );
+        insert monitoringRule;
+        
+        Rule__c limitsRule = new Rule__c(
+            Name__c = 'Test Limits Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Active__c = true,
+            EventTimeInterval__c = 180
+        );
+        insert limitsRule;
+        
+        // Setup: Monitoring is behind, Limits is current
+        DateTime now = DateTime.now();
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = now;
+        batchFlag.Last_Processed_Log__c = now.addDays(-2);
+        batchFlag.Last_Processed_Limits_Log__c = now.addMinutes(-1);
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        MonitoringService.IMonitoringStrategy strategy = 
+            MonitoringService.getActiveStrategy(Logger.getInstance(), now);
+        
+        Test.stopTest();
+        
+        System.assertNotEquals(null, strategy, 'Strategy should not be null');
+        System.assert(strategy instanceof MonitoringService.LogMonitoringStrategy,
+            'Should select LogMonitoringStrategy when monitoring flag is older');
+    }
+
+    /**
+     * TEST 3: Strategy Selection - Only Monitoring Has New Data
+     */
+    @IsTest
+    static void test_getActiveStrategy_whenOnlyMonitoringHasNewData() {
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        
+        Rule__c monitoringRule = new Rule__c(
+            Name__c = 'Test Monitoring Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING,
+            Active__c = true,
+            EventTimeInterval__c = 60
+        );
+        insert monitoringRule;
+        
+        Rule__c limitsRule = new Rule__c(
+            Name__c = 'Test Limits Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Active__c = true,
+            EventTimeInterval__c = 180
+        );
+        insert limitsRule;
+        
+        // Setup: Only monitoring has new logs
+        DateTime now = DateTime.now();
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = now;
+        batchFlag.Last_Processed_Log__c = now.addMinutes(-10);
+        batchFlag.Last_Processed_Limits_Log__c = now.addMinutes(10);
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        MonitoringService.IMonitoringStrategy strategy = 
+            MonitoringService.getActiveStrategy(Logger.getInstance(), now);
+        
+        Test.stopTest();
+        
+        System.assert(strategy instanceof MonitoringService.LogMonitoringStrategy,
+            'Should select LogMonitoringStrategy when only monitoring has new data');
+    }
+
+    /**
+     * TEST 4: Strategy Selection - Only Limits Has New Data
+     */
+    @IsTest
+    static void test_getActiveStrategy_whenOnlyLimitsHasNewData() {
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        
+        Rule__c monitoringRule = new Rule__c(
+            Name__c = 'Test Monitoring Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING,
+            Active__c = true,
+            EventTimeInterval__c = 60
+        );
+        insert monitoringRule;
+        
+        Rule__c limitsRule = new Rule__c(
+            Name__c = 'Test Limits Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Active__c = true,
+            EventTimeInterval__c = 180
+        );
+        insert limitsRule;
+        
+        // Setup: Only limits has new data
+        DateTime now = DateTime.now();
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = now;
+        batchFlag.Last_Processed_Log__c = now.addMinutes(10);
+        batchFlag.Last_Processed_Limits_Log__c = now.addMinutes(-10);
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        MonitoringService.IMonitoringStrategy strategy = 
+            MonitoringService.getActiveStrategy(Logger.getInstance(), now);
+        
+        Test.stopTest();
+        
+        System.assert(strategy instanceof MonitoringService.LimitsMonitoringStrategy,
+            'Should select LimitsMonitoringStrategy when only limits has new data');
+    }
+
+    /**
+     * TEST 5: Flag Update in finish() - Prevents Ping-Pong Loop
+     */
+    @IsTest
+    static void test_finishMethod_updatesFlagBeforeCheckingShouldRunOther() {
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        
+        Rule__c limitsRule = new Rule__c(
+            Name__c = 'Test Limits Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Active__c = true,
+            EventTimeInterval__c = 180,
+            Threshold__c = 50,
+            SubType__c = 'Spike'
+        );
+        insert limitsRule;
+        
+        // Setup: Limits flag is old
+        DateTime now = DateTime.now();
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = now;
+        batchFlag.Last_Processed_Limits_Log__c = now.addHours(-1);
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        MonitoringService.LimitsMonitoringStrategy strategy = 
+            new MonitoringService.LimitsMonitoringStrategy(Logger.getInstance());
+        
+        DateTime startTime = DateTime.now();
+        strategy.updateLastProcessedFlag(startTime);
+        
+        DateTime currentTime = DateTime.now().addSeconds(5);
+        strategy.updateLastProcessedFlag(currentTime);
+        
+        Test.stopTest();
+        
+        Monitoring_Batch_Flag__c updatedFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        Long timeDiffSeconds = (DateTime.now().getTime() - updatedFlag.Last_Processed_Limits_Log__c.getTime()) / 1000;
+        System.assert(timeDiffSeconds < 10,
+            'Flag should be updated to current time (within 10 seconds), actual diff: ' + timeDiffSeconds + 's');
+        
+        Boolean hasNewData = MonitoringService.hasNewLimits();
+        System.assertEquals(false, hasNewData,
+            'hasNewLimits() should return FALSE after flag is updated in finish()');
+    }
+
+    /**
+     * TEST 6: Integration Test - No Infinite Loop with Both Strategies
+     */
+    @IsTest
+    static void test_fullBatchExecution_noInfiniteLoopWithBothStrategies() {
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        PermissionsUtil.MaxMonitoringRules = 10;
+        
+        Rule__c monitoringRule = new Rule__c(
+            Name__c = 'Test Monitoring Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING,
+            Active__c = true,
+            EventTimeInterval__c = 60,
+            Threshold__c = 10,
+            SubType__c = 'Spike'
+        );
+        insert monitoringRule;
+        
+        Rule__c limitsRule = new Rule__c(
+            Name__c = 'Test Limits Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Active__c = true,
+            EventTimeInterval__c = 180,
+            Threshold__c = 50,
+            SubType__c = 'Spike'
+        );
+        insert limitsRule;
+        
+        // Setup: Both flags are old
+        DateTime now = DateTime.now();
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = now;
+        batchFlag.Last_Processed_Log__c = now.addHours(-2);
+        batchFlag.Last_Processed_Limits_Log__c = now.addDays(-7);
+        upsert batchFlag;
+        
+        Limits__c testLimits = new Limits__c(
+            FileStorageMB__c = 100,
+            SingleEmail__c = 50
+        );
+        insert testLimits;
+        
+        Log__c testLog = new Log__c(
+            Category__c = 'Pharos',
+            Type__c = 'HourlyLimitsBatch',
+            Limits__c = testLimits.Id,
+            Created_At__c = now.addMinutes(-10)
+        );
+        insert testLog;
+        
+        Test.startTest();
+        
+        // First execution - should select LimitsMonitoringStrategy
+        MonitoringService.IMonitoringStrategy strategy1 = 
+            MonitoringService.getActiveStrategy(Logger.getInstance(), now);
+        
+        if (strategy1 instanceof MonitoringService.LimitsMonitoringStrategy) {
+            MonitoringService.LimitsMonitoringStrategy limitsStrategy = 
+                (MonitoringService.LimitsMonitoringStrategy)strategy1;
+            limitsStrategy.updateLastProcessedFlag(DateTime.now());
+        }
+        
+        // Second execution - should select LogMonitoringStrategy
+        MonitoringService.IMonitoringStrategy strategy2 = 
+            MonitoringService.getActiveStrategy(Logger.getInstance(), now);
+        
+        if (strategy2 instanceof MonitoringService.LogMonitoringStrategy) {
+            MonitoringService.LogMonitoringStrategy logStrategy = 
+                (MonitoringService.LogMonitoringStrategy)strategy2;
+            logStrategy.updateLastProcessedFlag(DateTime.now());
+        }
+        
+        // Third check - should NOT run again
+        Boolean shouldRunAgain = MonitoringService.shouldRunMonitoring(DateTime.now());
+        
+        Test.stopTest();
+        
+        System.assert(strategy1 instanceof MonitoringService.LimitsMonitoringStrategy,
+            'First execution should select LimitsMonitoringStrategy');
+        System.assert(strategy2 instanceof MonitoringService.LogMonitoringStrategy,
+            'Second execution should select LogMonitoringStrategy');
+        System.assertEquals(false, shouldRunAgain,
+            'Batch should NOT run a third time (no infinite loop)');
+        
+        Monitoring_Batch_Flag__c finalFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        Long logDiffMinutes = (now.getTime() - finalFlag.Last_Processed_Log__c.getTime()) / 1000 / 60;
+        Long limitsDiffMinutes = (now.getTime() - finalFlag.Last_Processed_Limits_Log__c.getTime()) / 1000 / 60;
+        
+        System.assert(Math.abs(logDiffMinutes) < 5,
+            'Last_Processed_Log__c should be recent (within 5 minutes)');
+        System.assert(Math.abs(limitsDiffMinutes) < 5,
+            'Last_Processed_Limits_Log__c should be recent (within 5 minutes)');
+    }
+
+    /**
+     * TEST 7: Edge Case - Both Flags Have Same Timestamp
+     */
+    @IsTest
+    static void test_getActiveStrategy_whenBothFlagsHaveSameTimestamp() {
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        
+        Rule__c monitoringRule = new Rule__c(
+            Name__c = 'Test Monitoring Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING,
+            Active__c = true,
+            EventTimeInterval__c = 60
+        );
+        insert monitoringRule;
+        
+        Rule__c limitsRule = new Rule__c(
+            Name__c = 'Test Limits Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Active__c = true,
+            EventTimeInterval__c = 180
+        );
+        insert limitsRule;
+        
+        // Setup: Both flags have EXACT same timestamp
+        DateTime now = DateTime.now();
+        DateTime sameTime = now.addMinutes(-30);
+        
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = now;
+        batchFlag.Last_Processed_Log__c = sameTime;
+        batchFlag.Last_Processed_Limits_Log__c = sameTime;
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        MonitoringService.IMonitoringStrategy strategy = 
+            MonitoringService.getActiveStrategy(Logger.getInstance(), now);
+        
+        Test.stopTest();
+        
+        System.assert(strategy instanceof MonitoringService.LogMonitoringStrategy,
+            'Should default to LogMonitoringStrategy when both flags have same timestamp');
+    }
+
+    /**
+     * TEST 8: Verify shouldRunOtherStrategy Respects Updated Flags
+     */
+    @IsTest
+    static void test_shouldRunOtherStrategy_checksUpdatedFlags() {
+        PermissionsUtil.MonitoringEnabled = true;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        
+        Rule__c monitoringRule = new Rule__c(
+            Name__c = 'Test Monitoring Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_MONITORING,
+            Active__c = true,
+            EventTimeInterval__c = 60
+        );
+        insert monitoringRule;
+        
+        Rule__c limitsRule = new Rule__c(
+            Name__c = 'Test Limits Rule',
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Active__c = true,
+            EventTimeInterval__c = 180
+        );
+        insert limitsRule;
+        
+        // Setup: Initially limits needs to run
+        DateTime now = DateTime.now();
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = now;
+        batchFlag.Last_Processed_Log__c = now.addMinutes(-5);
+        batchFlag.Last_Processed_Limits_Log__c = now.addHours(-1);
+        upsert batchFlag;
+        
+        Test.startTest();
+        
+        MonitoringService.LogMonitoringStrategy logStrategy = 
+            new MonitoringService.LogMonitoringStrategy(Logger.getInstance());
+        
+        Boolean shouldRun1 = logStrategy.shouldRunOtherStrategy(now);
+        System.assertEquals(true, shouldRun1,
+            'Should run other strategy when limits flag is old');
+        
+        batchFlag.Last_Processed_Limits_Log__c = now;
+        upsert batchFlag;
+        
+        Boolean shouldRun2 = logStrategy.shouldRunOtherStrategy(now);
+        System.assertEquals(false, shouldRun2,
+            'Should NOT run other strategy after limits flag is updated');
+        
+        Test.stopTest();
+    }
 }

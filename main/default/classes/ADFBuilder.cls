@@ -32,6 +32,11 @@ public with sharing class ADFBuilder {
 	public static final String ATTR_LEVEL = 'level';
 	public static final String ATTR_VERSION = 'version';
 	public static final String ATTR_BODY = 'body';
+	public static final String ATTR_FIELDS = 'fields';
+	public static final String ATTR_DESCRIPTION = 'description';
+	public static final String ATTR_PROJECT = 'project';
+	public static final String ATTR_ISSUE_TYPE = 'issuetype';
+	public static final String ATTR_SUMMARY = 'summary';
 
 	private static final Pattern REGEX_URL_PATTERN = Pattern.compile('(https?://[^\\s]+)');
 
