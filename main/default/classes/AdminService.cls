@@ -558,11 +558,11 @@ public without sharing class AdminService {
             throw new AdminServiceException(ConfigUtil.EXCEPTION_CONNECTED_ORG_DELETE_FAIL);
         }
         List<Rule__c> rules = [SELECT Id, Type__c FROM Rule__c WHERE Related_Id__c = :corg.Id LIMIT 1];
+        deleteRemoteSiteSettingsMetadata(corg.Name);
         if (!rules.isEmpty()) {
             Database.DeleteResult deleteResult = RuleUtil.deleteRule(rules[0].Id);
             if (deleteResult.isSuccess()) RuleUtil.reIndexRules(rules[0].Type__c);
         }
-        deleteRemoteSiteSettingsMetadata(corg.Name);
         DatabaseUtils.getInstance().performDeleteDML(new List<Connected_Org__c>{corg}, Schema.SObjectType.Connected_Org__c, true);
         return true;
     }
