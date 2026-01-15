@@ -270,16 +270,12 @@ public with sharing class AdminController {
                 response.data = TestDataGenerator.connectedAppSendMeAnEmail();
             } else if (method == 'getPackageEmailServiceFunctionEmailAddress') {
                 response.data = AdminService.getPackageEmailServiceFunctionEmailAddress();
-            } else if (method == 'getQSAnotherConnectedOrg') {
-                response.data = ConnectedOrgService.getQSAnotherConnectedOrg();
             } else if (method == 'isMyDomainEnabled') {
                 response.data = AdminService.isMyDomainEnabled();
             } else if (method == 'createSelfConnectionOrg') {
                 response.data = AdminService.createSelfConnectionOrg(data);
             } else if (method == 'createSelfConnectionOrgOauth') {
                 response.data = AdminService.createSelfConnectionOrgOauth(data);
-            } else if (method == 'getQSAnotherConnectedOrg') {
-                response.data = ConnectedOrgService.getQSAnotherConnectedOrg();
             } else if (method == 'getUrlToPlatformEventSubscriberConfigLogEvent') {
                 response.data = AdminService.getUrlToPlatformEventSubscriberConfigLogEvent();
             } else if (method.equals('getUrlToPlatformEventSubscriberConfigAIEvent')) {
