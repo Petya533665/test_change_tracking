@@ -3643,7 +3643,6 @@ public class Test_AdminController {
         Assert.isFalse(responseQuickStartStateWrapper.teams);
         Assert.isFalse(responseQuickStartStateWrapper.monitoring);
         Assert.isFalse(responseQuickStartStateWrapper.monitoringTestInProgress);
-        Assert.isFalse(responseQuickStartStateWrapper.isPassthrough);
         Assert.isFalse(responseQuickStartStateWrapper.useTeams);
         Assert.isFalse(responseQuickStartStateWrapper.useSlack);
     }
@@ -3684,7 +3683,6 @@ public class Test_AdminController {
         Assert.isFalse(responseQuickStartStateWrapper.teams);
         Assert.isFalse(responseQuickStartStateWrapper.monitoring);
         Assert.isFalse(responseQuickStartStateWrapper.monitoringTestInProgress);
-        Assert.isFalse(responseQuickStartStateWrapper.isPassthrough);
         Assert.isFalse(responseQuickStartStateWrapper.useTeams);
         Assert.isFalse(responseQuickStartStateWrapper.useSlack);
     }

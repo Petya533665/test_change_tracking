@@ -7,7 +7,6 @@ public with sharing class ConnectedOrgService {
 
     public static final String BROADCAST_SEND_TO = 'sendTo';
     public static final String BROADCAST_RECEIVE_FROM = 'receiveFrom';
-    public static final String SOURCE_QUICK_START = 'QuickStart';
 
     public static List<Connected_Org__c> getConnectedOrgsList() {
 
@@ -36,17 +35,6 @@ public with sharing class ConnectedOrgService {
         for (Connected_Org__c corg : getConnectedOrgsList()) {
             if (corg.Connection_Valid__c && corg.Data_Direction__c == dataDirection) {
                 result.add(corg);
-            }
-        }
-        return result;
-    }
-
-    public static List<AdminService.ConnectedOrgDTO> getQSAnotherConnectedOrg() {
-        List<AdminService.ConnectedOrgDTO> result = new List<AdminService.ConnectedOrgDTO>();
-        for(Connected_Org__c corg : getConnectedOrgsList()) {
-            if(corg.Source__c == SOURCE_QUICK_START) {
-                result.add(new AdminService.ConnectedOrgDTO(corg));
-                break;
             }
         }
         return result;
@@ -145,7 +133,6 @@ public with sharing class ConnectedOrgService {
     }
 
     public static Connected_Org__c generateTokenForConnectedOrg(String codeFromOAuth, Object stateFromOAuth, String redirectUrl) {
-
         StateDTO state;
         try {
             state = (StateDTO)JSON.deserialize(JSON.serialize(stateFromOAuth), StateDTO.class);
@@ -183,30 +170,23 @@ public with sharing class ConnectedOrgService {
         String organizationId = resp.id.split('/')[4];
         String organizationId15 = organizationId.left(15);
         Connected_Org__c corgExisting = getConnectedOrgById(organizationId15);
-        if (corgExisting != null && corgExisting.Source__c != SOURCE_QUICK_START && corg.Source__c == SOURCE_QUICK_START) {
-            throw new ConnectedOrgServiceException('Org with ID ' + organizationId + ' already exists');
-        } else {
-            // allow upsert QuickStart settings
-            String accessToken = ConfigUtil.CONNECTED_ORGS_SETTINGS.Use_Oauth_for_Self_Org__c && organizationId15 == UserInfo.getOrganizationId().left(15) ? resp.access_token : null;
-            createRemoteSiteSettingInstance(organizationId15, resp.instance_url, corg.Title__c, accessToken);
-            if ((corgExisting != null && corgExisting.Source__c == SOURCE_QUICK_START) || (corg != null && corg.Source__c == SOURCE_QUICK_START)) {
-                PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Id, null);
-            }
-            PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Name, organizationId15);
-            PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Access_Token__c, resp.access_token);
-            PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Refresh_Token__c, resp.refresh_token);
-            PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Private_Key__c, generatePrivateKey(corg));
-            PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Instance_Url__c, resp.instance_url);
-            PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Identity_Url__c, resp.id);
-            PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Token_Refreshed_At__c, Datetime.now());
-            PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Is_Sandbox__c, isSandbox(corg));
-            PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Connection_Valid__c, true);
+        Boolean isSelfOrg = organizationId15 == UserInfo.getOrganizationId().left(15);
+        String accessToken = ConfigUtil.CONNECTED_ORGS_SETTINGS.Use_Oauth_for_Self_Org__c && isSelfOrg ? resp.access_token : null;
+        createRemoteSiteSettingInstance(organizationId15, resp.instance_url, corg.Title__c, accessToken);
+        PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Name, organizationId15);
+        PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Access_Token__c, resp.access_token);
+        PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Refresh_Token__c, resp.refresh_token);
+        PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Private_Key__c, generatePrivateKey(corg));
+        PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Instance_Url__c, resp.instance_url);
+        PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Identity_Url__c, resp.id);
+        PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Token_Refreshed_At__c, Datetime.now());
+        PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Is_Sandbox__c, isSandbox(corg));
+        PermissionsUtil.putSObjectField(corg, Schema.SObjectType.Connected_Org__c.fields.Connection_Valid__c, true);
 
-            putEncryptedTokenToCache(corg);
-            if (corg != null || (corgExisting != null && corgExisting.Source__c == SOURCE_QUICK_START)) {
-                DatabaseUtils.getInstance().performUpsertDML(new List<Connected_Org__c>{corg}, Schema.SObjectType.Connected_Org__c)
-                        .handleError(ConnectedOrgService.class.getName(), '.generateTokenForConnectedOrg');
-            }
+        putEncryptedTokenToCache(corg);
+        if (corg != null) {
+            DatabaseUtils.getInstance().performUpsertDML(new List<Connected_Org__c>{corg}, Schema.SObjectType.Connected_Org__c)
+                    .handleError(ConnectedOrgService.class.getName(), '.generateTokenForConnectedOrg');
         }
         return corg;
     }

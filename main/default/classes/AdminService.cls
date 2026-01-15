@@ -557,8 +557,8 @@ public without sharing class AdminService {
         if (corg == null) {
             throw new AdminServiceException(ConfigUtil.EXCEPTION_CONNECTED_ORG_DELETE_FAIL);
         }
-        List<Rule__c> rules = [SELECT Id, Type__c FROM Rule__c WHERE Related_Id__c = :corg.Id LIMIT 1];
         deleteRemoteSiteSettingsMetadata(corg.Name);
+        List<Rule__c> rules = [SELECT Id, Type__c FROM Rule__c WHERE Related_Id__c = :corg.Id LIMIT 1];
         if (!rules.isEmpty()) {
             Database.DeleteResult deleteResult = RuleUtil.deleteRule(rules[0].Id);
             if (deleteResult.isSuccess()) RuleUtil.reIndexRules(rules[0].Type__c);
@@ -1387,7 +1387,6 @@ public without sharing class AdminService {
         public Boolean teams;
         public Boolean monitoring;
         public Boolean monitoringTestInProgress;
-        public Boolean isPassthrough;
         public Boolean useTeams;
         public Boolean useSlack;
 
@@ -1400,7 +1399,6 @@ public without sharing class AdminService {
             this.teams = false;
             this.monitoring = false;
             this.monitoringTestInProgress = false;
-            this.isPassthrough = false;
             this.useTeams = false;
             this.useSlack = false;
         }
@@ -1503,6 +1501,11 @@ public without sharing class AdminService {
             rule.Active__c = false;
         }
         DatabaseUtils.getInstance().performUpdateDML(allActiveRules, Schema.SObjectType.Rule__c, true);
+
+        // clear event monitoring rules, enabled types and settings
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Enabled__c = false;
+        ConfigUtil.EVENT_MONITORING_SETTINGS.Initialized__c = false;
+        EventMonitoringUtil.setEventTypesStatuses(null);
         
         return true;
     }
@@ -2487,11 +2490,6 @@ public without sharing class AdminService {
                 MetadataServiceUtil.setEventSettingsLogGeneration(incomingValue);
             }
         }
-        Boolean monitoringEnabledFirstTime = incomingValue && !ConfigUtil.EVENT_MONITORING_SETTINGS?.Initialized__c;
-        if (monitoringEnabledFirstTime) {
-            EventMonitoringUtil.createDefaultRulesForEventType(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION);
-            ConfigUtil.EVENT_MONITORING_SETTINGS.Initialized__c = true;
-        }
 
         List<EventMonitoringUtil.EventTypeStatus> eventTypeStatuses = null;
         Object enabledTypesData = input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES);
@@ -2500,6 +2498,23 @@ public without sharing class AdminService {
                 JSON.serialize(enabledTypesData),
                 List<EventMonitoringUtil.EventTypeStatus>.class
             );
+
+            Boolean monitoringEnabledFirstTime = incomingValue && !ConfigUtil.EVENT_MONITORING_SETTINGS?.Initialized__c;
+            if (monitoringEnabledFirstTime) {
+                // activate apex unexpected exception, add it if not present
+                ConfigUtil.EVENT_MONITORING_SETTINGS.Initialized__c = true;
+                Boolean apexUnexpectedExceptionEnabled = false;
+                for (EventMonitoringUtil.EventTypeStatus eventTypeStatus : eventTypeStatuses) {
+                    if (eventTypeStatus.name == EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION) {
+                        eventTypeStatus.active = true;
+                        apexUnexpectedExceptionEnabled = true;
+                        break;
+                    }
+                }
+                if (!apexUnexpectedExceptionEnabled) {
+                    eventTypeStatuses.add(new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION, true, EventMonitoringUtil.getDefaultLogsLimitForEventType(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION)));
+                }
+            }
         } else {
             // Create default enabled event types when enabledTypesData is null
             eventTypeStatuses = new List<EventMonitoringUtil.EventTypeStatus>();
@@ -2508,6 +2523,7 @@ public without sharing class AdminService {
                 eventTypeStatuses.add(new EventMonitoringUtil.EventTypeStatus(eventType, true, defaultLogsLimit));
             }
         }
+
         EventMonitoringUtil.setEventTypesStatuses(eventTypeStatuses);
         DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
         return ConfigUtil.EVENT_MONITORING_SETTINGS;
