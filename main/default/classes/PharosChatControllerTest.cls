@@ -102,39 +102,6 @@ public class PharosChatControllerTest {
     }
 
     @IsTest
-    static void testInitChat_Git_Not_Integrated() {
-        Map<String, HttpCalloutMock> httpMocks = getBaseHttpMocks();
-        httpMocks.put(GIT_ENDPOINT, new TestDataFactory.SingleRequestMock(200, 'OK', '{"name": ""}'));
-
-        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(httpMocks));
-
-        Test.startTest();
-        PharosChatController.InitChatResponse response = PharosChatController.initChat();
-        Test.stopTest();
-
-        Assert.areEqual(false, response.success, 'Chat initialization should fail');
-        Assert.areEqual(1, response.errorMessages.size(), 'There should be one error message');
-        Assert.areEqual(PharosChatController.ERROR_GIT_NOT_INTEGRATED, response.errorMessages[0], 'Error message should indicate Git is not integrated');
-    }
-
-    @IsTest
-    static void testInitChat_Code_Not_Indexed() {
-        Map<String, HttpCalloutMock> httpMocks = getBaseHttpMocks();
-        httpMocks.put(PharosChatController.CHECK_NAMESPACE_STATUS_ENDPOINT + '?namespace=' + UserInfo.getOrganizationId(), 
-            new TestDataFactory.SingleRequestMock(200, 'OK', '{"empty": true}'));
-
-        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(httpMocks));
-
-        Test.startTest();
-        PharosChatController.InitChatResponse response = PharosChatController.initChat();
-        Test.stopTest();
-
-        Assert.areEqual(false, response.success, 'Chat initialization should fail');
-        Assert.areEqual(1, response.errorMessages.size(), 'There should be one error message');
-        Assert.areEqual(PharosChatController.ERROR_CODE_NOT_INDEXED, response.errorMessages[0], 'Error message should indicate code is not indexed');
-    }
-
-    @IsTest
     static void testInitChat_CSP_Trusted_Site_Not_Ready() {
         Map<String, HttpCalloutMock> httpMocks = getBaseHttpMocks();
         TestDataFactory.SingleRequestMock cspTrustedSitesMock = new TestDataFactory.SingleRequestMock(200, 'OK', '{"records": []}');
@@ -208,6 +175,9 @@ public class PharosChatControllerTest {
 
     @IsTest
     static void test_getSendMessageData() {
+        PermissionsUtil.GitHubIntegrationEnabled = true;
+        ConfigUtil.GIT_API_SETTINGS.Enabled__c = true;
+        PermissionsUtil.ChangeTrackingEnabled = true;
         ConfigUtil.CHANGE_TRACKING_SETTINGS.Git_Change_Tracking__c = true;
         Id testRecordId = TestDataFactory.getFakeIds(Log__c.SObjectType, 1).get(0);
         
@@ -216,7 +186,7 @@ public class PharosChatControllerTest {
         Test.stopTest();
         
         Assert.areNotEqual(null, result, 'Result should not be null');
-        Assert.areEqual(8, result.size(), 'Result should contain 8 keys');
+        Assert.areEqual(9, result.size(), 'Result should contain 9 keys');
         
         Assert.isTrue(result.containsKey('sf_session'), 'Result should contain sf_session key');
         Assert.isTrue(String.isNotBlank(result.get('sf_session')), 'sf_session should not be blank');
@@ -230,6 +200,9 @@ public class PharosChatControllerTest {
         Assert.isTrue(result.containsKey('sf_timezone_offset'), 'Result should contain sf_timezone_offset key');
         Assert.isTrue(String.isNotBlank(result.get('sf_timezone_offset')), 'sf_timezone_offset should not be blank');
         
+        Assert.isTrue(result.containsKey('git_enabled'), 'Result should contain git_enabled key');
+        Assert.areEqual('true', result.get('git_enabled'), 'git_enabled should be true');
+
         Assert.isTrue(result.containsKey('change_tracking_enabled'), 'Result should contain change_tracking_enabled key');
         Assert.areEqual('true', result.get('change_tracking_enabled'), 'change_tracking_enabled should be true');
         
