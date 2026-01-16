@@ -2493,28 +2493,17 @@ public without sharing class AdminService {
 
         List<EventMonitoringUtil.EventTypeStatus> eventTypeStatuses = null;
         Object enabledTypesData = input.get(ConfigUtil.MONITORING_APP_KEY_ENABLED_TYPES);
-        if (enabledTypesData != null) {
+        Boolean monitoringEnabledFirstTime = incomingValue && !ConfigUtil.EVENT_MONITORING_SETTINGS?.Initialized__c;
+        if (monitoringEnabledFirstTime) {
+            ConfigUtil.EVENT_MONITORING_SETTINGS.Initialized__c = true;
+            eventTypeStatuses = new List<EventMonitoringUtil.EventTypeStatus>{
+                new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION, true, EventMonitoringUtil.getDefaultLogsLimitForEventType(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION))
+            };
+        } else if (enabledTypesData != null) {
             eventTypeStatuses = (List<EventMonitoringUtil.EventTypeStatus>)JSON.deserialize(
                 JSON.serialize(enabledTypesData),
                 List<EventMonitoringUtil.EventTypeStatus>.class
             );
-
-            Boolean monitoringEnabledFirstTime = incomingValue && !ConfigUtil.EVENT_MONITORING_SETTINGS?.Initialized__c;
-            if (monitoringEnabledFirstTime) {
-                // activate apex unexpected exception, add it if not present
-                ConfigUtil.EVENT_MONITORING_SETTINGS.Initialized__c = true;
-                Boolean apexUnexpectedExceptionEnabled = false;
-                for (EventMonitoringUtil.EventTypeStatus eventTypeStatus : eventTypeStatuses) {
-                    if (eventTypeStatus.name == EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION) {
-                        eventTypeStatus.active = true;
-                        apexUnexpectedExceptionEnabled = true;
-                        break;
-                    }
-                }
-                if (!apexUnexpectedExceptionEnabled) {
-                    eventTypeStatuses.add(new EventMonitoringUtil.EventTypeStatus(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION, true, EventMonitoringUtil.getDefaultLogsLimitForEventType(EventLogProcessors.EVENT_TYPE_APEX_UNEXPECTED_EXCEPTION)));
-                }
-            }
         } else {
             // Create default enabled event types when enabledTypesData is null
             eventTypeStatuses = new List<EventMonitoringUtil.EventTypeStatus>();
@@ -2523,7 +2512,6 @@ public without sharing class AdminService {
                 eventTypeStatuses.add(new EventMonitoringUtil.EventTypeStatus(eventType, true, defaultLogsLimit));
             }
         }
-
         EventMonitoringUtil.setEventTypesStatuses(eventTypeStatuses);
         DatabaseUtils.getInstance().performUpsertDML(new List<Event_Monitoring__c>{ConfigUtil.EVENT_MONITORING_SETTINGS}, Schema.SObjectType.Event_Monitoring__c, true);
         return ConfigUtil.EVENT_MONITORING_SETTINGS;
