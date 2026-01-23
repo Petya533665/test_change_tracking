@@ -224,9 +224,8 @@ public with sharing class PharosChatController {
             // Send init-chat request to initialize OpenAI and get session_id
             sendInitChatRequest(orgId, openAiKey);
             
-            // Calculate date range (one week, date_to being today)
             Date dateTo = Date.today();
-            Date dateFrom = dateTo.addDays(-7);
+            Date dateFrom = dateTo.addDays(-60);
             
             // Get send message data and add date range
             Map<String, String> data = getSendMessageData(null);
