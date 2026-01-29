@@ -1,5 +1,6 @@
 public with sharing class PharosChatController {
-    public static final String CHAT_ENV_URL = Constants.REMOTE_SITE_SETTINGS.AI_URL + '/chat';
+    // public static final String CHAT_ENV_URL = Constants.REMOTE_SITE_SETTINGS.AI_URL + '/chat';
+    public static final String CHAT_ENV_URL = 'https://oa9kb839ng.execute-api.us-east-2.amazonaws.com/production';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/v2/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
     public static final String PREPARE_DIGEST_ENDPOINT = CHAT_ENV_URL + '/prepare-digest';
@@ -217,7 +218,7 @@ public with sharing class PharosChatController {
         }
     }
 
-    public static String runPrepareDigest(Object data) {
+    public static String prepareDigest(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         String prompt = (String) input.get('prompt');
 
@@ -225,10 +226,10 @@ public with sharing class PharosChatController {
         Date dateFrom = input.get('date_from') == null ? null : Date.valueOf((String) input.get('date_from'));
         Date dateTo = input.get('date_to') == null ? null : Date.valueOf((String) input.get('date_to'));
 
-        return runPrepareDigest(prompt, dateFrom, dateTo);
+        return prepareDigest(prompt, dateFrom, dateTo);
     }
 
-    public static String runPrepareDigest(String userPrompt, Date dateFrom, Date dateTo) {
+    public static String prepareDigest(String userPrompt, Date dateFrom, Date dateTo) {
         try {
             // Send init-chat request to initialize OpenAI and get session_id
             String orgId = UserInfo.getOrganizationId();

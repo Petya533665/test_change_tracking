@@ -7,6 +7,7 @@
     <apex:stylesheet value="{!URLFOR($Resource.libs, '/libs/material_design_icons.css')}"/>
     <apex:stylesheet value="{!URLFOR($Resource.libs, '/libs/syncfusion-material.css')}"/>
     <apex:stylesheet value="{!URLFOR($Resource.pharos_ds, '/pharos_ds/styles/slds252.min.css')}"/>
+    <apex:includeScript value="{!URLFOR($Resource.pharos_chat, '/smd.js')}"/>
     <style>
         .korpus > div, .korpus > input {
             display: none;
@@ -72,7 +73,8 @@
                         
             window.zESettings = {
                 webWidget: {
-                    offset: { horizontal: '0px', vertical: isClassic && bodyDiv ? '80px' :  '45px'}
+                    offset: { horizontal: '0px', vertical: isClassic && bodyDiv ? '80px' :  '45px'},
+                    zIndex: 999
                 }
             }
 
