@@ -1,12 +1,11 @@
 public with sharing class PharosChatController {
-    public static final String CHAT_ENV_URL = 'https://oa9kb839ng.execute-api.us-east-2.amazonaws.com/production';
+    public static final String CHAT_ENV_URL = Constants.REMOTE_SITE_SETTINGS.AI_URL + '/chat';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/v2/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
+    public static final String PREPARE_DIGEST_ENDPOINT = CHAT_ENV_URL + '/prepare-digest';
     public static final String CHAT_WEBSOCKET_URL = 'wss://chat.pharos.ai';
 
     public static final String ERROR_OPENAI_NOT_READY = 'OpenAI token is not configured or is invalid. Please set up OpenAI integration first.';
-    public static final String ERROR_GIT_NOT_INTEGRATED = 'Git integration is not configured. Please set up Git integration first.';
-    public static final String ERROR_CODE_NOT_INDEXED = 'Codebase is not indexed. Please wait for indexing to complete.';
     public static final String ERROR_INIT_FAILED = 'Chat initialization has failed.';
     public static final String ERROR_TRUSTED_SITE_NOT_READY = 'CSP Trusted Site is not configured. Please set up CSP Trusted Site first.';
 
@@ -84,12 +83,6 @@ public with sharing class PharosChatController {
         if (!settings.openAiConfigured) {
             errors.add(ERROR_OPENAI_NOT_READY);
         }
-        if (!settings.gitConfigured) {
-            errors.add(ERROR_GIT_NOT_INTEGRATED);
-        }
-        if (!settings.codebaseIndexed) {
-            errors.add(ERROR_CODE_NOT_INDEXED);
-        }
         if (!settings.trustedSiteReady) {
             errors.add(ERROR_TRUSTED_SITE_NOT_READY);
         }
@@ -119,7 +112,8 @@ public with sharing class PharosChatController {
 
     @AuraEnabled
     public static Map<String, String> getSendMessageData(String recordId) {
-        Boolean changeTrackingEnabled = ConfigUtil.CHANGE_TRACKING_SETTINGS.Git_Change_Tracking__c;
+        Boolean changeTrackingEnabled = PermissionsUtil.ChangeTrackingEnabled && ConfigUtil.CHANGE_TRACKING_SETTINGS.Git_Change_Tracking__c;
+        Boolean gitEnabled = PermissionsUtil.GitHubIntegrationEnabled && ConfigUtil.GIT_API_SETTINGS.Enabled__c;
         Map<String, String> data = new Map<String, String> {
             'sf_session' => EncodingUtil.base64Encode(Blob.valueOf(ConnectedOrgService.getSelfConnectedOrgAccessToken())),
             'sf_instance' => System.Url.getOrgDomainUrl().toExternalForm(),
@@ -127,9 +121,10 @@ public with sharing class PharosChatController {
             'sf_timezone_offset' => AdminService.getUserTimezoneOffset().toString(),
             'sf_org_name' => UserInfo.getOrganizationName(),
             'record_id' => recordId,
-            'change_tracking_enabled' => String.valueOf(changeTrackingEnabled)
+            'change_tracking_enabled' => String.valueOf(changeTrackingEnabled),
+            'git_enabled' => String.valueOf(gitEnabled)
         };
-        if (changeTrackingEnabled) {
+        if (gitEnabled && changeTrackingEnabled) {
             data.put('git_user', GitHubUtils.GIT_USERNAME);
             data.put('git_repo', GitHubUtils.GIT_REPONAME);
         }
@@ -222,31 +217,45 @@ public with sharing class PharosChatController {
         }
     }
 
-    public static String prepareDigest(String userPrompt) {
+    public static String runPrepareDigest(Object data) {
+        Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
+        String prompt = (String) input.get('prompt');
+
+        // Expects frontend dates in yyyy-MM-dd format
+        Date dateFrom = input.get('date_from') == null ? null : Date.valueOf((String) input.get('date_from'));
+        Date dateTo = input.get('date_to') == null ? null : Date.valueOf((String) input.get('date_to'));
+
+        return runPrepareDigest(prompt, dateFrom, dateTo);
+    }
+
+    public static String runPrepareDigest(String userPrompt, Date dateFrom, Date dateTo) {
         try {
+            // Send init-chat request to initialize OpenAI and get session_id
             String orgId = UserInfo.getOrganizationId();
             String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
-            
-            // Send init-chat request to initialize OpenAI and get session_id
             sendInitChatRequest(orgId, openAiKey);
-            
-            Date dateTo = Date.today();
-            Date dateFrom = dateTo.addDays(-60);
-            
-            // Get send message data and add date range
+
+            if (dateTo == null) {
+                dateTo = Date.today();
+            }
+            if (dateFrom == null) {
+                dateFrom = dateTo.addDays(-60);
+            }
+
             Map<String, String> data = getSendMessageData(null);
-            data.put('date_from', String.valueOf(dateFrom));
-            data.put('date_to', String.valueOf(dateTo));
             data.put('session_id', orgId);
             data.put('prompt', userPrompt);
-            
+            data.put('date_from', String.valueOf(dateFrom));
+            data.put('date_to', String.valueOf(dateTo));
+
             String response = HttpUtils.post(
-                CHAT_ENV_URL + '/prepare-digest',
+                PREPARE_DIGEST_ENDPOINT,
                 JSON.serialize(data),
                 HttpUtils.getHeadersWithApiKeyAndJson(),
                 200
             );
-            return response;
+            Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response);
+            return (String) responseBody.get('body') ?? null;
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'prepareDigest');
             return null;
