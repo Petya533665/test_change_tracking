@@ -867,7 +867,7 @@ public without sharing class JiraService {
                             if (chartEnum != null) {
                                 Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
                                 if (chartBlob != null) {
-                                    String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                    String fileName = HttpUtils.getNameAttachment(chartEnum.name() + Constants.GLOBAL_VARIABLE.FILE_EXTENSION_PNG);
                                     AttachmentResult result = addAttachmentWithMediaId(chartBlob, fileName, issueKey);
                                     attachmentResults.add(result);
                                 }
@@ -888,7 +888,7 @@ public without sharing class JiraService {
                             if (chartEnum != null) {
                                 Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
                                 if (chartBlob != null) {
-                                    String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                    String fileName = HttpUtils.getNameAttachment(chartEnum.name() + Constants.GLOBAL_VARIABLE.FILE_EXTENSION_PNG);
                                     addAttachment(chartBlob, fileName, issueKey);
                                     message += '\n!' + fileName + '!';
                                 }

@@ -189,7 +189,7 @@ public with sharing class GraphAPIService {
 						ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
 						if (chartEnum != null) {
 							String chartBase64 = chartGeneratorImageLambdaClient.getBase64ImageForChart(chartEnum.name());
-							String filename = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+							String filename = HttpUtils.getNameAttachment(chartEnum.name() + Constants.GLOBAL_VARIABLE.FILE_EXTENSION_PNG);
 
 							this.hostedContents.add(new Map<String, Object> {
 								'contentBytes' => chartBase64,

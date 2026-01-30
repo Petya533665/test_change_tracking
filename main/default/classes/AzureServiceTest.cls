@@ -946,6 +946,32 @@ public with sharing class AzureServiceTest {
     }
 
     @IsTest
+    static void test_parseAzureDevOpsWorkItemUrl_withQueryString() {
+        String url = 'https://dev.azure.com/testorg/testproject/_workitems/edit/789?fullScreen=true';
+
+        Test.startTest();
+        AzureService.WorkItemUrlParser parser = new AzureService.WorkItemUrlParser(url);
+        Test.stopTest();
+
+        Assert.areEqual('testorg', parser.organizationName, 'Organization name should be parsed');
+        Assert.areEqual('testproject', parser.projectIdOrName, 'Project name should be parsed');
+        Assert.areEqual('789', parser.workItemId, 'Work item ID should be parsed without querystring');
+    }
+
+    @IsTest
+    static void test_parseAzureDevOpsWorkItemUrl_treatsNullSegmentsAsMissing() {
+        String url = 'https://dev.azure.com/null/null/_apis/wit/workItems/null';
+
+        Test.startTest();
+        AzureService.WorkItemUrlParser parser = new AzureService.WorkItemUrlParser(url);
+        Test.stopTest();
+
+        Assert.isNull(parser.organizationName, 'Organization should be null when segment is literal "null"');
+        Assert.isNull(parser.projectIdOrName, 'Project should be null when segment is literal "null"');
+        Assert.isNull(parser.workItemId, 'Work item id should be null when segment is literal "null"');
+    }
+
+    @IsTest
     static void test_AzureDevOpsApiManageTokens_constructor() {
         Test.startTest();
         AzureService.AzureDevOpsApiManageTokens tokenManager = new AzureService.AzureDevOpsApiManageTokens();

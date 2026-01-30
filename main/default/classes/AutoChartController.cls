@@ -21,11 +21,17 @@ public with sharing class AutoChartController {
                 Constants.REMOTE_SITE_SETTINGS.PHAROS_API_API_URL,
                 Constants.REMOTE_SITE_SETTINGS.PHAROS_API_DESCRIPTION
             );
+            AdminService.upsertRemoteSiteSetting(
+                Constants.REMOTE_SITE_SETTINGS.SLACK_FILES_API_NAME,
+                Constants.REMOTE_SITE_SETTINGS.SLACK_FILES_API_URL,
+                Constants.REMOTE_SITE_SETTINGS.SLACK_FILES_DESCRIPTION
+            );
         } else {
             MetadataServiceUtil.deleteRemoteSiteSettingsMetadata(
-                new List<String>{
-                    ConfigUtil.prefixCurrentOrgNamespace(Constants.REMOTE_SITE_SETTINGS.PHAROS_API_NAME
-                )}
+                new List<String> {
+                    ConfigUtil.prefixCurrentOrgNamespace(Constants.REMOTE_SITE_SETTINGS.PHAROS_API_NAME),
+                    ConfigUtil.prefixCurrentOrgNamespace(Constants.REMOTE_SITE_SETTINGS.SLACK_FILES_API_NAME)
+                }
             );
         }
 

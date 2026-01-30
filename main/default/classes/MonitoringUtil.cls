@@ -762,6 +762,9 @@ public with sharing class MonitoringUtil {
                     when WEBHOOK {
                         newEventAction.Delivered_to__c = ConfigUtil.EVENT_ACTION_DELIVERED_TO_WEBHOOK + action.fields.Webhook_URL__c;
                     }
+                    when AZURE_DEV_OPS {
+                        newEventAction.Delivered_to__c = ConfigUtil.EVENT_ACTION_DELIVERED_TO_AZURE_DEV_OPS;
+                    }
                 }
 
                 if ((RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.SLACK
@@ -777,7 +780,8 @@ public with sharing class MonitoringUtil {
                     || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.REMOVAL && PermissionsUtil.ArchivalEnabled)
                     || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.ARCHIVAL_TO_BIG_OBJECT && PermissionsUtil.ArchivalEnabled)
                     || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.EXTERNAL_ARCHIVAL && PermissionsUtil.SplunkIntegrationEnabled)
-                    || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.WEBHOOK && PermissionsUtil.WebhookIntegrationEnabled)) {
+                    || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.WEBHOOK && PermissionsUtil.WebhookIntegrationEnabled)
+                    || (RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) == RuleUtil.ActionType.AZURE_DEV_OPS && PermissionsUtil.AzureDevOpsIntegrationEnabled)) {
 
                     newEventActions.add(newEventAction);
                 }
@@ -832,7 +836,7 @@ public with sharing class MonitoringUtil {
             if(startBatch && freeSlotBatch) {
                 String actionType = sendlist.get(0).Action_Type__c != null ? sendlist.get(0).Action_Type__c : sendlist.get(0).Type__c;
                 switch on RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(actionType) {
-                    when EMAIL, SLACK, PAGERDUTY, JIRA, TEAMS, WEBHOOK {
+                    when EMAIL, SLACK, PAGERDUTY, JIRA, TEAMS, WEBHOOK, AZURE_DEV_OPS {
                         NotificationBatch.getInstance().startBatch();
                     }
                     when REMOVAL, ARCHIVAL_TO_BIG_OBJECT {

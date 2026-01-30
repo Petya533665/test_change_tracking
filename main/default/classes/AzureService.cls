@@ -1536,18 +1536,64 @@ public with sharing class AzureService {
 		public String workItemId;
 
 		public WorkItemUrlParser(String url) {
-			if(String.isNotBlank(url)) {
-				List<String> parts = url.split('/');
-				if(parts.size() == 8) {
-					this.organizationName = parts.get(3);
-					this.projectIdOrName = parts.get(4);
-					this.workItemId = parts.get(7);
+			if (String.isBlank(url)) {
+				return;
+			}
+
+			// Be resilient to different URL shapes and querystrings.
+			// Examples:
+			// - https://dev.azure.com/org/project/_workitems/edit/5
+			// - https://dev.azure.com/org/project/_apis/wit/workItems/245
+			// - https://dev.azure.com/org/project/_workitems/edit/5?foo=bar
+			List<String> parts = url.split('/');
+
+			// Find the host segment ("dev.azure.com") and derive org/project from there.
+			Integer hostIdx = -1;
+			for (Integer i = 0; i < parts.size(); i++) {
+				if (parts[i] == 'dev.azure.com') {
+					hostIdx = i;
+					break;
 				}
-				if(parts.size() == 9) {
-					this.organizationName = parts.get(3);
-					this.projectIdOrName = parts.get(4);
-					this.workItemId = parts.get(8);
+			}
+
+			if (hostIdx >= 0 && parts.size() > hostIdx + 2) {
+				this.organizationName = parts.get(hostIdx + 1);
+				this.projectIdOrName = parts.get(hostIdx + 2);
+			}
+
+			// Extract work item id from common patterns.
+			// Prefer ".../edit/{id}" then ".../workItems/{id}", otherwise use last segment.
+			String candidateId;
+			for (Integer i = 0; i < parts.size(); i++) {
+				if (parts[i] == 'edit' && parts.size() > i + 1) {
+					candidateId = parts.get(i + 1);
+					break;
 				}
+				if ((parts[i] == 'workItems' || parts[i] == 'workitems') && parts.size() > i + 1) {
+					candidateId = parts.get(i + 1);
+					break;
+				}
+			}
+			if (String.isBlank(candidateId) && !parts.isEmpty()) {
+				candidateId = parts.get(parts.size() - 1);
+			}
+
+			if (String.isNotBlank(candidateId)) {
+				// Strip querystring/fragment if present.
+				candidateId = candidateId.split('\\?')[0];
+				candidateId = candidateId.split('#')[0];
+				this.workItemId = candidateId;
+			}
+
+			// Treat literal "null" segments as missing values (common when URLs were assembled with nulls).
+			if (String.isNotBlank(this.organizationName) && this.organizationName.toLowerCase() == 'null') {
+				this.organizationName = null;
+			}
+			if (String.isNotBlank(this.projectIdOrName) && this.projectIdOrName.toLowerCase() == 'null') {
+				this.projectIdOrName = null;
+			}
+			if (String.isNotBlank(this.workItemId) && this.workItemId.toLowerCase() == 'null') {
+				this.workItemId = null;
 			}
 		}
 	}

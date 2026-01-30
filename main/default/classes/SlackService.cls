@@ -203,37 +203,72 @@ public without sharing class SlackService {
     public static void sendMessageToSlackWithChartAttachments(
         String message, String slack_channel_id, ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient) {
 
+        // Always require Slack integration enabled for sending messages.
+        if (!PermissionsUtil.SlackIntegrationEnabled) {
+            return;
+        }
 
-        if (chartGeneratorImageLambdaClient != null && chartGeneratorImageLambdaClient.hasCharts()) {
-            List<Map<String, Object>> filesList = new List<Map<String, Object>>();
+        // If no charts are available, fall back to plain Slack message.
+        if (chartGeneratorImageLambdaClient == null || !chartGeneratorImageLambdaClient.hasCharts()) {
+            sendMessageToSlack(message, slack_channel_id);
+            return;
+        }
 
-            for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
-                if (chart != null && String.isNotBlank(chart)) {
-                    // Check if the chart type exists in ChartService.Chart enum
-                    ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
-                    if (chartEnum != null) {
-                        Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
-                        String filename = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
-                        String  uploadResul = getUploadUrl(filename, chartBlob.size());
-                        Map<String, Object> resultMap = (Map<String, Object>) JSON.deserializeUntyped(uploadResul);
+        List<Map<String, Object>> filesList = new List<Map<String, Object>>();
 
-                        String fileid = (String) resultMap.get('fileId');
-                        String uploadUrl = (String) resultMap.get('uploadUrl');
-                        if (String.isNotBlank(fileid) && String.isNotBlank(uploadUrl)) {
-                            uploadFileToSlack((String) resultMap.get('uploadUrl'), chartBlob, filename);
-                            filesList.add(new Map<String, Object> {
-                                'id' =>   fileid
-                            });
-                        }
-                    } else {
-                        // Chart type not found in enum
-                    }
-                }
+        for (String chart : chartGeneratorImageLambdaClient.getAvailableChartTypes()) {
+            if (String.isBlank(chart)) {
+                continue;
             }
-            if (!filesList?.isEmpty()) {
-                completeUpload(filesList, message, slack_channel_id);
+
+            // Check if the chart type exists in ChartService.Chart enum
+            ChartService.Chart chartEnum = ChartService.getChartEnumByChartName(chart);
+            if (chartEnum == null) {
+                continue;
+            }
+
+            try {
+                Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
+                String filename = HttpUtils.getNameAttachment(chartEnum.name() + Constants.GLOBAL_VARIABLE.FILE_EXTENSION_PNG);
+
+                // getUploadUrl can return an empty string on error; never attempt to deserialize empty JSON
+                String uploadResult = getUploadUrl(filename, chartBlob.size());
+                if (String.isBlank(uploadResult)) {
+                    continue;
+                }
+
+                Map<String, Object> resultMap;
+                try {
+                    resultMap = (Map<String, Object>) JSON.deserializeUntyped(uploadResult);
+                } catch (JSONException je) {
+                    continue;
+                }
+
+                String fileId = (String) resultMap.get(Constants.GLOBAL_VARIABLE.JSON_KEY_FILE_ID);
+                String uploadUrl = (String) resultMap.get(Constants.GLOBAL_VARIABLE.JSON_KEY_UPLOAD_URL);
+                if (String.isBlank(fileId) || String.isBlank(uploadUrl)) {
+                    continue;
+                }
+
+                uploadFileToSlack(uploadUrl, chartBlob, filename);
+                filesList.add(new Map<String, Object>{ Constants.GLOBAL_VARIABLE.JSON_KEY_ID => fileId });
+            } catch (Exception e) {
+                // Attachment failures should not block sending the Slack message itself.
             }
         }
+
+        // Try to post message with attached files; if that fails (or no files), fall back to plain message.
+        if (!filesList.isEmpty()) {
+            try {
+                completeUpload(filesList, message, slack_channel_id);
+                return;
+            } catch (Exception e) {
+            }
+        }
+
+        // Fallback: send message without attachments.
+        // (This prevents notification failures when Slack upload APIs return empty/non-JSON bodies.)
+        sendMessageToSlack(message, slack_channel_id);
     }
 
 
@@ -318,6 +353,13 @@ public without sharing class SlackService {
             ConfigUtil.SLACK_API_CONVERSATION_LIST_HEADERS,
             200
         );
+        // Slack APIs occasionally return empty/non-JSON bodies; never attempt to deserialize empty content.
+        if (String.isBlank(b)) {
+            SlackUsersResponse emptyResp = new SlackUsersResponse();
+            emptyResp.ok = false;
+            emptyResp.members = new List<SlackUser>();
+            return emptyResp;
+        }
         SlackUsersResponse resp = (SlackUsersResponse)JSON.deserialize(b, SlackUsersResponse.class);
         resp?.members?.sort();
         return resp;
@@ -370,6 +412,10 @@ public without sharing class SlackService {
                     ConfigUtil.SLACK_API_CONVERSATION_LIST_HEADERS,
                     200
                 );
+                if (String.isBlank(b)) {
+                    // Treat empty response as "not found" and fall through to list endpoint behavior.
+                    throw new SlackServiceException('Empty response from Slack conversation.info');
+                }
                 SlackChannelResponse respChannel = (SlackChannelResponse)JSON.deserialize(b, SlackChannelResponse.class);
                 if(respChannel != null && respChannel.ok) {
                     SlackChannelsResponse resp = new SlackChannelsResponse();
@@ -400,6 +446,12 @@ public without sharing class SlackService {
             ConfigUtil.SLACK_API_CONVERSATION_LIST_HEADERS,
             200
         );
+        if (String.isBlank(b)) {
+            SlackChannelsResponse emptyResp = new SlackChannelsResponse();
+            emptyResp.ok = false;
+            emptyResp.channels = new List<SlackChannel>();
+            return emptyResp;
+        }
         SlackChannelsResponse resp = (SlackChannelsResponse)JSON.deserialize(b, SlackChannelsResponse.class);
         resp?.channels?.sort();
         return resp;
@@ -453,15 +505,31 @@ public without sharing class SlackService {
                 200
         );
 
-        Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(response);
-        if ((Boolean) responseMap.get('ok')) {
-            String uploadUrl = (String) responseMap.get('upload_url');
-            String fileId = (String) responseMap.get('file_id');
-            return JSON.serialize(new Map<String, String> {
-                    'uploadUrl' => uploadUrl, 'fileId' => fileId
-            });
-        } else {
-            // Error in response
+        // Slack can return empty/non-JSON body; fail-soft and let caller fall back to message without attachments.
+        if (String.isBlank(response)) {
+            return '';
+        }
+
+        try {
+            Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(response);
+            Boolean ok = (responseMap != null && responseMap.containsKey(Constants.GLOBAL_VARIABLE.JSON_KEY_OK))
+                ? (Boolean) responseMap.get(Constants.GLOBAL_VARIABLE.JSON_KEY_OK)
+                : false;
+            if (ok == true) {
+                String uploadUrl = (String) responseMap.get(Constants.GLOBAL_VARIABLE.JSON_KEY_UPLOAD_URL_SNAKE);
+                String fileId = (String) responseMap.get(Constants.GLOBAL_VARIABLE.JSON_KEY_FILE_ID_SNAKE);
+                if (String.isBlank(uploadUrl) || String.isBlank(fileId)) {
+                    return '';
+                }
+                return JSON.serialize(new Map<String, String> {
+                        Constants.GLOBAL_VARIABLE.JSON_KEY_UPLOAD_URL => uploadUrl,
+                        Constants.GLOBAL_VARIABLE.JSON_KEY_FILE_ID => fileId
+                });
+            }
+        } catch (JSONException je) {
+            return '';
+        } catch (Exception e) {
+            return '';
         }
         return '';
     }

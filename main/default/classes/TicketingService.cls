@@ -5,6 +5,84 @@ public with sharing class TicketingService {
     private TicketingServiceInterface strategy;
     private Boolean shouldMarkForRecursionPrevention = false;
     public static final String AZURE_DEV_OPS_ERROR_CREATE_TAGS = 'TF401289:';
+    private static final String ERROR_INVALID_AZURE_DEVOPS_WORK_ITEM_URL =
+        'Invalid Azure DevOps work item URL in Bug Tracker field. ' +
+        'Expected something like https://dev.azure.com/{org}/{project}/_workitems/edit/{id}. ';
+
+    /**
+     * Filters chart->report data to only include non-empty datasets.
+     * This prevents Lambda 400 errors like "No chart data provided" when reports return empty arrays ("[]").
+     *
+     * @param input Chart->(SystemReport->JSON string) map
+     * @return Filtered map containing only charts that have at least one non-empty report payload
+     */
+    @TestVisible
+    private static Map<ChartService.Chart, Map<ReportService.SystemReport, String>> filterChartDataWithContent(
+        Map<ChartService.Chart, Map<ReportService.SystemReport, String>> input
+    ) {
+        Map<ChartService.Chart, Map<ReportService.SystemReport, String>> result =
+            new Map<ChartService.Chart, Map<ReportService.SystemReport, String>>();
+
+        if (input == null || input.isEmpty()) {
+            return result;
+        }
+
+        for (ChartService.Chart chartKey : input.keySet()) {
+            Map<ReportService.SystemReport, String> reports = input.get(chartKey);
+            if (reports == null || reports.isEmpty()) {
+                continue;
+            }
+
+            Map<ReportService.SystemReport, String> filteredReports = new Map<ReportService.SystemReport, String>();
+            for (ReportService.SystemReport reportKey : reports.keySet()) {
+                String payload = reports.get(reportKey);
+                if (hasNonEmptyJsonPayload(payload)) {
+                    filteredReports.put(reportKey, payload);
+                }
+            }
+
+            if (!filteredReports.isEmpty()) {
+                result.put(chartKey, filteredReports);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Checks whether a JSON payload contains meaningful data.
+     * Treats blank / "null" / empty array / empty object as empty.
+     */
+    @TestVisible
+    private static Boolean hasNonEmptyJsonPayload(String payload) {
+        if (String.isBlank(payload)) {
+            return false;
+        }
+        String trimmed = payload.trim();
+        if (trimmed == 'null' || trimmed == '[]' || trimmed == '{}' ) {
+            return false;
+        }
+
+        // If it's valid JSON, ensure collections are non-empty.
+        try {
+            Object parsed = JSON.deserializeUntyped(trimmed);
+            if (parsed == null) {
+                return false;
+            }
+            if (parsed instanceof List<Object>) {
+                return !((List<Object>) parsed).isEmpty();
+            }
+            if (parsed instanceof Map<String, Object>) {
+                return !((Map<String, Object>) parsed).isEmpty();
+            }
+        } catch (Exception e) {
+            // If not valid JSON for some reason, assume it's meaningful (avoid false negatives).
+            return true;
+        }
+
+        // Scalars (String/Number/Boolean) are considered meaningful if non-blank at this point.
+        return true;
+    }
 
     private static final Map<TICKETING_SERVICE_TYPE, TicketingServiceInterface> TYPE_TO_SERVICE = new Map<TICKETING_SERVICE_TYPE, TicketingServiceInterface>{
         TICKETING_SERVICE_TYPE.JIRA => new TicketingServiceJiraImpl(),
@@ -624,6 +702,10 @@ public with sharing class TicketingService {
         public override void createNewTicketComment() {
             // Only create ticket comment if we have a wrapper (not for event actions)
             if (this.sObjectWrapper != null && String.isNotBlank(this.sobjectWrapper.bugTracker)) {
+                // Safety: do not attempt Jira comment for non-Jira URLs (e.g., Azure DevOps work items).
+                if (!JiraSyncBatch.isJiraTaskUrl(this.sobjectWrapper.bugTracker)) {
+                    return;
+                }
                 String issueKey = JiraService.getIssueKeyByUrl(this.sobjectWrapper.bugTracker);
                 JiraService.JiraServiceInterface jiraServiceInterface = JiraService.getService();
 
@@ -639,6 +721,13 @@ public with sharing class TicketingService {
                             parameters
                         );
 
+                        // Skip chart generation if no chart data available (prevents Lambda 400 errors and recursive logs)
+                        chartToChartData = TicketingService.filterChartDataWithContent(chartToChartData);
+                        if (chartToChartData.isEmpty()) {
+                            jiraServiceInterface.createNewTicketComment(comments, issueKey);
+                            return;
+                        }
+
                         // Set metadata for error tracking
                         Map<String, String> metadata = new Map<String, String>();
                         if (this.sobjectWrapper.sObjectRecord != null && String.isNotBlank(this.sobjectWrapper.sObjectRecord.Id)) {
@@ -649,9 +738,16 @@ public with sharing class TicketingService {
                             metadata.put('issueId', issueKey);
                         }
 
-                        ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
-                            .setMetadata(metadata)
-                            .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
+                        ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient;
+                        try {
+                            chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
+                                .setMetadata(metadata)
+                                .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
+                        } catch (ChartGeneratorImageLambdaClient.ChartGeneratorException e) {
+                            // Fallback: post comment without charts; do not throw to avoid recursive Pharos error logs
+                            jiraServiceInterface.createNewTicketComment(comments, issueKey);
+                            return;
+                        }
 
                         String comment = jiraServiceInterface.addCommentToIssueWithAttachments(comments, issueKey, chartGeneratorImageLambdaClient);
 
@@ -744,6 +840,13 @@ public with sharing class TicketingService {
                         parameters
                     );
 
+                    // Skip chart generation if no chart data available (prevents Lambda 400 errors and recursive logs)
+                    chartToChartData = TicketingService.filterChartDataWithContent(chartToChartData);
+                    if (chartToChartData.isEmpty()) {
+                        // No chart data, skip chart attachment but still return the created ticket
+                        return new TicketCreateResult(issueKey, ConfigUtil.JIRA_TASK_URL + issueKey);
+                    }
+
                     // Set metadata for error tracking
                     Map<String, String> metadata = new Map<String, String>();
                     if (this.sobjectWrapper.sObjectRecord != null && String.isNotBlank(this.sobjectWrapper.sObjectRecord.Id)) {
@@ -753,9 +856,15 @@ public with sharing class TicketingService {
                         metadata.put('issueId', issueKey);
                     }
 
-                    ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
-                        .setMetadata(metadata)
-                        .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
+                    ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient;
+                    try {
+                        chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
+                            .setMetadata(metadata)
+                            .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
+                    } catch (ChartGeneratorImageLambdaClient.ChartGeneratorException e) {
+                        // Fallback: skip chart attachments; do not throw to avoid recursive Pharos error logs
+                        return new TicketCreateResult(issueKey, ConfigUtil.JIRA_TASK_URL + issueKey);
+                    }
 
                     // Attach charts and update description
                     updateIssueDescriptionWithCharts(issueKey, this.taskInfo.details, chartGeneratorImageLambdaClient);
@@ -781,7 +890,7 @@ public with sharing class TicketingService {
                                 if (chartEnum != null) {
                                     Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
                                     if (chartBlob != null) {
-                                        String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                        String fileName = HttpUtils.getNameAttachment(chartEnum.name() + Constants.GLOBAL_VARIABLE.FILE_EXTENSION_PNG);
                                         JiraService.AttachmentResult result = jiraServiceInterface.addAttachmentWithMediaId(chartBlob, fileName, issueKey);
                                         attachmentResults.add(result);
                                     }
@@ -852,7 +961,7 @@ public with sharing class TicketingService {
                                 if (chartEnum != null) {
                                     Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
                                     if (chartBlob != null) {
-                                        String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                        String fileName = HttpUtils.getNameAttachment(chartEnum.name() + Constants.GLOBAL_VARIABLE.FILE_EXTENSION_PNG);
                                         jiraServiceInterface.addAttachment(chartBlob, fileName, issueKey);
                                         descriptionWithCharts += '\n!' + fileName + '!';
                                     }
@@ -933,6 +1042,22 @@ public with sharing class TicketingService {
             }
             AzureService.WorkItemUrlParser urlWorkItem = new AzureService.WorkItemUrlParser(sObjectWrapper.bugTracker);
             return new TicketCreateResult(urlWorkItem.workItemId, this.sObjectWrapper.bugTracker);
+        }
+
+        /**
+         * Azure DevOps ticketing must not reuse Jira URLs stored in LogIndex.
+         * Only treat a LogIndex bugTracker as "existing" when it is a valid Azure DevOps work item URL.
+         */
+        public override String getBugTrackerLinkFromLogIndex() {
+            String candidate = super.getBugTrackerLinkFromLogIndex();
+            if (String.isBlank(candidate)) {
+                return null;
+            }
+            AzureService.WorkItemUrlParser parsed = new AzureService.WorkItemUrlParser(candidate);
+            if (String.isBlank(parsed?.organizationName) || String.isBlank(parsed?.projectIdOrName) || String.isBlank(parsed?.workItemId)) {
+                return null;
+            }
+            return candidate;
         }
 
         private List<String> getRelatedWorkItemIds() {
@@ -1052,11 +1177,17 @@ public with sharing class TicketingService {
         }
 
         private void populateEpic() {
-            if(String.isNotBlank(this.taskInfo.epicId)) {
+            String epicWorkItemId = normalizeWorkItemId(this.taskInfo.epicId);
+            if(String.isNotBlank(epicWorkItemId)) {
                 this.workItemRequest.add(new AzureService.AzureDevOpsWorkItemRequestBody(
                     AzureService.WORK_ITEM_TYPE_OPERATION_ADD, AzureService.WOKR_ITEM_REQUEST_PATH_RELATIONS, new Map<String, Object>{
                         'rel' => AzureService.WORK_ITEM_TYPE_FIELD_RELATED_PARENT_LINK,
-                        'url' => String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{ConfigUtil.AZURE_DEV_OPS_API_SETTINGS.Organization_Id__c, this.taskInfo.projectId, this.taskInfo.epicId})
+                        // Azure DevOps relations expect the REST API work item URL (not the UI "/_workitems/edit/" URL).
+                        'url' => String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM_ID, new List<String>{
+                            ConfigUtil.AZURE_DEV_OPS_API_SETTINGS.Organization_Id__c,
+                            this.taskInfo.projectId,
+                            epicWorkItemId
+                        })
                     })
                 );
             }
@@ -1080,12 +1211,48 @@ public with sharing class TicketingService {
 
         private void populateRelatedWorkItems(List<String> relatedWorkItems) {
             for(String relatedWorkItemId : relatedWorkItems) {
+                String normalizedRelatedWorkItemId = normalizeWorkItemId(relatedWorkItemId);
+                if (String.isBlank(normalizedRelatedWorkItemId)) {
+                    continue;
+                }
                 this.workItemRequest.add(new AzureService.AzureDevOpsWorkItemRequestBody(
                     AzureService.WORK_ITEM_TYPE_OPERATION_ADD, AzureService.WOKR_ITEM_REQUEST_PATH_RELATIONS, new Map<String, Object>{
                         'rel' => AzureService.WORK_ITEM_TYPE_FIELD_RELATED_LINK,
-                        'url' => String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{ConfigUtil.AZURE_DEV_OPS_API_SETTINGS.Organization_Id__c, this.taskInfo.projectId, relatedWorkItemId})
+                        // Azure DevOps relations expect the REST API work item URL (not the UI "/_workitems/edit/" URL).
+                        'url' => String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM_ID, new List<String>{
+                            ConfigUtil.AZURE_DEV_OPS_API_SETTINGS.Organization_Id__c,
+                            this.taskInfo.projectId,
+                            normalizedRelatedWorkItemId
+                        })
                     })
                 );
+            }
+        }
+
+        /**
+         * Normalize an Azure DevOps work item identifier that can be stored as:
+         * - a numeric ID ("1105")
+         * - a UI URL ("https://dev.azure.com/{org}/{project}/_workitems/edit/1105")
+         * - a REST URL ("https://dev.azure.com/{org}/{project}/_apis/wit/workItems/1105?...").
+         *
+         * Azure DevOps relations require a full URL; this helper ensures we only build relation URLs
+         * from a valid numeric work item ID. If input can't be normalized, returns null.
+         */
+        private String normalizeWorkItemId(String workItemIdOrUrl) {
+            if (String.isBlank(workItemIdOrUrl)) {
+                return null;
+            }
+            String candidate = workItemIdOrUrl.trim();
+            if (candidate.contains('/')) {
+                AzureService.WorkItemUrlParser parsed = new AzureService.WorkItemUrlParser(candidate);
+                candidate = parsed?.workItemId;
+            }
+            try {
+                // Validate it is numeric (work item id must be a number).
+                Integer.valueOf(candidate);
+                return candidate;
+            } catch (Exception e) {
+                return null;
             }
         }
 
@@ -1093,10 +1260,20 @@ public with sharing class TicketingService {
 
             // Only create ticket comment if we have a wrapper (not for event actions)
             if (this.sObjectWrapper != null && String.isNotBlank(this.sobjectWrapper.bugTracker)) {
+                // Safety: do not attempt Azure DevOps comment for non-Azure URLs (e.g., Jira "/browse/").
+                if (!JiraSyncBatch.isAzureDevOpsTaskUrl(this.sobjectWrapper.bugTracker)) {
+                    return;
+                }
                 AzureService.WorkItemUrlParser urlWorkItem = new AzureService.WorkItemUrlParser(this.sobjectWrapper.bugTracker);
                 String workItemId = urlWorkItem.workItemId;
                 String projectId = urlWorkItem.projectIdOrName;
                 String organizationId = urlWorkItem.organizationName;
+
+                if (String.isBlank(organizationId) || String.isBlank(projectId) || String.isBlank(workItemId)) {
+                    throw new AzureService.AzureServiceException(
+                        ERROR_INVALID_AZURE_DEVOPS_WORK_ITEM_URL + 'Actual: ' + this.sobjectWrapper.bugTracker
+                    );
+                }
 
                 AzureApiClient client = new AzureApiClient()
                     .setOrganization(organizationId)
@@ -1120,8 +1297,22 @@ public with sharing class TicketingService {
                                 parameters
                             );
 
-                            ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
-                                .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
+                            // Skip chart generation if no chart data available (prevents Lambda 400 errors and recursive logs)
+                            chartToChartData = TicketingService.filterChartDataWithContent(chartToChartData);
+                            if (chartToChartData.isEmpty()) {
+                                client.addComment(comments);
+                                return;
+                            }
+
+                            ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient;
+                            try {
+                                chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
+                                    .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
+                            } catch (ChartGeneratorImageLambdaClient.ChartGeneratorException e) {
+                                // Fallback: comment without charts; do not throw to avoid recursive Pharos error logs
+                                client.addComment(comments);
+                                return;
+                            }
 
                             client.addCommentWithAttachments(comments, chartGeneratorImageLambdaClient);
                         }
@@ -1195,6 +1386,13 @@ public with sharing class TicketingService {
                         parameters
                     );
 
+                    // Skip chart generation if no chart data available (prevents Lambda 400 errors and recursive logs)
+                    chartToChartData = TicketingService.filterChartDataWithContent(chartToChartData);
+                    if (chartToChartData.isEmpty()) {
+                        // No chart data, skip chart attachment but still create the work item
+                        return new TicketCreateResult(workItemId, String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{ConfigUtil.AZURE_DEV_OPS_API_SETTINGS.Organization_Id__c, this.taskInfo.projectId, workItemId}));
+                    }
+
                     // Set metadata for error tracking
                     Map<String, String> metadata = new Map<String, String>();
                     if (this.sobjectWrapper.sObjectRecord != null && String.isNotBlank(this.sobjectWrapper.sObjectRecord.Id)) {
@@ -1204,9 +1402,15 @@ public with sharing class TicketingService {
                         metadata.put('workItemId', workItemId);
                     }
 
-                    ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
-                        .setMetadata(metadata)
-                        .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
+                    ChartGeneratorImageLambdaClient chartGeneratorImageLambdaClient;
+                    try {
+                        chartGeneratorImageLambdaClient = new ChartGeneratorImageLambdaClient()
+                            .setMetadata(metadata)
+                            .generateChartImagesBasedStringChartConfig(JSON.serialize(chartToChartData));
+                    } catch (ChartGeneratorImageLambdaClient.ChartGeneratorException e) {
+                        // Fallback: skip chart attachments; do not throw to avoid recursive Pharos error logs
+                        return new TicketCreateResult(workItemId, String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{ConfigUtil.AZURE_DEV_OPS_API_SETTINGS.Organization_Id__c, this.taskInfo.projectId, workItemId}));
+                    }
 
                     // Attach charts and update description
                     updateWorkItemDescriptionWithCharts(workItemId, this.taskInfo.details, chartGeneratorImageLambdaClient);
@@ -1236,10 +1440,13 @@ public with sharing class TicketingService {
                             if (chartEnum != null) {
                                 Blob chartBlob = chartGeneratorImageLambdaClient.getBlobImageForChart(chartEnum.name());
                                 if (chartBlob != null) {
-                                    String fileName = HttpUtils.getNameAttachment(chartEnum.name() + '.png');
+                                    String fileName = HttpUtils.getNameAttachment(chartEnum.name() + Constants.GLOBAL_VARIABLE.FILE_EXTENSION_PNG);
                                     String imageUrl = client.addAttachment(chartBlob, fileName);
                                     if (String.isNotBlank(imageUrl)) {
-                                        descriptionWithCharts += '<br/><img src="' + imageUrl + '?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" alt="' + fileName + '"/>';
+                                        descriptionWithCharts += String.format(
+                                            Constants.GLOBAL_VARIABLE.HTML_IMG_TAG_WITH_QUERY_TEMPLATE,
+                                            new List<String>{ imageUrl, Constants.GLOBAL_VARIABLE.IMAGE_QUERY_TINYSRGB, fileName }
+                                        );
                                     }
                                 }
                             }

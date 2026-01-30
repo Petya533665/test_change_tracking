@@ -73,7 +73,15 @@ public with sharing class NotificationServiceLogImpl extends NotificationService
             
             // Query the rules to get their actions (only when not cached)
             List<Rule__c> rules = [
-                SELECT Id, (SELECT Id, Action__r.Subject__c, Action__r.Body__c, Action__r.EmailBody__c 
+                SELECT Id, (SELECT Id,
+                                   Action__r.RecordTypeId,
+                                   Action__r.Name,
+                                   Action__r.Name__c,
+                                   Action__r.Action_Type__c,
+                                   Action__r.Type__c,
+                                   Action__r.Subject__c,
+                                   Action__r.Body__c,
+                                   Action__r.EmailBody__c
                            FROM RuleActions__r) 
                 FROM Rule__c 
                 WHERE Id IN :ruleIds

@@ -107,6 +107,22 @@ public with sharing class Constants {
         public final String SYMBOL_COLON = ':';
         public final String SYMBOL_SLASH = '/';
         public final String SYMBOL_DASH = '-';
+
+        // File extensions
+        public final String FILE_EXTENSION_PNG = '.png';
+
+        // JSON keys (reused across integrations/builders)
+        public final String JSON_KEY_ID = 'id';
+        public final String JSON_KEY_OK = 'ok';
+        public final String JSON_KEY_URL = 'url';
+        public final String JSON_KEY_FILE_ID = 'fileId';
+        public final String JSON_KEY_UPLOAD_URL = 'uploadUrl';
+        public final String JSON_KEY_FILE_ID_SNAKE = 'file_id';
+        public final String JSON_KEY_UPLOAD_URL_SNAKE = 'upload_url';
+
+        // Image rendering helpers (used in ticket comments)
+        public final String IMAGE_QUERY_TINYSRGB = '?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2';
+        public final String HTML_IMG_TAG_WITH_QUERY_TEMPLATE = '<br/><img src="{0}{1}" alt="{2}"/>';
         
         // URL Protocol Constants
         public final String URL_PROTOCOL_SEPARATOR = '://';
@@ -757,6 +773,10 @@ public with sharing class Constants {
         public final String SLACK_API_NAME = 'Pharos_ai_Slack_API_URL';
         public final String SLACK_DESCRIPTION = 'Pharos.ai - Slack integration API login URL';
         public final String SLACK_API_URL = 'https://slack.com';
+
+        public final String SLACK_FILES_API_NAME = 'Pharos_ai_Slack_Files_API_URL';
+        public final String SLACK_FILES_DESCRIPTION = 'Pharos.ai - Slack files upload API URL';
+        public final String SLACK_FILES_API_URL = 'https://files.slack.com';
 
         public final String PAGER_DUTY_API_NAME = 'Pharos_ai_PagerDuty_API_URL';
         public final String PAGER_DUTY_DESCRIPTION = 'Pharos.ai - PagerDuty integration API login URL';
