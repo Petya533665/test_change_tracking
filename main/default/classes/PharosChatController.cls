@@ -3,7 +3,6 @@ public with sharing class PharosChatController {
     public static final String CHAT_ENV_URL = 'https://oa9kb839ng.execute-api.us-east-2.amazonaws.com/production';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/v2/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
-    public static final String PREPARE_DIGEST_ENDPOINT = CHAT_ENV_URL + '/prepare-digest';
     public static final String CHAT_WEBSOCKET_URL = 'wss://chat.pharos.ai';
 
     public static final String ERROR_OPENAI_NOT_READY = 'OpenAI token is not configured or is invalid. Please set up OpenAI integration first.';
@@ -90,7 +89,7 @@ public with sharing class PharosChatController {
         return errors;
     }
 
-    private static void sendInitChatRequest(String orgId, String openAiKey) {
+    public static void sendInitChatRequest(String orgId, String openAiKey) {
         String body = JSON.serialize(new Map<String, Object> {
             'session_id' => orgId,
             'openai_key' => openAiKey,
@@ -215,51 +214,6 @@ public with sharing class PharosChatController {
             when else {
                 return null;
             }
-        }
-    }
-
-    public static String prepareDigest(Object data) {
-        Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
-        String prompt = (String) input.get('prompt');
-
-        // Expects frontend dates in yyyy-MM-dd format
-        Date dateFrom = input.get('date_from') == null ? null : Date.valueOf((String) input.get('date_from'));
-        Date dateTo = input.get('date_to') == null ? null : Date.valueOf((String) input.get('date_to'));
-
-        return prepareDigest(prompt, dateFrom, dateTo);
-    }
-
-    public static String prepareDigest(String userPrompt, Date dateFrom, Date dateTo) {
-        try {
-            // Send init-chat request to initialize OpenAI and get session_id
-            String orgId = UserInfo.getOrganizationId();
-            String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
-            sendInitChatRequest(orgId, openAiKey);
-
-            if (dateTo == null) {
-                dateTo = Date.today();
-            }
-            if (dateFrom == null) {
-                dateFrom = dateTo.addDays(-60);
-            }
-
-            Map<String, String> data = getSendMessageData(null);
-            data.put('session_id', orgId);
-            data.put('prompt', userPrompt);
-            data.put('date_from', String.valueOf(dateFrom));
-            data.put('date_to', String.valueOf(dateTo));
-
-            String response = HttpUtils.post(
-                PREPARE_DIGEST_ENDPOINT,
-                JSON.serialize(data),
-                HttpUtils.getHeadersWithApiKeyAndJson(),
-                200
-            );
-            Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(response);
-            return (String) responseBody.get('body') ?? null;
-        } catch (Exception e) {
-            Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'prepareDigest');
-            return null;
         }
     }
 }

@@ -707,7 +707,8 @@ public with sharing class JiraSyncBatch extends DatabaseUtils.PharosBatchImpl im
 					workItemUpdateRequest.add(new AzureService.AzureDevOpsWorkItemRequestBody(
 						AzureService.WORK_ITEM_TYPE_OPERATION_ADD, AzureService.WOKR_ITEM_REQUEST_PATH_RELATIONS, new Map<String, Object>{
 							'rel' => AzureService.WORK_ITEM_TYPE_FIELD_RELATED_LINK,
-							'url' => String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{this.organizationName, this.projectIdOrName, relatedKey})
+							// Azure DevOps relations expect the REST API work item URL (not the UI "/_workitems/edit/" URL).
+							'url' => String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM_ID, new List<String>{this.organizationName, this.projectIdOrName, relatedKey})
 						})
 					);
 				}
@@ -732,7 +733,8 @@ public with sharing class JiraSyncBatch extends DatabaseUtils.PharosBatchImpl im
 					workItemUpdateRequest.add(new AzureService.AzureDevOpsWorkItemRequestBody(
 						AzureService.WORK_ITEM_TYPE_OPERATION_ADD, AzureService.WOKR_ITEM_REQUEST_PATH_RELATIONS, new Map<String, Object>{
 							'rel' => AzureService.WOKR_ITEM_TYPE_FIELD_DUPLICATE_CHILD_LINK,
-							'url' => String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{this.organizationName, this.projectIdOrName, duplicateKey})
+							// Azure DevOps relations expect the REST API work item URL (not the UI "/_workitems/edit/" URL).
+							'url' => String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM_ID, new List<String>{this.organizationName, this.projectIdOrName, duplicateKey})
 						})
 					);
 				}

@@ -461,11 +461,14 @@ public with sharing class NotificationService {
     }
 
     /**
-     * Helper method to check if the parent record being processed is already a Pharos error 
-     * from notification processing. If yes, we should mark new errors to prevent recursion.
-     * 
-     * @param record - The SObject record being processed by notification batch
-     * @return Boolean - true if parent is a Pharos error (mark new errors), false otherwise (allow one attempt)
+     * Helper method to check if the parent record being processed is already a Pharos error
+     * that originated from notification/ticketing processing.
+     *
+     * If yes, any new internal errors created by the notification pipeline must be marked with
+     * {@link ConfigUtil#ORIGINATED_FROM_NOTIFICATION_ERROR} to prevent recursion.
+     *
+     * @param record The SObject record being processed by notification batch
+     * @return true if parent is already a notification-originated Pharos error; false otherwise
      */
     public static Boolean isParentLogFromNotificationError(SObject record) {
         // Only check for Log__c objects (Issues and Trace Results don't have this problem)
@@ -482,19 +485,10 @@ public with sharing class NotificationService {
         if (!isPharosError) {
             return false; // Not a Pharos error, allow processing
         }
-        
-        // Check if this Pharos error already originated from a notification error
-        // If yes, any new errors should be marked to prevent further recursion
-        Boolean alreadyFromNotificationError = log.Originated_From__c == ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR;
-        
-        if (alreadyFromNotificationError) {
-            return true; // Already from notification error - mark new errors to stop recursion
-        }
-        
-        // This is a Pharos error but NOT from notification processing yet
-        // This is the FIRST attempt to process it - return true to mark any errors
-        // that occur during THIS processing attempt
-        return true;
+
+        // Mark recursion-prevention only when THIS Pharos error was already created by the notification pipeline.
+        // This preserves the "one attempt" behavior for normal Pharos errors.
+        return log.Originated_From__c == ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR;
     }
 
     public class ErrorsHelper {
@@ -579,9 +573,9 @@ public with sharing class NotificationService {
             config.clearRunningIds();
             PermissionsUtil.putSObjectField(failedRecord, dfrExecutableRules, config.toJSON());
 
-            // Check if the parent record is already a Pharos error from notification processing
-            // If yes, we should mark new errors to prevent recursion
-            // If no, allow ONE attempt to process the error (don't mark)
+            // Recursion prevention:
+            // Mark internal error logs ONLY when the parent record is already a notification-originated Pharos error.
+            // This preserves the original "one attempt" behavior.
             Boolean shouldMarkForRecursionPrevention = isParentLogFromNotificationError(record);
 
             List<System.Exception> emailExceptionsList = emailExceptions.get(recordId);
@@ -916,7 +910,7 @@ public with sharing class NotificationService {
     }
 
     public static void sendTicketing(RuleUtil.ActionType actionType, EventAction__c eventAction, Logger logger, SObject record) {
-        TicketingService service = new TicketingService(actionType, logger);
+        TicketingService service = new TicketingService(actionType, logger, true);
         TicketingService.TicketingServiceInputData data = new TicketingService.TicketingServiceInputData(eventAction);
         TicketingService.TicketCreateResult newTicket = service.createTicket(data);
         

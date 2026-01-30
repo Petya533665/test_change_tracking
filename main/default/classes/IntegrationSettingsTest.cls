@@ -795,6 +795,54 @@ public with sharing class IntegrationSettingsTest {
     }
 
     @IsTest
+    static void test_sendMessageToSlackWithChartAttachments_fallsBackWhenUploadUrlInvalid() {
+        // Given
+        TestDataFactory.createSlackSettings();
+        PermissionsUtil.SlackIntegrationEnabled = true;
+
+        ChartGeneratorImageLambdaClient client = new ChartGeneratorImageLambdaClient();
+        Blob fakeImageBlob = Blob.valueOf('fakeimage');
+        client.setChartImages(new Map<String, String>{
+            ChartService.Chart.OCCURRENCE_LAST_7_DAYS.name() => EncodingUtil.base64Encode(fakeImageBlob)
+        });
+
+        Map<String, HttpCalloutMock> endpoint2Mock = new Map<String, HttpCalloutMock>{
+            // Return a valid JSON body with ok=false so SlackService.getUploadUrl() returns empty string.
+            ConfigUtil.SLACK_GET_UPLOAD_URL_EXTERNAL_ENDPOINT => new TestDataFactory.SingleRequestMock(
+                200,
+                'OK',
+                '{"ok":false,"error":"invalid_auth"}'
+            ),
+            // Fallback plain message post must still succeed.
+            ConfigUtil.SLACK_POST_MESSAGE_ENDPOINT => new TestDataFactory.SingleRequestMock(
+                200,
+                'OK',
+                '{"ok":true}'
+            )
+        };
+
+        TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2Mock);
+        Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        // When
+        Test.startTest();
+        SlackService.sendMessageToSlackWithChartAttachments('hello', 'C123', client);
+        Test.stopTest();
+
+        // Then
+        Assert.areNotEqual(
+            null,
+            multiCalloutMock.getRequest(ConfigUtil.SLACK_GET_UPLOAD_URL_EXTERNAL_ENDPOINT),
+            'Upload URL endpoint should be called'
+        );
+        Assert.areNotEqual(
+            null,
+            multiCalloutMock.getRequest(ConfigUtil.SLACK_POST_MESSAGE_ENDPOINT),
+            'Should fall back to chat.postMessage when attachments fail'
+        );
+    }
+
+    @IsTest
     static void getSlackChannels_byNameFailedByBadJson() {
         String resp;
         String query = SLACK_CHANNEL_NAME;

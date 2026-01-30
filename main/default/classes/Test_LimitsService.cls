@@ -2037,4 +2037,157 @@ public class Test_LimitsService {
         System.assertNotEquals(null, capturedLogs[capturedLogs.size() - 1].Limits__r.DailyApiRequests__c,
             'Last snapshot should have API requests data');
     }
+
+    @IsTest
+    static void test_limitsRuleThreshold_azureDevOpsNotification_shouldCreateEventAction() {
+        // TEST: Verify that when a limits threshold rule fires, it creates an EventAction
+        // with Azure DevOps notification that can be processed by NotificationBatch
+        
+        // Setup: Enable limits monitoring and Azure DevOps integration
+        PermissionsUtil.MonitoringEnabled = false;
+        PermissionsUtil.LimitsMonitoringEnabled = true;
+        PermissionsUtil.AzureDevOpsIntegrationEnabled = true;
+        PermissionsUtil.MaxMonitoringRules = 10;
+        PermissionsUtil.NotificationForPharosErrors = true;
+        ConfigUtil.SETTINGS.Limits_Monitoring_Enabled__c = true;
+        
+        // Create Azure DevOps settings - must match mock constants!
+        Azure_Dev_Ops_API_Settings__c azureSettings = new Azure_Dev_Ops_API_Settings__c();
+        azureSettings.Organization_Id__c = JiraNotificationBatchTest.AZURE_DEV_OPS_MOCK_ACCOUNT_ID;
+        insert azureSettings;
+        
+        // Set OAuth token (required for Azure DevOps integration to be considered enabled)
+        AzureService.OAUTH_API_TOKEN = 'test-token';
+        Map<String, HttpCalloutMock> endpoint2TestResp = JiraNotificationBatchTest.createAzureDevOpsMocks();
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+        
+        DateTime baseTime = DateTime.now();
+        
+        // Setup batch flag (required for limits monitoring)
+        Monitoring_Batch_Flag__c batchFlag = Monitoring_Batch_Flag__c.getOrgDefaults();
+        batchFlag.Last_Created_Log__c = baseTime;
+        batchFlag.Last_Processed_Limits_Log__c = baseTime.addHours(-2); // Old → hasNewLimits() = TRUE
+        upsert batchFlag;
+        
+        // Clear cache
+        RuleUtil.cachedRules = new Map<String, Map<Id, RuleUtil.Rule>>();
+        
+        // Create threshold rule: DataStorageMB >= 80% of org limit
+        Rule__c thresholdRule = new Rule__c(
+            Name__c = 'DataStorage Threshold Rule with Azure DevOps',
+            Type__c = Constants.RULE_SOBJECT.TYPE_LIMITS,
+            Subtype__c = Constants.RULE_SOBJECT.SUB_TYPE_THRESHOLD,
+            AggregateType__c = 'Count',
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            EventTimeInterval__c = 60,
+            Threshold__c = 80,
+            Active__c = true,
+            SobjectType__c = null,
+            Index__c = 1,
+            Is_Not_Valid__c = false
+        );
+        insert thresholdRule;
+        
+        // Create filter for DataStorageMB field
+        insert new RuleFilter__c(
+            Rule__c = thresholdRule.Id,
+            Index__c = 1,
+            FieldName__c = 'DataStorageMB',
+            ComparisonOperator__c = RuleUtil.COMPARISON_OPERATOR_GREATER_OR_EQUAL,
+            Value__c = '1',
+            Comparison_Type__c = RuleUtil.COMPARISON_TYPE_VALUE,
+            Field_Type__c = RuleUtil.FIELD_TYPE_NUMBER
+        );
+        
+        // Create Azure DevOps action
+        Action__c azureAction = new Action__c(
+            Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
+            Subject__c = 'Data Storage Alert:',
+            Body__c = 'Data storage usage has exceeded threshold:',
+            Team_Id__c = JiraNotificationBatchTest.AZURE_DEV_OPS_MOCK_PROJECT_ID,
+			JIRAIssueType__c = JiraNotificationBatchTest.AZURE_DEV_OPS_MOCK_ISSUE_TYPE_ID,
+			JIRAProject__c = JiraNotificationBatchTest.AZURE_DEV_OPS_MOCK_PROJECT_ID,
+			JIRAPriority__c = JiraNotificationBatchTest.AZURE_DEV_OPS_MOCK_PRIORITY
+        );
+        insert azureAction;
+        
+        // Link action to rule
+        RuleAction__c ruleAction = new RuleAction__c(
+            Rule__c = thresholdRule.Id,
+            Action__c = azureAction.Id
+        );
+        insert ruleAction;
+        
+        // Get org limit for DataStorageMB
+        Map<String, System.OrgLimit> orgLimits = OrgLimits.getMap();
+        Integer dataStorageLimit = orgLimits.get('DataStorageMB').getLimit();
+        
+        // Create limits snapshot with DataStorageMB at 85% (should trigger rule at 80% threshold)
+        Decimal currentUsage = dataStorageLimit * 0.85;
+        Limits__c limitsSnapshot = new Limits__c(
+            DataStorageMB__c = currentUsage
+        );
+        insert limitsSnapshot;
+        
+        // Create log with limits snapshot
+        Log__c snapshotLog = new Log__c(
+            Summary__c = 'Limits Snapshot',
+            Limits__c = limitsSnapshot.Id,
+            Created_At__c = baseTime.addMinutes(-1)
+        );
+        insert snapshotLog;
+        
+        // Set batch time
+        MonitoringBatch.currentTime = baseTime;
+        
+        Test.startTest();
+        
+        // Execute monitoring batch
+        MonitoringBatch.getInstance().startBatch();
+        
+        Test.stopTest();
+        
+        // VERIFICATION: Check that Event and EventAction were created
+        List<Event__c> events = [
+            SELECT Id, Rule__c, Description__c
+            FROM Event__c
+            WHERE Rule__c = :thresholdRule.Id
+        ];
+        
+        System.assertEquals(1, events.size(), 
+            'Should create 1 event for threshold breach (85% exceeds 80% threshold). ' +
+            'DataStorage: ' + currentUsage + ' (' + (currentUsage/dataStorageLimit*100) + '%)' );
+        
+        List<EventAction__c> eventActions = [
+            SELECT Id, Event__c, Action_Type__c, Delivered_to__c, Subject__c, Body__c
+            FROM EventAction__c
+            WHERE Event__c IN :events
+        ];
+        
+        System.assertEquals(1, eventActions.size(), 
+            'Should create 1 EventAction for Azure DevOps notification');
+        
+        System.assertEquals(Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION, 
+            eventActions[0].Action_Type__c,
+            'EventAction should be Azure DevOps notification type');
+        
+        // After NotificationBatch processes the action, Delivered_to__c contains the actual work item URL
+        System.assertNotEquals(null, eventActions[0].Delivered_to__c,
+            'Delivered_to__c should be populated with Azure DevOps work item URL');
+        
+        System.assert(eventActions[0].Delivered_to__c.contains('dev.azure.com'),
+            'Delivered_to__c should contain Azure DevOps work item URL. ' +
+            'Actual: [' + eventActions[0].Delivered_to__c + ']');
+        
+        System.assert(eventActions[0].Delivered_to__c.contains('_workitems/edit/'),
+            'Delivered_to__c should contain work item path. ' +
+            'Actual: [' + eventActions[0].Delivered_to__c + ']');
+        
+        System.assertNotEquals(null, eventActions[0].Subject__c,
+            'Subject should be populated');
+        
+        System.assertNotEquals(null, eventActions[0].Body__c,
+            'Body should be populated');
+    }
 }

@@ -24,7 +24,7 @@ public with sharing class ADFBuilder {
 	public static final String ATTR_MARKS = 'marks';
 	public static final String ATTR_ATTRS = 'attrs';
 	public static final String ATTR_HREF = 'href';
-	public static final String ATTR_ID = 'id';
+	public static final String ATTR_ID = Constants.GLOBAL_VARIABLE.JSON_KEY_ID;
 	public static final String ATTR_COLLECTION = 'collection';
 	public static final String ATTR_ALT = 'alt';
 	public static final String ATTR_CONTENT = 'content';

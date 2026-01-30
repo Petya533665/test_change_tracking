@@ -927,13 +927,24 @@ private class AutoChartTest {
             String responseType
         ) {
             // Mock successful response for deleteMetadata
-            if (requestName == 'deleteMetadata') {
+            if (request instanceof MetadataService.deleteMetadata_element) {
                 MetadataService.deleteMetadataResponse_element responseElement = new MetadataService.deleteMetadataResponse_element();
                 MetadataService.DeleteResult deleteResult = new MetadataService.DeleteResult();
                 deleteResult.success = true;
                 deleteResult.fullName = 'Pharos_ai_API';
                 responseElement.result = new List<MetadataService.DeleteResult>{
                     deleteResult
+                };
+                response.put('response_x', responseElement);
+            }
+            // Mock successful response for upsertMetadata (RemoteSiteSetting/CspTrustedSite/etc.)
+            else if (request instanceof MetadataService.upsertMetadata_element) {
+                MetadataService.upsertMetadataResponse_element responseElement = new MetadataService.upsertMetadataResponse_element();
+                MetadataService.UpsertResult upsertResult = new MetadataService.UpsertResult();
+                upsertResult.success = true;
+                upsertResult.fullName = 'Pharos_ai_Mock';
+                responseElement.result = new List<MetadataService.UpsertResult>{
+                    upsertResult
                 };
                 response.put('response_x', responseElement);
             }

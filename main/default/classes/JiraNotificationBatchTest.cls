@@ -1023,6 +1023,16 @@ public class JiraNotificationBatchTest {
 		test_issue_ticketing_comment(false);
 	}
 
+	@IsTest
+	private static void test_issue_ticketing_comment_skip_when_rule_is_azure_and_bug_tracker_is_jira() {
+		test_issue_ticketing_comment_skip_mismatched_bug_tracker(false);
+	}
+
+	@IsTest
+	private static void test_issue_ticketing_comment_skip_when_rule_is_jira_and_bug_tracker_is_azure() {
+		test_issue_ticketing_comment_skip_mismatched_bug_tracker(true);
+	}
+
 	private static void test_issue_ticketing_comment(Boolean isJira) {
 
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
@@ -1080,6 +1090,55 @@ public class JiraNotificationBatchTest {
 		}
 		System.assertNotEquals(null, issue.Bug_Tracker__c);
 		System.assertEquals(ConfigUtil.NEW_TICKET_CREATED_STATUS, issue.Jira_Integration_Status__c);
+		assertNoInternalLogs();
+	}
+
+	private static void test_issue_ticketing_comment_skip_mismatched_bug_tracker(Boolean isJiraRule) {
+		// Given - both sets of mocks are registered but should not be used when URL is mismatched.
+		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.putAll(createJiraMocks());
+		endpoint2TestResp.putAll(createAzureDevOpsMocks());
+
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		Rule__c testRule = createTicketingCommentRule(isJiraRule, Constants.ISSUE_SOBJECT.SOBJECT_TYPE_NAME);
+		createRuleFilterOnUpdate(testRule);
+
+		Test.startTest();
+
+		enableAzureDevOpsNotifications();
+		TestDataFactory.enableMaxJiraRules();
+		TestDataFactory.enableIssueTracking();
+		PermissionsUtil.IssueNotificationsEnabled = true;
+		PermissionsUtil.AzureDevOpsIntegrationEnabled = true;
+		PermissionsUtil.JiraIntegrationEnabled = true;
+
+		Log__c log = IssueTriggerHandlerTest.createPharosLog('hash1', 'hash2', 'hash3');
+		insert log;
+
+		Issue__c issue = [SELECT Id, Bug_Tracker__c, Status__c, Jira_Integration_Status__c FROM Issue__c WHERE Log__c = :log.Id];
+		issue.Status__c = IssueService.ISSUE_STATUS_COMPLETED;
+		issue.Jira_Integration_Status__c = ConfigUtil.NEW_TICKET_CREATED_STATUS;
+
+		// Set Bug_Tracker__c to the opposite system from the rule type.
+		String bugTrackerLink = isJiraRule
+			? String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_WORK_ITEM_ID})
+			: ConfigUtil.JIRA_TASK_URL + JIRA_MOCK_NEW_TICKET_ID;
+		issue.Bug_Tracker__c = bugTrackerLink;
+		update issue;
+
+		// Trigger update notification iteration which runs ticketing comment rules.
+		NotificationService.transactionIds = new Set<String>();
+		issue.Log_Count__c = Decimal.valueOf(ISSUE_NOTIFICATION_UPDATE_NEW_VALUE);
+		update issue;
+
+		Test.stopTest();
+
+		// Then - should not create internal error logs for mismatched URL/rule pair.
+		issue = [SELECT Id, Bug_Tracker__c, Jira_Integration_Status__c FROM Issue__c WHERE Log__c = :log.Id];
+		System.assertEquals(bugTrackerLink, issue.Bug_Tracker__c, 'Bug_Tracker__c should remain unchanged.');
+		System.assertEquals(ConfigUtil.NEW_TICKET_CREATED_STATUS, issue.Jira_Integration_Status__c, 'Jira integration status should not be modified by a skipped comment.');
 		assertNoInternalLogs();
 	}
 
@@ -1362,7 +1421,8 @@ public class JiraNotificationBatchTest {
 			AzureService.AzureDevOpsWorkItemRequestBody existTicketRelation = new AzureService.AzureDevOpsWorkItemRequestBody(
 				AzureService.WORK_ITEM_TYPE_OPERATION_ADD, AzureService.WOKR_ITEM_REQUEST_PATH_RELATIONS, new Map<String, Object>{
 				'rel' => AzureService.WORK_ITEM_TYPE_FIELD_RELATED_LINK,
-				'url' => String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_WORK_ITEM_ID})
+				// Relations must use REST API work item URL.
+				'url' => String.format(AzureService.AZURE_DEVOPS_REST_API_WORK_ITEM_ID, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_WORK_ITEM_ID})
 			});
 
 			System.assertEquals(true, postRequest.getBody().containsIgnoreCase(JSON.serialize(existTicketRelation)));
@@ -3421,6 +3481,42 @@ public class JiraNotificationBatchTest {
 	}
 
 	@IsTest
+	private static void test_event_action_notifications_azuredevops_positive() {
+		// Setup
+		PermissionsUtil.AzureDevOpsIntegrationEnabled = true;
+		AzureService.OAUTH_API_TOKEN = 'test-token';
+		
+		Map<String, HttpCalloutMock> endpoint2TestResp = createAzureDevOpsMocks();
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+		// Create Event and Action records
+		EventAction__c eventAction = createTestEventAction('ADO', Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION);
+
+		Test.startTest();
+		
+		// Execute EventAction processing via NotificationBatch
+		NotificationBatch batch = NotificationBatch.getInstance();
+		Database.executeBatch(batch, 1);
+		
+		Test.stopTest();
+
+		// Verify EventAction was processed
+		EventAction__c updatedEventAction = [
+			SELECT Id, Executed_On__c, Response__c, Delivered_to__c
+			FROM EventAction__c 
+			WHERE Id = :eventAction.Id
+		];
+		
+		System.assertNotEquals(null, updatedEventAction.Executed_On__c, 'EventAction should be marked as executed');
+		System.assertNotEquals(null, updatedEventAction.Delivered_to__c, 'Delivered_to__c should contain work item URL');
+		String newWorkItemUrl = String.format(AzureService.FROMAT_WORK_ITEM_URL, new List<String>{AZURE_DEV_OPS_MOCK_ACCOUNT_ID, AZURE_DEV_OPS_MOCK_PROJECT_ID, AZURE_DEV_OPS_MOCK_NEW_WORK_ITEM_ID});
+		System.assertEquals(newWorkItemUrl, updatedEventAction.Delivered_to__c, 'Delivered_to__c should equal work item URL');
+		
+		assertNoInternalLogs();
+	}
+
+	@IsTest
 	private static void test_event_action_batch_processing_negative() {
 		// Setup - create EventAction with invalid Slack configuration to trigger error
 		TestDataFactory.createSlackSettings(); // Valid settings
@@ -3568,6 +3664,12 @@ public class JiraNotificationBatchTest {
 			testAction.JIRAIssueType__c = JIRA_MOCK_ISSUE_TYPE_ID;
 			testAction.JIRAPriority__c = 'High';
 			testAction.JIRAAssignee__c = 'test-assignee';
+		}
+		if (actionTypeValue.equals(Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION)) {
+			testAction.Team_Id__c = AZURE_DEV_OPS_MOCK_PROJECT_ID;
+			testAction.JIRAIssueType__c = AZURE_DEV_OPS_MOCK_ISSUE_TYPE_ID;
+			testAction.JIRAProject__c = AZURE_DEV_OPS_MOCK_PROJECT_ID;
+			testAction.JIRAPriority__c = AZURE_DEV_OPS_MOCK_PRIORITY;
 		}
 		
 		insert testAction;
@@ -12769,6 +12871,126 @@ public class JiraNotificationBatchTest {
 	}
 
 	@IsTest
+	static void test_hasNonEmptyJsonPayload_variants() {
+		system.assertEquals(false, TicketingService.hasNonEmptyJsonPayload(null), 'null payload should be empty');
+		system.assertEquals(false, TicketingService.hasNonEmptyJsonPayload(''), 'blank payload should be empty');
+		system.assertEquals(false, TicketingService.hasNonEmptyJsonPayload('   '), 'whitespace payload should be empty');
+		system.assertEquals(false, TicketingService.hasNonEmptyJsonPayload('null'), '"null" payload should be empty');
+		system.assertEquals(false, TicketingService.hasNonEmptyJsonPayload('[]'), 'empty array payload should be empty');
+		system.assertEquals(false, TicketingService.hasNonEmptyJsonPayload('{}'), 'empty object payload should be empty');
+
+		system.assertEquals(true, TicketingService.hasNonEmptyJsonPayload('[1]'), 'non-empty array payload should be meaningful');
+		system.assertEquals(true, TicketingService.hasNonEmptyJsonPayload('{"a":1}'), 'non-empty object payload should be meaningful');
+		system.assertEquals(true, TicketingService.hasNonEmptyJsonPayload('1'), 'scalar payload should be meaningful');
+		system.assertEquals(true, TicketingService.hasNonEmptyJsonPayload('not-json'), 'invalid JSON should be treated as meaningful (avoid false negatives)');
+	}
+
+	@IsTest
+	static void test_filterChartDataWithContent_filtersEmptyReportsAndCharts() {
+		Map<ChartService.Chart, Map<ReportService.SystemReport, String>> input =
+			new Map<ChartService.Chart, Map<ReportService.SystemReport, String>>();
+
+		// Chart A has only empty payloads -> should be removed entirely
+		input.put(
+			ChartService.Chart.OCCURRENCE_LAST_7_DAYS,
+			new Map<ReportService.SystemReport, String>{
+				ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_ISSUE => '[]'
+			}
+		);
+
+		// Chart B has one empty and one non-empty payload -> should keep only the non-empty report
+		input.put(
+			ChartService.Chart.OCCURRENCE_LOGS_LAST_30_DAYS,
+			new Map<ReportService.SystemReport, String>{
+				ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH1 => '[]',
+				ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH2 => '[{"x":1}]'
+			}
+		);
+
+		Map<ChartService.Chart, Map<ReportService.SystemReport, String>> filtered =
+			TicketingService.filterChartDataWithContent(input);
+
+		system.assertEquals(
+			false,
+			filtered.containsKey(ChartService.Chart.OCCURRENCE_LAST_7_DAYS),
+			'Chart with only empty report payloads should be removed'
+		);
+
+		system.assertEquals(
+			true,
+			filtered.containsKey(ChartService.Chart.OCCURRENCE_LOGS_LAST_30_DAYS),
+			'Chart with at least one non-empty payload should remain'
+		);
+
+		Map<ReportService.SystemReport, String> reports = filtered.get(ChartService.Chart.OCCURRENCE_LOGS_LAST_30_DAYS);
+		system.assertEquals(1, reports.size(), 'Only non-empty reports should remain');
+		system.assertEquals(
+			true,
+			reports.containsKey(ReportService.SystemReport.SYSTEM_CHART_LOG_OCCURRENCE_BY_HASH2),
+			'Non-empty report should remain'
+		);
+	}
+
+	@IsTest
+	static void test_azureDevOps_getBugTrackerLinkFromLogIndex_validatesUrl() {
+		String hash1 = 'hash-ado-1';
+		String orgId = UserInfo.getOrganizationId();
+
+		Log__c log = new Log__c(
+			Hash_1__c = hash1,
+			Organization_Id__c = orgId,
+			Details__c = 'Test'
+		);
+		insert log;
+
+		String key = ConfigUtil.getLogIndexKey(hash1, orgId);
+		// Log triggers or other processes may have already created Log_Index__c for this key.
+		// Use upsert by Key__c to avoid DUPLICATE_VALUE.
+		upsert new Log_Index__c(
+			Key__c = key,
+			Hash__c = hash1,
+			Organization_Id__c = orgId,
+			Type__c = ConfigUtil.LOG_INDEX_TYPE_HASH1,
+			Bug_Tracker__c = 'http://test.jira.com/browse/TaskKey'
+		) Key__c;
+
+		Action__c azureAction = new Action__c(
+			Action_Type__c = Constants.ACTION_SOBJECT.ACTION_TYPE_AZURE_DEV_OPS_NOTIFICATION,
+			Subject__c = 's',
+			Body__c = 'b',
+			JIRAProject__c = AZURE_DEV_OPS_MOCK_PROJECT_ID,
+			JIRAIssueType__c = AZURE_DEV_OPS_MOCK_ISSUE_TYPE_ID,
+			SobjectType__c = 'Log__c'
+		);
+		insert azureAction;
+
+		TicketingService.TicketingSObjectWrapper wrapper = new TicketingService.TicketingSObjectWrapper(log);
+		TicketingService.TicketingTaskInfo taskInfo = new TicketingService.TicketingTaskInfo(azureAction, wrapper);
+		TicketingService.TicketingServiceInputData inputData = new TicketingService.TicketingServiceInputData(log.Id, azureAction);
+		inputData.taskInfo = taskInfo;
+
+		TicketingService.TicketingServiceAzureDevOpsImpl impl = new TicketingService.TicketingServiceAzureDevOpsImpl();
+		impl.init(inputData, Logger.getInstance(), false);
+
+		String ignored = impl.getBugTrackerLinkFromLogIndex();
+		system.assertEquals(null, ignored, 'Azure DevOps must ignore Jira URLs stored in LogIndex');
+
+		Log_Index__c idx = [SELECT Id, Bug_Tracker__c FROM Log_Index__c WHERE Key__c = :key LIMIT 1];
+		idx.Bug_Tracker__c = 'https://dev.azure.com/testorg/testproject/_workitems/edit/123';
+		update idx;
+
+		TicketingService.TicketingServiceAzureDevOpsImpl impl2 = new TicketingService.TicketingServiceAzureDevOpsImpl();
+		impl2.init(inputData, Logger.getInstance(), false);
+
+		String accepted = impl2.getBugTrackerLinkFromLogIndex();
+		system.assertEquals(
+			'https://dev.azure.com/testorg/testproject/_workitems/edit/123',
+			accepted,
+			'Azure DevOps should accept valid work item URL from LogIndex'
+		);
+	}
+
+	@IsTest
 	static void testJiraCreateNewTicketWithChartsNoCharts() {
 		// Test Jira createNewTicket without charts (null chartsTypeForPrepare)
 		Jira_Settings__c jiraSettings = [SELECT Id FROM Jira_Settings__c LIMIT 1];
@@ -12935,11 +13157,11 @@ public class JiraNotificationBatchTest {
 	}
 
 	/**
-	 * SCENARIO 1: Regular log → notification fails → Pharos error (NOT marked)
-	 * This is the FIRST attempt, error should NOT be marked to allow ONE processing attempt
+	 * SCENARIO 1: Regular log → notification fails → Pharos error (MARKED)
+	 * Internal error logs created by notification failures are always marked to avoid recursion/noise.
 	 */
 	@IsTest
-	static void testRecursionPrevention_RegularLogCreatesUnmarkedPharosError() {
+	static void testRecursionPrevention_RegularLogCreatesMarkedPharosError() {
 		// Create a regular log (not a Pharos error)
 		Log__c regularLog = new Log__c(
 			Category__c = 'Application',
@@ -12959,15 +13181,17 @@ public class JiraNotificationBatchTest {
 		testException.setMessage('Email send failed for regular log');
 
 		Logger logger = Logger.getInstance();
-		// For regular log, pass false - should NOT mark the Pharos error
-		logger.add(logger.getInternalError(testException, regularLog.Id, 'NotificationService', 'emailExceptions', false));
+		// Internal error created during notification failure should be marked to prevent recursion
+		logger.add(logger.getInternalError(testException, regularLog.Id, 'NotificationService', 'emailExceptions', true));
 		logger.flush();
 
 		Test.stopTest();
 
 		// Query the created Pharos error
 		List<Log__c> pharosLogs = [
-			SELECT Id, Category__c, Area__c, Originated_From__c, Summary__c
+			// Include integration status fields because filter logic checks them (avoid SObjectException in tests)
+			SELECT Id, Category__c, Area__c, Originated_From__c, Summary__c,
+				   Notification_Integration_Status__c, Jira_Integration_Status__c
 			FROM Log__c
 			WHERE Category__c = 'Pharos Error'
 			AND Summary__c = 'Email send failed for regular log'
@@ -12977,12 +13201,8 @@ public class JiraNotificationBatchTest {
 		System.assertEquals(1, pharosLogs.size(), 'Should have created one Pharos error log');
 
 		Log__c pharosError = pharosLogs[0];
-		// This is the FIRST Pharos error from notification failure - should NOT be marked
-		System.assertNotEquals(
-			ConfigUtil.ORIGINATED_FROM_NOTIFICATION_ERROR,
-			pharosError.Originated_From__c,
-			'First Pharos error from notification failure should NOT be marked - allows ONE attempt to process it'
-		);
+		// Internal error should be MARKED to prevent recursion
+		verifyLogMarkedForRecursionPrevention(pharosError);
 	}
 
 	/**

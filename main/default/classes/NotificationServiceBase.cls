@@ -366,10 +366,6 @@ public with sharing abstract class NotificationServiceBase implements Notificati
         setRecordFailedStatusForEmptyRules();
         this.record = getSObjectRecordDetails();
         
-        // Check if parent record is already a Pharos error from notification processing
-        // If yes, mark new errors to prevent recursion
-        this.shouldMarkForRecursionPrevention = NotificationService.isParentLogFromNotificationError(this.record);
-        
         List<Messaging.SingleEmailMessage> emailMessages;
         
         if (targetIteration != null && targetIteration.iterationNumber > 1) {
@@ -427,7 +423,14 @@ public with sharing abstract class NotificationServiceBase implements Notificati
                 switch on RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type) {
                     when JIRA, AZURE_DEV_OPS {
                         try {
-                            TicketingService service = new TicketingService(RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type), this.logger, this.shouldMarkForRecursionPrevention);
+                            // Recursion prevention:
+                            // Internal Pharos Error logs created by ticketing failures must be marked with
+                            // ORIGINATED_FROM_NOTIFICATION_ERROR to avoid recursive rule execution.
+                            TicketingService service = new TicketingService(
+                                RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type),
+                                this.logger,
+                                true
+                            );
                             TicketingService.TicketingServiceInputData data = new TicketingService.TicketingServiceInputData(this.recordId, action.fields);
                             TicketingService.TicketCreateResult newTicket = service.createTicket(data);
                             ticketId = newTicket.id;
@@ -436,21 +439,41 @@ public with sharing abstract class NotificationServiceBase implements Notificati
                         }
                         catch (Exception e) {
                             this.logErrors.ticketingExceptions.put(this.recordId, e);
-                            // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
-                            logger?.add(logger.getInternalError(e, this.recordId, NotificationService.class.getName(), 'ticketingExceptions', shouldMarkForRecursionPrevention));
+                            logger?.add(logger.getInternalError(
+                                e,
+                                this.recordId,
+                                NotificationService.class.getName(),
+                                'ticketingExceptions',
+                                true
+                            ));
                         }
                     }
                     when JIRA_TICKET_COMMENT, AZURE_DEV_OPS_WORK_ITEM_COMMENT {
                         try {
-                            TicketingService service = new TicketingService(RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type), this.logger, this.shouldMarkForRecursionPrevention);
-                            TicketingService.TicketingServiceInputData data = new TicketingService.TicketingServiceInputData(this.recordId, action.fields);
+                            // Recursion prevention:
+                            // Internal Pharos Error logs created by ticketing comment failures must be marked with
+                            // ORIGINATED_FROM_NOTIFICATION_ERROR to avoid recursive rule execution.
+                            TicketingService service = new TicketingService(
+                                RuleUtil.MAP_ACTION_TYPES_BY_STRINGS.get(action.type),
+                                this.logger,
+                                true
+                            );
+                            TicketingService.TicketingServiceInputData data = new TicketingService.TicketingServiceInputData(
+                                this.recordId, 
+                                action.fields
+                            );
                             service.createTicketComment(data);
                             ticketId = 'comment';
                         }
                         catch(Exception e) {
                             this.logErrors.ticketingExceptions.put(this.recordId, e);
-                            // Mark with ORIGINATED_FROM_NOTIFICATION_ERROR only if parent is already a notification error (prevent recursion)
-                            logger?.add(logger.getInternalError(e, this.recordId, NotificationService.class.getName(), 'ticketingExceptions', shouldMarkForRecursionPrevention));
+                            logger?.add(logger.getInternalError(
+                                e,
+                                this.recordId,
+                                NotificationService.class.getName(),
+                                'ticketingExceptions',
+                                true
+                            ));
                         }
                     }
                 }
