@@ -3,7 +3,7 @@ public with sharing class DigestService {
     private static final String PREPARE_DIGEST_ENDPOINT = PharosChatController.CHAT_ENV_URL + '/prepare-digest';
     private static final String TEST_DIGEST_TITLE = 'Test_Digest';
 
-    public static String prepareDigest(Object data) {
+    public static Map<String, Object> prepareDigest(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         String prompt = (String) input.get('prompt');
 
@@ -14,7 +14,7 @@ public with sharing class DigestService {
         return prepareDigest(prompt, dateFrom, dateTo);
     }
 
-    public static String prepareDigest(String userPrompt, Date dateFrom, Date dateTo) {
+    public static Map<String, Object> prepareDigest(String userPrompt, Date dateFrom, Date dateTo) {
         try {
             // Send init-chat request to initialize OpenAI and get session_id
             String orgId = UserInfo.getOrganizationId();
@@ -34,16 +34,16 @@ public with sharing class DigestService {
             data.put('date_from', String.valueOf(dateFrom));
             data.put('date_to', String.valueOf(dateTo));
 
-            String response = HttpUtils.post(
+            HttpUtils.post(
                 PREPARE_DIGEST_ENDPOINT,
                 JSON.serialize(data),
                 HttpUtils.getHeadersWithApiKeyAndJson(),
                 200
             );
-            return response;
+            return new Map<String, Object>{'success' => true};
         } catch (Exception e) {
             Logger.getInstance().addInternalError(e, PharosChatController.class.getName(), 'prepareDigest');
-            return null;
+            return new Map<String, Object>{'success' => false, 'error' => e.getMessage()};
         }
     }
 
@@ -59,12 +59,6 @@ public with sharing class DigestService {
         }
         List<ContentDocument> documents = [SELECT Id FROM ContentDocument WHERE Id IN :docIds];
         DatabaseUtils.getInstance().performDeleteDML(documents, Schema.SObjectType.ContentDocument, true);
-    }
-
-    public static void setDigest(String ruleId, String digest) {
-        Rule__c rule = [SELECT Id, Digest__c FROM Rule__c WHERE Id = :ruleId];
-        rule.Digest__c = digest;
-        DatabaseUtils.getInstance().performUpdateDML(new List<Rule__c>{rule}, Schema.SObjectType.Rule__c, true);
     }
 
     public static void storeTestDigest(String digest) {
