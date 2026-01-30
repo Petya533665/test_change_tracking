@@ -7,7 +7,6 @@ public with sharing class AiEventTriggerHandler {
 				TestDataGenerator.createPlatformAIEventTest();
 			} else if (event.Method__c.equals(DigestService.DIGEST_METHOD)) {
 				if (event.Record_Id__c != null) {
-					DigestService.setDigest(event.Record_Id__c, event.Result__c);
 					//TODO: send notification
 				} else {
 					DigestService.storeTestDigest(event.Result__c);
