@@ -70,7 +70,7 @@ public with sharing class DigestService {
         DatabaseUtils.getInstance().performInsertDML(new List<ContentVersion>{contentVersion}, Schema.SObjectType.ContentVersion, true);
     }
 
-    public static String getTestDigest() {
+    public static Map<String, Object> getTestDigest() {
         List<ContentVersion> contentVersions = [
             SELECT Id, VersionData, ContentDocumentId
             FROM ContentVersion
@@ -78,11 +78,11 @@ public with sharing class DigestService {
             LIMIT 1
         ];
         if (contentVersions.isEmpty()) {
-            return null;
+            return new Map<String, Object>{'success' => false};
         }
         String result = contentVersions[0].VersionData.toString();
         Id docId = contentVersions[0].ContentDocumentId;
         DatabaseUtils.getInstance().performDeleteDML(new List<ContentDocument>{new ContentDocument(Id = docId)}, Schema.SObjectType.ContentDocument, true);
-        return result;
+        return new Map<String, Object>{'success' => true, 'result' => result};
     }
 }
