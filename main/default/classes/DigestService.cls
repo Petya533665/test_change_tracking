@@ -1,21 +1,31 @@
 public with sharing class DigestService {
     public static final String DIGEST_METHOD = 'digest';
     private static final String PREPARE_DIGEST_ENDPOINT = PharosChatController.CHAT_ENV_URL + '/prepare-digest';
-    private static final String TEST_DIGEST_TITLE = 'Test_Digest';
+    private static final String CACHE_KEY_TEST_DIGEST = 'TestDigest';
+    private static final Integer CACHE_TTL_SECONDS = 3600;
+
+    private static void clearTestDigestCache() {
+        Cache.OrgPartition partition = CacheUtils.getOrgPartition();
+        partition.put(CACHE_KEY_TEST_DIGEST, '', CACHE_TTL_SECONDS);
+    }
 
     public static Map<String, Object> prepareDigest(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         String prompt = (String) input.get('prompt');
+        String ruleId = (String) input.get('rule_id');
 
         // Expects frontend dates in yyyy-MM-dd format
         Date dateFrom = input.get('date_from') == null ? null : Date.valueOf((String) input.get('date_from'));
         Date dateTo = input.get('date_to') == null ? null : Date.valueOf((String) input.get('date_to'));
 
-        return prepareDigest(prompt, dateFrom, dateTo);
+        return prepareDigest(ruleId, prompt, dateFrom, dateTo);
     }
 
-    public static Map<String, Object> prepareDigest(String userPrompt, Date dateFrom, Date dateTo) {
+    public static Map<String, Object> prepareDigest(String ruleId, String userPrompt, Date dateFrom, Date dateTo) {
         try {
+            if (ruleId == null) {
+                clearTestDigestCache();
+            }
             // Send init-chat request to initialize OpenAI and get session_id
             String orgId = UserInfo.getOrganizationId();
             String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
@@ -25,10 +35,10 @@ public with sharing class DigestService {
                 dateTo = Date.today();
             }
             if (dateFrom == null) {
-                dateFrom = dateTo.addDays(-60);
+                dateFrom = dateTo.addDays(-7);
             }
 
-            Map<String, String> data = PharosChatController.getSendMessageData(null);
+            Map<String, String> data = PharosChatController.getSendMessageData(ruleId);
             data.put('session_id', orgId);
             data.put('prompt', userPrompt);
             data.put('date_from', String.valueOf(dateFrom));
@@ -47,42 +57,18 @@ public with sharing class DigestService {
         }
     }
 
-    private static void deleteOldTestDigestDocuments() {
-        List<ContentVersion> existingTestDigests = [
-            SELECT ContentDocumentId FROM ContentVersion
-            WHERE Title = :TEST_DIGEST_TITLE AND IsLatest = true
-        ];
-        if (existingTestDigests.isEmpty()) return;
-        Set<Id> docIds = new Set<Id>();
-        for (ContentVersion cv : existingTestDigests) {
-            docIds.add(cv.ContentDocumentId);
-        }
-        List<ContentDocument> documents = [SELECT Id FROM ContentDocument WHERE Id IN :docIds];
-        DatabaseUtils.getInstance().performDeleteDML(documents, Schema.SObjectType.ContentDocument, true);
-    }
-
     public static void storeTestDigest(String digest) {
-        deleteOldTestDigestDocuments();
-        ContentVersion contentVersion = new ContentVersion();
-        contentVersion.PathOnClient = TEST_DIGEST_TITLE + '.txt';
-        contentVersion.Title = TEST_DIGEST_TITLE;
-        contentVersion.VersionData = Blob.valueOf(digest);
-        DatabaseUtils.getInstance().performInsertDML(new List<ContentVersion>{contentVersion}, Schema.SObjectType.ContentVersion, true);
+        Cache.OrgPartition partition = CacheUtils.getOrgPartition();
+        CacheUtils.putCacheValue(partition, CACHE_KEY_TEST_DIGEST, digest, CACHE_TTL_SECONDS);
     }
 
     public static Map<String, Object> getTestDigest() {
-        List<ContentVersion> contentVersions = [
-            SELECT Id, VersionData, ContentDocumentId
-            FROM ContentVersion
-            WHERE Title = :TEST_DIGEST_TITLE AND IsLatest = true
-            LIMIT 1
-        ];
-        if (contentVersions.isEmpty()) {
-            return new Map<String, Object>{'success' => false};
+        Cache.OrgPartition partition = CacheUtils.getOrgPartition();
+        String result = (String) CacheUtils.getCacheValue(partition, CACHE_KEY_TEST_DIGEST);
+        if (String.isBlank(result)) {
+            return new Map<String, Object>{ 'success' => false };
         }
-        String result = contentVersions[0].VersionData.toString();
-        Id docId = contentVersions[0].ContentDocumentId;
-        DatabaseUtils.getInstance().performDeleteDML(new List<ContentDocument>{new ContentDocument(Id = docId)}, Schema.SObjectType.ContentDocument, true);
-        return new Map<String, Object>{'success' => true, 'result' => result};
+        clearTestDigestCache();
+        return new Map<String, Object>{ 'success' => true, 'result' => result };
     }
 }
