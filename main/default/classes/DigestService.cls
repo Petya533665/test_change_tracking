@@ -2,7 +2,7 @@ public with sharing class DigestService {
     public static final String DIGEST_METHOD = 'digest';
     public static final String TEST_DIGEST_PREFIX = 'TestDigest';
     private static final String PREPARE_DIGEST_ENDPOINT = PharosChatController.CHAT_ENV_URL + '/prepare-digest';
-    private static final Integer CACHE_TTL_SECONDS = 60;
+    private static final Integer CACHE_TTL_SECONDS = 300;
 
     public static Map<String, Object> prepareDigest(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
@@ -50,8 +50,7 @@ public with sharing class DigestService {
     }
 
     public static void storeTestDigest(String key, String digest) {
-        Cache.OrgPartition partition = CacheUtils.getOrgPartition();
-        CacheUtils.putCacheValue(partition, key, digest, CACHE_TTL_SECONDS);
+        CacheUtils.putCacheValue(key, digest, CACHE_TTL_SECONDS);
     }
 
     public static Map<String, Object> getTestDigest(Object data) {
@@ -62,6 +61,7 @@ public with sharing class DigestService {
         if (String.isBlank(result)) {
             return new Map<String, Object>{ 'success' => false };
         }
+        partition.remove(key);
         return new Map<String, Object>{ 'success' => true, 'result' => result };
     }
 }
