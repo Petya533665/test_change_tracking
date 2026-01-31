@@ -413,7 +413,7 @@ public with sharing class AdminController {
             } else if (method.equals('prepareDigest')) {
                 response.data = DigestService.prepareDigest(data);
             } else if (method.equals('getTestDigest')) {
-                response.data = DigestService.getTestDigest();
+                response.data = DigestService.getTestDigest(data);
             } else {
                 response.error = 'Action not found';
             }

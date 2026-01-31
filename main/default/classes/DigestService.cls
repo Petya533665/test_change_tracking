@@ -1,31 +1,23 @@
 public with sharing class DigestService {
     public static final String DIGEST_METHOD = 'digest';
+    public static final String TEST_DIGEST_PREFIX = 'TestDigest';
     private static final String PREPARE_DIGEST_ENDPOINT = PharosChatController.CHAT_ENV_URL + '/prepare-digest';
-    private static final String CACHE_KEY_TEST_DIGEST = 'TestDigest';
-    private static final Integer CACHE_TTL_SECONDS = 3600;
-
-    private static void clearTestDigestCache() {
-        Cache.OrgPartition partition = CacheUtils.getOrgPartition();
-        partition.put(CACHE_KEY_TEST_DIGEST, '', CACHE_TTL_SECONDS);
-    }
+    private static final Integer CACHE_TTL_SECONDS = 60;
 
     public static Map<String, Object> prepareDigest(Object data) {
         Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
         String prompt = (String) input.get('prompt');
-        String ruleId = (String) input.get('rule_id');
+        String ruleId = (String) input.get('ruleId');
 
         // Expects frontend dates in yyyy-MM-dd format
-        Date dateFrom = input.get('date_from') == null ? null : Date.valueOf((String) input.get('date_from'));
-        Date dateTo = input.get('date_to') == null ? null : Date.valueOf((String) input.get('date_to'));
+        Date dateFrom = input.get('dateFrom') == null ? null : Date.valueOf((String) input.get('dateFrom'));
+        Date dateTo = input.get('dateTo') == null ? null : Date.valueOf((String) input.get('dateTo'));
 
         return prepareDigest(ruleId, prompt, dateFrom, dateTo);
     }
 
     public static Map<String, Object> prepareDigest(String ruleId, String userPrompt, Date dateFrom, Date dateTo) {
         try {
-            if (ruleId == null) {
-                clearTestDigestCache();
-            }
             // Send init-chat request to initialize OpenAI and get session_id
             String orgId = UserInfo.getOrganizationId();
             String openAiKey = ConfigUtil.OPEN_AI_SETTINGS.Token__c;
@@ -57,18 +49,19 @@ public with sharing class DigestService {
         }
     }
 
-    public static void storeTestDigest(String digest) {
+    public static void storeTestDigest(String key, String digest) {
         Cache.OrgPartition partition = CacheUtils.getOrgPartition();
-        CacheUtils.putCacheValue(partition, CACHE_KEY_TEST_DIGEST, digest, CACHE_TTL_SECONDS);
+        CacheUtils.putCacheValue(partition, key, digest, CACHE_TTL_SECONDS);
     }
 
-    public static Map<String, Object> getTestDigest() {
+    public static Map<String, Object> getTestDigest(Object data) {
+        Map<String, Object> input = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(data));
+        String key = (String) input.get('key');
         Cache.OrgPartition partition = CacheUtils.getOrgPartition();
-        String result = (String) CacheUtils.getCacheValue(partition, CACHE_KEY_TEST_DIGEST);
+        String result = (String) CacheUtils.getCacheValue(partition, key);
         if (String.isBlank(result)) {
             return new Map<String, Object>{ 'success' => false };
         }
-        clearTestDigestCache();
         return new Map<String, Object>{ 'success' => true, 'result' => result };
     }
 }

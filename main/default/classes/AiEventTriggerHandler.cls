@@ -5,11 +5,11 @@ public with sharing class AiEventTriggerHandler {
 			AI_Event__e event = events.get(0);
 			if (event.Result__c.equals(TestDataGenerator.TEST_PLATFORM_EVENT_AI_EVENT_RESULT)) {
 				TestDataGenerator.createPlatformAIEventTest();
-			} else if (event.Method__c.equals(DigestService.DIGEST_METHOD)) {
-				if (event.Record_Id__c != null) {
-					//TODO: send notification
+			} else if (event.Method__c.equals(DigestService.DIGEST_METHOD) && event.Record_Id__c != null) {
+				if (event.Record_Id__c.startsWith(DigestService.TEST_DIGEST_PREFIX)) {
+					DigestService.storeTestDigest(event.Record_Id__c, event.Result__c);
 				} else {
-					DigestService.storeTestDigest(event.Result__c);
+					//TODO: send notification
 				}
 			}
 			return;
