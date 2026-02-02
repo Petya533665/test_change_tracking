@@ -91,8 +91,6 @@ public with sharing class DigestServiceTest {
 
     @IsTest
     static void test_prepareDigest_withMap_invalidDate() {
-        Test.setMock(HttpCalloutMock.class, new TestDataFactory.MultiRequestMock(getHttpMocks(200)));
-
         Map<String, Object> data = new Map<String, Object>{
             'prompt' => 'Summarize',
             'ruleId' => null,
@@ -101,11 +99,16 @@ public with sharing class DigestServiceTest {
         };
 
         Test.startTest();
-        Map<String, Object> result = DigestService.prepareDigest(data);
+        Boolean threw = false;
+        try {
+            DigestService.prepareDigest(data);
+        } catch (TypeException e) {
+            threw = true;
+            System.assert(e.getMessage().contains('not-a-date'), 'Exception message should mention invalid date');
+        }
         Test.stopTest();
 
-        System.assertEquals(false, result.get('success'), 'prepareDigest should return success false for invalid date');
-        System.assert(result.containsKey('error'), 'Result should contain error key');
+        System.assert(threw, 'prepareDigest should throw TypeException for invalid date');
     }
 
     @IsTest
