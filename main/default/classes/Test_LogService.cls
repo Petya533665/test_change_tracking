@@ -59,18 +59,24 @@ public class Test_LogService {
     public class TestException extends Exception {}
 
     public static void initSettings() {
+        initSettings(true);
+    }
+
+    public static void initSettings(Boolean createLoggerSettings) {
         Connected_Orgs_Settings__c connectedOrgsSettings = new Connected_Orgs_Settings__c(
             Client_Key__c = CONNECTED_ORG_SETTINGS_CLIENT_KEY,
             Client_Secret__c = CONNECTED_ORG_SETTINGS_CLIENT_SECRET
         );
         insert connectedOrgsSettings;
 
-        Logger_Settings__c settings = new Logger_Settings__c(
-            Email_Service_Address__c = LOGGER_SETTINGS_EMAIL_SERVICE_ADDRESS,
-            Debug__c = LOGGER_SETTINGS_DEBUG_MODE,
-            Web_2_Lead_Parser_Enabled__c = true
-        );
-        insert settings;
+        if (createLoggerSettings) {
+            Logger_Settings__c settings = new Logger_Settings__c(
+                Email_Service_Address__c = LOGGER_SETTINGS_EMAIL_SERVICE_ADDRESS,
+                Debug__c = LOGGER_SETTINGS_DEBUG_MODE,
+                Web_2_Lead_Parser_Enabled__c = true
+            );
+            insert settings;
+        }
         
         Connected_Org__c corg = new Connected_Org__c(
             Name = CONNECETED_ORG_NAME,

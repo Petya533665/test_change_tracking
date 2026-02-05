@@ -342,14 +342,45 @@ public with sharing class DatabaseUtils {
 		}
 	}
 
+	// Maximum hours a LogPostProcessingBatch job can run before being considered stuck
+    private static final Integer MAX_POST_PROCESSING_JOB_HOURS = 2;
+	private static final String POST_PROCESSING_JOB_ERROR_MESSAGE = 'Salesforce System Error';
+	private static final Set<String> apexClassNamesToCheckStuckJobs = new Set<String>{'LogPostProcessingBatch'};
+
+	public static List<AsyncApexJob> getStuckAsyncApexJobs(List<AsyncApexJob> jobs) {
+		List<AsyncApexJob> result = new List<AsyncApexJob>();
+
+		for (AsyncApexJob job : jobs) {
+			if (apexClassNamesToCheckStuckJobs.contains(job.ApexClass.Name) 
+				&& job.CreatedDate < DateTime.now().addHours(-MAX_POST_PROCESSING_JOB_HOURS)
+				&& job.Status == Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUS_PROCESSING
+				&& job.ExtendedStatus.contains(POST_PROCESSING_JOB_ERROR_MESSAGE)) {
+				
+				result.add(job);
+			}
+		}	
+		return result;
+	}
+
+	public static void abortStuckAsyncApexJobs(List<AsyncApexJob> jobs) {
+		for (AsyncApexJob job : jobs) {
+			try {
+				System.abortJob(job.Id);
+			} catch (Exception e) {
+				Logger.getInstance().internalError(e, null, true, DatabaseUtils.class.getName(), 'abortStuckAsyncApexJobs');
+			}
+		}
+	}
+
     public static List<AsyncApexJob> getCurrentJobs(List<String> apexClassNames) {
-        return [
-            SELECT Id
+        Integer limitJobs = (apexClassNames?.size() ?? 1);
+		return [
+            SELECT Id, CreatedDate, Status, ExtendedStatus, ApexClass.Name
             FROM AsyncApexJob
             WHERE Status IN :Constants.JOBS.ASYNC_APEX_JOB_PROCESS_STATUSES
             AND JobType NOT IN :Constants.JOBS.ASYNC_APEX_JOB_PROCESS_TYPES
             AND ApexClass.Name IN :apexClassNames
-            LIMIT 1
+            LIMIT :limitJobs
         ];
     }
 
@@ -369,6 +400,13 @@ public with sharing class DatabaseUtils {
 
 		if (!pharosBatch.isForceStart && !pharosBatch.isExecutionTime(jobNames[0])) return false;
 		if (!pharosBatch.initialValidation()) return false;
+
+		// check for stuck jobs and abort them
+		List<AsyncApexJob> currentJobs = getCurrentJobs(jobNames);
+		List<AsyncApexJob> stuckJobs = getStuckAsyncApexJobs(currentJobs);
+		if (!stuckJobs.isEmpty()) {
+			abortStuckAsyncApexJobs(stuckJobs);
+		}
 
 		// check duplicate jobs
 		if (!getCurrentJobs(jobNames).isEmpty()) return false;

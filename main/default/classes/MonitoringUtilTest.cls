@@ -6781,4 +6781,71 @@ public class MonitoringUtilTest {
         
         Test.stopTest();
     }
+
+    @IsTest
+    static void testLogPostProcessingBatch_48HourTimeLimit() {
+
+        Test_LogService.initSettings(false);
+
+        DateTime nowDateTime = ErrorEmailHandler.testCreatedAtDateTime;
+        
+        // Setup: Create logs before Test.startTest() with Post_Processing_Status__c already set
+        // to avoid triggering post-processing during insert
+        List<Log__c> logs = new List<Log__c>();
+
+        // Log created 24 hours ago (should be processed)
+        Log__c recentLog = new Log__c(
+            Summary__c = 'Recent Log',
+            Organization_Id__c = Test_LogService.CONNECETED_ORG_NAME,
+            Post_Processing_Status__c = LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED,
+            Created_At__c = nowDateTime
+        );
+        logs.add(recentLog);
+
+        // Log created 50 hours ago (should NOT be processed due to 48-hour limit)
+        Log__c oldLog = new Log__c(
+            Summary__c = 'Old Log',
+            Organization_Id__c = Test_LogService.CONNECETED_ORG_NAME,
+            Post_Processing_Status__c = LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED,
+            Created_At__c = nowDateTime.addHours(-50)
+        );
+        logs.add(oldLog);
+
+        LogTriggerHelper.runPostProcessingBatchInTest = false;
+        insert logs;
+
+        Test.startTest();
+
+        // run post processing batch in test context
+        LogTriggerHelper.runPostProcessingBatchInTest = true;
+
+        Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
+		endpoint2TestResp.putAll(Test_StackTraceParser.createPostProcessingMock(null, null, null));
+
+		TestDataFactory.MultiRequestMock multiCalloutMock = new TestDataFactory.MultiRequestMock(endpoint2TestResp);
+		Test.setMock(HttpCalloutMock.class, multiCalloutMock);
+
+        // Call the actual batch start method to test the 48-hour filter logic
+        LogPostProcessingBatch.getInstance().startBatch();
+
+        Test.stopTest();
+
+        // Query the logs after batch execution to verify post-processing status
+        recentLog = [SELECT Id, Post_Processing_Status__c FROM Log__c WHERE Id = :recentLog.Id];
+        oldLog = [SELECT Id, Post_Processing_Status__c FROM Log__c WHERE Id = :oldLog.Id];
+
+        // Verify the recent log was processed and completed
+        System.assertEquals(
+            LogPostProcessingService.POST_PROCESSING_STATUS_COMPLETED, 
+            recentLog.Post_Processing_Status__c, 
+            'Recent log should be processed and marked as Completed'
+        );
+
+        // Verify the old log was NOT processed due to 48-hour limit
+        System.assertEquals(
+            LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED, 
+            oldLog.Post_Processing_Status__c, 
+            'Old log (50 hours) should not be processed and remain as Needed'
+        );
+    }
 }
