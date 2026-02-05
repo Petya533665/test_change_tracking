@@ -923,6 +923,7 @@ public class JiraNotificationBatchTest {
 		Rule__c testRule = createIssuePagerDutyNotificationRule(pagerDutyType);
 
 		if (isUpdateCase) createRuleFilterOnUpdate(testRule);
+		PermissionsUtil.PagerDutyIntegrationEnabled = true;
 
 		Map<String, HttpCalloutMock> endpoint2TestResp = new Map<String, HttpCalloutMock>();
 		endpoint2TestResp.put(ConfigUtil.PAGER_DUTY_INCIDENT_ENDPOINT, createPagerDutyRequestIncidentMock());

@@ -2541,7 +2541,7 @@ public with sharing class RuleUtil {
 					Subtype__c = subtype,
 					Subject__c = subject,
 					PagerDuty_Type__c = pagerDutyType,
-					Team_Id__c = teamId != null ? teamId + (String.isNotBlank(boardId) ? ';' + boardId : '') : null,
+					Team_Id__c = teamId + (String.isNotBlank(boardId) ? ';' + boardId : ''),
 					Channel_Id__c = channelId,
 					SlackChannels__c = slackChannels,
 					EmailBody__c = emailBody,

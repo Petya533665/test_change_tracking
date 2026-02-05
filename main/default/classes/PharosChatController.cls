@@ -1,6 +1,5 @@
 public with sharing class PharosChatController {
-    // public static final String CHAT_ENV_URL = Constants.REMOTE_SITE_SETTINGS.AI_URL + '/chat';
-    public static final String CHAT_ENV_URL = 'https://oa9kb839ng.execute-api.us-east-2.amazonaws.com/production';
+    public static final String CHAT_ENV_URL = 'https://ai.pharos.ai/chat';
     public static final String CHAT_INIT_ENDPOINT = CHAT_ENV_URL + '/v2/init-chat';
     public static final String CHECK_NAMESPACE_STATUS_ENDPOINT = CHAT_ENV_URL + '/namespace-status';
     public static final String CHAT_WEBSOCKET_URL = 'wss://chat.pharos.ai';
@@ -89,7 +88,7 @@ public with sharing class PharosChatController {
         return errors;
     }
 
-    public static void sendInitChatRequest(String orgId, String openAiKey) {
+    private static void sendInitChatRequest(String orgId, String openAiKey) {
         String body = JSON.serialize(new Map<String, Object> {
             'session_id' => orgId,
             'openai_key' => openAiKey,
@@ -119,7 +118,6 @@ public with sharing class PharosChatController {
             'sf_instance' => System.Url.getOrgDomainUrl().toExternalForm(),
             'sf_namespace' => ConfigUtil.nameSpacePrefix,
             'sf_timezone_offset' => AdminService.getUserTimezoneOffset().toString(),
-            'sf_org_name' => UserInfo.getOrganizationName(),
             'record_id' => recordId,
             'change_tracking_enabled' => String.valueOf(changeTrackingEnabled),
             'git_enabled' => String.valueOf(gitEnabled)

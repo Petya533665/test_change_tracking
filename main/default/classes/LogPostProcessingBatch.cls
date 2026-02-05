@@ -28,10 +28,15 @@ public with sharing class LogPostProcessingBatch extends DatabaseUtils.PharosBat
         return instance;
     }
 
+    // Time limit for processing logs - only process logs created within last 48 hours
+    private static final Integer HOURS_TIME_LIMIT = 48;
+
     private LogPostProcessingBatch(Logger logger) {
         super(logger);
-        Integer logsWithStatusNeededCount = [SELECT COUNT() FROM Log__c WHERE Post_Processing_Status__c = :LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED AND Organization_Id__c != NULL LIMIT :QUERY_LIMIT];
-        Integer logsWithStatusExecutedCount = [SELECT COUNT() FROM Log__c WHERE Post_Processing_Status__c = :LogPostProcessingService.POST_PROCESSING_STATUS_EXECUTED AND Organization_Id__c != NULL LIMIT :QUERY_LIMIT];
+        DateTime timeLimit = DateTime.now().addHours(-HOURS_TIME_LIMIT);
+
+        Integer logsWithStatusNeededCount = [SELECT COUNT() FROM Log__c WHERE Post_Processing_Status__c = :LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED AND Organization_Id__c != NULL AND Created_At__c >= :timeLimit LIMIT :QUERY_LIMIT];
+        Integer logsWithStatusExecutedCount = [SELECT COUNT() FROM Log__c WHERE Post_Processing_Status__c = :LogPostProcessingService.POST_PROCESSING_STATUS_EXECUTED AND Organization_Id__c != NULL AND Created_At__c >= :timeLimit LIMIT :QUERY_LIMIT];
         if (logsWithStatusNeededCount > 0) {
             this.currentMode = BATCH_MODE.REGULAR_POST_PROCESSING;
         } else if (logsWithStatusExecutedCount > 0) {
@@ -48,18 +53,20 @@ public with sharing class LogPostProcessingBatch extends DatabaseUtils.PharosBat
     }
 
     public override Integer getIterationsCount() {
+        DateTime timeLimit = DateTime.now().addHours(-HOURS_TIME_LIMIT);
         if (currentMode == BATCH_MODE.REGULAR_POST_PROCESSING) {
-            return [SELECT COUNT() FROM Log__c WHERE Post_Processing_Status__c = :LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED AND Organization_Id__c != NULL LIMIT :QUERY_LIMIT];
+            return [SELECT COUNT() FROM Log__c WHERE Post_Processing_Status__c = :LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED AND Organization_Id__c != NULL AND Created_At__c >= :timeLimit LIMIT :QUERY_LIMIT];
         } else {
-            return [SELECT COUNT() FROM Log__c WHERE Post_Processing_Status__c = :LogPostProcessingService.POST_PROCESSING_STATUS_EXECUTED AND Organization_Id__c != NULL LIMIT :QUERY_LIMIT];
+            return [SELECT COUNT() FROM Log__c WHERE Post_Processing_Status__c = :LogPostProcessingService.POST_PROCESSING_STATUS_EXECUTED AND Organization_Id__c != NULL AND Created_At__c >= :timeLimit LIMIT :QUERY_LIMIT];
         }
     }
 
     public Database.QueryLocator start(Database.BatchableContext info) {
+        DateTime timeLimit = DateTime.now().addHours(-HOURS_TIME_LIMIT);
         List<String> logPostProcessingStatus = (this.currentMode == BATCH_MODE.REGULAR_POST_PROCESSING)
             ? new List<String>{LogPostProcessingService.POST_PROCESSING_STATUS_NEEDED}
             : new List<String>{LogPostProcessingService.POST_PROCESSING_STATUS_EXECUTED};
-        return Database.getQueryLocator([SELECT Id, Type__c, Organization_Id__c FROM Log__c WHERE Post_Processing_Status__c IN :logPostProcessingStatus AND Organization_Id__c != NULL LIMIT :QUERY_LIMIT]);
+        return Database.getQueryLocator([SELECT Id, Type__c, Organization_Id__c FROM Log__c WHERE Post_Processing_Status__c IN :logPostProcessingStatus AND Organization_Id__c != NULL AND Created_At__c >= :timeLimit LIMIT :QUERY_LIMIT]);
     }
 
     private Map<Id, List<Exception>> exceptionMap = new Map<Id, List<Exception>>();
