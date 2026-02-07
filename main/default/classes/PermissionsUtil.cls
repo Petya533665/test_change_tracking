@@ -892,7 +892,7 @@ public without sharing class PermissionsUtil {
 			if(MaxConnectedOrgs == null) {
 				MaxConnectedOrgs = FeatureMap2.get(MAP_FEATURE2_INDEX_BY_NAME.get(FP_MAX_CONNECTED_ORGS));
 			}
-			return MaxConnectedOrgs;
+			return 100;
 		}
 		private set;
 	}
