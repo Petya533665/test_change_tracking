@@ -410,6 +410,10 @@ public with sharing class AdminController {
                 response.data = HoltwintersForecastController.getForecastSetting();
             } else if (method.equals('setForecastSetting')) {
                 response.data = HoltwintersForecastController.updateForecastSetting((String)request.get('data'));
+            } else if (method.equals('prepareDigest')) {
+                response.data = DigestService.prepareDigest(data);
+            } else if (method.equals('getTestDigest')) {
+                response.data = DigestService.getTestDigest(data);
             } else {
                 response.error = 'Action not found';
             }

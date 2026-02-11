@@ -88,7 +88,7 @@ public with sharing class PharosChatController {
         return errors;
     }
 
-    private static void sendInitChatRequest(String orgId, String openAiKey) {
+    public static void sendInitChatRequest(String orgId, String openAiKey) {
         String body = JSON.serialize(new Map<String, Object> {
             'session_id' => orgId,
             'openai_key' => openAiKey,
@@ -118,6 +118,7 @@ public with sharing class PharosChatController {
             'sf_instance' => System.Url.getOrgDomainUrl().toExternalForm(),
             'sf_namespace' => ConfigUtil.nameSpacePrefix,
             'sf_timezone_offset' => AdminService.getUserTimezoneOffset().toString(),
+            'sf_org_name' => UserInfo.getOrganizationName(),
             'record_id' => recordId,
             'change_tracking_enabled' => String.valueOf(changeTrackingEnabled),
             'git_enabled' => String.valueOf(gitEnabled)
