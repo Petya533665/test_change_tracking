@@ -1,8 +1,3 @@
-/**
- * Unit tests for DigestService.
- * @author Cursor
- * @since 1.0
- */
 @IsTest
 public with sharing class DigestServiceTest {
 
